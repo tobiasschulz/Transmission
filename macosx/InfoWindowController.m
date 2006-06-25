@@ -38,9 +38,9 @@
 #define TAB_FILES_IDENT @"Files"
 
 //15 spacing at the bottom of each tab
-#define TAB_INFO_HEIGHT 182.0
-#define TAB_ACTIVITY_HEIGHT 198.0
-#define TAB_OPTIONS_HEIGHT 116.0
+#define TAB_INFO_HEIGHT 185.0
+#define TAB_ACTIVITY_HEIGHT 199.0
+#define TAB_OPTIONS_HEIGHT 82.0
 #define TAB_FILES_HEIGHT 250.0
 
 @interface InfoWindowController (Private)
@@ -189,23 +189,6 @@
     
     [fFileTable deselectAll: nil];
     [fFileTable reloadData];
-    
-    //set wait to start
-    if (numberSelected == 1)
-    {
-        #warning make work for multiple torrents
-        Torrent * torrent = [fTorrents objectAtIndex: 0];
-        [fWaitToStartButton setState: [torrent waitingToStart]];
-        
-        #warning disable if actively downloading or finished
-        [fWaitToStartButton setEnabled:
-            [[[NSUserDefaults standardUserDefaults] stringForKey: @"StartSetting"] isEqualToString: @"Wait"]];
-    }
-    else
-    {
-        [fWaitToStartButton setState: NSOffState];
-        [fWaitToStartButton setEnabled: NO];
-    }
     
     //set ratio settings
     if (numberSelected > 0)
@@ -425,10 +408,11 @@
 
 - (void) setRatioCheck: (id) sender
 {
-    int ratioSetting, tag = [[fRatioMatrix selectedCell] tag];
-    if (tag == RATIO_CHECK_TAG)
+    NSButtonCell * selected = [fRatioMatrix selectedCell];
+    int ratioSetting;
+    if (selected == [fRatioMatrix cellWithTag: RATIO_CHECK_TAG])
         ratioSetting = RATIO_CHECK;
-    else if (tag == RATIO_NO_CHECK_TAG)
+    else if (selected == [fRatioMatrix cellWithTag: RATIO_NO_CHECK_TAG])
         ratioSetting = RATIO_NO_CHECK;
     else
         ratioSetting = RATIO_GLOBAL;
@@ -439,7 +423,7 @@
         [torrent setStopRatioSetting: ratioSetting];
     
     [self setRatioLimit: fRatioLimitField];
-    [fRatioLimitField setEnabled: tag == RATIO_CHECK_TAG];
+    [fRatioLimitField setEnabled: selected == [fRatioMatrix cellWithTag: RATIO_CHECK_TAG]];
 }
 
 - (void) setRatioLimit: (id) sender
@@ -467,15 +451,6 @@
         while ((torrent = [enumerator nextObject]))
             [torrent setRatioLimit: ratioLimit];
     }
-}
-
-- (void) setWaitToStart: (id) sender
-{
-    #warning make work with multiples
-    Torrent * torrent = [fTorrents objectAtIndex: 0];
-    [torrent setWaitToStart: [sender state]];
-    
-    [[NSNotificationCenter defaultCenter] postNotificationName: @"TorrentStartSettingChange" object: torrent];
 }
 
 @end

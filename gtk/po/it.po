@@ -1,25 +1,25 @@
 # $Id$
 #
-# translation of it.po to Italiano
+# translation of it.utf8.po to Italiano
 # Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
 # This file is distributed under the same license as the PACKAGE package.
 #
 # Calorì Alessandro <lex82@fastwebnet.it>, 2006.
 msgid ""
 msgstr ""
-"Project-Id-Version: it\n"
+"Project-Id-Version: it.utf8\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2006-06-18 00:33-0700\n"
-"PO-Revision-Date: 2006-06-22 12:04+0100\n"
+"POT-Creation-Date: 2006-04-25 00:28-0700\n"
+"PO-Revision-Date: 2006-04-14 18:02+0200\n"
 "Last-Translator: Calorì Alessandro <lex82@fastwebnet.it>\n"
 "Language-Team: Italiano\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
-"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+"Plural-Forms:  nplurals=2; plural=(n != 1);\n"
 "X-Generator: KBabel 1.11.2\n"
 
-#: conf.c:95 conf.c:374
+#: conf.c:87
 #, c-format
 msgid ""
 "Failed to open the file %s for writing:\n"
@@ -28,12 +28,12 @@ msgstr ""
 "Impossibile aprire il file %s in scrittura:\n"
 "%s"
 
-#: conf.c:110
+#: conf.c:102
 #, c-format
 msgid "Another copy of %s is already running."
 msgstr "Un'altra istanza di %s è in esecuzione."
 
-#: conf.c:113
+#: conf.c:105
 #, c-format
 msgid ""
 "Failed to lock the file %s:\n"
@@ -42,7 +42,7 @@ msgstr ""
 "Impossibile bloccare il file %s:\n"
 "%s"
 
-#: conf.c:136 dialogs.c:137
+#: conf.c:128 dialogs.c:213 main.c:1130
 #, c-format
 msgid ""
 "Failed to create the directory %s:\n"
@@ -51,7 +51,7 @@ msgstr ""
 "Impossibile creare la cartella %s:\n"
 "%s"
 
-#: conf.c:209
+#: conf.c:197 conf.c:370
 #, c-format
 msgid ""
 "Failed to open the file %s for reading:\n"
@@ -60,7 +60,7 @@ msgstr ""
 "Impossibile aprire il file %s in lettura:\n"
 "%s"
 
-#: conf.c:216
+#: conf.c:216 conf.c:389
 #, c-format
 msgid ""
 "Error while reading from the file %s:\n"
@@ -69,7 +69,16 @@ msgstr ""
 "Si è verificato un errore durante la lettura del file %s:\n"
 "%s"
 
-#: conf.c:388
+#: conf.c:280 conf.c:491
+#, c-format
+msgid ""
+"Failed to open or lock the file %s:\n"
+"%s"
+msgstr ""
+"Impossibile aprire o bloccare il file %s:\n"
+"%s"
+
+#: conf.c:300 conf.c:533
 #, c-format
 msgid ""
 "Error while writing to the file %s:\n"
@@ -78,7 +87,7 @@ msgstr ""
 "Si è verificato un errore durante la scrittura del file %s:\n"
 "%s"
 
-#: conf.c:394
+#: conf.c:307 conf.c:540
 #, c-format
 msgid ""
 "Failed to rename the file %s to %s:\n"
@@ -87,136 +96,112 @@ msgstr ""
 "Impossibile rinominare il file %s in %s:\n"
 "%s"
 
-#: dialogs.c:174
+#: dialogs.c:77
 #, c-format
 msgid "%s Preferences"
 msgstr "%s Preferenze"
 
-#: dialogs.c:183 dialogs.c:407
+#: dialogs.c:86 dialogs.c:301
+#, fuzzy
 msgid "Choose a download directory"
 msgstr "Scegli una cartella di destinazione"
 
-#: dialogs.c:192
+#: dialogs.c:94
 msgid "_Limit download speed"
 msgstr "_Limita la velocità di ricezione"
 
-#: dialogs.c:194
+#: dialogs.c:96
 msgid "Maximum _download speed:"
 msgstr "Velocità di _ricezione massima:"
 
-#: dialogs.c:196
+#: dialogs.c:98
 msgid "Li_mit upload speed"
 msgstr "Li_mita la velocità di invio"
 
-#: dialogs.c:198
+#: dialogs.c:100
 msgid "Maximum _upload speed:"
 msgstr "Velocità massima di _invio:"
 
 #. directory label and chooser
-#: dialogs.c:246
+#: dialogs.c:152
 msgid "Download di_rectory:"
 msgstr "Ca_rtella di destinazione:"
 
 #. port label and entry
-#: dialogs.c:255
+#: dialogs.c:162
 msgid "Listening _port:"
 msgstr "_Porta d'ascolto:"
 
-#: dialogs.c:268
-msgid "Use the torrent file where it is"
-msgstr "Usa il torrent e lascialo dov'è"
-
-#: dialogs.c:271
-msgid "Keep a copy of the torrent file"
-msgstr "Crea una copia del file torrent"
-
-#: dialogs.c:274
-msgid "Keep a copy and remove the original"
-msgstr "Crea una copia e rimuovi l'originale"
-
-#. std
-#: dialogs.c:277
-msgid "For torrents added _normally:"
-msgstr "Per i torrent aggiunti _normalmente:"
-
-#: dialogs.c:291
-msgid ""
-"For torrents added e_xternally\n"
-"(via the command-line):"
-msgstr ""
-"Per i torrent aggiunti e_sternamente:\n"
-"(tramite la linea di comando):"
-
-#: dialogs.c:394
+#: dialogs.c:288
 msgid "Add a Torrent"
 msgstr "Aggiungi un nuovo torrent"
 
-#: dialogs.c:401
+#: dialogs.c:295
 msgid "Automatically _start torrent"
 msgstr "Avvia automaticamente que_sto torrent"
 
-#: dialogs.c:403
+#: dialogs.c:297
 msgid "Use alternate _download directory"
 msgstr "Usa una cartella di _destinazione diversa"
 
-#: dialogs.c:432
+#: dialogs.c:327
 msgid "Torrent files"
-msgstr "File torrent"
+msgstr "File Torrent"
 
-#: dialogs.c:434
+#: dialogs.c:329
 msgid "All files"
 msgstr "Tutti i file"
 
-#: dialogs.c:542
+#: dialogs.c:432
 #, c-format
 msgid "%s Properties"
 msgstr "%s Proprietà"
 
-#: dialogs.c:567 dialogs.c:570
+#: dialogs.c:457 dialogs.c:460
 msgid "Tracker:"
 msgstr "Tracker:"
 
-#: dialogs.c:572
+#: dialogs.c:462
 msgid "Announce:"
 msgstr "Annuncio:"
 
-#: dialogs.c:573
+#: dialogs.c:463
 msgid "Piece Size:"
 msgstr "Dim. pezzo:"
 
-#: dialogs.c:574
+#: dialogs.c:464
 msgid "Pieces:"
 msgstr "Pezzi:"
 
-#: dialogs.c:575
+#: dialogs.c:465
 msgid "Total Size:"
 msgstr "Dim. totale:"
 
-#: dialogs.c:577 dialogs.c:579
+#: dialogs.c:467 dialogs.c:469
 msgid "Seeders:"
 msgstr "Fonti complete:"
 
-#: dialogs.c:577 dialogs.c:581
+#: dialogs.c:467 dialogs.c:471
 msgid "?"
-msgstr "?"
+msgstr ""
 
-#: dialogs.c:581 dialogs.c:583
+#: dialogs.c:471 dialogs.c:473
 msgid "Leechers:"
 msgstr "Fonti parziali:"
 
-#: dialogs.c:587
+#: dialogs.c:477
 msgid "Directory:"
 msgstr "Cartella:"
 
-#: dialogs.c:588
+#: dialogs.c:478
 msgid "Downloaded:"
 msgstr "Dati scaricati:"
 
-#: dialogs.c:589
+#: dialogs.c:479
 msgid "Uploaded:"
 msgstr "Dati inviati:"
 
-#: ipc.c:208
+#: ipc.c:209
 #, c-format
 msgid ""
 "Failed to set up socket:\n"
@@ -225,129 +210,143 @@ msgstr ""
 "Impossibile creare il socket:\n"
 "%s"
 
-#: ipc.c:229
+#: ipc.c:230
 #, c-format
+#, fuzzy
 msgid "failed to create socket: %s\n"
-msgstr "impossibile creare il socket: %s\n"
+msgstr ""
 
-#: ipc.c:238
+#: ipc.c:239
 #, c-format
+#, fuzzy
 msgid "failed to connect to %s: %s\n"
-msgstr "impossibile connettersi a %s: %s\n"
+msgstr ""
 
-#: ipc.c:403
+#: ipc.c:400 main.c:366 main.c:663 main.c:1142
+#, c-format
+msgid "Failed to load the torrent file %s"
+msgid_plural ""
+"Failed to load the torrent files:\n"
+"%s"
+msgstr[0] "Impossibile caricare il file torrent %s"
+msgstr[1] ""
+"Impossibile caricare i file torrent:\n"
+"%s"
+
+#: ipc.c:418
 #, c-format
 msgid "bad IPC protocol version\n"
-msgstr "versione errata del protocollo IPC\n"
+msgstr ""
 
-#: main.c:150
+#: main.c:168
 msgid "Add"
 msgstr "Aggiungi"
 
-#: main.c:151
+#: main.c:169
 msgid "Add a new torrent"
 msgstr "Aggiungi un nuovo torrent"
 
-#: main.c:152
+#: main.c:170
 msgid "Start"
 msgstr "Avvia"
 
-#: main.c:154
+#: main.c:172
 msgid "Start a torrent that is not running"
 msgstr "Avvia un torrent che è stato interrotto"
 
-#: main.c:155
+#: main.c:173
 msgid "Stop"
 msgstr "Interrompi"
 
-#: main.c:157
+#: main.c:175
 msgid "Stop a torrent that is running"
 msgstr "Interrompe un torrent che è stato avviato"
 
-#: main.c:158
+#: main.c:176
 msgid "Remove"
 msgstr "Rimuovi"
 
-#: main.c:159
+#: main.c:177
 msgid "Remove a torrent"
 msgstr "Rimuovi un torrent"
 
-#: main.c:160
+#: main.c:178
 msgid "Properties"
 msgstr "Proprietà"
 
-#: main.c:161
+#: main.c:179
 msgid "Show additional information about a torrent"
 msgstr "Mostra informazioni aggiuntive su un torrent"
 
-#: main.c:162
+#: main.c:180
 msgid "Preferences"
 msgstr "Preferenze"
 
-#: main.c:163
+#: main.c:181
 msgid "Customize application behavior"
 msgstr "Personalizza il comportamento dell'applicazione"
 
-#: main.c:200
+#: main.c:219
 msgid "Transmission"
 msgstr "Transmission"
 
-#: main.c:453
+#: main.c:459
 msgid "Name"
 msgstr "Nome"
 
 #. this string is only used to determing the size of the progress bar
-#: main.c:461
+#: main.c:466
 msgid "  fnord    fnord  "
 msgstr "  fnord    fnord  "
 
-#: main.c:464
+#: main.c:469
 msgid "Progress"
 msgstr "Avanzamento"
 
-#: main.c:700
+#: main.c:740
 #, c-format
 msgid "Checking existing files (%.1f%%)"
-msgstr "Controllo i file esistenti (%.1f%%)"
+msgstr "Controllo dei file esistenti (%.1f%%)"
 
-#: main.c:703
+#: main.c:743
 #, c-format
 msgid "Finishing in --:--:-- (%.1f%%)"
 msgstr "Completamento tra --:--:-- (%.1f%%)"
 
-#: main.c:705
+#: main.c:745
 #, c-format
 msgid "Finishing in %02i:%02i:%02i (%.1f%%)"
 msgstr "Completamento tra %02i:%02i:%02i (%.1f%%)"
 
-#: main.c:709
+#: main.c:749
 #, c-format
+#, fuzzy
 msgid "Seeding, uploading to %d of %d peer"
 msgid_plural "Seeding, uploading to %d of %d peers"
 msgstr[0] "Completato, invio a %d utente (%d disponibili)"
 msgstr[1] "Completato, invio a %d utenti (%d disponibili)"
 
-#: main.c:713
+#: main.c:753
 msgid "Stopping..."
 msgstr "Interruzione in corso..."
 
-#: main.c:715
+#: main.c:755
 #, c-format
 msgid "Stopped (%.1f%%)"
 msgstr "Interrotto (%.1f%%)"
 
-#: main.c:723
+#: main.c:763
 msgid "Error: "
 msgstr "Errore: "
 
-#: main.c:727
+#: main.c:767
 #, c-format
 msgid "Downloading from %i of %i peer"
 msgid_plural "Downloading from %i of %i peers"
 msgstr[0] "Ricezione da %i utente (%i disponibili)"
 msgstr[1] "Ricezione da %i utenti (%i disponibili)"
 
-#: main.c:761
+#: main.c:800
 #, c-format
 msgid ""
 "Ratio: %s\n"
@@ -356,7 +355,7 @@ msgstr ""
 "Rapporto: %s\n"
 "Dati inviati: %s/s"
 
-#: main.c:764
+#: main.c:803
 #, c-format
 msgid ""
 "DL: %s/s\n"
@@ -365,68 +364,63 @@ msgstr ""
 "Dati ricev.: %s/s\n"
 "Dati inviati: %s/s"
 
-#: main.c:810
+#: main.c:849
 #, c-format
 msgid "     Total DL: %s/s     Total UL: %s/s"
 msgstr "     Velocità di ricezione: %s/s     Velocità d'invio: %s/s"
 
-#: main.c:1081
-#, c-format
-msgid ""
-"Failed to load torrent file:\n"
-"%s"
-msgid_plural ""
-"Failed to load torrent files:\n"
-"%s"
-msgstr[0] "Impossibile caricare il file torrent %s"
-msgstr[1] ""
-"Impossibile caricare i file torrent:\n"
-"%s"
+#: main.c:1118
+msgid "not a valid torrent file"
+msgstr "il file torrent non è valido"
 
-#: tr_torrent.c:290
-#, c-format
-msgid "%s: not a valid torrent file"
-msgstr "%s: il file torrent non è valido"
+#: main.c:1119
+msgid "torrent is already open"
+msgstr "il file torrent è già aperto"
 
-#: tr_torrent.c:293
+#: main.c:1144
 #, c-format
-msgid "%s: torrent is already open"
-msgstr "%s: il file torrent è già aperto"
+msgid "Failed to load the torrent file %s: %s"
+msgstr "Impossibile caricare il file torrent %s: %s"
 
-#: util.c:67
+#: main.c:1150
+#, c-format
+msgid "%s (%s)"
+msgstr "%s (%s)"
+
+#: util.c:64
 msgid "B"
 msgstr "B"
 
-#: util.c:67
+#: util.c:64
 msgid "KiB"
 msgstr "KiB"
 
-#: util.c:67
+#: util.c:64
 msgid "MiB"
 msgstr "MiB"
 
-#: util.c:67
+#: util.c:64
 msgid "GiB"
 msgstr "GiB"
 
-#: util.c:67
+#: util.c:64
 msgid "TiB"
 msgstr "TiB"
 
-#: util.c:67
+#: util.c:64
 msgid "PiB"
 msgstr "PiB"
 
-#: util.c:67
+#: util.c:64
 msgid "EiB"
 msgstr "EiB"
 
-#: util.c:92
+#: util.c:89
 msgid "N/A"
 msgstr "N/D"
 
 #. this is a UTF-8 infinity symbol
-#: util.c:96
+#: util.c:93
 msgid "∞"
 msgstr "∞"
 
