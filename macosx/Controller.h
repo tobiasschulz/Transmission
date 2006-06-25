@@ -59,8 +59,8 @@
     IBOutlet NSTextField        * fTotalTorrentsField;
     
     NSString                    * fSortType;
-    IBOutlet NSMenuItem         * fNameSortItem, * fStateSortItem, * fProgressSortItem,
-                                * fDateSortItem, * fOrderSortItem;
+    IBOutlet NSMenuItem         * fNameSortItem, * fStateSortItem,
+                                * fProgressSortItem, * fDateSortItem;
                                 
     IBOutlet NSMenuItem         * fNextInfoTabItem, * fPrevInfoTabItem;
     
@@ -131,15 +131,7 @@
 - (void) setRatioGlobalEnabled: (id) sender;
 - (void) setQuickRatioGlobal: (id) sender;
 - (void) ratioGlobalChange: (NSNotification *) notification;
-
-- (void) checkWaitingForStopped: (NSNotification *) notification;
-- (void) checkWaitingForFinished: (Torrent *) finishedTorrent;
-- (void) torrentStartSettingChange: (NSNotification *) notification;
-- (void) globalStartSettingChange: (NSNotification *) notification;
-
-- (void) attemptToStartAuto: (Torrent *) torrent;
-
-- (void) reloadInspector: (NSNotification *) notification;
+- (void) ratioSingleChange: (NSNotification *) notification;
 
 - (void) sleepCallBack: (natural_t) messageType argument:
                         (void *) messageArgument;

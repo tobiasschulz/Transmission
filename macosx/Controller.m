@@ -168,10 +168,8 @@ static void sleepCallBack(void * controller, io_service_t y,
         currentSortItem = fStateSortItem;
     else if ([fSortType isEqualToString: @"Progress"])
         currentSortItem = fProgressSortItem;
-    else if ([fSortType isEqualToString: @"Date"])
-        currentSortItem = fDateSortItem;
     else
-        currentSortItem = fOrderSortItem;
+        currentSortItem = fDateSortItem;
     [currentSortItem setState: NSOnState];
     
     //set upload limit action button
@@ -205,27 +203,14 @@ static void sleepCallBack(void * controller, io_service_t y,
                     name: SUUpdaterWillRestartNotification object: nil];
     fUpdateInProgress = NO;
     
+    [nc addObserver: self selector: @selector(ratioSingleChange:)
+                    name: @"TorrentRatioChanged" object: nil];
+    
     [nc addObserver: self selector: @selector(limitGlobalChange:)
                     name: @"LimitGlobalChange" object: nil];
     
     [nc addObserver: self selector: @selector(ratioGlobalChange:)
                     name: @"RatioGlobalChange" object: nil];
-    
-    //check to start another because of stopped torrent
-    [nc addObserver: self selector: @selector(checkWaitingForStopped:)
-                    name: @"StoppedDownloading" object: nil];
-    
-    //check all torrents for starting
-    [nc addObserver: self selector: @selector(globalStartSettingChange:)
-                    name: @"GlobalStartSettingChange" object: nil];
-
-    //check if torrent should now start
-    [nc addObserver: self selector: @selector(torrentStartSettingChange:)
-                    name: @"TorrentStartSettingChange" object: nil];
-    
-    //change that just impacts the inspector
-    [nc addObserver: self selector: @selector(reloadInspector:)
-                    name: @"TorrentSettingChange" object: nil];
 
     //timer to update the interface
     fCompleted = 0;
@@ -242,7 +227,7 @@ static void sleepCallBack(void * controller, io_service_t y,
     //show windows
     [fWindow makeKeyAndOrderFront: nil];
 
-    [self reloadInspector: nil];
+    [fInfoController updateInfoForTorrents: [self torrentsAtIndexes: [fTableView selectedRowIndexes]]];
     if ([fDefaults boolForKey: @"InfoVisible"])
         [self showInfo: nil];
 }
@@ -333,9 +318,9 @@ static void sleepCallBack(void * controller, io_service_t y,
     if (code == NSOKButton)
     {
         [torrent setDownloadFolder: [[openPanel filenames] objectAtIndex: 0]];
-        [self attemptToStartAuto: torrent];
+        if ([fDefaults boolForKey: @"AutoStartDownload"])
+            [torrent startTransfer];
         [fTorrents addObject: torrent];
-        [torrent update];
         
         [self torrentNumberChanged];
     }
@@ -343,8 +328,11 @@ static void sleepCallBack(void * controller, io_service_t y,
     [NSApp stopModal];
 }
 
-- (void) application: (NSApplication *) sender openFiles: (NSArray *) filenames
+- (void) application: (NSApplication *) sender
+         openFiles: (NSArray *) filenames
 {
+    BOOL autoStart = [fDefaults boolForKey: @"AutoStartDownload"];
+    
     NSString * downloadChoice = [fDefaults stringForKey: @"DownloadChoice"], * torrentPath;
     Torrent * torrent;
     NSEnumerator * enumerator = [filenames objectEnumerator];
@@ -353,7 +341,7 @@ static void sleepCallBack(void * controller, io_service_t y,
         if (!(torrent = [[Torrent alloc] initWithPath: torrentPath lib: fLib]))
             continue;
 
-        //add it to the "File > Open Recent" menu
+        /* Add it to the "File > Open Recent" menu */
         [[NSDocumentController sharedDocumentController]
             noteNewRecentDocumentURL: [NSURL fileURLWithPath: torrentPath]];
 
@@ -382,9 +370,9 @@ static void sleepCallBack(void * controller, io_service_t y,
                 : [torrentPath stringByDeletingLastPathComponent];
 
             [torrent setDownloadFolder: folder];
-            [self attemptToStartAuto: torrent];
+            if (autoStart)
+                [torrent startTransfer];
             [fTorrents addObject: torrent];
-            [torrent update];
         }
         
         [torrent release];
@@ -478,7 +466,6 @@ static void sleepCallBack(void * controller, io_service_t y,
         [[fTorrents objectAtIndex: i] startTransfer];
     
     [self updateUI: nil];
-    [self reloadInspector: nil];
     [self updateTorrentHistory];
 }
 
@@ -495,20 +482,11 @@ static void sleepCallBack(void * controller, io_service_t y,
 
 - (void) stopTorrentWithIndex: (NSIndexSet *) indexSet
 {
-    //don't want any of these starting then stopping
     unsigned int i;
-    Torrent * torrent;
-    for (i = [indexSet firstIndex]; i != NSNotFound; i = [indexSet indexGreaterThanIndex: i])
-    {
-        torrent = [fTorrents objectAtIndex: i];
-        [torrent setWaitToStart: NO];
-    }
-
     for (i = [indexSet firstIndex]; i != NSNotFound; i = [indexSet indexGreaterThanIndex: i])
         [[fTorrents objectAtIndex: i] stopTransfer];
     
     [self updateUI: nil];
-    [self reloadInspector: nil];
     [self updateTorrentHistory];
 }
 
@@ -524,7 +502,7 @@ static void sleepCallBack(void * controller, io_service_t y,
         if ([torrent isActive])
             active++;
 
-    if (active > 0 && [fDefaults boolForKey: @"CheckRemove"])
+    if( active > 0 && [fDefaults boolForKey: @"CheckRemove"] )
     {
         NSDictionary * dict = [[NSDictionary alloc] initWithObjectsAndKeys:
             torrents, @"Torrents",
@@ -582,15 +560,8 @@ static void sleepCallBack(void * controller, io_service_t y,
 - (void) confirmRemove: (NSArray *) torrents
         deleteData: (BOOL) deleteData deleteTorrent: (BOOL) deleteTorrent
 {
-    //don't want any of these starting then stopping
-    NSEnumerator * enumerator = [torrents objectEnumerator];
     Torrent * torrent;
-    while ((torrent = [enumerator nextObject]))
-        [torrent setWaitToStart: NO];
-
-    NSNumber * lowestOrderValue = [NSNumber numberWithInt: [torrents count]], * currentOrederValue;
-
-    enumerator = [torrents objectEnumerator];
+    NSEnumerator * enumerator = [torrents objectEnumerator];
     while ((torrent = [enumerator nextObject]))
     {
         [torrent stopTransfer];
@@ -599,31 +570,11 @@ static void sleepCallBack(void * controller, io_service_t y,
             [torrent trashData];
         if (deleteTorrent)
             [torrent trashTorrent];
-        
-        //determine lowest order value
-        currentOrederValue = [torrent orderValue];
-        if ([lowestOrderValue compare: currentOrederValue] == NSOrderedDescending)
-            lowestOrderValue = currentOrederValue;
 
         [torrent removeForever];
         [fTorrents removeObject: torrent];
     }
     [torrents release];
-
-    //reset the order values if necessary
-    if ([lowestOrderValue intValue] < [fTorrents count])
-    {
-        NSSortDescriptor * orderDescriptor = [[[NSSortDescriptor alloc] initWithKey:
-                                                @"orderValue" ascending: YES] autorelease];
-        NSArray * descriptors = [[NSArray alloc] initWithObjects: orderDescriptor, nil];
-
-        NSArray * tempTorrents = [fTorrents sortedArrayUsingDescriptors: descriptors];
-        [descriptors release];
-
-        int i;
-        for (i = [lowestOrderValue intValue]; i < [tempTorrents count]; i++)
-            [[tempTorrents objectAtIndex: i] setOrderValue: i];
-    }
     
     [self torrentNumberChanged];
     [fTableView deselectAll: nil];
@@ -757,8 +708,6 @@ static void sleepCallBack(void * controller, io_service_t y,
 
         if ([torrent justFinished])
         {
-            [self checkWaitingForFinished: torrent];
-        
             //notifications
             [self notifyGrowl: [torrent name]];
             if (![fWindow isKeyWindow])
@@ -812,12 +761,12 @@ static void sleepCallBack(void * controller, io_service_t y,
 
     NSSortDescriptor * nameDescriptor = [[[NSSortDescriptor alloc] initWithKey:
                                             @"name" ascending: YES] autorelease],
-                    * orderDescriptor = [[[NSSortDescriptor alloc] initWithKey:
-                                            @"orderValue" ascending: YES] autorelease];
+                    * dateDescriptor = [[[NSSortDescriptor alloc] initWithKey:
+                                            @"date" ascending: YES] autorelease];
 
     NSArray * descriptors;
     if ([fSortType isEqualToString: @"Name"])
-        descriptors = [[NSArray alloc] initWithObjects: nameDescriptor, orderDescriptor, nil];
+        descriptors = [[NSArray alloc] initWithObjects: nameDescriptor, dateDescriptor, nil];
     else if ([fSortType isEqualToString: @"State"])
     {
         NSSortDescriptor * stateDescriptor = [[[NSSortDescriptor alloc] initWithKey:
@@ -826,24 +775,17 @@ static void sleepCallBack(void * controller, io_service_t y,
                                             @"progressSortKey" ascending: NO] autorelease];
         
         descriptors = [[NSArray alloc] initWithObjects: stateDescriptor, progressDescriptor,
-                                                            nameDescriptor, orderDescriptor, nil];
+                                                            nameDescriptor, dateDescriptor, nil];
     }
     else if ([fSortType isEqualToString: @"Progress"])
     {
         NSSortDescriptor * progressDescriptor = [[[NSSortDescriptor alloc] initWithKey:
                                             @"progressSortKey" ascending: YES] autorelease];
         
-        descriptors = [[NSArray alloc] initWithObjects: progressDescriptor, nameDescriptor, orderDescriptor, nil];
-    }
-    else if ([fSortType isEqualToString: @"Date"])
-    {
-        NSSortDescriptor * dateDescriptor = [[[NSSortDescriptor alloc] initWithKey:
-                                            @"date" ascending: YES] autorelease];
-    
-        descriptors = [[NSArray alloc] initWithObjects: dateDescriptor, orderDescriptor, nil];
+        descriptors = [[NSArray alloc] initWithObjects: progressDescriptor, nameDescriptor, dateDescriptor, nil];
     }
     else
-        descriptors = [[NSArray alloc] initWithObjects: orderDescriptor, nil];
+        descriptors = [[NSArray alloc] initWithObjects: dateDescriptor, nameDescriptor, nil];
 
     [fTorrents sortUsingDescriptors: descriptors];
     
@@ -874,10 +816,8 @@ static void sleepCallBack(void * controller, io_service_t y,
         prevSortItem = fStateSortItem;
     else if ([fSortType isEqualToString: @"Progress"])
         prevSortItem = fProgressSortItem;
-    else if ([fSortType isEqualToString: @"Date"])
-        prevSortItem = fDateSortItem;
     else
-        prevSortItem = fOrderSortItem;
+        prevSortItem = fDateSortItem;
     
     if (sender != prevSortItem)
     {
@@ -891,10 +831,8 @@ static void sleepCallBack(void * controller, io_service_t y,
             fSortType = [[NSString alloc] initWithString: @"State"];
         else if (sender == fProgressSortItem)
             fSortType = [[NSString alloc] initWithString: @"Progress"];
-        else if (sender == fDateSortItem)
-            fSortType = [[NSString alloc] initWithString: @"Date"];
         else
-            fSortType = [[NSString alloc] initWithString: @"Order"];
+            fSortType = [[NSString alloc] initWithString: @"Date"];
            
         [fDefaults setObject: fSortType forKey: @"Sort"];
     }
@@ -964,161 +902,12 @@ static void sleepCallBack(void * controller, io_service_t y,
     [dict release];
 }
 
-- (void) checkWaitingForStopped: (NSNotification *) notification
+- (void) ratioSingleChange: (NSNotification *) notification
 {
-    [self checkWaitingForFinished: [notification object]];
-}
-
-- (void) checkWaitingForFinished: (Torrent *) finishedTorrent
-{
-    //don't try to start a transfer if there should be none waiting
-    if (![[fDefaults stringForKey: @"StartSetting"] isEqualToString: @"Wait"])
-        return;
-
-    int desiredActive = [fDefaults integerForKey: @"WaitToStartNumber"], active = 0;
-    
-    NSEnumerator * enumerator = [fTorrents objectEnumerator];
-    Torrent * torrent, * torrentToStart = nil;
-    while ((torrent = [enumerator nextObject]))
-    {
-        //ignore the torrent just stopped; for some reason it is not marked instantly as not active
-        if (torrent == finishedTorrent)
-            continue;
-    
-        if ([torrent isActive])
-        {
-            if (![torrent isSeeding])
-            {
-                active++;
-                if (active >= desiredActive)
-                    return;
-            }
-        }
-        else
-        {
-            //use as next if it is waiting to start and either no previous or order value is lower
-            if ([torrent waitingToStart] && (!torrentToStart
-                || [[torrentToStart orderValue] compare: [torrent orderValue]] == NSOrderedDescending))
-                torrentToStart = torrent;
-        }
-    }
-    
-    //since it hasn't returned, the queue amount has not been met
-    if (torrentToStart)
-    {
-        [torrentToStart startTransfer];
-        [self updateUI: nil];
-    }
-}
-
-- (void) globalStartSettingChange: (NSNotification *) notification
-{
-    NSString * startSetting = [fDefaults stringForKey: @"StartSetting"];
-    
-    if ([startSetting isEqualToString: @"Start"])
-    {
-        NSEnumerator * enumerator = [fTorrents objectEnumerator];
-        Torrent * torrent;
-        while ((torrent = [enumerator nextObject]))
-            if ([torrent waitingToStart])
-                [torrent startTransfer];
-    }
-    else if ([startSetting isEqualToString: @"Wait"])
-    {
-        NSMutableArray * waitingTorrents = [[NSMutableArray alloc] initWithCapacity: [fTorrents count]];
-    
-        int amountToStart = [fDefaults integerForKey: @"WaitToStartNumber"];
-        
-        NSEnumerator * enumerator = [fTorrents objectEnumerator];
-        Torrent * torrent;
-        while ((torrent = [enumerator nextObject]))
-        {
-            if ([torrent isActive])
-            {
-                if (![torrent isSeeding])
-                {
-                    amountToStart--;
-                    if (amountToStart <= 0)
-                        break;
-                }
-            }
-            else if ([torrent waitingToStart])
-                [waitingTorrents addObject: torrent];
-            else;
-        }
-        
-        int waitingCount = [waitingTorrents count];
-        if (amountToStart > 0 && waitingCount > 0)
-        {
-            if (amountToStart > waitingCount)
-                amountToStart = waitingCount;
-            
-            //sort torrents by date to start earliest added
-            if (amountToStart < waitingCount)
-            {
-                NSSortDescriptor * orderDescriptor = [[[NSSortDescriptor alloc] initWithKey:
-                                                            @"orderValue" ascending: YES] autorelease];
-                NSArray * descriptors = [[NSArray alloc] initWithObjects: orderDescriptor, nil];
-                
-                [waitingTorrents sortUsingDescriptors: descriptors];
-                [descriptors release];
-            }
-            
-            int i;
-            for (i = 0; i < amountToStart; i++)
-                [[waitingTorrents objectAtIndex: i] startTransfer];
-        }
-        
-        [waitingTorrents release];
-    }
-    else;
-    
-    [self updateUI: nil];
-    
-    //update info for changed start setting
-    [self reloadInspector: nil];
-}
-
-- (void) torrentStartSettingChange: (NSNotification *) notification
-{
-    [self attemptToStartAuto: [notification object]];
-
-    [self updateUI: nil];
-    [self reloadInspector: nil];
-    [self updateTorrentHistory];
-}
-
-//will try to start, taking into consideration the start preference
-- (void) attemptToStartAuto: (Torrent *) torrent
-{
-    if (![torrent waitingToStart])
-            return;
-    
-    NSString * startSetting = [fDefaults stringForKey: @"StartSetting"];
-    if ([startSetting isEqualToString: @"Wait"])
-    {
-        int desiredActive = [fDefaults integerForKey: @"WaitToStartNumber"];
-        
-        Torrent * tempTorrent;
-        NSEnumerator * enumerator = [fTorrents objectEnumerator];
-        while ((tempTorrent = [enumerator nextObject]))
-            if ([tempTorrent isActive] && ![tempTorrent isSeeding])
-            {
-                desiredActive--;
-                if (desiredActive <= 0)
-                    return;
-            }
-        
-        [torrent startTransfer];
-    }
-    else if ([startSetting isEqualToString: @"Start"])
-        [torrent startTransfer];
-    else;
-}
-
-- (void) reloadInspector: (NSNotification *) notification
-{
-    [fInfoController updateInfoForTorrents: [self torrentsAtIndexes: [fTableView selectedRowIndexes]]];
+    //update info for changed ratio setting
+    NSArray * torrents = [self torrentsAtIndexes: [fTableView selectedRowIndexes]];
+    if ([torrents containsObject: [notification object]])
+        [fInfoController updateInfoForTorrents: torrents];
 }
 
 - (int) numberOfRowsInTableView: (NSTableView *) t
@@ -1158,7 +947,8 @@ static void sleepCallBack(void * controller, io_service_t y,
 
 - (void) tableViewSelectionDidChange: (NSNotification *) notification
 {
-    [self reloadInspector: nil];
+    [fInfoController updateInfoForTorrents: [self torrentsAtIndexes:
+                                    [fTableView selectedRowIndexes]]];
 }
 
 - (void) toggleStatusBar: (id) sender
