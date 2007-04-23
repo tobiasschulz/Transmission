@@ -216,22 +216,18 @@
     [descriptors release];
     
     //select torrent closest to text that isn't before text alphabetically
-    int row;
     NSEnumerator * enumerator = [tempTorrents objectEnumerator];
     Torrent * torrent;
     while ((torrent = [enumerator nextObject]))
         if ([[torrent name] caseInsensitiveCompare: text] != NSOrderedAscending)
         {
-            row = [fTorrents indexOfObject: torrent];
+            [self selectRow: [fTorrents indexOfObject: torrent] byExtendingSelection: NO];
             break;
         }
     
     //select last torrent alphabetically if no match found
     if (!torrent)
-        row = [fTorrents indexOfObject: [tempTorrents lastObject]];
-    
-    [self selectRow: row byExtendingSelection: NO];
-    [self scrollRowToVisible: row];
+        [self selectRow: [fTorrents indexOfObject: [tempTorrents lastObject]] byExtendingSelection: NO];
 }
 
 - (void) drawRect: (NSRect) r

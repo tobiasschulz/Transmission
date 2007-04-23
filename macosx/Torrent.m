@@ -80,7 +80,7 @@ static uint32_t kRed   = BE(0xFF6450FF), //255, 100, 80
     if (self)
     {
         fUseIncompleteFolder = [fDefaults boolForKey: @"UseIncompleteDownloadFolder"];
-        fIncompleteFolder = [[[fDefaults stringForKey: @"IncompleteDownloadFolder"] stringByExpandingTildeInPath] retain];
+        fIncompleteFolder = [[fDefaults stringForKey: @"IncompleteDownloadFolder"] copy];
         
         if (!fPublicTorrent)
             [self trashFile: path];
@@ -289,16 +289,15 @@ static uint32_t kRed   = BE(0xFF6450FF), //255, 100, 80
     }
     
     //check to stop for ratio
-    float stopRatio;
+    float stopRatio, ratio;
     if ([self isSeeding] && (stopRatio = [self actualStopRatio]) != INVALID
-			&& [self ratio] >= stopRatio)
+			&& ((ratio = [self ratio]) >= stopRatio || ratio == TR_RATIO_INF))
     {
         [self stopTransfer];
         fStat = tr_torrentStat(fHandle);
         
         fFinishedSeeding = YES;
         
-        [self setRatioSetting: NSOffState];
         [[NSNotificationCenter defaultCenter] postNotificationName: @"TorrentStoppedForRatio" object: self];
     }
 	
@@ -415,7 +414,7 @@ static uint32_t kRed   = BE(0xFF6450FF), //255, 100, 80
     if (wasChecking && !fChecking)
         [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateQueue" object: self];
     
-    if ([self isError])
+    if (fStat->error)
     {
         [statusString setString: [NSLocalizedString(@"Error: ", "Torrent -> status string") stringByAppendingString:
                                     [self errorMessage]]];
@@ -951,7 +950,7 @@ static uint32_t kRed   = BE(0xFF6450FF), //255, 100, 80
 
 - (BOOL) isError
 {
-    return fStat->error != 0;
+    return fStat->error;
 }
 
 - (NSString *) errorMessage
@@ -959,10 +958,12 @@ static uint32_t kRed   = BE(0xFF6450FF), //255, 100, 80
     if (![self isError])
         return @"";
     
+    #warning localize string after release
     NSString * error;
     if (!(error = [NSString stringWithUTF8String: fStat->errorString])
         && !(error = [NSString stringWithCString: fStat->errorString encoding: NSISOLatin1StringEncoding]))
-        error = NSLocalizedString(@"(unreadable error)", "Torrent -> error string unreadable");
+        error = @"";
+        //error = NSLocalizedString(@"(unreadable error)", "Torrent -> error string unreadable");
     
     return error;
 }
@@ -1256,7 +1257,11 @@ static uint32_t kRed   = BE(0xFF6450FF), //255, 100, 80
 
 - (NSNumber *) ratioSortKey
 {
-    return [NSNumber numberWithFloat: [self ratio]];
+    float ratio = [self ratio];
+    if (ratio == TR_RATIO_INF)
+        return [NSNumber numberWithInt: 999999999]; //this should hopefully be big enough
+    else
+        return [NSNumber numberWithFloat: [self ratio]];
 }
 
 @end

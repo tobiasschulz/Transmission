@@ -30,8 +30,7 @@
 #define SSDP_SUBTYPE            "ssdp:alive"
 #define SSDP_FIRST_DELAY        3750    /* 3 3/4 seconds */
 #define SSDP_MAX_DELAY          1800000 /* 30 minutes */
-#define SERVICE_TYPE_IP         "urn:schemas-upnp-org:service:WANIPConnection:1"
-#define SERVICE_TYPE_PPP        "urn:schemas-upnp-org:service:WANPPPConnection:1"
+#define UPNP_SERVICE_TYPE       "urn:schemas-upnp-org:service:WANIPConnection:1"
 #define SOAP_ENVELOPE           "http://schemas.xmlsoap.org/soap/envelope/"
 #define LOOP_DETECT_THRESHOLD   10 /* error on 10 add/get/del state changes */
 #define MAPPING_CHECK_INTERVAL  900000 /* 15 minutes */
@@ -46,6 +45,7 @@
 typedef struct tr_upnp_action_s
 {
     char * name;
+    char * action;
     int    len;
     struct { char * name; char * var; char dir; } * args;
 } tr_upnp_action_t;
@@ -56,7 +56,6 @@ typedef struct tr_upnp_device_s
     char                    * host;
     char                    * root;
     int                       port;
-    int                       ppp;
     char                    * soap;
     char                    * scpd;
     int                       mappedport;
@@ -123,7 +122,7 @@ static tr_http_t *
 devicePulseGetHttp( tr_upnp_device_t * dev );
 static int
 parseRoot( const char * root, const char *buf, int len,
-           char ** soap, char ** scpd, int * ppp );
+           char ** soap, char ** scpd );
 static void
 addUrlbase( const char * base, char ** path );
 static int
@@ -138,7 +137,7 @@ static char *
 joinstrs( const char *, const char *, const char * );
 static tr_http_t *
 soapRequest( int retry, const char * host, int port, const char * path,
-             const char * type, tr_upnp_action_t * action, ... );
+             tr_upnp_action_t * action, ... );
 static void
 actionSetup( tr_upnp_action_t * action, const char * name, int prealloc );
 static void
@@ -674,7 +673,7 @@ devicePulse( tr_upnp_device_t * dev, int port )
                         dev->host, code );
             }
             else if( parseRoot( dev->root, body, len,
-                                &dev->soap, &dev->scpd, &dev->ppp ) )
+                                &dev->soap, &dev->scpd ) )
             {
                 tr_dbg( "upnp device %s: parse root failed", dev->host );
             }
@@ -823,8 +822,7 @@ static tr_http_t *
 devicePulseGetHttp( tr_upnp_device_t * dev )
 {
     tr_http_t  * ret;
-    char         numstr[6];
-    const char * type;
+    char numstr[6];
 
     ret = NULL;
     switch( dev->state ) 
@@ -848,9 +846,8 @@ devicePulseGetHttp( tr_upnp_device_t * dev )
                 break;
             }
             snprintf( numstr, sizeof( numstr ), "%i", dev->mappedport );
-            type = ( dev->ppp ? SERVICE_TYPE_PPP : SERVICE_TYPE_IP );
             ret = soapRequest( dev->soapretry, dev->host, dev->port, dev->soap,
-                               type, &dev->addcmd,
+                               &dev->addcmd,
                                "PortMappingEnabled", "1",
                                "PortMappingLeaseDuration", "0",
                                "RemoteHost", "",
@@ -863,9 +860,8 @@ devicePulseGetHttp( tr_upnp_device_t * dev )
             break;
         case UPNPDEV_STATE_GET:
             snprintf( numstr, sizeof( numstr ), "%i", dev->mappedport );
-            type = ( dev->ppp ? SERVICE_TYPE_PPP : SERVICE_TYPE_IP );
             ret = soapRequest( dev->soapretry, dev->host, dev->port, dev->soap,
-                               type, &dev->getcmd,
+                               &dev->getcmd,
                                "RemoteHost", "",
                                "ExternalPort", numstr,
                                "PortMappingProtocol", "TCP",
@@ -873,9 +869,8 @@ devicePulseGetHttp( tr_upnp_device_t * dev )
             break;
         case UPNPDEV_STATE_DEL:
             snprintf( numstr, sizeof( numstr ), "%i", dev->mappedport );
-            type = ( dev->ppp ? SERVICE_TYPE_PPP : SERVICE_TYPE_IP );
             ret = soapRequest( dev->soapretry, dev->host, dev->port, dev->soap,
-                               type, &dev->delcmd,
+                               &dev->delcmd,
                                "RemoteHost", "",
                                "ExternalPort", numstr,
                                "PortMappingProtocol", "TCP",
@@ -956,7 +951,7 @@ devicePulseHttp( tr_upnp_device_t * dev,
 
 static int
 parseRoot( const char * root, const char *buf, int len,
-           char ** soap, char ** scpd, int * ppp )
+           char ** soap, char ** scpd )
 {
     const char * end, * ii, * jj, * kk, * urlbase;
     char       * basedup;
@@ -1003,21 +998,10 @@ parseRoot( const char * root, const char *buf, int len,
                 kk = tr_xmlFindTag( kk, end, "service" );
                 buf = tr_xmlTagContents( kk, end );
                 if( !tr_xmlFindTagVerifyContents( buf, end, "serviceType",
-                                                  SERVICE_TYPE_IP, 1 ) )
+                                                  UPNP_SERVICE_TYPE, 1 ) )
                 {
                     *soap = tr_xmlDupTagContents( buf, end, "controlURL");
                     *scpd = tr_xmlDupTagContents( buf, end, "SCPDURL");
-                    *ppp  = 0;
-                    break;
-                }
-                /* XXX we should save all services of both types and
-                   try adding mappings for each in turn */
-                else if( !tr_xmlFindTagVerifyContents( buf, end, "serviceType",
-                                                       SERVICE_TYPE_PPP, 1 ) )
-                {
-                    *soap = tr_xmlDupTagContents( buf, end, "controlURL");
-                    *scpd = tr_xmlDupTagContents( buf, end, "SCPDURL");
-                    *ppp  = 1;
                     break;
                 }
             }
@@ -1223,13 +1207,12 @@ joinstrs( const char * first, const char * delim, const char * second )
 
 static tr_http_t *
 soapRequest( int retry, const char * host, int port, const char * path,
-             const char * type, tr_upnp_action_t * action, ... )
+             tr_upnp_action_t * action, ... )
 {
     tr_http_t  * http;
     va_list      ap;
     const char * name, * value;
     int          method;
-    char       * actstr;
 
     method = ( retry ? TR_HTTP_M_POST : TR_HTTP_POST );
     http = makeHttp( method, host, port, path );
@@ -1237,10 +1220,7 @@ soapRequest( int retry, const char * host, int port, const char * path,
     {
         tr_httpAddHeader( http, "Content-type",
                           "text/xml; encoding=\"utf-8\"" );
-        actstr = NULL;
-        asprintf( &actstr, "\"%s#%s\"", type, action->name );
-        tr_httpAddHeader( http, "SOAPAction", actstr );
-        free( actstr );
+        tr_httpAddHeader( http, "SOAPAction", action->action );
         if( retry )
         {
             tr_httpAddHeader( http, "Man", "\"" SOAP_ENVELOPE "\"" );
@@ -1251,7 +1231,7 @@ soapRequest( int retry, const char * host, int port, const char * path,
 "    xmlns:s=\"" SOAP_ENVELOPE "\""
 "    s:encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
 "  <s:Body>"
-"    <u:%s xmlns:u=\%s\">", action->name, type );
+"    <u:%s xmlns:u=\"" UPNP_SERVICE_TYPE "\">", action->name );
 
         va_start( ap, action );
         do
@@ -1290,6 +1270,8 @@ static void
 actionSetup( tr_upnp_action_t * action, const char * name, int prealloc )
 {
     action->name = strdup( name );
+    action->action = NULL;
+    asprintf( &action->action, "\"%s#%s\"", UPNP_SERVICE_TYPE, name );
     assert( NULL == action->args );
     action->args = malloc( sizeof( *action->args ) * prealloc );
     memset( action->args, 0, sizeof( *action->args ) * prealloc );
@@ -1300,6 +1282,7 @@ static void
 actionFree( tr_upnp_action_t * act )
 {
     free( act->name );
+    free( act->action );
     while( 0 < act->len )
     {
         act->len--;
@@ -1377,95 +1360,3 @@ actionLookup( tr_upnp_action_t * act, const char * key, int len,
 
     return NULL;
 }
-
-#if 0
-/* this code is used for standalone root parsing for debugging purposes */
-/* cc -g -Wall -D__TRANSMISSION__ -o upnp upnp.c xml.c utils.c */
-int
-main( int argc, char * argv[] )
-{
-    struct stat sb;
-    char      * data, * soap, * scpd;
-    int         fd, ppp;
-    ssize_t     res;
-
-    if( 3 != argc )
-    {
-        printf( "usage: %s root-url root-file\n", argv[0] );
-        return 0;
-    }
-
-    tr_msgInit();
-    tr_setMessageLevel( 9 );
-
-    if( 0 > stat( argv[2], &sb ) )
-    {
-        tr_err( "failed to stat file %s: %s", argv[2], strerror( errno ) );
-        return 1;
-    }
-
-    data = malloc( sb.st_size );
-    if( NULL == data )
-    {
-        tr_err( "failed to malloc %zd bytes", ( size_t )sb.st_size );
-        return 1;
-    }
-
-    fd = open( argv[2], O_RDONLY );
-    if( 0 > fd )
-    {
-        tr_err( "failed to open file %s: %s", argv[2], strerror( errno ) );
-        free( data );
-        return 1;
-    }
-
-    res = read( fd, data, sb.st_size );
-    if( sb.st_size > res )
-    {
-        tr_err( "failed to read file %s: %s", argv[2],
-                ( 0 > res ? strerror( errno ) : "short read count" ) );
-        close( fd );
-        free( data );
-        return 1;
-    }
-
-    close( fd );
-
-    if( parseRoot( argv[1], data, sb.st_size, &soap, &scpd, &ppp ) )
-    {
-        tr_err( "root parsing failed" );
-    }
-    else
-    {
-        tr_err( "soap=%s scpd=%s ppp=%s", soap, scpd, ( ppp ? "yes" : "no" ) );
-        free( soap );
-        free( scpd );
-    }
-    free( data );
-
-    return 0;
-}
-
-int  tr_netMcastOpen( int port, struct in_addr addr ) { assert( 0 ); }
-int  tr_netBind    ( int port, int type ) { assert( 0 ); }
-void tr_netClose   ( int s ) { assert( 0 ); }
-int  tr_netRecvFrom( int s, uint8_t * buf, int size, struct sockaddr_in * sin ) { assert( 0 ); }
-int         tr_httpRequestType( const char * data, int len,
-                                char ** method, char ** uri ) { assert( 0 ); }
-int         tr_httpResponseCode( const char * data, int len ) { assert( 0 ); }
-char *      tr_httpParse( const char * data, int len, tr_http_header_t *headers ) { assert( 0 ); }
-int         tr_httpIsUrl( const char * u, int l ) { assert( 0 ); }
-int         tr_httpParseUrl( const char * u, int l, char ** h, int * p, char ** q ) { assert( 0 ); }
-tr_http_t   * tr_httpClient( int t, const char * h, int p, const char * u, ... ) { assert( 0 ); }
-tr_http_t   * tr_httpClientUrl( int t, const char * u, ... ) { assert( 0 ); }
-void          tr_httpAddHeader( tr_http_t * h, const char * n, const char * v ) { assert( 0 ); }
-void          tr_httpAddBody( tr_http_t * h, const char * b, ... ) { assert( 0 ); }
-tr_tristate_t tr_httpPulse( tr_http_t * h, const char ** b, int * l ) { assert( 0 ); }
-char        * tr_httpWhatsMyAddress( tr_http_t * h ) { assert( 0 ); }
-void          tr_httpClose( tr_http_t * h ) { assert( 0 ); }
-
-void tr_lockInit     ( tr_lock_t * l ) {}
-int  pthread_mutex_lock( pthread_mutex_t * m ) { return 0; }
-int  pthread_mutex_unlock( pthread_mutex_t * m ) { return 0; }
-
-#endif

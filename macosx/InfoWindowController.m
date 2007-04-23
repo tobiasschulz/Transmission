@@ -433,7 +433,9 @@
 
 - (void) updateInfoSettings
 {
-    if ([fTorrents count] > 0)
+    int numberSelected = [fTorrents count];
+
+    if (numberSelected > 0)
     {
         Torrent * torrent;
         
@@ -546,16 +548,9 @@
         [fRatioLimitField setStringValue: @""];
 		
 		[fPexCheck setEnabled: NO];
-        [fPexCheck setState: NSOffState];
     }
     
     [self updateInfoStats];
-}
-
-- (void) updateRatioForTorrent: (Torrent *) torrent
-{
-    if ([fTorrents containsObject: torrent])
-        [self updateInfoSettings];
 }
 
 - (int) stateSettingToPopUpIndex: (int) index
