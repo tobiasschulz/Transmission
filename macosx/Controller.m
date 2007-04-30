@@ -428,22 +428,6 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     [[NSAppleEventManager sharedAppleEventManager] setEventHandler: self
         andSelector: @selector(handleOpenContentsEvent:replyEvent:)
         forEventClass: kCoreEventClass andEventID: kAEOpenContents];
-    
-    //debug warning
-    if ([fDefaults boolForKey: @"WarningDebug"] && [fDefaults integerForKey: @"MessageLevel"] == TR_MSG_DBG)
-    {
-        NSAlert * alert = [[NSAlert alloc] init];
-        [alert setMessageText: NSLocalizedString(@"The Message Log is set to \"Debug\"", "Debug log alert -> message")];
-        [alert setInformativeText: NSLocalizedString(@"Continuous use at this level might increase memory usage."
-                                    " This setting can be changed in the Message Log window (accessible from the Window menu).",
-                                    "Debug log alert -> informative message")];
-        [alert addButtonWithTitle: NSLocalizedString(@"OK", "Debug log alert -> button")];
-        [alert addButtonWithTitle: NSLocalizedString(@"Don't Remind Again", "Debug log alert -> button")];
-        
-        if ([alert runModal] == NSAlertSecondButtonReturn)
-            [fDefaults setBool: NO forKey: @"WarningDebug"];
-        [alert release];
-    }
 }
 
 - (BOOL) applicationShouldHandleReopen: (NSApplication *) app hasVisibleWindows: (BOOL) visibleWindows
@@ -1210,16 +1194,6 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
         //time interval returned will be negative
         if (!(date = [torrent announceDate]) || [date timeIntervalSinceNow] <= ANNOUNCE_WAIT_INTERVAL_SECONDS)
             [torrent announce];
-    }
-}
-
-- (void) resetCacheForSelectedTorrents: (id) sender
-{
-    NSEnumerator * enumerator = [[fDisplayedTorrents objectsAtIndexes: [fTableView selectedRowIndexes]] objectEnumerator];
-    Torrent * torrent;
-    while ((torrent = [enumerator nextObject]))
-    {
-        [torrent resetCache];
     }
 }
 
@@ -2595,22 +2569,6 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
             //time interval returned will be negative
             if ([torrent isActive] &&
                     (!(date = [torrent announceDate]) || [date timeIntervalSinceNow] <= ANNOUNCE_WAIT_INTERVAL_SECONDS))
-                return YES;
-        }
-        return NO;
-    }
-    
-    //enable reset cache item
-    if (action == @selector(resetCacheForSelectedTorrents:))
-    {
-        if (!canUseTable)
-            return NO;
-        
-        NSEnumerator * enumerator = [[fDisplayedTorrents objectsAtIndexes: [fTableView selectedRowIndexes]] objectEnumerator];
-        Torrent * torrent;
-        while ((torrent = [enumerator nextObject]))
-        {
-            if (![torrent isActive])
                 return YES;
         }
         return NO;

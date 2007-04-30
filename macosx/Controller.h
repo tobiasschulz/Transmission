@@ -143,8 +143,6 @@
 
 - (void) announceSelectedTorrents: (id) sender;
 
-- (void) resetCacheForSelectedTorrents: (id) sender;
-
 - (void) showPreferenceWindow: (id) sender;
 
 - (void) showInfo: (id) sender;

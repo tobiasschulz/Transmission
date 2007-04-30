@@ -555,11 +555,6 @@ static uint32_t kRed   = BE(0xFF6450FF), //255, 100, 80
     return fAnnounceDate;
 }
 
-- (void) resetCache
-{
-    tr_torrentRemoveFastResume(fHandle);
-}
-
 - (BOOL) allDownloaded
 {
     return [self progress] >= 1.0;
@@ -688,7 +683,7 @@ static uint32_t kRed   = BE(0xFF6450FF), //255, 100, 80
 
 - (BOOL) alertForRemainingDiskSpace
 {
-    if ([self allDownloaded] || ![fDefaults boolForKey: @"WarningRemainingSpace"])
+    if ([self allDownloaded] || ![fDefaults boolForKey: @"RemainingSpaceWarning"])
         return YES;
     
     NSString * volumeName = [[[NSFileManager defaultManager] componentsToDisplayForPath: [self downloadFolder]]
@@ -714,7 +709,7 @@ static uint32_t kRed   = BE(0xFF6450FF), //255, 100, 80
         [alert release];
         
         if (result == NSAlertThirdButtonReturn)
-            [fDefaults setBool: NO forKey: @"WarningRemainingSpace"];
+            [fDefaults setBool: NO forKey: @"RemainingSpaceWarning"];
         
         return result != NSAlertFirstButtonReturn;
     }
