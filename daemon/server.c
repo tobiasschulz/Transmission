@@ -179,7 +179,7 @@ server_listen( int fd )
     }
 
     event_set( ev, fd, EV_READ | EV_PERSIST, newclient, ev );
-    event_base_set( gl_base, ev );
+    /* XXX event_base_set( gl_base, ev ); */
     event_add( ev, NULL );
 
     return 0;
@@ -257,7 +257,7 @@ newclient( int fd, short event UNUSED, void * arg )
             free( client );
             return;
         }
-        bufferevent_base_set( gl_base, clev );
+        /* XXX bufferevent_base_set( gl_base, clev ); */
         bufferevent_settimeout( clev, CLIENT_TIMEOUT, CLIENT_TIMEOUT );
 
         client->fd      = clfd;

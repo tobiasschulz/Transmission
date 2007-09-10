@@ -67,9 +67,9 @@
     IBOutlet NSTextField            * fTotalDLField, * fTotalULField, * fTotalTorrentsField;
     
     IBOutlet NSMenuItem             * fNameSortItem, * fStateSortItem, * fProgressSortItem,
-                                    * fTrackerSortItem, * fDateSortItem, * fOrderSortItem,
+                                    * fDateSortItem, * fOrderSortItem,
                                     * fNameSortActionItem, * fStateSortActionItem, * fProgressSortActionItem,
-                                    * fTrackerSortActionItem, * fDateSortActionItem, * fOrderSortActionItem;
+                                    * fDateSortActionItem, * fOrderSortActionItem;
     
     IBOutlet FilterBarView          * fFilterBar;
     IBOutlet FilterBarButton        * fNoFilterButton, * fDownloadFilterButton,
@@ -186,7 +186,6 @@
 - (void) setSortReverse: (id) sender;
 - (void) applyFilter: (id) sender;
 - (void) setFilter: (id) sender;
-- (void) setFilterSearchType: (id) sender;
 - (void) switchFilter: (id) sender;
 
 - (void) applySpeedLimit: (id) sender;
@@ -207,8 +206,6 @@
 - (void) beginCreateFile: (NSNotification *) notification;
 
 - (void) sleepCallBack: (natural_t) messageType argument: (void *) messageArgument;
-
-- (void) torrentTableViewSelectionDidChange: (NSNotification *) notification;
 
 - (void) toggleSmallView: (id) sender;
 

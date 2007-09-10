@@ -29,7 +29,7 @@
 
 typedef enum
 {
-    TORRENT_FILE_DELETE,
+	TORRENT_FILE_DELETE,
     TORRENT_FILE_SAVE,
     TORRENT_FILE_DEFAULT
 } torrentFileState;
@@ -56,19 +56,20 @@ typedef enum
 
     NSUserDefaults * fDefaults;
 
-    NSImage * fIcon;
+    NSImage * fIcon, * fIconFlipped, * fIconSmall;
     NSMutableString * fNameString, * fProgressString, * fStatusString, * fShortStatusString, * fRemainingTimeString;
     
     tr_file_stat_t * fileStat;
     NSArray * fFileList, * fFlatFileList;
-    
-    NSMenu * fFileMenu;
     
     float   fRatioLimit;
     int     fRatioSetting;
     BOOL    fFinishedSeeding, fWaitToStart, fError, fChecking, fStalled;
     
     int fOrderValue;
+    
+    NSBitmapImageRep * fBitmap;
+    int8_t * fPieces;
     
     NSDictionary * fQuickPauseDict;
 }
@@ -90,6 +91,7 @@ typedef enum
 - (void) getAmountFinished: (float *) tab size: (int) size;
 
 - (void) update;
+- (NSDictionary *) infoForCurrentView;
 
 - (void) startTransfer;
 - (void) stopTransfer;
@@ -129,6 +131,8 @@ typedef enum
 - (BOOL) alertForMoveFolderAvailable;
 
 - (NSImage *) icon;
+- (NSImage *) iconFlipped;
+- (NSImage *) iconSmall;
 
 - (NSString *) name;
 - (uint64_t) size;
@@ -154,7 +158,6 @@ typedef enum
 
 - (float) progress;
 - (float) progressDone;
-- (float) progressLeft;
 - (int) eta;
 
 - (BOOL) isActive;
@@ -212,8 +215,6 @@ typedef enum
 - (void) setFilePriority: (int) priority forIndexes: (NSIndexSet *) indexSet;
 - (BOOL) hasFilePriority: (int) priority forIndexes: (NSIndexSet *) indexSet;
 - (NSSet *) filePrioritiesForIndexes: (NSIndexSet *) indexSet;
-
-- (NSMenu *) fileMenu;
 
 - (NSDate *) dateAdded;
 - (NSDate *) dateCompleted;

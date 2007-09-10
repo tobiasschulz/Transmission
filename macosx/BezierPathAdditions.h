@@ -22,23 +22,10 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#import "NSMenuAdditions.h"
+#import <Cocoa/Cocoa.h>
 
-@implementation NSMenu (NSMenuAdditions)
+@interface NSBezierPath (BezierPathAdditions)
 
-- (void) appendItemsFromMenu: (NSMenu *) menu atIndexes: (NSIndexSet *) indexes
-{
-    int bottom = [self numberOfItems];
-    
-    NSMenuItem * item;
-    unsigned int i;
-    for (i = [indexes lastIndex]; i != NSNotFound; i = [indexes indexLessThanIndex: i])
-    {
-        item = [[menu itemAtIndex:i] retain];
-        [menu removeItemAtIndex: i];
-        [self insertItem: item atIndex: bottom];
-        [item release];
-    }
-}
++ (NSBezierPath *) bezierPathWithRoundedRect: (NSRect) rect radius: (float) radius;
 
 @end

@@ -66,7 +66,6 @@ struct tr_thread_s
     thread_id        thread;
 #elif defined(WIN32)
     HANDLE           thread;
-    unsigned int     thread_id;
 #else
     pthread_t        thread;
 #endif
@@ -117,7 +116,7 @@ tr_threadNew( void (*func)(void *),
     t->thread = spawn_thread( (void*)ThreadFunc, name, B_NORMAL_PRIORITY, t );
     resume_thread( t->thread );
 #elif defined(WIN32)
-    t->thread = (HANDLE) _beginthreadex( NULL, 0, &ThreadFunc, t, 0, &t->thread_id );
+    t->thread = (HANDLE) _beginthreadex( NULL, 0, &ThreadFunc, t, 0, NULL );
 #else
     pthread_create( &t->thread, NULL, (void * (*) (void *)) ThreadFunc, t );
 #endif
@@ -125,20 +124,6 @@ tr_threadNew( void (*func)(void *),
     return t;
 }
 
-int
-tr_amInThread ( const tr_thread_t * t )
-{
-    int ret;
-#ifdef __BEOS__
-    ret = find_thread(NULL) == t->thread;
-#elif defined(WIN32)
-    ret = GetCurrentThreadId() == t->thread_id;
-#else
-    ret = pthread_equal( t->thread, pthread_self( ) );
-#endif
-    return ret;
-}
-    
 void
 tr_threadJoin( tr_thread_t * t )
 {
@@ -363,7 +348,7 @@ struct tr_cond_s
     thread_id threads[BEOS_MAX_THREADS];
     int start, end;
 #elif defined(WIN32)
-    tr_list * events;
+    tr_list_t * events;
     tr_lock_t * lock;
 #else
     pthread_cond_t cond;
@@ -428,7 +413,7 @@ tr_condWait( tr_cond_t * c, tr_lock_t * l )
 
     /* add it to the list of events waiting to be signaled */
     tr_lockLock( c->lock );
-    tr_list_append( &c->events, hEvent );
+    c->events = tr_list_append( c->events, hEvent );
     tr_lockUnlock( c->lock );
 
     /* now wait for it to be signaled */
@@ -438,7 +423,7 @@ tr_condWait( tr_cond_t * c, tr_lock_t * l )
 
     /* remove it from the list of events waiting to be signaled */
     tr_lockLock( c->lock );
-    tr_list_remove_data( &c->events, hEvent );
+    c->events = tr_list_remove_data( c->events, hEvent );
     tr_lockUnlock( c->lock );
 
 #else
@@ -506,7 +491,7 @@ tr_condBroadcast( tr_cond_t * c )
 
 #elif defined(WIN32)
 
-    tr_list * l;
+    tr_list_t * l;
     tr_lockLock( c->lock );
     for( l=c->events; l!=NULL; l=l->next )
         SetEvent( (HANDLE)l->data );
@@ -525,7 +510,7 @@ tr_condFree( tr_cond_t * c )
 #ifdef __BEOS__
     delete_sem( c->sem );
 #elif defined(WIN32)
-    tr_list_free( &c->events );
+    tr_list_free( c->events );
     tr_lockFree( c->lock );
 #else
     pthread_cond_destroy( &c->cond );

@@ -1,6 +1,6 @@
 /******************************************************************************
  * $Id$
- * 
+ *
  * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
@@ -22,17 +22,28 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#import <Cocoa/Cocoa.h>
+#import "BezierPathAdditions.h"
 
-@interface FileNameCell : NSActionCell
+@implementation NSBezierPath (BezierPathAdditions)
+
++ (NSBezierPath *) bezierPathWithRoundedRect: (NSRect) rect radius: (float) radius
 {
-    NSImage * fFolderImage;
+    float minX = NSMinX(rect),
+        minY = NSMinY(rect),
+        maxX = NSMaxX(rect),
+        maxY = NSMaxY(rect),
+        midX = NSMidX(rect),
+        midY = NSMidY(rect);
     
-    NSMutableDictionary * fTitleAttributes, * fStatusAttributes;
+    NSBezierPath * bp = [NSBezierPath bezierPath];
+    [bp moveToPoint: NSMakePoint(maxX, midY)];
+    [bp appendBezierPathWithArcFromPoint: NSMakePoint(maxX, maxY) toPoint: NSMakePoint(midX, maxY) radius: radius];
+    [bp appendBezierPathWithArcFromPoint: NSMakePoint(minX, maxY) toPoint: NSMakePoint(minX, midY) radius: radius];
+    [bp appendBezierPathWithArcFromPoint: NSMakePoint(minX, minY) toPoint: NSMakePoint(midX, minY) radius: radius];
+    [bp appendBezierPathWithArcFromPoint: NSMakePoint(maxX, minY) toPoint: NSMakePoint(maxX, midY) radius: radius];
+    [bp closePath];
+    
+    return bp;
 }
-
-- (NSRect) imageRectForBounds: (NSRect) bounds;
-- (NSRect) titleRectForBounds: (NSRect) bounds;
-- (NSRect) statusRectForBounds: (NSRect) bounds;
 
 @end

@@ -1,27 +1,3 @@
-/******************************************************************************
- * $Id$
- * 
- * Copyright (c) 2007 Transmission authors and contributors
- *
- * Permission is hereby granted, free of charge, to any person obtaining a
- * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software without restriction, including without limitation
- * the rights to use, copy, modify, merge, publish, distribute, sublicense,
- * and/or sell copies of the Software, and to permit persons to whom the
- * Software is furnished to do so, subject to the following conditions:
- *
- * The above copyright notice and this permission notice shall be included in
- * all copies or substantial portions of the Software.
- *
- * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
- * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
- * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
- * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
- * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
- * DEALINGS IN THE SOFTWARE.
- *****************************************************************************/
-
 #import "FilePriorityCell.h"
 #import "InfoWindowController.h"
 #import "Torrent.h"
@@ -46,12 +22,18 @@
     return self;
 }
 
+- (void) setItem: (NSMutableDictionary *) item
+{
+    fItem = item;
+}
+
 - (void) setSelected: (BOOL) flag forSegment: (int) segment
 {
     [super setSelected: flag forSegment: segment];
     
     //only for when clicking manually
     Torrent * torrent = [[[[self controlView] window] windowController] selectedTorrent];
+    NSIndexSet * indexes = [fItem objectForKey: @"Indexes"];
     
     int priority;
     if (segment == 0)
@@ -61,21 +43,20 @@
     else
         priority = TR_PRI_NORMAL;
     
-    [torrent setFilePriority: priority forIndexes: [[self representedObject] objectForKey: @"Indexes"]];
+    [torrent setFilePriority: priority forIndexes: indexes];
     [(FileOutlineView *)[self controlView] reloadData];
 }
 
 - (void) drawWithFrame: (NSRect) cellFrame inView: (NSView *) controlView
 {
     Torrent * torrent = [(InfoWindowController *)[[[self controlView] window] windowController] selectedTorrent];
-    NSDictionary * dict = [self representedObject];
-    NSSet * priorities = [torrent filePrioritiesForIndexes: [dict objectForKey: @"Indexes"]];
+    NSSet * priorities = [torrent filePrioritiesForIndexes: [fItem objectForKey: @"Indexes"]];
     
     int count = [priorities count];
     
     FileOutlineView * view = (FileOutlineView *)[self controlView];
     int row = [view hoverRow];
-    if (count > 0 && row != -1 && [view itemAtRow: row] == dict)
+    if (count > 0 && row != -1 && [view itemAtRow: row] == fItem)
     {
         [super setSelected: [priorities containsObject: [NSNumber numberWithInt: TR_PRI_LOW]] forSegment: 0];
         [super setSelected: [priorities containsObject: [NSNumber numberWithInt: TR_PRI_NORMAL]] forSegment: 1];
@@ -98,6 +79,7 @@
                 fMixedImage = [NSImage imageNamed: @"PriorityMixed.png"];
             image = fMixedImage;
         }
+        
         else if ([priorities containsObject: [NSNumber numberWithInt: TR_PRI_NORMAL]])
         {
             if (!fNormalImage)

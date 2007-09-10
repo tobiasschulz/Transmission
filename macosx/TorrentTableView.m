@@ -26,33 +26,23 @@
 #import "TorrentCell.h"
 #import "Controller.h"
 #import "Torrent.h"
-#import "NSMenuAdditions.h"
-
-#define PADDING 3.0
 
 #define BUTTON_TO_TOP_REGULAR 33.0
 #define BUTTON_TO_TOP_SMALL 20.0
 
-#define ACTION_BUTTON_TO_TOP 47.0
-
-#define ACTION_MENU_GLOBAL_TAG 101
-#define ACTION_MENU_UNLIMITED_TAG 102
-#define ACTION_MENU_LIMIT_TAG 103
+//button layout (from end of bar) is: padding, button, padding, button, padding
+//change BUTTONS_TOTAL_WIDTH in .h when changing these values, add 2.0 to that value
+#define BUTTON_WIDTH 14.0
+#define PADDING 3.0
 
 @interface TorrentTableView (Private)
 
 - (NSRect) pauseRectForRow: (int) row;
 - (NSRect) revealRectForRow: (int) row;
-- (NSRect) actionRectForRow: (int) row;
-
-- (BOOL) pointInIconRect: (NSPoint) point;
-- (BOOL) pointInMinimalStatusRect: (NSPoint) point;
-
 - (BOOL) pointInPauseRect: (NSPoint) point;
 - (BOOL) pointInRevealRect: (NSPoint) point;
-- (BOOL) pointInActionRect: (NSPoint) point;
-
-- (void) updateFileMenu: (NSMenu *) menu forFiles: (NSArray *) files;
+- (BOOL) pointInIconRect: (NSPoint) point;
+- (BOOL) pointInMinimalStatusRect: (NSPoint) point;
 
 @end
 
@@ -65,24 +55,20 @@
         fResumeOnIcon = [NSImage imageNamed: @"ResumeOn.png"];
         fResumeOffIcon = [NSImage imageNamed: @"ResumeOff.png"];
         fPauseOnIcon = [NSImage imageNamed: @"PauseOn.png"];
-        fPauseOffIcon = [NSImage imageNamed: @"PauseOff.png"];
         fResumeNoWaitOnIcon = [NSImage imageNamed: @"ResumeNoWaitOn.png"];
         fResumeNoWaitOffIcon = [NSImage imageNamed: @"ResumeNoWaitOff.png"];
-        
+        fPauseOffIcon = [NSImage imageNamed: @"PauseOff.png"];
         fRevealOnIcon = [NSImage imageNamed: @"RevealOn.png"];
         fRevealOffIcon = [NSImage imageNamed: @"RevealOff.png"];
         
-        fActionOnIcon = [NSImage imageNamed: @"ActionOn.png"];
-        fActionOffIcon = [NSImage imageNamed: @"ActionOff.png"];
-        
         fClickPoint = NSZeroPoint;
-        fClickIn = NO;
         
         fKeyStrokes = [[NSMutableArray alloc] init];
         
-        fDefaults = [NSUserDefaults standardUserDefaults];
+        fSmallStatusAttributes = [[NSDictionary alloc] initWithObjectsAndKeys:
+                                        [NSFont messageFontOfSize: 9.0], NSFontAttributeName, nil];
         
-        [self setDelegate: self];
+        fDefaults = [NSUserDefaults standardUserDefaults];
     }
     
     return self;
@@ -97,8 +83,7 @@
 - (void) dealloc
 {
     [fKeyStrokes release];
-    [fMenuTorrent release];
-    
+    [fSmallStatusAttributes release];
     [super dealloc];
 }
 
@@ -107,58 +92,38 @@
     fTorrents = torrents;
 }
 
-- (void) tableView: (NSTableView *) tableView willDisplayCell: (id) cell
-        forTableColumn: (NSTableColumn *) tableColumn row: (int) row
-{
-    [cell setRepresentedObject: [fTorrents objectAtIndex: row]];
-}
-
 - (void) mouseDown: (NSEvent *) event
 {
     fClickPoint = [self convertPoint: [event locationInWindow] fromView: nil];
 
-    if ([self pointInActionRect: fClickPoint])
-    {
-        int row = [self rowAtPoint: fClickPoint];
-        [self setNeedsDisplayInRect: [self rectOfRow: row]]; //ensure button is pushed down
-        
-        [self displayTorrentMenuForEvent: event];
-        
-        fClickPoint = NSZeroPoint;
-        [self setNeedsDisplayInRect: [self rectOfRow: row]];
-    }
-    else if ([self pointInPauseRect: fClickPoint] || [self pointInRevealRect: fClickPoint])
-    {
-        fClickIn = YES;
-        [self setNeedsDisplayInRect: [self rectOfRow: [self rowAtPoint: fClickPoint]]];
-    }
-    else
+    if (![self pointInPauseRect: fClickPoint] && ![self pointInRevealRect: fClickPoint])
     {
         if ([event modifierFlags] & NSAlternateKeyMask)
         {
             [fDefaults setBool: ![fDefaults boolForKey: @"UseAdvancedBar"] forKey: @"UseAdvancedBar"];
             fClickPoint = NSZeroPoint;
-            [self reloadData];
         }
         else
         {
             if ([self pointInMinimalStatusRect: fClickPoint])
             {
-                [fDefaults setBool: ![fDefaults boolForKey: @"SmallStatusRegular"] forKey: @"SmallStatusRegular"];
+                [(TorrentCell *)[[self tableColumnWithIdentifier: @"Torrent"] dataCell] toggleMinimalStatus];
                 fClickPoint = NSZeroPoint;
-                [self reloadData];
             }
 
             [super mouseDown: event];
         }
     }
+    else;
+
+    [self display];
 }
 
 - (void) mouseUp: (NSEvent *) event
 {
     NSPoint point = [self convertPoint: [event locationInWindow] fromView: nil];
-    int row = [self rowAtPoint: point], oldRow = [self rowAtPoint: fClickPoint];
-    BOOL sameRow = row == oldRow;
+    int row = [self rowAtPoint: point];
+    BOOL sameRow = row == [self rowAtPoint: fClickPoint];
     
     if (sameRow && [self pointInPauseRect: point] && [self pointInPauseRect: fClickPoint])
     {
@@ -183,46 +148,15 @@
     {
         if ([self pointInIconRect: point])
             [[fTorrents objectAtIndex: row] revealData];
-        else if (![self pointInActionRect: point])
+        else
             [fController showInfo: nil];
-        else;
     }
     else;
     
     [super mouseUp: event];
 
     fClickPoint = NSZeroPoint;
-    fClickIn = NO;
-    [self setNeedsDisplayInRect: [self rectOfRow: oldRow]];
-}
-
-- (void) mouseDragged: (NSEvent *) event
-{
-    if (NSEqualPoints(fClickPoint, NSZeroPoint))
-    {
-        [super mouseDragged: event];
-        return;
-    }
-    
-    NSPoint point = [self convertPoint: [event locationInWindow] fromView: nil];
-    int oldRow = [self rowAtPoint: fClickPoint];
-    
-    BOOL inRect;
-    if ([self pointInRevealRect: fClickPoint])
-        inRect = oldRow == [self rowAtPoint: point] && [self pointInRevealRect: point];
-    else if ([self pointInPauseRect: fClickPoint])
-        inRect = oldRow == [self rowAtPoint: point] && [self pointInPauseRect: point];
-    else
-    {
-        [super mouseDragged: event];
-        return;
-    }
-    
-    if (inRect != fClickIn)
-    {
-        fClickIn = inRect;
-        [self setNeedsDisplayInRect: [self rectOfRow: oldRow]];
-    }
+    [self display];
 }
 
 - (NSMenu *) menuForEvent: (NSEvent *) event
@@ -300,185 +234,43 @@
     [self scrollRowToVisible: row];
 }
 
-- (void) displayTorrentMenuForEvent: (NSEvent *) event
+- (void) drawRect: (NSRect) r
 {
-    int row = [self rowAtPoint: [self convertPoint: [event locationInWindow] fromView: nil]];
-    if (row < 0)
-        return;
-    
-    //get and update file menu
-    fMenuTorrent = [[fTorrents objectAtIndex: row] retain];
-    NSMenu * fileMenu = [fMenuTorrent fileMenu];
-    [self updateFileMenu: fileMenu forFiles: [fMenuTorrent fileList]];
-    
-    //add file menu items to action menu
-    NSRange range =  NSMakeRange(0, [fileMenu numberOfItems]);
-    [fActionMenu appendItemsFromMenu: fileMenu atIndexes: [NSIndexSet indexSetWithIndexesInRange: range]];
-    
-    //place menu below button
-    NSRect rect = [self actionRectForRow: row];
-    NSPoint location = rect.origin;
-    location.y += rect.size.height + 5.0;
-    location = [self convertPoint: location toView: nil];
-    
-    NSEvent * newEvent = [NSEvent mouseEventWithType: [event type] location: location
-        modifierFlags: [event modifierFlags] timestamp: [event timestamp] windowNumber: [event windowNumber]
-        context: [event context] eventNumber: [event eventNumber] clickCount: [event clickCount] pressure: [event pressure]];
-    
-    [NSMenu popUpContextMenu: fActionMenu withEvent: newEvent forView: self];
-    
-    //move file menu items back to the torrent's file menu
-    range.location = [fActionMenu numberOfItems] - range.length;
-    [fileMenu appendItemsFromMenu: fActionMenu atIndexes: [NSIndexSet indexSetWithIndexesInRange: range]];
-    
-    [fMenuTorrent release];
-    fMenuTorrent = nil;
-}
+    NSRect rect;
+    Torrent * torrent;
+    NSImage * image;
 
-- (void) menuNeedsUpdate: (NSMenu *) menu
-{
-    //this method seems to be called when it shouldn't be
-    if (!fMenuTorrent || ![menu supermenu])
-        return;
-    
-    if (menu == fUploadMenu || menu == fDownloadMenu)
+    [super drawRect: r];
+
+    int i;
+    for (i = 0; i < [fTorrents count]; i++)
     {
-        BOOL upload = menu == fUploadMenu;
-        tr_speedlimit_t mode = [fMenuTorrent speedMode: upload];
+        torrent = [fTorrents objectAtIndex: i];
+        rect  = [self pauseRectForRow: i];
         
-        NSMenuItem * item = [menu itemWithTag: ACTION_MENU_LIMIT_TAG];
-        [item setState: mode == TR_SPEEDLIMIT_SINGLE ? NSOnState : NSOffState];
-        [item setTitle: [NSString stringWithFormat: NSLocalizedString(@"Limit (%d KB/s)",
-                    "torrent action context menu -> upload/download limit"), [fMenuTorrent speedLimit: upload]]];
+        image = nil;
+        if ([torrent isActive])
+        {
+            if (![torrent isChecking])
+                image = NSPointInRect(fClickPoint, rect) ? fPauseOnIcon : fPauseOffIcon;
+        }
+        else if ([torrent isPaused])
+        {
+            if ([[NSApp currentEvent] modifierFlags] & NSAlternateKeyMask && [fDefaults boolForKey: @"Queue"])
+                image = NSPointInRect(fClickPoint, rect) ? fResumeNoWaitOnIcon : fResumeNoWaitOffIcon;
+            else if ([torrent waitingToStart])
+                image = NSPointInRect(fClickPoint, rect) ? fPauseOnIcon : fPauseOffIcon;
+            else
+                image = NSPointInRect(fClickPoint, rect) ? fResumeOnIcon : fResumeOffIcon;
+        }
+        else;
         
-        item = [menu itemWithTag: ACTION_MENU_UNLIMITED_TAG];
-        [item setState: mode == TR_SPEEDLIMIT_UNLIMITED ? NSOnState : NSOffState];
-        
-        item = [menu itemWithTag: ACTION_MENU_GLOBAL_TAG];
-        [item setState: mode == TR_SPEEDLIMIT_GLOBAL ? NSOnState : NSOffState];
-    }
-    else if (menu == fRatioMenu)
-    {
-        int mode = [fMenuTorrent ratioSetting];
-        
-        NSMenuItem * item = [menu itemWithTag: ACTION_MENU_LIMIT_TAG];
-        [item setState: mode == NSOnState ? NSOnState : NSOffState];
-        [item setTitle: [NSString stringWithFormat: NSLocalizedString(@"Stop at Ratio (%.2f)",
-                    "torrent action context menu -> ratio stop"), [fMenuTorrent ratioLimit]]];
-        
-        item = [menu itemWithTag: ACTION_MENU_UNLIMITED_TAG];
-        [item setState: mode == NSOffState ? NSOnState : NSOffState];
-        
-        item = [menu itemWithTag: ACTION_MENU_GLOBAL_TAG];
-        [item setState: mode == NSMixedState ? NSOnState : NSOffState];
-    }
-    else if ([menu supermenu]) //assume the menu is part of the file list
-    {
-        NSMenu * supermenu = [menu supermenu];
-        [self updateFileMenu: menu forFiles: [[[supermenu itemAtIndex: [supermenu indexOfItemWithSubmenu: menu]]
-                                                    representedObject] objectForKey: @"Children"]];
-    }
-    else;
-}
+        if (image)
+            [image compositeToPoint: NSMakePoint(rect.origin.x, NSMaxY(rect)) operation: NSCompositeSourceOver];
 
-- (void) setQuickLimitMode: (id) sender
-{
-    int tag = [sender tag];
-    tr_speedlimit_t mode;
-    if (tag == ACTION_MENU_UNLIMITED_TAG)
-        mode = TR_SPEEDLIMIT_UNLIMITED;
-    else if (tag == ACTION_MENU_LIMIT_TAG)
-        mode = TR_SPEEDLIMIT_SINGLE;
-    else
-        mode = TR_SPEEDLIMIT_GLOBAL;
-    
-    [fMenuTorrent setSpeedMode: mode upload: [sender menu] == fUploadMenu];
-    
-    [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateSettings" object: nil];
-}
-
-- (void) setQuickLimit: (id) sender
-{
-    BOOL upload = [sender menu] == fUploadMenu;
-    [fMenuTorrent setSpeedMode: TR_SPEEDLIMIT_SINGLE upload: upload];
-    [fMenuTorrent setSpeedLimit: [[sender title] intValue] upload: upload];
-    
-    [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateSettings" object: nil];
-}
-
-- (void) setQuickRatioMode: (id) sender
-
-{
-    int tag = [sender tag];
-    int mode;
-    if (tag == ACTION_MENU_UNLIMITED_TAG)
-        mode = NSOffState;
-    else if (tag == ACTION_MENU_LIMIT_TAG)
-        mode = NSOnState;
-    else
-        mode = NSMixedState;
-    
-    [fMenuTorrent setRatioSetting: mode];
-    
-    [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateSettings" object: nil];
-}
-
-- (void) setQuickRatio: (id) sender
-{
-    [fMenuTorrent setRatioSetting: NSOnState];
-    [fMenuTorrent setRatioLimit: [[sender title] floatValue]];
-    
-    [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateSettings" object: nil];
-}
-
-- (void) checkFile: (id) sender
-{
-    NSIndexSet * indexSet = [[sender representedObject] objectForKey: @"Indexes"];
-    [fMenuTorrent setFileCheckState: [sender state] != NSOnState ? NSOnState : NSOffState forIndexes: indexSet];
-    
-    [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateStats" object: nil];
-}
-
-- (void) drawRow: (int) row clipRect: (NSRect) rect
-{
-    [super drawRow: row clipRect: rect];
-    
-    Torrent * torrent = [fTorrents objectAtIndex: row];
-    
-    //pause/resume icon
-    NSImage * pauseImage = nil;
-    NSRect pauseRect  = [self pauseRectForRow: row];
-    if ([torrent isActive])
-    {
-        if (![torrent isChecking])
-            pauseImage = fClickIn && NSPointInRect(fClickPoint, pauseRect) ? fPauseOnIcon : fPauseOffIcon;
-    }
-    else if ([torrent isPaused])
-    {
-        BOOL inPauseRect = fClickIn && NSPointInRect(fClickPoint, pauseRect);
-        if ([[NSApp currentEvent] modifierFlags] & NSAlternateKeyMask && [fDefaults boolForKey: @"Queue"])
-            pauseImage = inPauseRect ? fResumeNoWaitOnIcon : fResumeNoWaitOffIcon;
-        else if ([torrent waitingToStart])
-            pauseImage = inPauseRect ? fPauseOnIcon : fPauseOffIcon;
-        else
-            pauseImage = inPauseRect ? fResumeOnIcon : fResumeOffIcon;
-    }
-    else;
-    
-    if (pauseImage)
-        [pauseImage compositeToPoint: NSMakePoint(pauseRect.origin.x, NSMaxY(pauseRect)) operation: NSCompositeSourceOver];
-    
-    //reveal icon
-    NSRect revealRect = [self revealRectForRow: row];
-    NSImage * revealImage = fClickIn && NSPointInRect(fClickPoint, revealRect) ? fRevealOnIcon : fRevealOffIcon;
-    [revealImage compositeToPoint: NSMakePoint(revealRect.origin.x, NSMaxY(revealRect)) operation: NSCompositeSourceOver];
-    
-    //action icon
-    if (![fDefaults boolForKey: @"SmallView"])
-    {
-        NSRect actionRect = [self actionRectForRow: row];
-        NSImage * actionImage = NSPointInRect(fClickPoint, actionRect) ? fActionOnIcon : fActionOffIcon;
-        [actionImage compositeToPoint: NSMakePoint(actionRect.origin.x, NSMaxY(actionRect)) operation: NSCompositeSourceOver];
+        rect = [self revealRectForRow: i];
+        image = NSPointInRect(fClickPoint, rect) ? fRevealOnIcon : fRevealOffIcon;
+        [image compositeToPoint: NSMakePoint(rect.origin.x, NSMaxY(rect)) operation: NSCompositeSourceOver];
     }
 }
 
@@ -488,10 +280,7 @@
 
 - (NSRect) pauseRectForRow: (int) row
 {
-    if (row < 0)
-        return NSZeroRect;
-    
-    NSRect cellRect = [self frameOfCellAtColumn: 0 row: row];
+    NSRect cellRect = [self frameOfCellAtColumn: [self columnWithIdentifier: @"Torrent"] row: row];
     
     float buttonToTop = [fDefaults boolForKey: @"SmallView"] ? BUTTON_TO_TOP_SMALL : BUTTON_TO_TOP_REGULAR;
     
@@ -501,10 +290,7 @@
 
 - (NSRect) revealRectForRow: (int) row
 {
-    if (row < 0)
-        return NSZeroRect;
-    
-    NSRect cellRect = [self frameOfCellAtColumn: 0 row: row];
+    NSRect cellRect = [self frameOfCellAtColumn: [self columnWithIdentifier: @"Torrent"] row: row];
     
     float buttonToTop = [fDefaults boolForKey: @"SmallView"] ? BUTTON_TO_TOP_SMALL : BUTTON_TO_TOP_REGULAR;
     
@@ -512,30 +298,20 @@
                         cellRect.origin.y + buttonToTop, BUTTON_WIDTH, BUTTON_WIDTH);
 }
 
-- (NSRect) actionRectForRow: (int) row
-{
-    if (row < 0)
-        return NSZeroRect;
-    
-    TorrentCell * cell = [[self tableColumnWithIdentifier: @"Torrent"] dataCell];
-    NSRect cellRect = [self frameOfCellAtColumn: 0 row: row],
-            iconRect = [cell iconRectForBounds: cellRect];
-    
-    if ([fDefaults boolForKey: @"SmallView"])
-        return iconRect;
-    else
-        return NSMakeRect(iconRect.origin.x + (iconRect.size.width - ACTION_BUTTON_WIDTH) * 0.5,
-                        cellRect.origin.y + ACTION_BUTTON_TO_TOP, ACTION_BUTTON_WIDTH, ACTION_BUTTON_HEIGHT);
-}
-
 - (BOOL) pointInIconRect: (NSPoint) point
 {
     int row = [self rowAtPoint: point];
     if (row < 0)
         return NO;
+
+    NSRect cellRect = [self frameOfCellAtColumn: [self columnWithIdentifier: @"Torrent"] row: row];
+    NSSize iconSize = [fDefaults boolForKey: @"SmallView"] ? [[[fTorrents objectAtIndex: row] iconSmall] size]
+                                                        : [[[fTorrents objectAtIndex: row] iconFlipped] size];
     
-    TorrentCell * cell = [[self tableColumnWithIdentifier: @"Torrent"] dataCell];
-    return NSPointInRect(point, [cell iconRectForBounds: [self frameOfCellAtColumn: 0 row: row]]);
+    NSRect iconRect = NSMakeRect(cellRect.origin.x + 3.0, cellRect.origin.y
+            + (cellRect.size.height - iconSize.height) * 0.5, iconSize.width, iconSize.height);
+    
+    return NSPointInRect(point, iconRect);
 }
 
 - (BOOL) pointInMinimalStatusRect: (NSPoint) point
@@ -543,90 +319,28 @@
     int row = [self rowAtPoint: point];
     if (row < 0 || ![fDefaults boolForKey: @"SmallView"])
         return NO;
+
+    Torrent * torrent = [fTorrents objectAtIndex: row];
+    NSString * statusString = ![fDefaults boolForKey: @"SmallStatusRegular"] && [torrent isActive]
+                                    ? [torrent remainingTimeString] : [torrent shortStatusString];
     
-    TorrentCell * cell = [[self tableColumnWithIdentifier: @"Torrent"] dataCell];
-    [cell setRepresentedObject: [fTorrents objectAtIndex: row]];
-    return NSPointInRect(point, [cell minimalStatusRectForBounds: [self frameOfCellAtColumn: 0 row: row]]);
+    float statusWidth = [statusString sizeWithAttributes: fSmallStatusAttributes].width + 3.0;
+    
+    NSRect cellRect = [self frameOfCellAtColumn: [self columnWithIdentifier: @"Torrent"] row: row];
+    NSRect statusRect = NSMakeRect(NSMaxX(cellRect) - statusWidth, cellRect.origin.y,
+                                    statusWidth, cellRect.size.height - BUTTON_WIDTH);
+    
+    return NSPointInRect(point, statusRect);
 }
 
 - (BOOL) pointInPauseRect: (NSPoint) point
 {
-    int row = [self rowAtPoint: point];
-    if (row < 0)
-        return NO;
-    
-    return NSPointInRect(point, [self pauseRectForRow: row]);
+    return NSPointInRect(point, [self pauseRectForRow: [self rowAtPoint: point]]);
 }
 
 - (BOOL) pointInRevealRect: (NSPoint) point
 {
-    int row = [self rowAtPoint: point];
-    if (row < 0)
-        return NO;
-    
-    return NSPointInRect(point, [self revealRectForRow: row]);
-}
-
-- (BOOL) pointInActionRect: (NSPoint) point
-{
-    int row = [self rowAtPoint: point];
-    if (row < 0)
-        return NO;
-    
-    return NSPointInRect(point, [self actionRectForRow: row]);
-}
-
-- (void) updateFileMenu: (NSMenu *) menu forFiles: (NSArray *) files
-{
-    BOOL create = [menu numberOfItems] <= 0;
-    
-    NSEnumerator * enumerator = [files objectEnumerator];
-    NSDictionary * dict;
-    NSMenuItem * item;
-    while ((dict = [enumerator nextObject]))
-    {
-        NSString * name = [dict objectForKey: @"Name"];
-        
-        if (create)
-        {
-            item = [[NSMenuItem alloc] initWithTitle: name action: NULL keyEquivalent: @""];
-            
-            NSImage * icon;
-            if (![[dict objectForKey: @"IsFolder"] boolValue])
-            {
-                icon = [[dict objectForKey: @"Icon"] copy];
-                [icon setFlipped: NO];
-            }
-            else
-            {
-                NSMenu * itemMenu = [[NSMenu alloc] initWithTitle: name];
-                [itemMenu setAutoenablesItems: NO];
-                [item setSubmenu: itemMenu];
-                [itemMenu setDelegate: self];
-                [itemMenu release];
-                
-                icon = [[[NSWorkspace sharedWorkspace] iconForFileType: NSFileTypeForHFSTypeCode('fldr')] copy];
-            }
-            
-            [item setRepresentedObject: dict];
-            
-            [icon setScalesWhenResized: YES];
-            [icon setSize: NSMakeSize(16.0, 16.0)];
-            [item setImage: icon];
-            [icon release];
-            
-            [item setAction: @selector(checkFile:)];
-            
-            [menu addItem: item];
-            [item release];
-        }
-        else
-            item = [menu itemWithTitle: name];
-        
-        NSIndexSet * indexSet = [dict objectForKey: @"Indexes"];
-        [item setState: [fMenuTorrent checkForFiles: indexSet]];
-        [item setEnabled: [fMenuTorrent canChangeDownloadCheckForFiles: indexSet]];
-    }
+    return NSPointInRect(point, [self revealRectForRow: [self rowAtPoint: point]]);
 }
 
 @end

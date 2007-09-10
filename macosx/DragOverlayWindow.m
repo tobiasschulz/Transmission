@@ -24,7 +24,7 @@
 
 #import "DragOverlayWindow.h"
 #import "DragOverlayView.h"
-#import "NSStringAdditions.h"
+#import "StringAdditions.h"
 
 @implementation DragOverlayWindow
 
@@ -158,13 +158,16 @@
 
 - (void) fadeOut
 {
-    //stop other animation and set to same progress
-    if ([fFadeInAnimation isAnimating])
+    if ([self alphaValue] > 0.0)
     {
-        [fFadeInAnimation stopAnimation];
-        [fFadeOutAnimation setCurrentProgress: 1.0 - [fFadeInAnimation currentProgress]];
+        //stop other animation and set to same progress
+        if ([fFadeInAnimation isAnimating])
+        {
+            [fFadeInAnimation stopAnimation];
+            [fFadeOutAnimation setCurrentProgress: 1.0 - [fFadeInAnimation currentProgress]];
+        }
+        [fFadeOutAnimation startAnimation];
     }
-    [fFadeOutAnimation startAnimation];
 }
 
 @end

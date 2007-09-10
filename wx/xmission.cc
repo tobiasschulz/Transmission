@@ -1,24 +1,13 @@
 /*
- * Xmission - a cross-platform bittorrent client
- * Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; version 2 of the License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- * $Id$
+ * This file is licensed by the GPL version 2.  Works owned by the
+ * Transmission project are granted a special exemption to clause 2(b)
+ * so that the bulk of its code can remain under the MIT license. 
+ * This exemption does not extend to derived works not owned by
+ * the Transmission project.
  */
 
-#include <ctype.h>
 #include <inttypes.h>
 #include <set>
 #include <map>
@@ -64,7 +53,7 @@ extern "C"
 
 #include "foreach.h"
 #include "speed-stats.h"
-#include "filter.h"
+#include "torrent-filter.h"
 #include "torrent-list.h"
 #include "torrent-stats.h"
 
@@ -168,7 +157,7 @@ public:
     void OnDeselectAll( wxCommandEvent& );
     void OnDeselectAllUpdate( wxUpdateUIEvent& );
 
-    void OnFilterChanged( wxCommandEvent& );
+    void OnFilterToggled( wxCommandEvent& );
 
     void OnPulse( wxTimerEvent& );
 
@@ -192,10 +181,10 @@ private:
     SpeedStats * mySpeedStats;
     torrents_v myTorrents;
     torrents_v mySelectedTorrents;
-    int myFilter;
+    int myFilterFlags;
     std::string mySavePath;
     time_t myExitTime;
-    wxToggleButton* myFilterButtons[TorrentFilter::N_FILTERS];
+    wxToggleButton * myFilterToggles[TorrentFilter::N_FILTERS];
 
 private:
     DECLARE_EVENT_TABLE()
@@ -212,7 +201,7 @@ enum
 };
 
 BEGIN_EVENT_TABLE(MyFrame, wxFrame)
-    EVT_COMMAND_RANGE( ID_Filter, ID_Filter+TorrentFilter::N_FILTERS, wxEVT_COMMAND_TOGGLEBUTTON_CLICKED, MyFrame::OnFilterChanged )
+    EVT_COMMAND_RANGE( ID_Filter, ID_Filter+TorrentFilter::N_FILTERS, wxEVT_COMMAND_TOGGLEBUTTON_CLICKED, MyFrame::OnFilterToggled )
     EVT_MENU     ( wxID_ABOUT, MyFrame::OnAbout )
     EVT_TIMER    ( ID_Pulse, MyFrame::OnPulse )
     EVT_MENU     ( wxID_EXIT, MyFrame::OnExit )
@@ -235,21 +224,16 @@ IMPLEMENT_APP(MyApp)
 
 
 void
-MyFrame :: OnFilterChanged( wxCommandEvent& e )
+MyFrame :: OnFilterToggled( wxCommandEvent& e )
 {
-    static bool ignore = false;
-
-    if( !ignore )
-    {
-        myFilter = e.GetId() - ID_Filter;
-        std::cerr << " OnFilterChanged, myFilter is now " << myFilter << std::endl;
-        ApplyCurrentFilter ( );
-
-        ignore = true;
-        for( int i=0; i<TorrentFilter::N_FILTERS; ++i )
-            myFilterButtons[i]->SetValue( i==myFilter );
-        ignore = false;
-    }
+    const int index = e.GetId() - ID_Filter;
+    int flags = 1<<index;
+    const bool active = myFilterToggles[index]->GetValue ( );
+    if( active )
+        myFilterFlags |= flags;
+    else
+        myFilterFlags &= ~flags;
+    ApplyCurrentFilter ( );
 }
 
 void
@@ -371,7 +355,7 @@ void MyFrame :: OnOpen( wxCommandEvent& WXUNUSED(event) )
             tr_torrent_t * tor = tr_torrentInit( handle,
                                                  filename.c_str(),
                                                  mySavePath.c_str(),
-                                                 TR_FLAG_SAVE, NULL );
+                                                 0, NULL );
             if( tor )
                 myTorrents.push_back( tor );
         }
@@ -426,14 +410,14 @@ MyFrame :: RefreshFilterCounts( )
     int hits[ TorrentFilter :: N_FILTERS ];
     TorrentFilter::CountHits( myTorrents, hits );
     for( int i=0; i<TorrentFilter::N_FILTERS; ++i )
-        myFilterButtons[i]->SetLabel( TorrentFilter::GetName( i, hits[i] ) );
+        myFilterToggles[i]->SetLabel( TorrentFilter::GetName( i, hits[i] ) );
 }
 
 void
 MyFrame :: ApplyCurrentFilter( )
 {
     torrents_v tmp( myTorrents );
-    TorrentFilter :: RemoveFailures( myFilter, tmp );
+    TorrentFilter :: RemoveFailures( myFilterFlags, tmp );
     myTorrentList->Assign( tmp );
 }
 
@@ -443,9 +427,6 @@ MyFrame :: OnTorrentListSelectionChanged( TorrentListCtrl* list,
 {
     assert( list == myTorrentList );
     mySelectedTorrents.assign( torrents.begin(), torrents.end() );
-
-    tr_torrent_t * tor = mySelectedTorrents.empty() ? NULL : mySelectedTorrents.front();
-    mySpeedStats->SetTorrent( tor );
 }
 
 void
@@ -463,7 +444,7 @@ MyFrame :: OnPulse(wxTimerEvent& WXUNUSED(event) )
     RefreshFilterCounts( );
     ApplyCurrentFilter( );
 
-    mySpeedStats->Pulse( handle );
+    mySpeedStats->Update( handle );
 
     float down, up;
     tr_torrentRates( handle, &down, &up );
@@ -498,16 +479,11 @@ MyFrame :: MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size
     myPulseTimer( this, ID_Pulse ),
     myLogoIcon( transmission_xpm ),
     myTrayIconIcon( systray_xpm ),
-    mySpeedStats( 0 ),
-    myFilter( TorrentFilter::ALL ),
+    myFilterFlags( ~0 ),
     myExitTime( 0 )
 {
     myTrayIcon = new wxTaskBarIcon;
     SetIcon( myLogoIcon );
-
-    /**
-    ***  Prefs
-    **/
 
     long port;
     wxString key = _T("port");
@@ -518,36 +494,9 @@ MyFrame :: MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size
     key = _T("save-path");
     wxString wxstr;
     if( !myConfig->Read( key, &wxstr, wxFileName::GetHomeDir() ) )
-         myConfig->Write( key, wxstr );
+        myConfig->Write( key, wxstr );
     mySavePath = toStr( wxstr );
-
-    const wxString default_colors[SpeedStats::N_COLORS] = {
-        _T("#000000"), // background
-        _T("#32cd32"), // frame
-        _T("#ff0000"), // all up
-        _T("#ff00ff"), // all down
-        _T("#ffff00"), // torrent up
-        _T("#00ff88")  // torrent down
-    };
-    wxColor speedColors[SpeedStats::N_COLORS];
-    for( int i=0; i<SpeedStats::N_COLORS; ++i )
-    {
-        key = SpeedStats::GetColorName( i );
-        myConfig->Read( key, &wxstr, _T("") );
-        std::string str = toStr( wxstr );
-        if( (str.size()!=7)
-            || (str[0]!='#')
-            || !isxdigit(str[1]) || !isxdigit(str[2])
-            || !isxdigit(str[3]) || !isxdigit(str[4])
-            || !isxdigit(str[5]) || !isxdigit(str[6]))
-        {
-            myConfig->Write( key, default_colors[i] );
-            str = toStr( default_colors[i] );
-        }
-        int r, g, b;
-        sscanf( str.c_str()+1, "%02x%02x%02x", &r, &g, &b );
-        speedColors[i].Set( r, g, b );
-    }
+    std::cerr << __FILE__ << ':' << __LINE__ << " save-path is [" << mySavePath << ']' << std::endl;
 
     /**
     ***  Menu
@@ -616,21 +565,27 @@ MyFrame :: MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size
 
     wxPanel * panel_1 = new wxPanel( hsplit, wxID_ANY );
 
-    wxBoxSizer * buttonSizer = new wxBoxSizer( wxVERTICAL );
+    wxBoxSizer * buttonSizer = new wxBoxSizer( wxHORIZONTAL );
 
+    wxStaticText * text = new wxStaticText( panel_1, wxID_ANY, _("Show:") );
+    buttonSizer->Add( text, 0, wxALIGN_CENTER|wxLEFT|wxRIGHT, 3 );
+
+    int rightButtonSpacing[TorrentFilter::N_FILTERS] = { 0, 0, 10, 0, 10, 0, 0 };
     for( int i=0; i<TorrentFilter::N_FILTERS; ++i ) {
-        wxToggleButton * b = new wxToggleButton( panel_1, ID_Filter+i, TorrentFilter::GetName(i), wxDefaultPosition, wxDefaultSize, (i==0)?wxRB_GROUP:0 );
-        b->SetValue( i==0 );
-        myFilterButtons[i] = b;
-        buttonSizer->Add( b, 1, wxGROW, 0 );
+        wxToggleButton * tb = new wxToggleButton( panel_1, ID_Filter+i, TorrentFilter::GetName(i) );
+        tb->SetValue( true );
+        myFilterToggles[i] = tb;
+        //buttonSizer->Add( tb, 0, wxRIGHT, rightButtonSpacing[i] );
+        buttonSizer->Add( tb, 1, wxEXPAND|wxRIGHT, rightButtonSpacing[i] );
     }
 
     myTorrentList = new TorrentListCtrl( handle, myConfig, panel_1 );
     myTorrentList->AddListener( this );
 
-    wxBoxSizer * panelSizer = new wxBoxSizer( wxHORIZONTAL );
-    panelSizer->Add( buttonSizer, 0, wxALL, 5 );
-    panelSizer->Add( myTorrentList, 1, wxGROW|wxALL, 5 );
+    wxBoxSizer * panelSizer = new wxBoxSizer( wxVERTICAL );
+    panelSizer->Add( new wxStaticLine( panel_1 ), 0, wxEXPAND, 0 );
+    panelSizer->Add( buttonSizer, 0, 0, 0 );
+    panelSizer->Add( myTorrentList, 1, wxEXPAND, 0 );
 
     panel_1->SetSizer( panelSizer );
 
@@ -645,8 +600,6 @@ MyFrame :: MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size
     tmp = new wxButton( notebook, wxID_ANY, _T("Hello World"));
     notebook->AddPage( tmp, _T("Files") );
     mySpeedStats = new SpeedStats( notebook, wxID_ANY );
-    for( int i=0; i<SpeedStats::N_COLORS; ++i )
-        mySpeedStats->SetColor( i, speedColors[i] );
     notebook->AddPage( mySpeedStats, _T("Speed"), true );
     tmp = new wxButton( notebook, wxID_ANY, _T("Hello World"));
     notebook->AddPage( tmp, _T("Logger") );
@@ -667,7 +620,7 @@ MyFrame :: MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size
     ***  Refresh
     **/
 
-    myPulseTimer.Start( 500 );
+    myPulseTimer.Start( 1500 );
 
     /**
     ***  Load the torrents

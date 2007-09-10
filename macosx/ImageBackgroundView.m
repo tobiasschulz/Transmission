@@ -28,20 +28,17 @@
 
 - (void) setBackgroundImage: (NSImage *) image
 {
-    [fBackgroundColor release];
+    if (fBackgroundColor)
+        [fBackgroundColor release];
     fBackgroundColor = [[NSColor colorWithPatternImage: image] retain];
     
     [self setNeedsDisplay: YES];
 }
 
-- (BOOL) isOpaque
-{
-    return YES;
-}
-
 - (void) dealloc
 {
-    [fBackgroundColor release];
+    if (fBackgroundColor)
+        [fBackgroundColor release];
     [super dealloc];
 }
 

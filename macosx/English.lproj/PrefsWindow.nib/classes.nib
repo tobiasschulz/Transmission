@@ -16,7 +16,6 @@
                 setAutoSize = id; 
                 setAutoSpeedLimit = id; 
                 setBadge = id; 
-                setCheckForUpdate = id; 
                 setDownloadLocation = id; 
                 setGlobalLimit = id; 
                 setNat = id; 
@@ -28,6 +27,7 @@
                 setSpeedLimit = id; 
                 setStalled = id; 
                 setStalledMinutes = id; 
+                setUpdate = id; 
             }; 
             CLASS = PrefsController; 
             LANGUAGE = ObjC; 
@@ -55,6 +55,7 @@
                 fSpeedLimitUploadField = NSTextField; 
                 fStalledField = NSTextField; 
                 fTransfersView = NSView; 
+                fUpdatePopUp = NSPopUpButton; 
                 fUploadField = NSTextField; 
             }; 
             SUPERCLASS = NSWindowController; 

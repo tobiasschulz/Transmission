@@ -1,5 +1,5 @@
 /******************************************************************************
- * $Id$
+ * $Id:$
  *
  * Copyright (c) 2005-2007 Transmission authors and contributors
  *
@@ -92,15 +92,7 @@ enum
      * uint32_t: ul speed rate to use when the mode is single
      * uint32_t: ul's tr_speedlimit_t
      */
-    FR_ID_SPEED = 8,
-
-    /* active
-     * char: 't' if running, 'f' if paused
-     */
-    FR_ID_RUN = 9,
-
-    /* number of corrupt bytes downloaded */
-    FR_ID_CORRUPT = 10
+    FR_ID_SPEED = 8
 };
 
 
@@ -156,12 +148,8 @@ getMTimes( const tr_torrent_t * tor, int * setme_n )
     return m;
 }
 
-static void
-fastResumeWriteData( uint8_t       id,
-                     const void  * data,
-                     uint32_t      size,
-                     uint32_t      count,
-                     FILE        * file )
+static void fastResumeWriteData( uint8_t id, void * data, uint32_t size,
+                                 uint32_t count, FILE * file )
 {
     uint32_t  datalen = size * count;
 
@@ -273,22 +261,12 @@ tr_fastResumeSave( const tr_torrent_t * tor )
         tr_free( buf );
     }
 
-    if( TRUE ) /* FR_ID_RUN */
-    {
-        const int run = tor->runStatusToSaveIsSet
-            ? tor->runStatusToSave
-            : tor->runStatus;
-        const char is_running = (run == TR_RUN_RUNNING) ? 't' : 'f';
-        fastResumeWriteData( FR_ID_RUN, &is_running, 1, 1, file );
-    }
 
     /* Write download and upload totals */
     total = tor->downloadedCur + tor->downloadedPrev;
     fastResumeWriteData( FR_ID_DOWNLOADED, &total, 8, 1, file );
     total = tor->uploadedCur + tor->uploadedPrev;
     fastResumeWriteData( FR_ID_UPLOADED, &total, 8, 1, file );
-    total = tor->corruptCur + tor->corruptPrev;
-    fastResumeWriteData( FR_ID_CORRUPT, &total, 8, 1, file );
 
     if( !( TR_FLAG_PRIVATE & tor->info.flags ) )
     {
@@ -578,19 +556,6 @@ fastResumeLoadImpl ( tr_torrent_t   * tor,
                 }
                 break;
 
-            case FR_ID_RUN:
-                {
-                    char ch;
-                    if( fread( &ch, 1, 1, file ) != 1 )
-                    {
-                        fclose( file );
-                        return ret;
-                    }
-                    tor->runStatus = ch=='f' ? TR_RUN_STOPPED : TR_RUN_RUNNING;
-                    ret |= TR_FR_RUN;
-                    continue;
-                }
-
             case FR_ID_DOWNLOADED:
                 /* read download total */
                 if( 8 == len)
@@ -617,21 +582,6 @@ fastResumeLoadImpl ( tr_torrent_t   * tor,
                     }
                     tor->uploadedCur = 0;
                     ret |= TR_FR_UPLOADED;
-                    continue;
-                }
-                break;
-
-            case FR_ID_CORRUPT:
-                /* read upload total */
-                if( 8 == len )
-                {
-                    if( 1 != fread( &tor->corruptPrev, 8, 1, file ) )
-                    {
-                        fclose( file );
-                        return ret;
-                    }
-                    tor->corruptCur = 0;
-                    ret |= TR_FR_CORRUPT;
                     continue;
                 }
                 break;

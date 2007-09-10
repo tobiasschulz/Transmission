@@ -24,20 +24,14 @@
 
 #import <Cocoa/Cocoa.h>
 
-@class CTGradient;
 @interface FilterBarButton : NSButton
 {
+    NSImage * fButtonNormal, * fButtonNormalDim, * fButtonOver,
+            * fButtonPressed, * fButtonSelected, * fButtonSelectedDim;
     int fCount;
-    int fState;
+    
     BOOL fEnabled;
     NSTrackingRectTag fTrackingTag;
-    NSBezierPath * fPath, * fEdgePath, * fStepPath;
-    NSDictionary * fNormalAttributes, * fNormalDimAttributes,
-                 * fHighlightedAttributes, * fHighlightedDimAttributes;
-    CTGradient * fHighlightedBackground, * fHighlightedOutline,
-               * fActiveBackground, * fActiveOutline,
-               * fHoveringBackground;
-    NSColor    * fHoveringOutline;
 }
 
 - (void) setCount: (int) count;

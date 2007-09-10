@@ -219,8 +219,7 @@ static int
 parseExtendedHandshake( tr_peer_t * peer, uint8_t * buf, int len )
 {
     benc_val_t val, * sub;
-    int        dbgport, dbgpex, dbgclient, grow;
-    size_t     size;
+    int        dbgport, dbgpex;
 
     if( tr_bencLoad( buf, len, &val, NULL ) )
     {
@@ -251,31 +250,20 @@ parseExtendedHandshake( tr_peer_t * peer, uint8_t * buf, int len )
         }
     }
 
+#if 0 /* ugh, we have to deal with encoding if we do this */
     /* get peer's client name */
-    dbgclient = 0;
-    if( !peer->extclient )
+    sub = tr_bencDictFind( &val, "v" );
+    if( NULL != sub && TYPE_STR == sub->type &&
+        ( NULL == peer->client || 0 != strcmp( sub->val.s.s, peer->client ) ) )
     {
-        sub = tr_bencDictFind( &val, "v" );
-        if( NULL != sub && TYPE_STR == sub->type )
+        client = tr_bencStealStr( sub );
+        if( NULL != client )
         {
-            dbgclient = 1;
             free( peer->client );
-            size = bufsize_utf8( sub->val.s.s, &grow );
-            if( grow )
-            {
-                peer->client = calloc( size, 1 );
-                if( NULL == peer->client )
-                {
-                    tr_bencFree( &val );
-                    return TR_ERROR;
-                }
-                strlcat_utf8( peer->client, sub->val.s.s, size, 0 );
-            }
-            else
-                peer->client = tr_bencStealStr( sub );
-            peer->extclient = 1;
+            peer->client = client;
         }
     }
+#endif
 
     /* get peer's listening port */
     sub = tr_bencDictFind( &val, "p" );
@@ -287,12 +275,7 @@ parseExtendedHandshake( tr_peer_t * peer, uint8_t * buf, int len )
         dbgport = sub->val.i;
     }
 
-    if( dbgclient )
-        peer_dbg( "GET  extended-handshake, ok port=%d pex=%d client=%s",
-                  dbgport, dbgpex, peer->client );
-    else
-        peer_dbg( "GET  extended-handshake, ok port=%d pex=%d",
-                  dbgport, dbgpex );
+    peer_dbg( "GET  extended-handshake, ok port=%i pex=%i", dbgport, dbgpex );
 
     tr_bencFree( &val );
     return TR_OK;

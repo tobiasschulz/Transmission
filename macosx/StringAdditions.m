@@ -1,5 +1,5 @@
 /******************************************************************************
- * $Id: StringAdditions.m 2869 2007-08-19 03:03:28Z livings124 $
+ * $Id$
  *
  * Copyright (c) 2005-2007 Transmission authors and contributors
  *
@@ -22,10 +22,10 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#import "NSStringAdditions.h"
+#import "StringAdditions.h"
 #import <transmission.h>
 
-@implementation NSString (NSStringAdditions)
+@implementation NSString (StringAdditions)
 
 + (NSString *) ellipsis
 {
@@ -35,6 +35,11 @@
 - (NSString *) stringByAppendingEllipsis
 {
 	return [self stringByAppendingString: [NSString ellipsis]];
+}
+
++ (NSString *) stringWithInt: (int) value
+{
+    return [NSString stringWithFormat: @"%d", value];
 }
 
 + (NSString *) stringForFileSize: (uint64_t) size

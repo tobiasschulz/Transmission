@@ -23,8 +23,7 @@
  *****************************************************************************/
 
 #import "FileOutlineView.h"
-#import "FileNameCell.h"
-#import "FilePriorityCell.h"
+#import "FileBrowserCell.h"
 #import "InfoWindowController.h"
 #import "Torrent.h"
 
@@ -32,13 +31,8 @@
 
 - (void) awakeFromNib
 {
-    FileNameCell * nameCell = [[FileNameCell alloc] init];
-    [[self tableColumnWithIdentifier: @"Name"] setDataCell: nameCell];
-    [nameCell release];
-    
-    FilePriorityCell * priorityCell = [[FilePriorityCell alloc] init];
-    [[self tableColumnWithIdentifier: @"Priority"] setDataCell: priorityCell];
-    [priorityCell release];
+    NSBrowserCell * browserCell = [[[FileBrowserCell alloc] init] autorelease];
+    [[self tableColumnWithIdentifier: @"Name"] setDataCell: browserCell];
     
     [self setAutoresizesOutlineColumn: NO];
     [self setIndentationPerLevel: 14.0];
@@ -112,28 +106,23 @@
     {
         NSDictionary * item = [self itemAtRow: row];
         Torrent * torrent = [(InfoWindowController *)[[self window] windowController] selectedTorrent];
-        NSIndexSet * indexes = [item objectForKey: @"Indexes"];
         
-        if ([torrent checkForFiles: indexes] == NSOffState)
+
+        NSSet * priorities = [torrent filePrioritiesForIndexes: [item objectForKey: @"Indexes"]];
+        int count = [priorities count];
+        if (count == 0)
             [fNormalColor set];
+        else if (count > 1)
+            [fMixedPriorityColor set];
         else
         {
-            NSSet * priorities = [torrent filePrioritiesForIndexes: indexes];
-            int count = [priorities count];
-            if (count == 0)
-                [fNormalColor set];
-            else if (count > 1)
-                [fMixedPriorityColor set];
+            int priority = [[priorities anyObject] intValue];
+            if (priority == TR_PRI_LOW)
+                [fLowPriorityColor set];
+            else if (priority == TR_PRI_HIGH)
+                [fHighPriorityColor set];
             else
-            {
-                int priority = [[priorities anyObject] intValue];
-                if (priority == TR_PRI_LOW)
-                    [fLowPriorityColor set];
-                else if (priority == TR_PRI_HIGH)
-                    [fHighPriorityColor set];
-                else
-                    [fNormalColor set];
-            }
+                [fNormalColor set];
         }
         
         NSRect rect = [self rectOfRow: row];

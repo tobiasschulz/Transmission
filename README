@@ -11,31 +11,3 @@ and BeOS (native interface).
 
 For more information (including build instructions), please consult the
 website: http://transmission.m0k.org/
-
-
-Building Transmission
-=====================
-
-Transmission has an Xcode project file (Transmission.xcodeproj) that allows it to be built in Xcode.
-
-Building a Transmission release from the command line:
-
-    $ tar xvfz Transmission-80.tar.gz
-    $ cd Transmission-0.80
-    $ ./configure -q && make -s
-    $ su (if necessary for the next line)
-    $ make install
-
-Building Transmission from SVN (First Time):
-
-    $ svn co svn://svn.m0k.org/Transmission/trunk Transmission
-    $ cd Transmission
-    $ ./autogen.sh
-    $ ./configure -q && make -s
-
-Building Transmission from SVN (Updating):
-
-    $ cd Transmission
-    $ svn up
-    $ make -s
-

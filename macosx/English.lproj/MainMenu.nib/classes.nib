@@ -28,7 +28,6 @@
                 resumeWaitingTorrents = id; 
                 revealFile = id; 
                 setFilter = id; 
-                setFilterSearchType = id; 
                 setInfoTab = id; 
                 setLimitGlobalEnabled = id; 
                 setQuickLimitGlobal = id; 
@@ -86,8 +85,6 @@
                 fTotalDLField = NSTextField; 
                 fTotalTorrentsField = NSTextField; 
                 fTotalULField = NSTextField; 
-                fTrackerSortActionItem = NSMenuItem; 
-                fTrackerSortItem = NSMenuItem; 
                 fURLSheetTextField = NSTextField; 
                 fURLSheetWindow = NSWindow; 
                 fUpdater = SUUpdater; 
@@ -180,24 +177,9 @@
             SUPERCLASS = NSObject; 
         }, 
         {
-            ACTIONS = {
-                checkFile = id; 
-                setQuickLimit = id; 
-                setQuickLimitMode = id; 
-                setQuickRatio = id; 
-                setQuickRatioMode = id; 
-            }; 
             CLASS = TorrentTableView; 
             LANGUAGE = ObjC; 
-            OUTLETS = {
-                fActionMenu = NSMenu; 
-                fContextNoRow = NSMenu; 
-                fContextRow = NSMenu; 
-                fController = Controller; 
-                fDownloadMenu = NSMenu; 
-                fRatioMenu = NSMenu; 
-                fUploadMenu = NSMenu; 
-            }; 
+            OUTLETS = {fContextNoRow = NSMenu; fContextRow = NSMenu; fController = Controller; }; 
             SUPERCLASS = NSTableView; 
         }
     ); 

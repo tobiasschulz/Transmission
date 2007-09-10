@@ -23,7 +23,9 @@
  *****************************************************************************/
 
 #import "InfoWindowController.h"
-#import "NSStringAdditions.h"
+#import "FileBrowserCell.h"
+#import "FilePriorityCell.h"
+#import "StringAdditions.h"
 
 #define FILE_ROW_SMALL_HEIGHT 18.0
 
@@ -36,8 +38,9 @@
 //15 spacing at the bottom of each tab
 #define TAB_INFO_HEIGHT 268.0
 #define TAB_ACTIVITY_HEIGHT 274.0
+#define TAB_PEERS_HEIGHT 279.0
+#define TAB_FILES_HEIGHT 279.0
 #define TAB_OPTIONS_HEIGHT 158.0
-#define TAB_RESIZABLE_MIN_HEIGHT 279.0
 
 #define PIECES_CONTROL_PROGRESS 0
 #define PIECES_CONTROL_AVAILABLE 1
@@ -84,11 +87,8 @@
     
     //select tab
     NSString * identifier = [[NSUserDefaults standardUserDefaults] stringForKey: @"InspectorSelected"];
-    
-    if (!identifier || [fTabView indexOfTabViewItemWithIdentifier: identifier] == NSNotFound)
+    if ([fTabView indexOfTabViewItemWithIdentifier: identifier] == NSNotFound)
         identifier = TAB_INFO_IDENT;
-    
-    fCanResizeVertical = [identifier isEqualToString: TAB_PEERS_IDENT] || [identifier isEqualToString: TAB_FILES_IDENT];
     
     [fTabView selectTabViewItemWithIdentifier: identifier];
     [self setWindowForTab: identifier animate: NO];
@@ -101,36 +101,30 @@
     //set file table
     [fFileOutline setDoubleAction: @selector(revealFile:)];
     
+    //set file outline
+    FilePriorityCell * priorityCell = [[[FilePriorityCell alloc] init] autorelease];
+    [[fFileOutline tableColumnWithIdentifier: @"Priority"] setDataCell: priorityCell];
+    
     //set blank inspector
     [self updateInfoForTorrents: [NSArray array]];
-    
-    //allow for update notifications
-    NSNotificationCenter * nc = [NSNotificationCenter defaultCenter];
-    [nc addObserver: self selector: @selector(updateInfoStats)
-            name: @"UpdateStats" object: nil];
-    
-    [nc addObserver: self selector: @selector(updateInfoSettings)
-            name: @"UpdateSettings" object: nil];
 }
 
 - (void) dealloc
 {
-    if (fCanResizeVertical)
-        [[NSUserDefaults standardUserDefaults] setFloat: [[[fTabView selectedTabViewItem] view] frame].size.height
-                                                forKey: @"InspectorHeight"];
-    
-    [[NSNotificationCenter defaultCenter] removeObserver: self];
-    
-    [fTorrents release];
-    [fPeers release];
-    [fFiles release];
+    if (fTorrents)
+        [fTorrents release];
+    if (fPeers)
+        [fPeers release];
+    if (fFiles)
+        [fFiles release];
     
     [super dealloc];
 }
 
 - (void) updateInfoForTorrents: (NSArray *) torrents
 {
-    [fTorrents release];
+    if (fTorrents)
+        [fTorrents release];
     fTorrents = [torrents retain];
 
     int numberSelected = [fTorrents count];
@@ -233,10 +227,7 @@
     {    
         Torrent * torrent = [fTorrents objectAtIndex: 0];
         
-        NSImage * icon = [[torrent icon] copy];
-        [icon setFlipped: NO];
-        [fImageView setImage: icon];
-        [icon release];
+        [fImageView setImage: [torrent icon]];
         
         NSString * name = [torrent name];
         [fNameField setStringValue: name];
@@ -291,7 +282,8 @@
         
         //set file table
         [fFileOutline deselectAll: nil];
-        [fFiles release];
+        if (fFiles)
+            [fFiles release];
         fFiles = [[torrent fileList] retain];
         
         [self updateInfoFiles];
@@ -399,9 +391,9 @@
     Torrent * torrent = [fTorrents objectAtIndex: 0];
     
     int seeders = [torrent seeders], leechers = [torrent leechers], downloaded = [torrent completedFromTracker];
-    [fSeedersField setStringValue: seeders < 0 ? @"" : [NSString stringWithFormat: @"%d", seeders]];
-    [fLeechersField setStringValue: leechers < 0 ? @"" : [NSString stringWithFormat: @"%d", leechers]];
-    [fCompletedFromTrackerField setStringValue: downloaded < 0 ? @"" : [NSString stringWithFormat: @"%d", downloaded]];
+    [fSeedersField setStringValue: seeders < 0 ? @"" : [NSString stringWithInt: seeders]];
+    [fLeechersField setStringValue: leechers < 0 ? @"" : [NSString stringWithInt: leechers]];
+    [fCompletedFromTrackerField setStringValue: downloaded < 0 ? @"" : [NSString stringWithInt: downloaded]];
     
     BOOL active = [torrent isActive];
     
@@ -436,10 +428,11 @@
     else
         [fConnectedPeersField setStringValue: NSLocalizedString(@"info not available", "Inspector -> Peers tab -> peers")];
     
-    [fDownloadingFromField setStringValue: active ? [NSString stringWithFormat: @"%d", [torrent peersSendingToUs]] : @""];
-    [fUploadingToField setStringValue: active ? [NSString stringWithFormat: @"%d", [torrent peersGettingFromUs]] : @""];
+    [fDownloadingFromField setStringValue: active ? [NSString stringWithInt: [torrent peersSendingToUs]] : @""];
+    [fUploadingToField setStringValue: active ? [NSString stringWithInt: [torrent peersGettingFromUs]] : @""];
     
-    [fPeers release];
+    if (fPeers)
+        [fPeers release];
     fPeers = [[[torrent peers] sortedArrayUsingDescriptors: [self peerSortDescriptors]] retain];
     
     [fPeerTable reloadData];
@@ -617,19 +610,8 @@
     SEL action = [menuItem action];
     
     if (action == @selector(revealFile:))
-    {
-        if (![[[fTabView selectedTabViewItem] identifier] isEqualToString: TAB_FILES_IDENT])
-            return NO;
-        
-        NSString * downloadFolder = [[fTorrents objectAtIndex: 0] downloadFolder];
-        NSIndexSet * indexSet = [fFileOutline selectedRowIndexes];
-        int i;
-        for (i = [indexSet firstIndex]; i != NSNotFound; i = [indexSet indexGreaterThanIndex: i])
-            if ([[NSFileManager defaultManager] fileExistsAtPath:
-                    [downloadFolder stringByAppendingPathComponent: [[fFiles objectAtIndex: i] objectForKey: @"Path"]]])
-                return YES;
-        return NO;
-    }
+        return [fFileOutline numberOfSelectedRows] > 0 &&
+            [[[fTabView selectedTabViewItem] identifier] isEqualToString: TAB_FILES_IDENT];
     
     if (action == @selector(setCheck:))
     {
@@ -719,53 +701,40 @@
 {
     [self updateInfoStats];
     
-    BOOL canResizeVertical = NO;
     float height;
-    if ([identifier isEqualToString: TAB_INFO_IDENT])
-        height = TAB_INFO_HEIGHT;
-    else if ([identifier isEqualToString: TAB_ACTIVITY_IDENT])
+    if ([identifier isEqualToString: TAB_ACTIVITY_IDENT])
     {
         height = TAB_ACTIVITY_HEIGHT;
         [fPiecesView updateView: YES];
     }
+    else if ([identifier isEqualToString: TAB_PEERS_IDENT])
+        height = TAB_PEERS_HEIGHT;
+    else if ([identifier isEqualToString: TAB_FILES_IDENT])
+        height = TAB_FILES_HEIGHT;
     else if ([identifier isEqualToString: TAB_OPTIONS_IDENT])
         height = TAB_OPTIONS_HEIGHT;
     else
-    {
-        canResizeVertical = YES;
-        height = MAX(TAB_RESIZABLE_MIN_HEIGHT, [[NSUserDefaults standardUserDefaults] floatForKey: @"InspectorHeight"]);
-    }
+        height = TAB_INFO_HEIGHT;
     
     NSWindow * window = [self window];
+    NSRect frame = [window frame];
     NSView * view = [[fTabView selectedTabViewItem] view];
-    NSRect windowFrame = [window frame], viewFrame = [view frame];
     
-    //save previous size
-    if (fCanResizeVertical && !canResizeVertical)
-        [[NSUserDefaults standardUserDefaults] setFloat: viewFrame.size.height forKey: @"InspectorHeight"];
+    float difference = height - [view frame].size.height;
+    frame.origin.y -= difference;
+    frame.size.height += difference;
     
-    float difference = (height - viewFrame.size.height) * [window userSpaceScaleFactor];
-    windowFrame.origin.y -= difference;
-    windowFrame.size.height += difference;
-    
-    //actually do resize
-    if (!fCanResizeVertical || !canResizeVertical)
+    if (animate)
     {
-        if (animate)
-        {
-            [view setHidden: YES];
-            [window setFrame: windowFrame display: YES animate: YES];
-            [view setHidden: NO];
-        }
-        else
-            [window setFrame: windowFrame display: YES];
+        [view setHidden: YES];
+        [window setFrame: frame display: YES animate: YES];
+        [view setHidden: NO];
     }
+    else
+        [window setFrame: frame display: YES];
     
-    [window setMinSize: NSMakeSize([window minSize].width, !canResizeVertical ? windowFrame.size.height
-                            : (windowFrame.size.height - (viewFrame.size.height + difference)) + TAB_RESIZABLE_MIN_HEIGHT)];
-    [window setMaxSize: NSMakeSize(FLT_MAX, !canResizeVertical ? windowFrame.size.height : FLT_MAX)];
-    
-    fCanResizeVertical = canResizeVertical;
+    [window setMinSize: NSMakeSize([window minSize].width, frame.size.height)];
+    [window setMaxSize: NSMakeSize([window maxSize].width, frame.size.height)];
 }
 
 - (void) setNextTab
@@ -914,10 +883,21 @@
             forTableColumn: (NSTableColumn *) tableColumn item: (id) item
 {
     NSString * identifier = [tableColumn identifier];
-    if ([identifier isEqualToString: @"Check"])
+    if ([identifier isEqualToString: @"Name"])
+    {
+        if ([[item objectForKey: @"IsFolder"] boolValue])
+            [cell setImage: nil];
+        else
+        {
+            [cell setImage: [item objectForKey: @"Icon"]];
+            [(FileBrowserCell *)cell setProgress: [[fTorrents objectAtIndex: 0] fileProgress:
+                                                    [[item objectForKey: @"Indexes"] firstIndex]]];
+        }
+    }
+    else if ([identifier isEqualToString: @"Check"])
         [cell setEnabled: [[fTorrents objectAtIndex: 0] canChangeDownloadCheckForFiles: [item objectForKey: @"Indexes"]]];
     else if ([identifier isEqualToString: @"Priority"])
-        [cell setRepresentedObject: item];
+        [(FilePriorityCell *)cell setItem: item];
     else;
 }
 
@@ -936,9 +916,8 @@
         
         [torrent setFileCheckState: [object intValue] != NSOffState ? NSOnState : NSOffState forIndexes: indexSet];
         [fFileOutline reloadData];
-        
-        [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateUI" object: nil];
     }
+    else;
 }
 
 - (NSString *) outlineView: (NSOutlineView *) outlineView toolTipForCell: (NSCell *) cell rect: (NSRectPointer) rect

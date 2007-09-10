@@ -23,15 +23,10 @@
  *****************************************************************************/
 
 #import "FilterBarButton.h"
-#import "CTGradient.h"
-#import "CTGradientAdditions.h"
-#import "NSBezierPathAdditions.h"
 
 @interface FilterBarButton (Private)
 
-- (void) createPaths;
-- (void) createGradients;
-- (void) createFontAttributes;
+- (void) createButtons;
 
 @end
 
@@ -43,16 +38,24 @@
     {
         fEnabled = NO;
         fTrackingTag = 0;
+        
+        [self createButtons];
+        [self setAlternateImage: fButtonPressed];
+        [self setImage: fButtonNormal];
+        
         fCount = -1;
         [self setCount: 0];
-        [self createPaths];
-        [self createGradients];
-        [self createFontAttributes];
         
         NSNotificationCenter * nc = [NSNotificationCenter defaultCenter];
-        [nc addObserver: self selector: @selector(setForActive:) name: NSWindowDidBecomeKeyNotification object: [self window]];
-        [nc addObserver: self selector: @selector(setForInactive:) name: NSWindowDidResignKeyNotification object: [self window]];
-        [nc addObserver: self selector: @selector(resetBounds:) name: NSViewFrameDidChangeNotification object: nil];
+        
+        [nc addObserver: self selector: @selector(setForActive:)
+                    name: NSWindowDidBecomeKeyNotification object: [self window]];
+        
+        [nc addObserver: self selector: @selector(setForInactive:)
+                    name: NSWindowDidResignKeyNotification object: [self window]];
+        
+        [nc addObserver: self selector: @selector(resetBounds:)
+                    name: NSViewFrameDidChangeNotification object: nil];
     }
     return self;
 }
@@ -61,75 +64,13 @@
 {
     [[NSNotificationCenter defaultCenter] removeObserver: self];
 
-    [fPath release];
-    [fEdgePath release];
-    [fStepPath release];
-    
-    [fNormalAttributes release];
-    [fNormalDimAttributes release];
-    [fHighlightedAttributes release];
-    
-    [fHighlightedDimAttributes release];
-    [fHighlightedBackground release];
-    [fHighlightedOutline release];
-    [fActiveBackground release];
-    [fActiveOutline release];
-    [fHoveringBackground release];
-    [fHoveringOutline release];
+    [fButtonNormal release];
+    [fButtonOver release];
+    [fButtonPressed release];
+    [fButtonSelected release];
+    [fButtonSelectedDim release];
     
     [super dealloc];
-}
-
-- (void) sizeToFit
-{
-    NSSize size = [[self title] sizeWithAttributes: fNormalAttributes];
-    size.width = floorf(size.width + 14.5);
-    size.height += 1;
-    [self setFrameSize: size];
-    [self setBoundsSize: size];
-    [self createPaths];
-}
-
-- (BOOL) isFlipped
-{
-    return NO;
-}
-
-- (void) drawRect: (NSRect) rect
-{
-    // draw background
-    if ([[self cell] isHighlighted])
-    {
-        [fHighlightedBackground fillBezierPath: fPath angle: -90.0];
-        [fHighlightedOutline fillBezierPath: fStepPath angle: -90.0];
-    }
-    else
-        switch (fState)
-        {
-            case 1:     // active
-                [fActiveBackground fillBezierPath: fPath angle: -90.0];
-                [fActiveOutline fillBezierPath: fStepPath angle: -90.0];
-                break;
-            case 2:     // hovering
-            case 3:     // clicked but cell is not highlighted
-                [fHoveringBackground fillBezierPath: fPath angle: -90.0];
-                [fHoveringOutline setStroke];
-                [fEdgePath stroke];
-                break;
-        }
-    
-    // draw title
-    NSSize titleSize = [[self title] sizeWithAttributes: fNormalAttributes];
-    NSPoint titlePos = NSMakePoint(([self bounds].size.width  - titleSize.width)  * 0.5,
-                                   ([self bounds].size.height - titleSize.height) * 0.5 + 1.5);
-    
-    NSDictionary * attributes;
-    if (fState)
-        attributes = fEnabled ? fHighlightedAttributes : fHighlightedDimAttributes;
-    else
-        attributes = fEnabled ? fNormalAttributes : fNormalDimAttributes;
-    
-    [[self title] drawAtPoint: titlePos withAttributes: attributes];
 }
 
 - (void) setCount: (int) count
@@ -142,49 +83,26 @@
             : [NSString stringWithFormat: NSLocalizedString(@"%d Transfers", "Filter Bar Button -> tool tip"), fCount]];
 }
 
-- (void) mouseDown: (NSEvent *) event
-{
-    if ([self state] != 1)
-        [self setState: 3];
-    [super mouseDown: event];
-}
-
-- (void) mouseUp: (NSEvent *) event
-{
-    [super mouseUp: event];
-    if ([self state] != 1)
-        [self setState: 1];
-}
-
 - (void) mouseEntered: (NSEvent *) event
 {
+    if (!fEnabled)
+        [self setImage: fButtonOver];
+    
     [super mouseEntered: event];
-    if ([self state] == 0)
-        [self setState: 2];
 }
 
 - (void) mouseExited: (NSEvent *) event
 {
+    if (!fEnabled)
+        [self setImage: fButtonNormal];
+
     [super mouseExited: event];
-    if ([self state] >= 2)
-        [self setState: 0];
 }
 
 - (void) setEnabled: (BOOL) enable
 {
     fEnabled = enable;
-    [self setNeedsDisplay: YES];
-}
-
-- (int) state
-{
-    return fState;
-}
-
-- (void) setState: (int) state
-{
-    fState = state;
-    [self setNeedsDisplay: YES];
+    [self setImage: fEnabled ? fButtonSelected : fButtonNormal];
 }
 
 - (void) resetBounds: (NSNotification *) notification
@@ -196,105 +114,177 @@
 
 - (void) setForActive: (NSNotification *) notification
 {
-    [self setEnabled: YES];
+    [self setImage: fEnabled ? fButtonSelected : fButtonNormal];
     [self resetBounds: nil];
-    [self setNeedsDisplay: YES];
 }
 
 - (void) setForInactive: (NSNotification *) notification
 {
+    [self setImage: fEnabled ? fButtonSelectedDim : fButtonNormalDim];
+    
     if (fTrackingTag)
     {
         [self removeTrackingRect: fTrackingTag];
         fTrackingTag = 0;
     }
-    [self setEnabled: NO];
-    [self setNeedsDisplay: YES];
 }
 
 @end
 
 @implementation FilterBarButton (Private)
 
-- (void) createPaths
+- (void) createButtons
 {
-    NSSize buttonSize = [self frame].size;
+    //create attributes
+    NSFont * boldFont = [[NSFontManager sharedFontManager] convertFont:
+                            [NSFont fontWithName: @"Lucida Grande" size: 12.0] toHaveTrait: NSBoldFontMask];
     
-    // the main button path
-    [fPath release];
-    fPath = [[NSBezierPath bezierPathWithRoundedRect: NSMakeRect(0.0, 1.0, buttonSize.width, buttonSize.height - 1.0)
-                radius: (buttonSize.height - 1.0) / 2.0] retain];
-    
-    // the path used to draw the hover edging
-    [fEdgePath release];
-    fEdgePath = [[NSBezierPath bezierPathWithRoundedRect: NSMakeRect(0.5, 1.5, buttonSize.width - 1.0, buttonSize.height - 2.0)
-                    radius: (buttonSize.height - 2.0) / 2.0] retain];
-    
-    // the path used to draw the depressed shading/highlights of the active button
-    [fStepPath release];
-    fStepPath = [[NSBezierPath bezierPathWithRoundedRect: NSMakeRect(0.0, 0.0, buttonSize.width, buttonSize.height - 1.0)
-                    radius: (buttonSize.height - 1.0) / 2.0] retain];
-    [fStepPath appendBezierPath: fPath];
-    [fStepPath setWindingRule: NSEvenOddWindingRule];
-}
-
-- (void) createGradients
-{
-    NSColor *quarterAlphaBlack = [NSColor colorWithCalibratedWhite: 0.0 alpha: 0.25];
-    NSColor *thirdAlphaWhite = [NSColor colorWithCalibratedWhite: 1.0 alpha: 0.3333];
-    fHighlightedBackground = [[CTGradient gradientWithBeginningColor: [NSColor colorWithCalibratedRed: 134.0/255 green: 151.0/255 blue: 176.0/255 alpha: 1.0]
-                                                         endingColor: [NSColor colorWithCalibratedRed: 104.0/255 green: 125.0/255 blue: 157.0/255 alpha: 1.0]] retain];
-    fHighlightedOutline = [[CTGradient gradientWithBeginningColor: quarterAlphaBlack
-                                                     middleColor1: quarterAlphaBlack
-                                                     middleColor2: thirdAlphaWhite
-                                                      endingColor: thirdAlphaWhite] retain];
-    fActiveBackground = [[CTGradient gradientWithBeginningColor: [NSColor colorWithCalibratedRed: 151.0/255 green: 166.0/255 blue: 188.0/255 alpha: 1.0]
-                                                    endingColor: [NSColor colorWithCalibratedRed: 126.0/255 green: 144.0/255 blue: 171.0/255 alpha: 1.0]] retain];
-    fActiveOutline = [fHighlightedOutline retain];
-    fHoveringBackground = [[CTGradient gradientWithBeginningColor: [NSColor colorWithCalibratedRed: 164.0/255 green: 177.0/255 blue: 196.0/255 alpha: 1.0]
-                                                      endingColor: [NSColor colorWithCalibratedRed: 141.0/255 green: 158.0/255 blue: 182.0/255 alpha: 1.0]] retain];
-    fHoveringOutline = [[NSColor colorWithCalibratedWhite: 0.0 alpha: 0.075] retain];
-}
-
-- (void) createFontAttributes
-{
-    NSFont * boldSystemFont = [NSFont boldSystemFontOfSize: 12.0];
     NSSize shadowOffset = NSMakeSize(0.0, -1.0);
     
-    NSShadow * shadowNormal = [[[NSShadow alloc] init] autorelease]; 
-    [shadowNormal setShadowOffset: shadowOffset]; 
-    [shadowNormal setShadowBlurRadius: 1.0]; 
-    [shadowNormal setShadowColor: [NSColor colorWithCalibratedWhite: 1.0 alpha: 0.4]]; 
+    NSShadow * shadowNormal = [NSShadow alloc];
+    [shadowNormal setShadowOffset: shadowOffset];
+    [shadowNormal setShadowBlurRadius: 1.0];
+    [shadowNormal setShadowColor: [NSColor colorWithDeviceWhite: 1.0 alpha: 0.4]];
+
+    NSShadow * shadowDim = [NSShadow alloc];
+    [shadowDim setShadowOffset: shadowOffset];
+    [shadowDim setShadowBlurRadius: 1.0];
+    [shadowDim setShadowColor: [NSColor colorWithDeviceWhite: 1.0 alpha: 0.2]];
     
-    NSShadow * shadowNormalDim = [[[NSShadow alloc] init] autorelease]; 
-    [shadowNormalDim setShadowOffset: shadowOffset]; 
-    [shadowNormalDim setShadowBlurRadius: 1.0]; 
-    [shadowNormalDim setShadowColor: [NSColor colorWithCalibratedWhite: 1.0 alpha: 0.2]]; 
+    NSShadow * shadowHighlighted = [NSShadow alloc];
+    [shadowHighlighted setShadowOffset: shadowOffset];
+    [shadowHighlighted setShadowBlurRadius: 1.0];
+    [shadowHighlighted setShadowColor: [NSColor colorWithDeviceWhite: 0.0 alpha: 0.4]];
     
-    NSShadow * shadowHighlighted = [[[NSShadow alloc] init] autorelease]; 
-    [shadowHighlighted setShadowOffset: shadowOffset]; 
-    [shadowHighlighted setShadowBlurRadius: 1.0]; 
-    [shadowHighlighted setShadowColor: [NSColor colorWithCalibratedWhite: 0.0 alpha: 0.4]]; 
+    NSDictionary * normalAttributes = [[NSDictionary alloc] initWithObjectsAndKeys:
+                [NSColor colorWithCalibratedRed: 0.259 green: 0.259 blue: 0.259 alpha: 1.0],
+                NSForegroundColorAttributeName,
+                boldFont, NSFontAttributeName,
+                shadowNormal, NSShadowAttributeName, nil],
+        * normalDimAttributes = [[NSDictionary alloc] initWithObjectsAndKeys:
+                [NSColor disabledControlTextColor], NSForegroundColorAttributeName,
+                boldFont, NSFontAttributeName,
+                shadowDim, NSShadowAttributeName, nil],
+        * highlightedAttributes = [[NSDictionary alloc] initWithObjectsAndKeys:
+                [NSColor whiteColor], NSForegroundColorAttributeName,
+                boldFont, NSFontAttributeName,
+                shadowHighlighted, NSShadowAttributeName, nil],
+        * highlightedDimAttributes = [[NSDictionary alloc] initWithObjectsAndKeys:
+                [NSColor colorWithCalibratedRed: 0.9 green: 0.9 blue: 0.9 alpha: 1.0], NSForegroundColorAttributeName,
+                boldFont, NSFontAttributeName,
+                shadowHighlighted, NSShadowAttributeName, nil];
     
-    fNormalAttributes = [[NSDictionary alloc] initWithObjectsAndKeys:
-        [NSColor colorWithCalibratedWhite: 0.259 alpha: 1.0], NSForegroundColorAttributeName,
-        boldSystemFont, NSFontAttributeName,
-        shadowNormal, NSShadowAttributeName, nil];
+    [shadowNormal release];
+    [shadowDim release];
+    [shadowHighlighted release];
     
-    fNormalDimAttributes = [[NSDictionary alloc] initWithObjectsAndKeys:
-        [NSColor disabledControlTextColor], NSForegroundColorAttributeName,
-        boldSystemFont, NSFontAttributeName,
-        shadowNormalDim, NSShadowAttributeName, nil];
+    //get images
+    NSImage * leftOver = [NSImage imageNamed: @"FilterButtonOverLeft.png"],
+            * rightOver = [NSImage imageNamed: @"FilterButtonOverRight.png"],
+            * mainOver = [NSImage imageNamed: @"FilterButtonOverMain.png"];
     
-    fHighlightedAttributes = [[NSDictionary alloc] initWithObjectsAndKeys:
-        [NSColor whiteColor], NSForegroundColorAttributeName,
-        boldSystemFont, NSFontAttributeName,
-        shadowHighlighted, NSShadowAttributeName, nil];
+    NSImage * leftPressed = [NSImage imageNamed: @"FilterButtonPressedLeft.png"],
+            * rightPressed = [NSImage imageNamed: @"FilterButtonPressedRight.png"],
+            * mainPressed = [NSImage imageNamed: @"FilterButtonPressedMain.png"];
     
-    fHighlightedDimAttributes = [[NSDictionary alloc] initWithObjectsAndKeys:
-        [NSColor colorWithCalibratedWhite: 0.9 alpha: 1.0], NSForegroundColorAttributeName,
-        boldSystemFont, NSFontAttributeName,
-        shadowHighlighted, NSShadowAttributeName, nil];
+    NSImage * leftSelected = [NSImage imageNamed: @"FilterButtonSelectedLeft.png"],
+            * rightSelected = [NSImage imageNamed: @"FilterButtonSelectedRight.png"],
+            * mainSelected = [NSImage imageNamed: @"FilterButtonSelectedMain.png"];
+    
+    //get button sizes and placement
+    NSString * text = [self title];
+    NSSize textSize = [text sizeWithAttributes: normalAttributes];
+    textSize.width = ceilf(textSize.width);
+    
+    float overlap = 7.0;
+    NSSize endSize = [leftOver size],
+            mainSize = NSMakeSize(textSize.width - overlap * 2.0, endSize.height),
+            buttonSize = NSMakeSize(mainSize.width + 2.0 * endSize.width, endSize.height);
+    NSRect textRect = NSMakeRect(endSize.width - overlap, (buttonSize.height - textSize.height) * 0.5 + 1.5,
+                                textSize.width, textSize.height);
+    
+    NSPoint leftPoint = NSZeroPoint,
+            mainPoint = NSMakePoint(endSize.width, 0),
+            rightPoint = NSMakePoint(mainPoint.x + mainSize.width, 0);
+    
+    fButtonNormal = [[NSImage alloc] initWithSize: buttonSize];
+    fButtonNormalDim = [[NSImage alloc] initWithSize: buttonSize];
+    fButtonOver = [[NSImage alloc] initWithSize: buttonSize];
+    fButtonPressed = [[NSImage alloc] initWithSize: buttonSize];
+    fButtonSelected = [[NSImage alloc] initWithSize: buttonSize];
+    fButtonSelectedDim = [[NSImage alloc] initWithSize: buttonSize];
+    
+    //rolled over button
+    [mainOver setScalesWhenResized: YES];
+    [mainOver setSize: mainSize];
+    
+    [fButtonOver lockFocus];
+    [leftOver compositeToPoint: leftPoint operation: NSCompositeSourceOver];
+    [mainOver compositeToPoint: mainPoint operation: NSCompositeSourceOver];
+    [rightOver compositeToPoint: rightPoint operation: NSCompositeSourceOver];
+    [fButtonOver unlockFocus];
+    
+    //pressed button
+    [mainPressed setScalesWhenResized: YES];
+    [mainPressed setSize: mainSize];
+    
+    [fButtonPressed lockFocus];
+    [leftPressed compositeToPoint: leftPoint operation: NSCompositeSourceOver];
+    [mainPressed compositeToPoint: mainPoint operation: NSCompositeSourceOver];
+    [rightPressed compositeToPoint: rightPoint operation: NSCompositeSourceOver];
+    [fButtonPressed unlockFocus];
+    
+    //selected button
+    [mainSelected setScalesWhenResized: YES];
+    [mainSelected setSize: mainSize];
+    
+    [fButtonSelected lockFocus];
+    [leftSelected compositeToPoint: leftPoint operation: NSCompositeSourceOver];
+    [mainSelected compositeToPoint: mainPoint operation: NSCompositeSourceOver];
+    [rightSelected compositeToPoint: rightPoint operation: NSCompositeSourceOver];
+    [fButtonSelected unlockFocus];
+    
+    //selected and dimmed button
+    fButtonSelectedDim = [fButtonSelected copy];
+    
+    //normal button
+    [fButtonNormal lockFocus];
+    [text drawInRect: textRect withAttributes: normalAttributes];
+    [fButtonNormal unlockFocus];
+    
+    //normal and dim button
+    [fButtonNormalDim lockFocus];
+    [text drawInRect: textRect withAttributes: normalDimAttributes];
+    [fButtonNormalDim unlockFocus];
+    
+    //rolled over button
+    [fButtonOver lockFocus];
+    [text drawInRect: textRect withAttributes: highlightedAttributes];
+    [fButtonOver unlockFocus];
+    
+    //pressed button
+    [fButtonPressed lockFocus];
+    [text drawInRect: textRect withAttributes: highlightedAttributes];
+    [fButtonPressed unlockFocus];
+    
+    //selected button
+    [fButtonSelected lockFocus];
+    [text drawInRect: textRect withAttributes: highlightedAttributes];
+    [fButtonSelected unlockFocus];
+    
+    //selected and dim button
+    [fButtonSelectedDim lockFocus];
+    [text drawInRect: textRect withAttributes: highlightedDimAttributes];
+    [fButtonSelectedDim unlockFocus];
+    
+    [normalAttributes release];
+    [normalDimAttributes release];
+    [highlightedAttributes release];
+    [highlightedDimAttributes release];
+    
+    //resize button
+    NSPoint point = [self frame].origin;
+    [self setFrame: NSMakeRect(point.x, point.y, buttonSize.width, buttonSize.height)];
 }
 
 @end

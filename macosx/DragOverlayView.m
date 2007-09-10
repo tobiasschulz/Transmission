@@ -23,7 +23,7 @@
  *****************************************************************************/
 
 #import "DragOverlayView.h"
-#import "NSBezierPathAdditions.h"
+#import "BezierPathAdditions.h"
 
 @implementation DragOverlayView
 
@@ -74,8 +74,10 @@
 {
     [fBackBadge release];
     
-    [fBadge release];
-    [fAppIcon release];
+    if (fBadge)
+        [fBadge release];
+    if (fAppIcon)
+        [fAppIcon release];
     
     [fMainLineAttributes release];
     [fSubLineAttributes release];

@@ -23,7 +23,7 @@
  *****************************************************************************/
 
 #import "Badger.h"
-#import "NSStringAdditions.h"
+#import "StringAdditions.h"
 
 @interface Badger (Private)
 
@@ -79,6 +79,7 @@
                 fBadge = [NSImage imageNamed: @"Badge"];
             
             NSRect badgeRect;
+            NSSize iconSize = [fDockIcon size];
             badgeRect.size = [fBadge size];
             badgeRect.origin.x = iconSize.width - badgeRect.size.width;
             badgeRect.origin.y = iconSize.height - badgeRect.size.height;
@@ -94,7 +95,7 @@
             badgeRect.origin.y += badgeBottomExtra;
             
             //place badge text
-            [self badgeString: [NSString stringWithFormat: @"%d", fCompleted] forRect: badgeRect];
+            [self badgeString: [NSString stringWithInt: fCompleted] forRect: badgeRect];
                         
             [fDockIcon unlockFocus];
         }
@@ -118,7 +119,7 @@
     
     NSImage * dockIcon = nil;
     BOOL speedChange;
-    if ((speedChange = (uploadRateString || downloadRateString)))
+    if (speedChange = (uploadRateString || downloadRateString))
     {
         if (!fDockIcon)
             fDockIcon = [[NSImage imageNamed: @"NSApplicationIcon"] copy];

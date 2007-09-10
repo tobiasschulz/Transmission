@@ -2,24 +2,24 @@
 #
 # $Id$
 
-# convention: -TR MAJOR MINOR MAINT BETA - (each a single char)
-# BETA: "Z" for beta, "0" for stable 
-# these should be the only two lines you need to change
-PEERID_PREFIX="-TR082Z-"
-USERAGENT_PREFIX="0.82+"
+# constraint: strlen(MAJOR MINOR MAINT BETA) must be 4
+# convention: BETA: "Z" for a beta, "0" for a stable
+MAJOR="0"
+MINOR="8"
+MAINT="2"
+BETA="0"
+STRING=0.82
 
-
-SVN_REVISION=`find ./ -name "*\.[ch]" -o -name "*\.cpp" -o -name "*\.po" | \
-              xargs grep "\$Id:" | \
-              grep -v third-party | \
-              cut -d"$Id:" -f3 | cut -d" " -f3 | sort -n | tail -n 1`
-
-if test "x${PEERID_PREFIX//Z/}" = "x$PEERID_PREFIX";
-then
-    STABLE_RELEASE=yes
-else
-    STABLE_RELEASE=no
-fi
+PEERID_PREFIX="-TR0820-"
+USERAGENT_PREFIX="0.82"
+SVN_REVISION=`( find . '(' -name '*.[chm]' -o -name '*.cpp' -o -name '*.po' \
+                     -o -name '*.mk' -o -name '*.in' -o -name 'Makefile' \
+                     -o -name 'configure' ')' -exec cat '{}' ';' ) | \
+                   sed -e '/\$Id:/!d' -e \
+                     's/.*\$Id: [^ ]* \([0-9]*\) .*/\1/' |
+                   awk 'BEGIN { REV=0 }
+                              { if ( $1 > REV ) REV=$1 }
+                        END   { print REV }'`
   
 # Generate files to be included: only overwrite them if changed so make
 # won't rebuild everything unless necessary
@@ -34,9 +34,11 @@ replace_if_differs ()
 
 # Generate version.mk
 cat > mk/version.mk.new << EOF
-VERSION_REVISION    = "$SVN_REVISION"
-VERSION_STRING      = "$USERAGENT_PREFIX ($SVN_REVISION)"
-STABLE_RELEASE      = "$STABLE_RELEASE"
+VERSION_MAJOR       = "$MAJOR"
+VERSION_MINOR       = "$MINOR"
+VERSION_MAINTENANCE = "$MAINT"
+VERSION_REVISION    = "$REV"
+VERSION_STRING      = "$STRING ($REV)"
 EOF
 replace_if_differs mk/version.mk.new mk/version.mk
 

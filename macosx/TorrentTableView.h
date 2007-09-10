@@ -24,46 +24,30 @@
 
 #import <Cocoa/Cocoa.h>
 #import <transmission.h>
-#import <Controller.h>
 
-//button layout (from end of bar) is: button, padding, button, padding
-#define BUTTON_WIDTH 14.0
-#define BUTTONS_TOTAL_WIDTH 36.0
+#define BUTTONS_TOTAL_WIDTH 39.0
 
-#define ACTION_BUTTON_HEIGHT 12.0
-#define ACTION_BUTTON_WIDTH 28.0
+@class Controller;
 
 @interface TorrentTableView : NSTableView
+
 {
     IBOutlet Controller * fController;
-    NSArray * fTorrents;
+    NSArray             * fTorrents;
+    NSPoint             fClickPoint;
     
-    NSPoint fClickPoint;
-    BOOL fClickIn;
+    NSUserDefaults      * fDefaults;
     
-    NSUserDefaults * fDefaults;
+    IBOutlet NSMenu     * fContextRow, * fContextNoRow;
+    NSImage             * fResumeOnIcon, * fResumeOffIcon,
+                        * fPauseOnIcon, * fPauseOffIcon,
+                        * fResumeNoWaitOnIcon, * fResumeNoWaitOffIcon, 
+                        * fRevealOnIcon, * fRevealOffIcon;
     
-    IBOutlet NSMenu * fContextRow, * fContextNoRow;
-    NSImage * fResumeOnIcon, * fResumeOffIcon, * fPauseOnIcon, * fPauseOffIcon,
-            * fResumeNoWaitOnIcon, * fResumeNoWaitOffIcon, * fRevealOnIcon, * fRevealOffIcon,
-            * fActionOnIcon, * fActionOffIcon;
+    NSMutableArray      * fKeyStrokes;
     
-    NSMutableArray * fKeyStrokes;
-    
-    IBOutlet NSMenu * fActionMenu, * fUploadMenu, * fDownloadMenu, * fRatioMenu;
-    Torrent * fMenuTorrent;
+    NSDictionary        * fSmallStatusAttributes;
 }
-
 - (void) setTorrents: (NSArray *) torrents;
-
-- (void) displayTorrentMenuForEvent: (NSEvent *) event;
-
-- (void) setQuickLimitMode: (id) sender;
-- (void) setQuickLimit: (id) sender;
-
-- (void) setQuickRatioMode: (id) sender;
-- (void) setQuickRatio: (id) sender;
-
-- (void) checkFile: (id) sender;
 
 @end

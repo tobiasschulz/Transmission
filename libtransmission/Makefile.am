@@ -1,6 +1,4 @@
-AM_CPPFLAGS = -I. -I$(top_srcdir) -D__TRANSMISSION__ $(LIBEVENT_CPPFLAGS)
-
-AM_CFLAGS = $(PTHREAD_CFLAGS)
+AM_CPPFLAGS = -I. -I@top_srcdir@ -D__TRANSMISSION__
 
 noinst_LIBRARIES = libtransmission.a
 
@@ -25,18 +23,14 @@ libtransmission_a_SOURCES = \
     net.c \
     peer.c \
     platform.c \
-    ptrarray.c \
-    publish.c \
     ratecontrol.c \
     sha1.c \
     shared.c \
     strlcat.c \
     strlcpy.c \
-    timer.c \
     torrent.c \
     tracker.c \
     transmission.c \
-    trevent.c \
     upnp.c \
     utils.c \
     xml.c
@@ -67,16 +61,12 @@ noinst_HEADERS = \
     peertree.h \
     peerutils.h \
     platform.h \
-    ptrarray.h \
-    publish.h \
     ratecontrol.h \
     sha1.h \
     shared.h \
-    timer.h \
     tracker.h \
     transmission.h \
     trcompat.h \
-    trevent.h \
     upnp.h \
     utils.h \
     xml.h

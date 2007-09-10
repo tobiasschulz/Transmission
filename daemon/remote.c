@@ -940,12 +940,6 @@ printlisting( void )
             printf( "%.*f%% checking files",
                     BESTDECIMAL( progress ), progress );
         }
-        /* print progress */
-        else if( 0 == strcasecmp( "waiting to checking", ii->state ) )
-        {
-            printf( "%.*f%% waiting to check files",
-                    BESTDECIMAL( progress ), progress );
-        }
         /* print download progress, speeds, and eta */
         else if( 0 == strcasecmp( "downloading", ii->state ) )
         {

@@ -23,7 +23,12 @@
  *****************************************************************************/
 
 #import "Torrent.h"
-#import "NSStringAdditions.h"
+#import "StringAdditions.h"
+
+#define BAR_HEIGHT 12.0
+
+#define MAX_PIECES 324
+#define BLANK_PIECE -99
 
 static int static_lastid = 0;
 
@@ -46,6 +51,7 @@ static int static_lastid = 0;
 - (void) insertPath: (NSMutableArray *) components forSiblings: (NSMutableArray *) siblings
             withParent: (NSMutableDictionary *) parent previousPath: (NSString *) previousPath
             flatList: (NSMutableArray *) flatList fileSize: (uint64_t) size index: (int) index;
+- (NSImage *) advancedBar;
 
 - (void) quickPause;
 - (void) endQuickPause;
@@ -55,6 +61,18 @@ static int static_lastid = 0;
 @end
 
 @implementation Torrent
+
+// Used to optimize drawing. They contain packed RGBA pixels for every color needed.
+#define BE OSSwapBigToHostConstInt32
+
+static uint32_t kRed   = BE(0xFF6450FF), //255, 100, 80
+                kBlue = BE(0x50A0FFFF), //80, 160, 255
+                kBlue2 = BE(0x1E46B4FF), //30, 70, 180
+                kGray  = BE(0x969696FF), //150, 150, 150
+                kGreen1 = BE(0x99FFCCFF), //153, 255, 204
+                kGreen2 = BE(0x66FF99FF), //102, 255, 153
+                kGreen3 = BE(0x00FF66FF), //0, 255, 102
+                kWhite = BE(0xFFFFFFFF); //255, 255, 255
 
 - (id) initWithPath: (NSString *) path location: (NSString *) location deleteTorrentFile: (torrentFileState) torrentDelete
         lib: (tr_handle_t *) lib
@@ -156,6 +174,8 @@ static int static_lastid = 0;
     [fDateActivity release];
     
     [fIcon release];
+    [fIconFlipped release];
+    [fIconSmall release];
     
     [fProgressString release];
     [fStatusString release];
@@ -165,9 +185,12 @@ static int static_lastid = 0;
     [fFileList release];
     [fFlatFileList release];
     
-    [fFileMenu release];
-    
     [fQuickPauseDict release];
+    
+    [fBitmap release];
+    
+    if (fPieces)
+        free(fPieces);
     
     [super dealloc];
 }
@@ -419,16 +442,11 @@ static int static_lastid = 0;
     
     //create strings for error or stalled
     if (fError)
-    {
-        NSString * errorString = [self errorMessage];
-        if (!errorString || [errorString isEqualToString: @""])
-            [statusString setString: NSLocalizedString(@"Error", "Torrent -> status string")];
-        else
-            [statusString setString: [NSLocalizedString(@"Error: ", "Torrent -> status string")
-                                    stringByAppendingString: errorString]];
-    }
+        [statusString setString: [NSLocalizedString(@"Error: ", "Torrent -> status string")
+                                    stringByAppendingString: [self errorMessage]]];
     else if (fStalled)
-        [statusString insertString: NSLocalizedString(@"Stalled, ", "Torrent -> status string") atIndex: 0];
+        [statusString setString: [NSLocalizedString(@"Stalled, ", "Torrent -> status string")
+                                    stringByAppendingString: statusString]];
     else;
     
     //update queue for checking (from downloading to seeding), stalled, or error
@@ -465,6 +483,40 @@ static int static_lastid = 0;
 	[fStatusString setString: statusString];
 	[fShortStatusString setString: shortStatusString];
 	[fRemainingTimeString setString: remainingTimeString];
+}
+
+- (NSDictionary *) infoForCurrentView
+{
+    NSMutableDictionary * info = [NSMutableDictionary dictionaryWithObjectsAndKeys:
+                                    [self name], @"Name",
+                                    [NSNumber numberWithFloat: [self progress]], @"Progress",
+                                    [NSNumber numberWithFloat: (float)fStat->left/[self size]], @"Left",
+                                    [NSNumber numberWithBool: [self isActive]], @"Active",
+                                    [NSNumber numberWithBool: [self isSeeding]], @"Seeding",
+                                    [NSNumber numberWithBool: [self isChecking]], @"Checking",
+                                    [NSNumber numberWithBool: fWaitToStart], @"Waiting",
+                                    [NSNumber numberWithBool: [self isError]], @"Error", nil];
+    
+    if ([self isSeeding])
+        [info setObject: [NSNumber numberWithFloat: [self progressStopRatio]] forKey: @"ProgressStopRatio"];
+    
+    if (![fDefaults boolForKey: @"SmallView"])
+    {
+        [info setObject: [self iconFlipped] forKey: @"Icon"];
+        [info setObject: [self progressString] forKey: @"ProgressString"];
+        [info setObject: [self statusString] forKey: @"StatusString"];
+    }
+    else
+    {
+        [info setObject: [self iconSmall] forKey: @"Icon"];
+        [info setObject: [self remainingTimeString] forKey: @"RemainingTimeString"];
+        [info setObject: [self shortStatusString] forKey: @"ShortStatusString"];
+    }
+    
+    if ([fDefaults boolForKey: @"UseAdvancedBar"])
+        [info setObject: [self advancedBar] forKey: @"AdvancedBar"];
+    
+    return info;
 }
 
 - (void) startTransfer
@@ -568,7 +620,6 @@ static int static_lastid = 0;
         return 0;
 }
 
-#warning use enum value
 - (int) speedMode: (BOOL) upload
 {
     return tr_torrentGetSpeedMode(fHandle, upload ? TR_UP : TR_DOWN);
@@ -747,27 +798,27 @@ static int static_lastid = 0;
     {
         NSAlert * alert = [[NSAlert alloc] init];
         [alert setMessageText: [NSString stringWithFormat:
-                                NSLocalizedString(@"The folder for downloading \"%@\" cannot be used.",
-                                    "Folder cannot be used alert -> title"), [self name]]];
+                                NSLocalizedString(@"The folder for downloading \"%@\" cannot be found.",
+                                    "Folder cannot be found alert -> title"), [self name]]];
         [alert setInformativeText: [NSString stringWithFormat:
-                        NSLocalizedString(@"\"%@\" cannot be used. The transfer will be paused.",
-                                            "Folder cannot be used alert -> message"), [self downloadFolder]]];
-        [alert addButtonWithTitle: NSLocalizedString(@"OK", "Folder cannot be used alert -> button")];
+                        NSLocalizedString(@"\"%@\" cannot be found. The transfer will be paused.",
+                                            "Folder cannot be found alert -> message"), [self downloadFolder]]];
+        [alert addButtonWithTitle: NSLocalizedString(@"OK", "Folder cannot be found alert -> button")];
         [alert addButtonWithTitle: [NSLocalizedString(@"Choose New Location",
-                                    "Folder cannot be used alert -> location button") stringByAppendingEllipsis]];
+                                    "Folder cannot be found alert -> location button") stringByAppendingEllipsis]];
         
         if ([alert runModal] != NSAlertFirstButtonReturn)
         {
             NSOpenPanel * panel = [NSOpenPanel openPanel];
             
-            [panel setPrompt: NSLocalizedString(@"Select", "Folder cannot be used alert -> prompt")];
+            [panel setPrompt: NSLocalizedString(@"Select", "Folder cannot be found alert -> prompt")];
             [panel setAllowsMultipleSelection: NO];
             [panel setCanChooseFiles: NO];
             [panel setCanChooseDirectories: YES];
             [panel setCanCreateDirectories: YES];
 
             [panel setMessage: [NSString stringWithFormat: NSLocalizedString(@"Select the download folder for \"%@\"",
-                                "Folder cannot be used alert -> select destination folder"), [self name]]];
+                                "Folder cannot be found alert -> select destination folder"), [self name]]];
             
             [[NSNotificationCenter defaultCenter] postNotificationName: @"MakeWindowKey" object: nil];
             [panel beginSheetForDirectory: nil file: nil types: nil modalForWindow: [NSApp keyWindow] modalDelegate: self
@@ -805,12 +856,12 @@ static int static_lastid = 0;
     {
         NSAlert * alert = [[NSAlert alloc] init];
         [alert setMessageText: [NSString stringWithFormat:
-                                NSLocalizedString(@"The folder for moving the completed \"%@\" cannot be used.",
-                                    "Move folder cannot be used alert -> title"), [self name]]];
+                                NSLocalizedString(@"The folder for moving the completed \"%@\" cannot be found.",
+                                    "Move folder cannot be found alert -> title"), [self name]]];
         [alert setInformativeText: [NSString stringWithFormat:
-                                NSLocalizedString(@"\"%@\" cannot be used. The file will remain in its current location.",
-                                    "Move folder cannot be used alert -> message"), fDownloadFolder]];
-        [alert addButtonWithTitle: NSLocalizedString(@"OK", "Move folder cannot be used alert -> button")];
+                                NSLocalizedString(@"\"%@\" cannot be found. The file will remain in its current location.",
+                                    "Move folder cannot be found alert -> message"), fDownloadFolder]];
+        [alert addButtonWithTitle: NSLocalizedString(@"OK", "Move folder cannot be found alert -> button")];
         
         [alert runModal];
         [alert release];
@@ -823,13 +874,29 @@ static int static_lastid = 0;
 
 - (NSImage *) icon
 {
-    if (!fIcon)
-    {
-        fIcon = [[[NSWorkspace sharedWorkspace] iconForFileType: fInfo->multifile ? NSFileTypeForHFSTypeCode('fldr')
-                                                : [[self name] pathExtension]] retain];
-        [fIcon setFlipped: YES];
-    }
     return fIcon;
+}
+
+- (NSImage *) iconFlipped
+{
+    if (!fIconFlipped)
+    {
+        fIconFlipped = [fIcon copy];
+        [fIconFlipped setFlipped: YES];
+    }
+    return fIconFlipped;
+}
+
+- (NSImage *) iconSmall
+{
+    if (!fIconSmall)
+    {
+        fIconSmall = [fIcon copy];
+        [fIconSmall setFlipped: YES];
+        [fIconSmall setScalesWhenResized: YES];
+        [fIconSmall setSize: NSMakeSize(16.0, 16.0)];
+    }
+    return fIconSmall;
 }
 
 - (NSString *) name
@@ -951,11 +1018,6 @@ static int static_lastid = 0;
 - (float) progressDone
 {
     return fStat->percentDone;
-}
-
-- (float) progressLeft
-{
-    return (float)fStat->left/[self size];
 }
 
 - (int) eta
@@ -1320,16 +1382,6 @@ static int static_lastid = 0;
     return priorities;
 }
 
-- (NSMenu *) fileMenu
-{
-    if (!fFileMenu)
-    {
-        fFileMenu = [[NSMenu alloc] initWithTitle: [@"TorrentMenu:" stringByAppendingString: [self name]]];
-        [fFileMenu setAutoenablesItems: NO];
-    }
-    return fFileMenu;
-}
-
 - (NSDate *) dateAdded
 {
     return fDateAdded;
@@ -1374,7 +1426,6 @@ static int static_lastid = 0;
         return [NSNumber numberWithInt: 2];
 }
 
-#warning is progress different when seeding?
 - (NSNumber *) progressSortKey
 {
     float progress;
@@ -1495,6 +1546,9 @@ static int static_lastid = 0;
     fWaitToStart = waitToStart ? [waitToStart boolValue] : [fDefaults boolForKey: @"AutoStartDownload"];
     fOrderValue = orderValue ? [orderValue intValue] : tr_torrentCount(fLib) - 1;
     fError = NO;
+    
+    fIcon = [[[NSWorkspace sharedWorkspace] iconForFileType: fInfo->multifile ? NSFileTypeForHFSTypeCode('fldr')
+                                                : [[self name] pathExtension]] retain];
 
     fProgressString = [[NSMutableString alloc] initWithCapacity: 50];
     fStatusString = [[NSMutableString alloc] initWithCapacity: 75];
@@ -1502,6 +1556,16 @@ static int static_lastid = 0;
     fRemainingTimeString = [[NSMutableString alloc] initWithCapacity: 30];
     
     [self createFileList];
+    
+    //set up advanced bar
+    fBitmap = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes: nil
+        pixelsWide: MAX_PIECES pixelsHigh: BAR_HEIGHT bitsPerSample: 8 samplesPerPixel: 4 hasAlpha: YES
+        isPlanar: NO colorSpaceName: NSCalibratedRGBColorSpace bytesPerRow: 0 bitsPerPixel: 0];
+    
+    fPieces = malloc(MAX_PIECES);
+    int i;
+    for (i = 0; i < MAX_PIECES; i++)
+        fPieces[i] = BLANK_PIECE;
     
     [self update];
     return self;
@@ -1575,10 +1639,7 @@ static int static_lastid = 0;
         {
             [dict setObject: [NSIndexSet indexSetWithIndex: index] forKey: @"Indexes"];
             [dict setObject: [NSNumber numberWithUnsignedLongLong: size] forKey: @"Size"];
-            
-            NSImage * icon = [[NSWorkspace sharedWorkspace] iconForFileType: [name pathExtension]];
-            [icon setFlipped: YES];
-            [dict setObject: icon forKey: @"Icon"];
+            [dict setObject: [[NSWorkspace sharedWorkspace] iconForFileType: [name pathExtension]] forKey: @"Icon"];
             
             [flatList addObject: dict];
         }
@@ -1607,6 +1668,135 @@ static int static_lastid = 0;
 {
     NSString * folder = [self shouldUseIncompleteFolderForName: [self name]] ? fIncompleteFolder : fDownloadFolder;
     tr_torrentSetFolder(fHandle, [folder UTF8String]);
+}
+
+#warning move?
+- (NSImage *) advancedBar
+{
+    uint32_t * p;
+    uint8_t * bitmapData = [fBitmap bitmapData];
+    int bytesPerRow = [fBitmap bytesPerRow];
+    
+    int pieceCount = [self pieceCount];
+    int8_t * piecesAvailablity = malloc(pieceCount);
+    [self getAvailability: piecesAvailablity size: pieceCount];
+    
+    //lines 2 to 14: blue, green, or gray depending on piece availability
+    int i, h, index = 0;
+    float increment = (float)pieceCount / (float)MAX_PIECES, indexValue = 0;
+    uint32_t color;
+    BOOL change;
+    for (i = 0; i < MAX_PIECES; i++)
+    {
+        change = NO;
+        if (piecesAvailablity[index] < 0)
+        {
+            if (fPieces[i] != -1)
+            {
+                color = kBlue;
+                fPieces[i] = -1;
+                change = YES;
+            }
+        }
+        else if (piecesAvailablity[index] == 0)
+        {
+            if (fPieces[i] != 0)
+            {
+                color = kGray;
+                fPieces[i] = 0;
+                change = YES;
+            }
+        }
+        else if (piecesAvailablity[index] <= 4)
+        {
+            if (fPieces[i] != 1)
+            {
+                color = kGreen1;
+                fPieces[i] = 1;
+                change = YES;
+            }
+        }
+        else if (piecesAvailablity[index] <= 8)
+        {
+            if (fPieces[i] != 2)
+            {
+                color = kGreen2;
+                fPieces[i] = 2;
+                change = YES;
+            }
+        }
+        else
+        {
+            if (fPieces[i] != 3)
+            {
+                color = kGreen3;
+                fPieces[i] = 3;
+                change = YES;
+            }
+        }
+        
+        if (change)
+        {
+            //point to pixel (i, 2) and draw "vertically"
+            p = (uint32_t *)(bitmapData + 2 * bytesPerRow) + i;
+            for (h = 2; h < BAR_HEIGHT; h++)
+            {
+                p[0] = color;
+                p = (uint32_t *)((uint8_t *)p + bytesPerRow);
+            }
+        }
+        
+        indexValue += increment;
+        index = (int)indexValue;
+    }
+    
+    //determine percentage finished and available
+    int have = rintf((float)MAX_PIECES * [self progress]), avail;
+    if ([self progress] >= 1.0 || ![self isActive] || [self totalPeersConnected] <= 0)
+        avail = 0;
+    else
+    {
+        float * piecesFinished = malloc(pieceCount * sizeof(float));
+        [self getAmountFinished: piecesFinished size: pieceCount];
+        
+        float available = 0;
+        for (i = 0; i < pieceCount; i++)
+            if (piecesAvailablity[i] > 0)
+                available += 1.0 - piecesFinished[i];
+        
+        avail = rintf((float)MAX_PIECES * available / (float)pieceCount);
+        if (have + avail > MAX_PIECES) //case if both end in .5 and all pieces are available
+            avail--;
+        
+        free(piecesFinished);
+    }
+    
+    free(piecesAvailablity);
+    
+    //first two lines: dark blue to show progression, green to show available
+    p = (uint32_t *)bitmapData;
+    for (i = 0; i < have; i++)
+    {
+        p[i] = kBlue2;
+        p[i + bytesPerRow / 4] = kBlue2;
+    }
+    for (; i < avail + have; i++)
+    {
+        p[i] = kGreen3;
+        p[i + bytesPerRow / 4] = kGreen3;
+    }
+    for (; i < MAX_PIECES; i++)
+    {
+        p[i] = kWhite;
+        p[i + bytesPerRow / 4] = kWhite;
+    }
+    
+    //actually draw image
+    NSImage * bar = [[NSImage alloc] initWithSize: [fBitmap size]];
+    [bar addRepresentation: fBitmap];
+    [bar setScalesWhenResized: YES];
+    
+    return [bar autorelease];
 }
 
 - (void) quickPause

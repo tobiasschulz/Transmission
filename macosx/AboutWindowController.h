@@ -27,7 +27,7 @@
 @interface AboutWindowController : NSWindowController
 {
 	IBOutlet NSTextView * fTextView, * fLicenseView;
-    IBOutlet NSTextField * fVersionField, * fCopyrightField;
+    IBOutlet NSTextField * fVersionField;
     IBOutlet NSPanel * fLicenseSheet;
 }
 

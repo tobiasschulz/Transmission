@@ -1,23 +1,14 @@
 /*
- * Xmission - a cross-platform bittorrent client
- * Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation; version 2 of the License.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this program; if not, write to the Free Software
- * Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA
- *
- * $Id$
+ * This file is licensed by the GPL version 2.  Works owned by the
+ * Transmission project are granted a special exemption to clause 2(b)
+ * so that the bulk of its code can remain under the MIT license.
+ * This exemption does not extend to derived works not owned by
+ * the Transmission project.
  */
 
+#include <iostream>
 #include <wx/intl.h>
 #include <torrent-list.h>
 
@@ -533,49 +524,25 @@ TorrentListCtrl :: Sort( int column )
     Resort ();
 }
 
-bool
-TorrentListCtrl :: IsSorted( ) const
-{
-    bool is_sorted = true;
-    long prevItem=-1, curItem=-1;
-
-    uglyHack = const_cast<TorrentListCtrl*>(this);
-    while( is_sorted )
-    {
-        prevItem = curItem;
-        curItem = GetNextItem( curItem, wxLIST_NEXT_ALL, wxLIST_STATE_DONTCARE );
-        if ( curItem == -1 )
-            break;
-        if( prevItem>=0 && curItem>=0 )
-            if( Compare( prevItem, curItem, prevSortCol ) > 0 )
-                is_sorted = false;
-    }
-    uglyHack = 0;
-
-    return is_sorted;
-}
-
 void
 TorrentListCtrl :: Resort( )
 {
+    uglyHack = this;
+
     myConfig->Write( _T("torrent-sort-column"), columnKeys[abs(prevSortCol)] );
     myConfig->Write( _T("torrent-sort-is-descending"), prevSortCol < 0 );
 
-    if( !IsSorted ( ) )
-    {
-        uglyHack = this;
-        SortItems( Compare, prevSortCol );
+    SortItems( Compare, prevSortCol );
 
-        const int n = GetItemCount ();
-        str2int_t tmp;
-        for( int i=0; i<n; ++i ) {
-            int idx = GetItemData( i );
-            const tr_info_t* info = tr_torrentInfo( myTorrents[idx] );
-            tmp[info->hashString] = i;
-        }
-        myHashToItem.swap( tmp );
-        uglyHack = NULL;
+    const int n = GetItemCount ();
+    str2int_t tmp;
+    for( int i=0; i<n; ++i ) {
+        int idx = GetItemData( i );
+        const tr_info_t* info = tr_torrentInfo( myTorrents[idx] );
+        tmp[info->hashString] = i;
     }
+    myHashToItem.swap( tmp );
+    uglyHack = NULL;
 }
 
 /***

@@ -29,7 +29,7 @@
 @interface FilterBarView : ImageBackgroundView
 {
     IBOutlet FilterBarButton * fNoFilterButton, * fDownloadFilterButton,
-                             * fSeedFilterButton, * fPauseFilterButton;
+                        * fSeedFilterButton, * fPauseFilterButton;
 }
 
 @end

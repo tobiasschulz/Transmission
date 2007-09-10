@@ -6,8 +6,6 @@
  * so that the bulk of its code can remain under the MIT license. 
  * This exemption does not extend to derived works not owned by
  * the Transmission project.
- *
- * $Id$
  */
 
 #include <assert.h>
@@ -88,7 +86,7 @@ bestPieceSize( uint64_t totalSize )
     static const uint64_t MiB = 1048576;
     static const uint64_t KiB = 1024;
 
-    if( totalSize >=   (1*GiB) ) return MiB;
+    if( totalSize >=      GiB  ) return MiB;
     if( totalSize >= (512*MiB) ) return (512*KiB);
     if( totalSize >= (350*MiB) ) return (256*KiB);
     if( totalSize >= (150*MiB) ) return (128*KiB);

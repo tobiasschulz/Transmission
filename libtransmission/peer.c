@@ -40,7 +40,6 @@
 #include "peer.h"
 #include "peertree.h"
 #include "ratecontrol.h"
-#include "trcompat.h" /* for strlcpy */
 #include "utils.h"
 
 /*****
@@ -256,7 +255,6 @@ struct tr_peer_s
     tr_ratecontrol_t  * upload;
 
     char              * client;
-    int                 extclient;
 
     int64_t             credit;
 };
@@ -290,18 +288,6 @@ static void tr_htonl( uint32_t a, void * p )
     const uint32_t u = htonl( a );
     memcpy ( p, &u, sizeof( uint32_t ) );
 }
-
-static const char* getPeerId( void )
-{
-    static char * peerId = NULL;
-    if( !peerId ) {
-        peerId = tr_new0( char, TR_ID_LEN + 1 );
-        tr_peerIdNew( peerId, TR_ID_LEN + 1 );
-    }
-    return peerId;
-}
-
-static void tr_peerPieceIsCorrupt  ( tr_peer_t *, int pieceIndex );
 
 #include "peerext.h"
 #include "peeraz.h"
@@ -370,7 +356,7 @@ void tr_peerDestroy( tr_peer_t * peer )
     tr_bitfieldFree( peer->banfield );
     tr_bitfieldFree( peer->reqfield );
     tr_list_foreach( peer->outRequests, tr_free );
-    tr_list_free( &peer->outRequests );
+    tr_list_free( peer->outRequests );
     tr_free( peer->inRequests );
     tr_free( peer->buf );
     tr_free( peer->outMessages );
@@ -591,7 +577,7 @@ int tr_peerPulse( tr_peer_t * peer )
         HANDSHAKE_SET_EXTPREF( buf + HANDSHAKE_FLAGS_OFF,
                                HANDSHAKE_EXTPREF_WANT_EXT );
         memcpy( buf + HANDSHAKE_HASH_OFF, inf->hash, SHA_DIGEST_LENGTH );
-        memcpy( buf + HANDSHAKE_PEERID_OFF, getPeerId(), TR_ID_LEN );
+        memcpy( buf + HANDSHAKE_PEERID_OFF, tor->peer_id, TR_ID_LEN );
 
         switch( tr_netSend( peer->socket, buf, 68 ) )
         {
@@ -967,24 +953,7 @@ int tr_peerGetConnectable( const tr_torrent_t * tor, uint8_t ** _buf )
 ***/
 
 void
-tr_peerPieceIsCorrupt( tr_peer_t * peer, int pieceIndex )
-{
-    tr_torrent_t * tor = peer->tor;
-
-    const uint64_t byteCount = tr_torPieceCountBytes( tor, pieceIndex );
-
-    /* increment the `corrupt' field */
-    tor->corruptCur += byteCount;
-
-    /* decrement the `downloaded' field */
-    if( tor->downloadedCur >= byteCount )
-        tor->downloadedCur -= byteCount;
-    else
-        tor->downloadedCur = 0;
-}
-
-void
-tr_peerSentBlockToUs( tr_peer_t * peer, int byteCount )
+tr_peerSentBlockToUs ( tr_peer_t * peer, int byteCount )
 {
     tr_torrent_t * tor = peer->tor;
 

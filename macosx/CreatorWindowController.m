@@ -23,7 +23,7 @@
  *****************************************************************************/
 
 #import "CreatorWindowController.h"
-#import "NSStringAdditions.h"
+#import "StringAdditions.h"
 
 @interface CreatorWindowController (Private)
 
@@ -159,7 +159,8 @@
 - (void) dealloc
 {
     [fPath release];
-    [fLocation release];
+    if (fLocation)
+        [fLocation release];
     
     if (fInfo)
         tr_metaInfoBuilderFree(fInfo);
@@ -281,7 +282,6 @@
 {
     NSOpenPanel * panel = [NSOpenPanel openPanel];
     
-    [panel setTitle: NSLocalizedString(@"Create Torrent File", "Create torrent -> select file")];
     [panel setPrompt: NSLocalizedString(@"Select", "Create torrent -> select file")];
     [panel setAllowsMultipleSelection: NO];
     [panel setCanChooseFiles: YES];

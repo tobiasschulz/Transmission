@@ -34,15 +34,13 @@ AboutWindowController * fAboutBoxInstance = nil;
     return fAboutBoxInstance;
 }
 
-#warning make completely localized
 - (void) windowDidLoad
 {
     NSDictionary * info = [[NSBundle mainBundle] infoDictionary];
     [fVersionField setStringValue: [NSString stringWithFormat: @"%@ (%@)",
         [info objectForKey: @"CFBundleShortVersionString"], [info objectForKey: (NSString *)kCFBundleVersionKey]]];
     
-    [fCopyrightField setStringValue: [[NSBundle mainBundle] localizedStringForKey: @"NSHumanReadableCopyright"
-                                        value: nil table: @"InfoPlist"]];
+    #warning get copyright info from file
     
     [[fTextView textStorage] setAttributedString: [[[NSAttributedString alloc] initWithPath:
             [[NSBundle mainBundle] pathForResource: @"Credits" ofType: @"rtf"] documentAttributes: nil] autorelease]];

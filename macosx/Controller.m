@@ -30,7 +30,7 @@
 #import "TorrentTableView.h"
 #import "CreatorWindowController.h"
 #import "AboutWindowController.h"
-#import "NSStringAdditions.h"
+#import "StringAdditions.h"
 #import "UKKQueue.h"
 #import "ActionMenuSpeedToDisplayLimitTransformer.h"
 #import "ActionMenuRatioToDisplayRatioTransformer.h"
@@ -49,24 +49,6 @@
 #define TOOLBAR_PAUSE_SELECTED  @"Toolbar Pause Selected"
 #define TOOLBAR_RESUME_SELECTED @"Toolbar Resume Selected"
 #define TOOLBAR_FILTER          @"Toolbar Toggle Filter"
-
-#define SORT_DATE       @"Date"
-#define SORT_NAME       @"Name"
-#define SORT_STATE      @"State"
-#define SORT_PROGRESS   @"Progress"
-#define SORT_TRACKER    @"Tracker"
-#define SORT_ORDER      @"Order"
-
-#define FILTER_NONE     @"None"
-#define FILTER_DOWNLOAD @"Download"
-#define FILTER_SEED     @"Seed"
-#define FILTER_PAUSE    @"Pause"
-
-#define FILTER_TYPE_NAME    @"Name"
-#define FILTER_TYPE_TRACKER @"Tracker"
-
-#define FILTER_TYPE_TAG_NAME    401
-#define FILTER_TYPE_TAG_TRACKER 402
 
 #define GROWL_DOWNLOAD_COMPLETE @"Download Complete"
 #define GROWL_SEEDING_COMPLETE  @"Seeding Complete"
@@ -142,7 +124,8 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
             [alert runModal];
             [alert release];
             
-            //kill ourselves right away
+            //activate the already running instance, then kill ourselves right away
+            [[NSWorkspace sharedWorkspace] launchApplication: [dic objectForKey: @"NSApplicationPath"]];
             exit(0);
         }
     }
@@ -257,9 +240,9 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     [fPrevInfoTabItem setKeyEquivalent: [NSString stringWithCharacters: & leftChar length: 1]];
     
     [fNextFilterItem setKeyEquivalent: [NSString stringWithCharacters: & rightChar length: 1]];
-    [fNextFilterItem setKeyEquivalentModifierMask: NSCommandKeyMask | NSAlternateKeyMask];
+    [fNextFilterItem setKeyEquivalentModifierMask: NSCommandKeyMask + NSAlternateKeyMask];
     [fPrevFilterItem setKeyEquivalent: [NSString stringWithCharacters: & leftChar length: 1]];
-    [fPrevFilterItem setKeyEquivalentModifierMask: NSCommandKeyMask | NSAlternateKeyMask];
+    [fPrevFilterItem setKeyEquivalentModifierMask: NSCommandKeyMask + NSAlternateKeyMask];
     
     //set up filter bar
     NSView * contentView = [fWindow contentView];
@@ -338,27 +321,22 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     NSString * sortType = [fDefaults stringForKey: @"Sort"];
     
     NSMenuItem * currentSortItem, * currentSortActionItem;
-    if ([sortType isEqualToString: SORT_NAME])
+    if ([sortType isEqualToString: @"Name"])
     {
         currentSortItem = fNameSortItem;
         currentSortActionItem = fNameSortActionItem;
     }
-    else if ([sortType isEqualToString: SORT_STATE])
+    else if ([sortType isEqualToString: @"State"])
     {
         currentSortItem = fStateSortItem;
         currentSortActionItem = fStateSortActionItem;
     }
-    else if ([sortType isEqualToString: SORT_PROGRESS])
+    else if ([sortType isEqualToString: @"Progress"])
     {
         currentSortItem = fProgressSortItem;
         currentSortActionItem = fProgressSortActionItem;
     }
-    else if ([sortType isEqualToString: SORT_TRACKER])
-    {
-        currentSortItem = fTrackerSortItem;
-        currentSortActionItem = fTrackerSortActionItem;
-    }
-    else if ([sortType isEqualToString: SORT_ORDER])
+    else if ([sortType isEqualToString: @"Order"])
     {
         currentSortItem = fOrderSortItem;
         currentSortActionItem = fOrderSortActionItem;
@@ -366,8 +344,9 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     else
     {
         //safety
-        if (![sortType isEqualToString: SORT_DATE])
-            [fDefaults setObject: SORT_DATE forKey: @"Sort"];
+        if (![sortType isEqualToString: @"Date"])
+            [fDefaults setObject: @"Date" forKey: @"Sort"];
+        
         currentSortItem = fDateSortItem;
         currentSortActionItem = fDateSortActionItem;
     }
@@ -378,36 +357,22 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     NSString * filterType = [fDefaults stringForKey: @"Filter"];
     
     FilterBarButton * currentFilterButton;
-    if ([filterType isEqualToString: FILTER_PAUSE])
+    if ([filterType isEqualToString: @"Pause"])
         currentFilterButton = fPauseFilterButton;
-    else if ([filterType isEqualToString: FILTER_SEED])
+    else if ([filterType isEqualToString: @"Seed"])
         currentFilterButton = fSeedFilterButton;
-    else if ([filterType isEqualToString: FILTER_DOWNLOAD])
+    else if ([filterType isEqualToString: @"Download"])
         currentFilterButton = fDownloadFilterButton;
     else
     {
         //safety
-        if (![filterType isEqualToString: FILTER_NONE])
-            [fDefaults setObject: FILTER_NONE forKey: @"Filter"];
+        if (![filterType isEqualToString: @"None"])
+            [fDefaults setObject: @"None" forKey: @"Filter"];
+        
         currentFilterButton = fNoFilterButton;
     }
-    [currentFilterButton setState: NSOnState];
     
-    //set filter search type
-    NSString * filterSearchType = [fDefaults stringForKey: @"FilterSearchType"];
-    
-    NSMenu * filterSearchMenu = [[fSearchFilterField cell] searchMenuTemplate];
-    NSString * filterSearchTypeTitle;
-    if ([filterSearchType isEqualToString: FILTER_TYPE_TRACKER])
-        filterSearchTypeTitle = [[filterSearchMenu itemWithTag: FILTER_TYPE_TAG_TRACKER] title];
-    else
-    {
-        //safety
-        if (![filterType isEqualToString: FILTER_TYPE_NAME])
-            [fDefaults setObject: FILTER_TYPE_NAME forKey: @"FilterSearchType"];
-        filterSearchTypeTitle = [[filterSearchMenu itemWithTag: FILTER_TYPE_TAG_NAME] title];
-    }
-    [[fSearchFilterField cell] setPlaceholderString: filterSearchTypeTitle];
+    [currentFilterButton setEnabled: YES];
     
     //observe notifications
     NSNotificationCenter * nc = [NSNotificationCenter defaultCenter];
@@ -423,10 +388,6 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     
     [nc addObserver: self selector: @selector(torrentRestartedDownloading:)
                     name: @"TorrentRestartedDownloading" object: nil];
-    
-    //avoids need of setting delegate
-    [nc addObserver: self selector: @selector(torrentTableViewSelectionDidChange:)
-                    name: NSTableViewSelectionDidChangeNotification object: fTableView];
     
     [nc addObserver: self selector: @selector(updateControlTint:)
                     name: NSControlTintDidChangeNotification object: nil];
@@ -578,7 +539,7 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
         [fPendingTorrentDownloads removeAllObjects];
     }
     
-    //remove all remaining torrent files in the temporary directory
+    //remove all torrent files in the temporary directory
     if (fTempTorrentFiles)
     {
         NSEnumerator * torrentEnumerator = [fTempTorrentFiles objectEnumerator];
@@ -721,20 +682,20 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
         return;
     }
     
-    #warning make submethod
     if (!path && [fDefaults boolForKey: @"UseIncompleteDownloadFolder"]
         && access([[[fDefaults stringForKey: @"IncompleteDownloadFolder"] stringByExpandingTildeInPath] UTF8String], 0))
     {
         NSOpenPanel * panel = [NSOpenPanel openPanel];
         
-        [panel setPrompt: NSLocalizedString(@"Select", "Default incomplete folder cannot be used alert -> prompt")];
+        [panel setPrompt: NSLocalizedString(@"Select", "Default incomplete folder cannot be found alert -> prompt")];
         [panel setAllowsMultipleSelection: NO];
         [panel setCanChooseFiles: NO];
         [panel setCanChooseDirectories: YES];
         [panel setCanCreateDirectories: YES];
 
-        [panel setMessage: NSLocalizedString(@"The incomplete folder cannot be used. Choose a new location or cancel for none.",
-                                        "Default incomplete folder cannot be used alert -> message")];
+        [panel setMessage: NSLocalizedString(@"The incomplete folder cannot be found."
+                                        " Choose a new location or cancel for none.",
+                                        "Default incomplete folder cannot be found alert -> message")];
         
         NSDictionary * dict = [[NSDictionary alloc] initWithObjectsAndKeys:
                                         filenames, @"Filenames",
@@ -750,14 +711,14 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     {
         NSOpenPanel * panel = [NSOpenPanel openPanel];
         
-        [panel setPrompt: NSLocalizedString(@"Select", "Default folder cannot be used alert -> prompt")];
+        [panel setPrompt: NSLocalizedString(@"Select", "Default folder cannot be found alert -> prompt")];
         [panel setAllowsMultipleSelection: NO];
         [panel setCanChooseFiles: NO];
         [panel setCanChooseDirectories: YES];
         [panel setCanCreateDirectories: YES];
 
-        [panel setMessage: NSLocalizedString(@"The download folder cannot be used. Choose a new location.",
-                                        "Default folder cannot be used alert -> message")];
+        [panel setMessage: NSLocalizedString(@"The download folder cannot be found. Choose a new location.",
+                                        "Default folder cannot be found alert -> message")];
         
         NSDictionary * dict = [[NSDictionary alloc] initWithObjectsAndKeys:
                                         filenames, @"Filenames",
@@ -912,6 +873,7 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
         [self updateTorrentsInQueue];
     }
     
+    [openPanel close];
     [self performSelectorOnMainThread: @selector(openFilesAskWithDict:) withObject: dictionary waitUntilDone: NO];
 }
 
@@ -995,6 +957,7 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
             didEndSelector: @selector(urlSheetDidEnd:returnCode:contextInfo:) contextInfo: nil];
 }
 
+#warning combine
 - (void) openURLEndSheet: (id) sender
 {
     [fURLSheetWindow orderOut: sender];
@@ -1147,41 +1110,17 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
             int selected = [fTableView numberOfSelectedRows];
             if (selected == 1)
             {
-                NSString * torrentName = [[fDisplayedTorrents objectAtIndex: [fTableView selectedRow]] name];
-                
-                if (!deleteData && !deleteTorrent)
-                    title = [NSString stringWithFormat: NSLocalizedString(@"Confirm removal of \"%@\" from the transfer list.",
-                                "Removal confirm panel -> title"), torrentName];
-                else if (deleteData && !deleteTorrent)
-                    title = [NSString stringWithFormat: NSLocalizedString(@"Confirm removal of \"%@\" from the transfer list"
-                                " and trash data file.", "Removal confirm panel -> title"), torrentName];
-                else if (!deleteData && deleteTorrent)
-                    title = [NSString stringWithFormat: NSLocalizedString(@"Confirm removal of \"%@\" from the transfer list"
-                                " and trash torrent file.", "Removal confirm panel -> title"), torrentName];
-                else
-                    title = [NSString stringWithFormat: NSLocalizedString(@"Confirm removal of \"%@\" from the transfer list"
-                            " and trash both data and torrent files.", "Removal confirm panel -> title"), torrentName];
-                
+                title = [NSString stringWithFormat: NSLocalizedString(@"Confirm Removal of \"%@\"",
+                            "Removal confirm panel -> title"),
+                            [[fDisplayedTorrents objectAtIndex: [fTableView selectedRow]] name]];
                 message = NSLocalizedString(@"This transfer is active."
                             " Once removed, continuing the transfer will require the torrent file."
                             " Do you really want to remove it?", "Removal confirm panel -> message");
             }
             else
             {
-                if (!deleteData && !deleteTorrent)
-                    title = [NSString stringWithFormat: NSLocalizedString(@"Confirm removal of %d transfers"
-                                " from the transfer list.", "Removal confirm panel -> title"), selected];
-                else if (deleteData && !deleteTorrent)
-                    title = [NSString stringWithFormat: NSLocalizedString(@"Confirm removal of %d transfers"
-                                " from the transfer list and trash data file.", "Removal confirm panel -> title"), selected];
-                else if (!deleteData && deleteTorrent)
-                    title = [NSString stringWithFormat: NSLocalizedString(@"Confirm removal of %d transfers"
-                                " from the transfer list and trash torrent file.", "Removal confirm panel -> title"), selected];
-                else
-                    title = [NSString stringWithFormat: NSLocalizedString(@"Confirm removal of %d transfers"
-                                " from the transfer list aand trash both data and torrent files.",
-                                "Removal confirm panel -> title"), selected];
-                
+                title = [NSString stringWithFormat: NSLocalizedString(@"Confirm Removal of %d Transfers",
+                            "Removal confirm panel -> title"), selected];
                 if (selected == active)
                     message = [NSString stringWithFormat: NSLocalizedString(@"There are %d active transfers.",
                                 "Removal confirm panel -> message part 1"), active];
@@ -1456,8 +1395,7 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
 
     //resort if necessary or just update the table
     NSString * sortType = [fDefaults stringForKey: @"Sort"];
-    if ([sortType isEqualToString: SORT_PROGRESS] || [sortType isEqualToString: SORT_STATE]
-            || [sortType isEqualToString: SORT_TRACKER])
+    if ([sortType isEqualToString: @"Progress"] || [sortType isEqualToString: @"State"])
         [self sortTorrents];
     else
         [fTableView reloadData];
@@ -1659,14 +1597,14 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     BOOL asc = ![fDefaults boolForKey: @"SortReverse"];
     
     NSSortDescriptor * nameDescriptor = [[[NSSortDescriptor alloc] initWithKey: @"name"
-                                            ascending: asc selector: @selector(caseInsensitiveCompare:)] autorelease],
+                            ascending: asc selector: @selector(caseInsensitiveCompare:)] autorelease],
                     * orderDescriptor = [[[NSSortDescriptor alloc] initWithKey: @"orderValue"
                                             ascending: asc] autorelease];
     
     NSArray * descriptors;
-    if ([sortType isEqualToString: SORT_NAME])
+    if ([sortType isEqualToString: @"Name"])
         descriptors = [[NSArray alloc] initWithObjects: nameDescriptor, orderDescriptor, nil];
-    else if ([sortType isEqualToString: SORT_STATE])
+    else if ([sortType isEqualToString: @"State"])
     {
         NSSortDescriptor * stateDescriptor = [[[NSSortDescriptor alloc] initWithKey:
                                                 @"stateSortKey" ascending: !asc] autorelease],
@@ -1678,7 +1616,7 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
         descriptors = [[NSArray alloc] initWithObjects: stateDescriptor, progressDescriptor, ratioDescriptor,
                                                             nameDescriptor, orderDescriptor, nil];
     }
-    else if ([sortType isEqualToString: SORT_PROGRESS])
+    else if ([sortType isEqualToString: @"Progress"])
     {
         NSSortDescriptor * progressDescriptor = [[[NSSortDescriptor alloc] initWithKey:
                                             @"progressSortKey" ascending: asc] autorelease],
@@ -1688,14 +1626,7 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
         descriptors = [[NSArray alloc] initWithObjects: progressDescriptor, ratioDescriptor,
                                                             nameDescriptor, orderDescriptor, nil];
     }
-    else if ([sortType isEqualToString: SORT_TRACKER])
-    {
-        NSSortDescriptor * trackerDescriptor = [[[NSSortDescriptor alloc] initWithKey: @"trackerAddress"
-                                                ascending: asc selector: @selector(caseInsensitiveCompare:)] autorelease];
-        
-        descriptors = [[NSArray alloc] initWithObjects: trackerDescriptor, nameDescriptor, orderDescriptor, nil];
-    }
-    else if ([sortType isEqualToString: SORT_ORDER])
+    else if ([sortType isEqualToString: @"Order"])
         descriptors = [[NSArray alloc] initWithObjects: orderDescriptor, nil];
     else
     {
@@ -1710,34 +1641,28 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     [fTableView reloadData];
 }
 
-#warning bindings?
 - (void) setSort: (id) sender
 {
     NSString * oldSortType = [fDefaults stringForKey: @"Sort"];
     
     //get checked items
     NSMenuItem * prevSortItem, * prevSortActionItem;
-    if ([oldSortType isEqualToString: SORT_NAME])
+    if ([oldSortType isEqualToString: @"Name"])
     {
         prevSortItem = fNameSortItem;
         prevSortActionItem = fNameSortActionItem;
     }
-    else if ([oldSortType isEqualToString: SORT_STATE])
+    else if ([oldSortType isEqualToString: @"State"])
     {
         prevSortItem = fStateSortItem;
         prevSortActionItem = fStateSortActionItem;
     }
-    else if ([oldSortType isEqualToString: SORT_PROGRESS])
+    else if ([oldSortType isEqualToString: @"Progress"])
     {
         prevSortItem = fProgressSortItem;
         prevSortActionItem = fProgressSortActionItem;
     }
-    else if ([oldSortType isEqualToString: SORT_TRACKER])
-    {
-        prevSortItem = fTrackerSortItem;
-        prevSortActionItem = fTrackerSortActionItem;
-    }
-    else if ([oldSortType isEqualToString: SORT_ORDER])
+    else if ([oldSortType isEqualToString: @"Order"])
     {
         prevSortItem = fOrderSortItem;
         prevSortActionItem = fOrderSortActionItem;
@@ -1757,31 +1682,25 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
         {
             currentSortItem = fNameSortItem;
             currentSortActionItem = fNameSortActionItem;
-            sortType = SORT_NAME;
+            sortType = @"Name";
         }
         else if (sender == fStateSortItem || sender == fStateSortActionItem)
         {
             currentSortItem = fStateSortItem;
             currentSortActionItem = fStateSortActionItem;
-            sortType = SORT_STATE;
+            sortType = @"State";
         }
         else if (sender == fProgressSortItem || sender == fProgressSortActionItem)
         {
             currentSortItem = fProgressSortItem;
             currentSortActionItem = fProgressSortActionItem;
-            sortType = SORT_PROGRESS;
-        }
-        else if (sender == fTrackerSortItem || sender == fTrackerSortActionItem)
-        {
-            currentSortItem = fTrackerSortItem;
-            currentSortActionItem = fTrackerSortActionItem;
-            sortType = SORT_TRACKER;
+            sortType = @"Progress";
         }
         else if (sender == fOrderSortItem || sender == fOrderSortActionItem)
         {
             currentSortItem = fOrderSortItem;
             currentSortActionItem = fOrderSortActionItem;
-            sortType = SORT_ORDER;
+            sortType = @"Order";
             
             [fDefaults setBool: NO forKey: @"SortReverse"];
         }
@@ -1789,7 +1708,7 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
         {
             currentSortItem = fDateSortItem;
             currentSortActionItem = fDateSortActionItem;
-            sortType = SORT_DATE;
+            sortType = @"Date";
         }
         
         [fDefaults setObject: sortType forKey: @"Sort"];
@@ -1819,10 +1738,10 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     NSString * filterType = [fDefaults stringForKey: @"Filter"];
     
     int downloading = 0, seeding = 0, paused = 0;
-    BOOL isDownload = [filterType isEqualToString: FILTER_DOWNLOAD],
-            isSeed = [filterType isEqualToString: FILTER_SEED],
-            isPause = [filterType isEqualToString: FILTER_PAUSE];
-    BOOL filtering = isDownload || isSeed || isPause;
+    BOOL isDownloading = [filterType isEqualToString: @"Download"],
+            isSeeding = [filterType isEqualToString: @"Seed"],
+            isPaused = [filterType isEqualToString: @"Pause"];
+    BOOL filtering = isDownloading || isSeeding || isPaused;
     
     //get count of each type
     NSEnumerator * enumerator = [fTorrents objectEnumerator];
@@ -1834,20 +1753,20 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
             if ([torrent isSeeding])
             {
                 seeding++;
-                if (isSeed)
+                if (isSeeding)
                     [tempTorrents addObject: torrent];
             }
             else
             {
                 downloading++;
-                if (isDownload)
+                if (isDownloading)
                     [tempTorrents addObject: torrent];
             }
         }
         else
         {
             paused++;
-            if (isPause)
+            if (isPaused)
                 [tempTorrents addObject: torrent];
         }
     }
@@ -1866,23 +1785,11 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     {
         filtering = YES;
         
-        #warning check multiple trackers
-        NSString * filterType = [fDefaults stringForKey: @"FilterSearchType"];
-        NSString * fullString;
-        Torrent * torrent;
-        
         int i;
-        for (i = [tempTorrents count]-1; i >= 0; i--)
-        {
-            torrent = [tempTorrents objectAtIndex: i];
-            if ([filterType isEqualToString: FILTER_TYPE_TRACKER])
-                fullString = [torrent trackerAddress];
-            else
-                fullString = [torrent name];
-            
-            if ([fullString rangeOfString: searchString options: NSCaseInsensitiveSearch].location == NSNotFound)
+        for (i = [tempTorrents count] - 1; i >= 0; i--)
+            if ([[[tempTorrents objectAtIndex: i] name] rangeOfString: searchString
+                                        options: NSCaseInsensitiveSearch].location == NSNotFound)
                 [tempTorrents removeObjectAtIndex: i];
-        }
     }
     
     [fDisplayedTorrents setArray: tempTorrents];
@@ -1914,7 +1821,7 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     if (totalCount != 1)
         [totalTorrentsString appendFormat: NSLocalizedString(@"%d Transfers", "Status bar transfer count"), totalCount];
     else
-        [totalTorrentsString appendString: NSLocalizedString(@"1 Transfer", "Status bar transfer count")];
+        [totalTorrentsString appendFormat: NSLocalizedString(@"1 Transfer", "Status bar transfer count")];
     
     [fTotalTorrentsField setStringValue: totalTorrentsString];
     [totalTorrentsString release];
@@ -1928,29 +1835,29 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     NSString * oldFilterType = [fDefaults stringForKey: @"Filter"];
     
     FilterBarButton * prevFilterButton;
-    if ([oldFilterType isEqualToString: FILTER_PAUSE])
+    if ([oldFilterType isEqualToString: @"Pause"])
         prevFilterButton = fPauseFilterButton;
-    else if ([oldFilterType isEqualToString: FILTER_SEED])
+    else if ([oldFilterType isEqualToString: @"Seed"])
         prevFilterButton = fSeedFilterButton;
-    else if ([oldFilterType isEqualToString: FILTER_DOWNLOAD])
+    else if ([oldFilterType isEqualToString: @"Download"])
         prevFilterButton = fDownloadFilterButton;
     else
         prevFilterButton = fNoFilterButton;
     
     if (sender != prevFilterButton)
     {
-        [prevFilterButton setState: NSOffState];
-        [sender setState: NSOnState];
+        [prevFilterButton setEnabled: NO];
+        [sender setEnabled: YES];
 
         NSString * filterType;
         if (sender == fDownloadFilterButton)
-            filterType = FILTER_DOWNLOAD;
+            filterType = @"Download";
         else if (sender == fPauseFilterButton)
-            filterType = FILTER_PAUSE;
+            filterType = @"Pause";
         else if (sender == fSeedFilterButton)
-            filterType = FILTER_SEED;
+            filterType = @"Seed";
         else
-            filterType = FILTER_NONE;
+            filterType = @"None";
 
         [fDefaults setObject: filterType forKey: @"Filter"];
     }
@@ -1958,44 +1865,18 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     [self applyFilter: nil];
 }
 
-- (void) setFilterSearchType: (id) sender
-{
-    NSString * oldFilterType = [fDefaults stringForKey: @"FilterSearchType"];
-    
-    int prevTag, currentTag = [sender tag];
-    if ([oldFilterType isEqualToString: FILTER_TYPE_TRACKER])
-        prevTag = FILTER_TYPE_TAG_TRACKER;
-    else
-        prevTag = FILTER_TYPE_TAG_NAME;
-    
-    if (currentTag != prevTag)
-    {
-        NSString * filterType;
-        if (currentTag == FILTER_TYPE_TAG_TRACKER)
-            filterType = FILTER_TYPE_TRACKER;
-        else
-            filterType = FILTER_TYPE_NAME;
-        
-        [fDefaults setObject: filterType forKey: @"FilterSearchType"];
-        
-        [[fSearchFilterField cell] setPlaceholderString: [sender title]];
-    }
-    
-    [self applyFilter: nil];
-}
-
 - (void) switchFilter: (id) sender
 {
     NSString * filterType = [fDefaults stringForKey: @"Filter"];
     
-    FilterBarButton * button;
-    if ([filterType isEqualToString: FILTER_NONE])
+    NSButton * button;
+    if ([filterType isEqualToString: @"None"])
         button = sender == fNextFilterItem ? fDownloadFilterButton : fPauseFilterButton;
-    else if ([filterType isEqualToString: FILTER_DOWNLOAD])
+    else if ([filterType isEqualToString: @"Download"])
         button = sender == fNextFilterItem ? fSeedFilterButton : fNoFilterButton;
-    else if ([filterType isEqualToString: FILTER_SEED])
+    else if ([filterType isEqualToString: @"Seed"])
         button = sender == fNextFilterItem ? fPauseFilterButton : fDownloadFilterButton;
-    else if ([filterType isEqualToString: FILTER_PAUSE])
+    else if ([filterType isEqualToString: @"Pause"])
         button = sender == fNextFilterItem ? fNoFilterButton : fSeedFilterButton;
     else
         button = fNoFilterButton;
@@ -2245,6 +2126,11 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     return [fDisplayedTorrents count];
 }
 
+- (id) tableView: (NSTableView *) tableView objectValueForTableColumn: (NSTableColumn *) tableColumn row: (int) row
+{
+    return [[fDisplayedTorrents objectAtIndex: row] infoForCurrentView];
+}
+
 - (BOOL) tableView: (NSTableView *) tableView writeRowsWithIndexes: (NSIndexSet *) indexes
     toPasteboard: (NSPasteboard *) pasteboard
 {
@@ -2336,7 +2222,7 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     return YES;
 }
 
-- (void) torrentTableViewSelectionDidChange: (NSNotification *) notification
+- (void) tableViewSelectionDidChange: (NSNotification *) notification
 {
     [fInfoController updateInfoForTorrents: [fDisplayedTorrents objectsAtIndexes: [fTableView selectedRowIndexes]]];
 }
@@ -2556,9 +2442,9 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     unsigned int statsMask = [fStatusBar autoresizingMask];
     unsigned int filterMask = [fFilterBar autoresizingMask];
     unsigned int scrollMask = [fScrollView autoresizingMask];
-    [fStatusBar setAutoresizingMask: NSViewNotSizable];
-    [fFilterBar setAutoresizingMask: NSViewNotSizable];
-    [fScrollView setAutoresizingMask: NSViewNotSizable];
+    [fStatusBar setAutoresizingMask: 0];
+    [fFilterBar setAutoresizingMask: 0];
+    [fScrollView setAutoresizingMask: 0];
     
     frame = [self windowFrameByAddingHeight: heightChange checkLimits: NO];
     [fWindow setFrame: frame display: YES animate: animate]; 
@@ -2620,8 +2506,8 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     //set views to not autoresize
     unsigned int filterMask = [fFilterBar autoresizingMask];
     unsigned int scrollMask = [fScrollView autoresizingMask];
-    [fFilterBar setAutoresizingMask: NSViewNotSizable];
-    [fScrollView setAutoresizingMask: NSViewNotSizable];
+    [fFilterBar setAutoresizingMask: 0];
+    [fScrollView setAutoresizingMask: 0];
     
     frame = [self windowFrameByAddingHeight: heightChange checkLimits: NO];
     [fWindow setFrame: frame display: YES animate: animate];
@@ -2770,7 +2656,6 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
             TOOLBAR_FILTER, TOOLBAR_INFO, nil];
 }
 
-#warning validateUserInterfaceItem: ???
 - (BOOL) validateToolbarItem: (NSToolbarItem *) toolbarItem
 {
     NSString * ident = [toolbarItem itemIdentifier];
@@ -2807,8 +2692,10 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
         NSEnumerator * enumerator = [[fDisplayedTorrents objectsAtIndexes: [fTableView selectedRowIndexes]] objectEnumerator];
         Torrent * torrent;
         while ((torrent = [enumerator nextObject]))
+        {
             if ([torrent isActive] || [torrent waitingToStart])
                 return YES;
+        }
         return NO;
     }
     
@@ -2818,8 +2705,10 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
         NSEnumerator * enumerator = [[fDisplayedTorrents objectsAtIndexes: [fTableView selectedRowIndexes]] objectEnumerator];
         Torrent * torrent;
         while ((torrent = [enumerator nextObject]))
+        {
             if ([torrent isPaused] && ![torrent waitingToStart])
                 return YES;
+        }
         return NO;
     }
 
@@ -3035,23 +2924,7 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
     //enable reverse sort item
     if (action == @selector(setSortReverse:))
         return ![[fDefaults stringForKey: @"Sort"] isEqualToString: @"Order"];
-    
-    //check proper filter search item
-    if (action == @selector(setFilterSearchType:))
-    {
-        NSString * filterType = [fDefaults stringForKey: @"FilterSearchType"];
-        
-        int tag = [menuItem tag];
-        BOOL state;
-        if (tag == FILTER_TYPE_TAG_TRACKER)
-            state = [filterType isEqualToString: FILTER_TYPE_TRACKER];
-        else
-            state = [filterType isEqualToString: FILTER_TYPE_NAME];
-        
-        [menuItem setState: state ? NSOnState : NSOffState];
-        return YES;
-    }
-    
+
     return YES;
 }
 
@@ -3059,7 +2932,7 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
 {
     NSEnumerator * enumerator;
     Torrent * torrent;
-    BOOL active, allowSleep;
+    BOOL active;
 
     switch (messageType)
     {
@@ -3083,24 +2956,20 @@ static void sleepCallBack(void * controller, io_service_t y, natural_t messageTy
             break;
 
         case kIOMessageCanSystemSleep:
-            
-            allowSleep = YES;
-            if ([fDefaults boolForKey: @"SleepPrevent"])
-            {
-                //prevent idle sleep unless no torrents are active
-                enumerator = [fTorrents objectEnumerator];
-                while ((torrent = [enumerator nextObject]))
-                    if ([torrent isActive] && ![torrent isStalled] && ![torrent isError])
-                    {
-                        allowSleep = NO;
-                        break;
-                    }
-            }
+            //pevent idle sleep unless all paused
+            active = NO;
+            enumerator = [fTorrents objectEnumerator];
+            while ((torrent = [enumerator nextObject]))
+                if ([torrent isActive])
+                {
+                    active = YES;
+                    break;
+                }
 
-            if (allowSleep)
-                IOAllowPowerChange(fRootPort, (long) messageArgument);
-            else
+            if (active)
                 IOCancelPowerChange(fRootPort, (long) messageArgument);
+            else
+                IOAllowPowerChange(fRootPort, (long) messageArgument);
             break;
 
         case kIOMessageSystemHasPoweredOn:

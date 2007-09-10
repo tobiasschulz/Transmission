@@ -103,7 +103,8 @@ main( int argc, char ** argv )
     server_debug( debug );
     server_listen( sockfd );
 
-    event_base_dispatch( evbase );
+    event_dispatch();
+    /* XXX event_base_dispatch( evbase ); */
 
     return 1;
 }
@@ -313,22 +314,22 @@ exitcleanup( void )
 }
 
 void
-setupsigs( struct event_base * base )
+setupsigs( struct event_base * base /* XXX */ UNUSED )
 {
     static struct event ev_int;
     static struct event ev_quit;
     static struct event ev_term;
 
     signal_set( &ev_int, SIGINT, gotsig, NULL );
-    event_base_set( base, &ev_int );
+    /* XXX event_base_set( base, &ev_int ); */
     signal_add( &ev_int, NULL );
 
     signal_set( &ev_quit, SIGQUIT, gotsig, NULL );
-    event_base_set( base, &ev_quit );
+    /* XXX event_base_set( base, &ev_quit ); */
     signal_add( &ev_quit, NULL );
 
     signal_set( &ev_term, SIGTERM, gotsig, NULL );
-    event_base_set( base, &ev_term );
+    /* XXX event_base_set( base, &ev_term ); */
     signal_add( &ev_term, NULL );
 
     signal( SIGPIPE, SIG_IGN );

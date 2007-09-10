@@ -6,8 +6,6 @@
  * so that the bulk of its code can remain under the MIT license. 
  * This exemption does not extend to derived works not owned by
  * the Transmission project.
- * 
- * $Id$
  */
 
 #include <gtk/gtk.h>

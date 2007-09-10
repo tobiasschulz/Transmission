@@ -40,7 +40,6 @@
 #include "platform.h"
 #include "ratecontrol.h"
 #include "shared.h"
-#include "trevent.h"
 #include "utils.h"
 
 /* Generate a peer id : "-TRxyzb-" + 12 random alphanumeric
@@ -62,10 +61,6 @@ tr_peerIdNew ( char * buf, int buflen )
     buf[TR_ID_LEN] = '\0';
 }
 
-/***
-****
-***/
-
 
 /***********************************************************************
  * tr_init
@@ -78,25 +73,34 @@ tr_handle_t * tr_init( const char * tag )
     int           i;
 
     tr_msgInit();
-
-    h = tr_new0( tr_handle_t, 1 );
-    if( !h )
-        return NULL;
-
-    tr_eventInit( h );
     tr_netInit();
     tr_netResolveThreadInit();
 
+    h = calloc( 1, sizeof( tr_handle_t ) );
+    if( NULL == h )
+    {
+        return NULL;
+    }
+
     h->tag = strdup( tag );
-    if( !h->tag ) {
+    if( NULL == h->tag )
+    {
         free( h );
         return NULL;
     }
 
+    /* Random key */
+    for( i=0; i < TR_KEY_LEN; ++i )
+    {
+        const int r = tr_rand( 36 );
+        h->key[i] = ( r < 26 ) ? ( 'a' + r ) : ( '0' + r - 26 ) ;
+    }
 
     /* Azureus identity */
     for( i=0; i < TR_AZ_ID_LEN; ++i )
+    {
         h->azId[i] = tr_rand( 0xff );
+    }
 
 #ifndef WIN32
     /* Don't exit when writing on a broken socket */
@@ -231,7 +235,6 @@ void tr_close( tr_handle_t * h )
     tr_rcClose( h->upload );
     tr_rcClose( h->download );
     
-    tr_eventClose( h );
     tr_sharedClose( h->shared );
     tr_fdClose();
     free( h->tag );
@@ -267,7 +270,7 @@ tr_loadTorrents ( tr_handle_t   * h,
                 tr_buildPath( path, sizeof(path), torrentDir, d->d_name, NULL );
                 tor = tr_torrentInit( h, path, destination, flags, NULL );
                 if( tor != NULL ) {
-                    tr_list_append( &list, tor );
+                    list = tr_list_append( list, tor );
                     //fprintf (stderr, "#%d - %s\n", n, tor->info.name );
                     n++;
                 }
@@ -281,7 +284,7 @@ tr_loadTorrents ( tr_handle_t   * h,
         torrents[i++] = (tr_torrent_t*) l->data;
     assert( i==n );
 
-    tr_list_free( &list );
+    tr_list_free( list );
 
     *setmeCount = n;
     tr_inf( "Loaded %d torrents from disk", *setmeCount );

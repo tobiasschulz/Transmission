@@ -27,7 +27,6 @@
 
 #include <inttypes.h>
 #include <stdarg.h>
-#include <stddef.h> /* for size_t */
 
 void tr_msgInit( void );
 
@@ -77,9 +76,6 @@ int tr_concat( char ** buf, int * used, int * max,
 void tr_buildPath ( char* buf, size_t buflen,
                     const char * first_element, ... );
 
-struct timeval timevalSec ( int seconds );
-struct timeval timevalMsec ( int milliseconds );
-
 
 int    tr_ioErrorFromErrno( void );
 
@@ -90,17 +86,6 @@ uint64_t tr_date( void );
 
 /* wait the specified number of milliseconds */
 void tr_wait( uint64_t delay_milliseconds );
-
-/***********************************************************************
- * strlcat_utf8
- ***********************************************************************
- * According to the official specification, all strings in the torrent
- * file are supposed to be UTF-8 encoded. However, there are
- * non-compliant torrents around... If we encounter an invalid UTF-8
- * character, we assume it is ISO 8859-1 and convert it to UTF-8.
- **********************************************************************/
-void strlcat_utf8( void *, const void *, size_t, char );
-size_t bufsize_utf8( const void *, int * );
 
 /***
 ****

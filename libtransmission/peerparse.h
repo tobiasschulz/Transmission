@@ -244,7 +244,7 @@ static int parseRequest( tr_torrent_t * tor, tr_peer_t * peer,
     r->index = index;
     r->begin = begin;
     r->length = length;
-    tr_list_append( &peer->outRequests, r );
+    peer->outRequests = tr_list_append( peer->outRequests, r );
 
     return TR_OK;
 }
@@ -342,7 +342,7 @@ static int parsePiece( tr_torrent_t * tor, tr_peer_t * peer,
     tr_peerSentBlockToUs( peer, len-8 );
     broadcastCancel( tor, index, begin, len - 8 );
 
-    if( !tr_cpPieceIsComplete( tor->completion, index ) )
+    if( !tr_cpPieceHasAllBlocks( tor->completion, index ) )
     {
         return TR_OK;
     }
@@ -350,8 +350,11 @@ static int parsePiece( tr_torrent_t * tor, tr_peer_t * peer,
     /* Piece is complete, check it */
     if( ( ret = tr_ioHash( tor->io, index ) ) )
     {
-        tr_peerPieceIsCorrupt( peer, index );
         return ret;
+    }
+    if( !tr_cpPieceIsComplete( tor->completion, index ) )
+    {
+        return TR_OK;
     }
 
     /* Hash OK */
@@ -415,9 +418,9 @@ static int parseCancel( tr_torrent_t * tor, tr_peer_t * peer,
     req.index = index;
     req.begin = begin;
     req.length = length;
-    while(( l = tr_list_find( peer->outRequests, &req, reqCompare ) )) {
+    while(( l = tr_list_find( peer->outRequests, reqCompare, &req ) )) {
         tr_request_t * r = (tr_request_t *) l->data;
-        tr_list_remove_data( &peer->outRequests, r );
+        peer->outRequests = tr_list_remove_data( peer->outRequests, r );
         tr_free( r );
     }
 
@@ -610,7 +613,7 @@ static int parseHandshake( tr_torrent_t * tor, tr_peer_t * peer )
         return TR_ERROR;
     }
 
-    if( 0 == memcmp( peer->buf + HANDSHAKE_PEERID_OFF, getPeerId(),
+    if( 0 == memcmp( peer->buf + HANDSHAKE_PEERID_OFF, tor->peer_id,
                      TR_ID_LEN ) )
     {
         /* We are connected to ourselves... */

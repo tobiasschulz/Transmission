@@ -24,580 +24,278 @@
 
 #import "TorrentCell.h"
 #import "TorrentTableView.h"
-#import "NSStringAdditions.h"
+#import "StringAdditions.h"
 #import "CTGradientAdditions.h"
 
+//also defined in Torrent.m
 #define BAR_HEIGHT 12.0
-
-#define IMAGE_SIZE_REG 32.0
-#define IMAGE_SIZE_MIN 16.0
-
-//end up being larger than font height
-#define HEIGHT_TITLE 16.0
-#define HEIGHT_STATUS 12.0
-
-#define PADDING_HORIZONAL 2.0
-#define PADDING_ABOVE_IMAGE_REG 9.0
-#define PADDING_BETWEEN_IMAGE_AND_TITLE 5.0
-#define PADDING_BETWEEN_IMAGE_AND_BAR 7.0
-#define PADDING_ABOVE_TITLE 3.0
-#define PADDING_ABOVE_MIN_STATUS 4.0
-#define PADDING_BETWEEN_TITLE_AND_MIN_STATUS 2.0
-#define PADDING_BETWEEN_TITLE_AND_PROGRESS 1.0
-#define PADDING_BETWEEN_PROGRESS_AND_BAR 2.0
-#define PADDING_BETWEEN_TITLE_AND_BAR_MIN 3.0
-#define PADDING_BETWEEN_BAR_AND_STATUS 2.0
-
-#define MAX_PIECES 324
-#define BLANK_PIECE -99
 
 @interface TorrentCell (Private)
 
-- (void) drawSimpleBar: (NSRect) barRect;
-- (void) drawAdvancedBar: (NSRect) barRect;
-- (NSImage *) advancedBar;
-
-- (NSRect) rectForMinimalStatusWithString: (NSAttributedString *) string inBounds: (NSRect) bounds;
-- (NSRect) rectForTitleWithString: (NSAttributedString *) string basedOnMinimalStatusRect: (NSRect) statusRect
-            inBounds: (NSRect) bounds;
-- (NSRect) rectForProgressWithString: (NSAttributedString *) string inBounds: (NSRect) bounds;
-- (NSRect) rectForStatusWithString: (NSAttributedString *) string inBounds: (NSRect) bounds;
-
-- (NSAttributedString *) attributedTitleWithColor: (NSColor *) color;
-- (NSAttributedString *) attributedStatusString: (NSString *) string withColor: (NSColor *) color;
+- (void) placeBar: (NSImage *) barImage width: (float) width point: (NSPoint) point;
+- (void) buildSimpleBar: (float) width point: (NSPoint) point;
+- (void) buildAdvancedBar: (float) widthFloat point: (NSPoint) point;
 
 @end
 
 @implementation TorrentCell
 
-// Used to optimize drawing. They contain packed RGBA pixels for every color needed.
-#define BE OSSwapBigToHostConstInt32
-
-static uint32_t kRed    = BE(0xFF6450FF), //255, 100, 80
-                kBlue   = BE(0x50A0FFFF), //80, 160, 255
-                kBlue2  = BE(0x1E46B4FF), //30, 70, 180
-                kGray   = BE(0x969696FF), //150, 150, 150
-                kGreen1 = BE(0x99FFCCFF), //153, 255, 204
-                kGreen2 = BE(0x66FF99FF), //102, 255, 153
-                kGreen3 = BE(0x00FF66FF), //0, 255, 102
-                kWhite  = BE(0xFFFFFFFF); //255, 255, 255
-
-//only called one, so don't worry about release
 - (id) init
 {
     if ((self = [super init]))
 	{
         fDefaults = [NSUserDefaults standardUserDefaults];
         
-        NSMutableParagraphStyle * paragraphStyle = [[NSParagraphStyle defaultParagraphStyle] mutableCopy];
-        [paragraphStyle setLineBreakMode: NSLineBreakByTruncatingTail];
-    
-        fTitleAttributes = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
-                                [NSFont messageFontOfSize: 12.0], NSFontAttributeName,
-                                paragraphStyle, NSParagraphStyleAttributeName, nil];
-        fStatusAttributes = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
-                                [NSFont messageFontOfSize: 9.0], NSFontAttributeName,
-                                paragraphStyle, NSParagraphStyleAttributeName, nil];
-        [paragraphStyle release];
+        fWhiteGradient = [[CTGradient progressWhiteGradient] retain];
+        fGrayGradient = [[CTGradient progressGrayGradient] retain];
+        fLightGrayGradient = [[CTGradient progressLightGrayGradient] retain];
+        fBlueGradient = [[CTGradient progressBlueGradient] retain];
+        fDarkBlueGradient = [[CTGradient progressDarkBlueGradient] retain];
+        fGreenGradient = [[CTGradient progressGreenGradient] retain];
+        fLightGreenGradient = [[CTGradient progressLightGreenGradient] retain];
+        fDarkGreenGradient = [[CTGradient progressDarkGreenGradient] retain];
+        fYellowGradient = [[CTGradient progressYellowGradient] retain];
+        fTransparentGradient = [[CTGradient progressTransparentGradient] retain];
         
-        fBarOverlayColor = [[NSColor colorWithDeviceWhite: 0.0 alpha: 0.2] retain];
+        fErrorImage = [[NSImage imageNamed: @"Error"] copy];
+        [fErrorImage setFlipped: YES];
     }
 	return self;
 }
 
-- (id) copyWithZone: (NSZone *) zone
+- (void) placeBar: (NSImage *) barImage width: (float) width point: (NSPoint) point
 {
-    TorrentCell * copy = [super copyWithZone: zone];
+    if (width <= 0.0)
+        return;
     
-    copy->fBitmap = nil;
-    copy->fPieces = NULL;
-    
-    return copy;
+    if ([barImage size].width < width)
+        [barImage setSize: NSMakeSize(width * 2.0, BAR_HEIGHT)];
+
+    [barImage compositeToPoint: point fromRect: NSMakeRect(0, 0, width, BAR_HEIGHT) operation: NSCompositeSourceOver];
 }
 
-- (void) dealloc
+- (void) buildSimpleBar: (float) width point: (NSPoint) point
 {
-    [fBitmap release];
-    if (fPieces)
-        free(fPieces);
+    NSDictionary * info = [self objectValue];
     
-    [super dealloc];
-}
-
-- (NSRect) iconRectForBounds: (NSRect) bounds
-{
-    NSRect result = bounds;
-    
-    result.origin.x += PADDING_HORIZONAL;
-    
-    float imageSize;
-    if ([fDefaults boolForKey: @"SmallView"])
-    {
-        imageSize = IMAGE_SIZE_MIN;
-        result.origin.y += (result.size.height - imageSize) * 0.5;
-    }
+    NSRect barBounds, completeBounds;
+    if([[self controlView] isFlipped])
+        barBounds = NSMakeRect(point.x, point.y, width, BAR_HEIGHT);
     else
-    {
-        imageSize = IMAGE_SIZE_REG;
-        result.origin.y += PADDING_ABOVE_IMAGE_REG;
-    }
+        barBounds = NSMakeRect(point.x, point.y - BAR_HEIGHT, width, BAR_HEIGHT);
+    completeBounds = barBounds;
     
-    result.size = NSMakeSize(imageSize, imageSize);
+    float progress = [[info objectForKey: @"Progress"] floatValue];
+    completeBounds.size.width = progress * width;
     
-    return result;
-}
-
-- (NSRect) titleRectForBounds: (NSRect) bounds
-{
-    return [self rectForTitleWithString: [self attributedTitleWithColor: nil]
-            basedOnMinimalStatusRect: [self minimalStatusRectForBounds: bounds] inBounds: bounds];
-}
-
-- (NSRect) minimalStatusRectForBounds: (NSRect) bounds
-{
-    Torrent * torrent = [self representedObject];
-    NSString * string = [torrent isActive] && ![fDefaults boolForKey: @"SmallStatusRegular"]
-                            ? [torrent remainingTimeString] : [torrent shortStatusString];
-    return [self rectForMinimalStatusWithString: [self attributedStatusString: string withColor: nil] inBounds: bounds];
-}
-
-- (NSRect) progressRectForBounds: (NSRect) bounds
-{
-    return [self rectForProgressWithString: [self attributedStatusString: [[self representedObject] progressString] withColor: nil]
-                    inBounds: bounds];
-}
-
-- (NSRect) barRectForBounds: (NSRect) bounds
-{
-    BOOL minimal = [fDefaults boolForKey: @"SmallView"];
-    
-    NSRect result = bounds;
-    result.size.height = BAR_HEIGHT;
-    result.origin.x = PADDING_HORIZONAL + (minimal ? IMAGE_SIZE_MIN : IMAGE_SIZE_REG)
-                        + PADDING_BETWEEN_IMAGE_AND_BAR;
-    
-    result.origin.y += PADDING_ABOVE_TITLE + HEIGHT_TITLE;
-    if (minimal)
-        result.origin.y += PADDING_BETWEEN_TITLE_AND_BAR_MIN;
-    else
-        result.origin.y += PADDING_BETWEEN_TITLE_AND_PROGRESS + HEIGHT_STATUS + PADDING_BETWEEN_PROGRESS_AND_BAR;
-    
-    result.size.width = NSMaxX(bounds) - result.origin.x - PADDING_HORIZONAL - BUTTONS_TOTAL_WIDTH;
-    
-    return result;
-}
-
-- (NSRect) statusRectForBounds: (NSRect) bounds
-{
-    return [self rectForStatusWithString: [self attributedStatusString: [[self representedObject] statusString] withColor: nil]
-                    inBounds: bounds];
-}
-
-- (void) drawInteriorWithFrame: (NSRect) cellFrame inView: (NSView *) controlView
-{
-    [super drawInteriorWithFrame: cellFrame inView: controlView];
-    
-    Torrent * torrent = [self representedObject];
-    
-    BOOL minimal = [fDefaults boolForKey: @"SmallView"];
-    
-    //error image
-    BOOL error = [torrent isError];
-    if (error && !fErrorImage)
-    {
-        fErrorImage = [[NSImage imageNamed: @"Error.png"] copy];
-        [fErrorImage setFlipped: YES];
-    }
-    
-    //icon
-    NSImage * icon = minimal && error ? fErrorImage : [torrent icon];
-    NSRect iconRect = [self iconRectForBounds: cellFrame];
-    [icon drawInRect: iconRect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
-    
-    if (error && !minimal)
-    {
-        NSRect errorRect = NSMakeRect(NSMaxX(iconRect) - IMAGE_SIZE_MIN, NSMaxY(iconRect) - IMAGE_SIZE_MIN,
-                                        IMAGE_SIZE_MIN, IMAGE_SIZE_MIN);
-        [fErrorImage drawInRect: errorRect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
-    }
-    
-    //text color
-    BOOL highlighted = [self isHighlighted] && [[self highlightColorWithFrame: cellFrame inView: controlView]
-                                                isEqual: [NSColor alternateSelectedControlColor]];
-    NSColor * titleColor, * statusColor;
-    if ([self isHighlighted]
-            && [[self highlightColorWithFrame: cellFrame inView: controlView] isEqual: [NSColor alternateSelectedControlColor]])
-    {
-        titleColor = [NSColor whiteColor];
-        statusColor = [NSColor whiteColor];
-    }
-    else
-    {
-        titleColor = [NSColor controlTextColor];
-        statusColor = [NSColor darkGrayColor];
-    }
-    
-    //minimal status
-    NSRect minimalStatusRect;
-    if (minimal)
-    {
-        NSString * string = ![fDefaults boolForKey: @"SmallStatusRegular"] && [torrent isActive]
-                                ? [torrent remainingTimeString] : [torrent shortStatusString];
-        NSAttributedString * minimalString = [self attributedStatusString: string withColor: statusColor];
-        minimalStatusRect = [self rectForMinimalStatusWithString: minimalString inBounds: cellFrame];
-        
-        [minimalString drawInRect: minimalStatusRect];
-    }
-    
-    //title
-    NSAttributedString * titleString = [self attributedTitleWithColor: titleColor];
-    NSRect titleRect = [self rectForTitleWithString: titleString basedOnMinimalStatusRect: minimalStatusRect inBounds: cellFrame];
-    [titleString drawInRect: titleRect];
-    
-    //progress
-    NSRect progressRect;
-    if (!minimal)
-    {
-        NSAttributedString * progressString = [self attributedStatusString: [torrent progressString] withColor: statusColor];
-        progressRect = [self rectForProgressWithString: progressString inBounds: cellFrame];
-        [progressString drawInRect: progressRect];
-    }
-    
-    //bar
-    NSRect barRect = [self barRectForBounds: cellFrame];
-    [fDefaults boolForKey: @"UseAdvancedBar"] ? [self drawAdvancedBar: barRect] : [self drawSimpleBar: barRect];
-    
-    //status
-    if (!minimal)
-    {
-        NSAttributedString * statusString = [self attributedStatusString: [torrent statusString] withColor: statusColor];
-        [statusString drawInRect: [self rectForStatusWithString: statusString inBounds: cellFrame]];
-    }
-}
-
-@end
-
-@implementation TorrentCell (Private)
-
-#warning NSDivideRect ?
-- (void) drawSimpleBar: (NSRect) barRect
-{
-    Torrent * torrent = [self representedObject];
-    
-    float progress = [torrent progress], left = [torrent progressLeft];
-    
+    float left = INVALID;
     if (progress < 1.0)
     {
-        if (!fWhiteGradient)
-            fWhiteGradient = [[CTGradient progressWhiteGradient] retain];
-        [fWhiteGradient fillRect: barRect angle: -90];
+        [fWhiteGradient fillRect: barBounds angle: -90];
         
-        float include = progress + left;
-        if (include < 1.0)
+        left = [[info objectForKey: @"Left"] floatValue];
+        if ((progress + left) < 1.0)
         {
-            if (!fLightGrayGradient)
-                fLightGrayGradient = [[CTGradient progressLightGrayGradient] retain];
+            NSRect blankBounds = barBounds;
+            blankBounds.origin.x += width * (progress + left);
+            blankBounds.size.width = width * ((1.0 - progress) - left);
             
-            NSRect noIncludeRect = barRect;
-            noIncludeRect.origin.x += barRect.size.width * include;
-            noIncludeRect.size.width *= 1.0 - include;
-            [fLightGrayGradient fillRect: noIncludeRect angle: -90];
+            [fLightGrayGradient fillRect: blankBounds angle: -90];
         }
     }
     
-    NSRect completeRect = barRect;
-    completeRect.size.width *= progress;
-    
-    if ([torrent isActive])
+    if ([[info objectForKey: @"Active"] boolValue])
     {
-        if ([torrent isChecking])
+        if ([[info objectForKey: @"Checking"] boolValue])
+            [fYellowGradient fillRect: completeBounds angle: -90];
+        else if ([[info objectForKey: @"Seeding"] boolValue])
         {
-            if (!fYellowGradient)
-                fYellowGradient = [[CTGradient progressYellowGradient] retain];
-            [fYellowGradient fillRect: completeRect angle: -90];
-        }
-        else if ([torrent isSeeding])
-        {
-            NSRect ratioRect = completeRect;
-            ratioRect.size.width *= [torrent progressStopRatio];
+            NSRect ratioBounds = completeBounds;
+            ratioBounds.size.width *= [[info objectForKey: @"ProgressStopRatio"] floatValue];
             
-            if (ratioRect.size.width < completeRect.size.width)
-            {
-                if (!fLightGreenGradient)
-                    fLightGreenGradient = [[CTGradient progressLightGreenGradient] retain];
-                [fLightGreenGradient fillRect: completeRect angle: -90];
-            }
-            
-            if (!fGreenGradient)
-                fGreenGradient = [[CTGradient progressGreenGradient] retain];
-            [fGreenGradient fillRect: ratioRect angle: -90]; 
+            if (ratioBounds.size.width < completeBounds.size.width)
+                [fLightGreenGradient fillRect: completeBounds angle: -90];
+            [fGreenGradient fillRect: ratioBounds angle: -90]; 
         }
         else
-        {
-            if (!fBlueGradient)
-                fBlueGradient = [[CTGradient progressBlueGradient] retain];
-            [fBlueGradient fillRect: completeRect angle: -90];
-        }
+            [fBlueGradient fillRect: completeBounds angle: -90];
     }
     else
     {
-        if ([torrent waitingToStart])
+        if ([[info objectForKey: @"Waiting"] boolValue])
         {
+            if (left == INVALID)
+                left = [[info objectForKey: @"Left"] floatValue];
+            
             if (left <= 0.0)
-            {
-                if (!fDarkGreenGradient)
-                    fDarkGreenGradient = [[CTGradient progressDarkGreenGradient] retain];
-                [fDarkGreenGradient fillRect: completeRect angle: -90];
-            }
+                [fDarkGreenGradient fillRect: completeBounds angle: -90];
             else
-            {
-                if (!fDarkBlueGradient)
-                    fDarkBlueGradient = [[CTGradient progressDarkBlueGradient] retain];
-                [fDarkBlueGradient fillRect: completeRect angle: -90];
-            }
+                [fDarkBlueGradient fillRect: completeBounds angle: -90];
         }
         else
-        {
-            if (!fGrayGradient)
-                fGrayGradient = [[CTGradient progressGrayGradient] retain];
-            [fGrayGradient fillRect: completeRect angle: -90];
-        }
+            [fGrayGradient fillRect: completeBounds angle: -90];
     }
     
-    [fBarOverlayColor set];
-    [NSBezierPath strokeRect: NSInsetRect(barRect, 0.5, 0.5)];
+    [[NSColor colorWithDeviceWhite: 0.0 alpha: 0.2] set];
+    [NSBezierPath strokeRect: NSInsetRect(barBounds, 0.5, 0.5)];
 }
 
-- (void) drawAdvancedBar: (NSRect) barRect
+- (void) buildAdvancedBar: (float) width point: (NSPoint) point
 {
-    [[self advancedBar] drawInRect: barRect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
+    NSDictionary * info = [self objectValue];
     
-    if (!fTransparentGradient)
-        fTransparentGradient = [[CTGradient progressTransparentGradient] retain];
-    [fTransparentGradient fillRect: barRect angle: -90];
+    //place actual advanced bar
+    NSImage * image = [info objectForKey: @"AdvancedBar"];
+    [image setSize: NSMakeSize(width, BAR_HEIGHT)];
+    [image compositeToPoint: point operation: NSCompositeSourceOver];
     
-    [fBarOverlayColor set];
-    [NSBezierPath strokeRect: NSInsetRect(barRect, 0.5, 0.5)];
-}
-
-- (NSImage *) advancedBar
-{
-    if (!fBitmap)
-        fBitmap = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes: nil
-            pixelsWide: MAX_PIECES pixelsHigh: BAR_HEIGHT bitsPerSample: 8 samplesPerPixel: 4 hasAlpha: YES
-            isPlanar: NO colorSpaceName: NSCalibratedRGBColorSpace bytesPerRow: 0 bitsPerPixel: 0];
-    
-    uint32_t * p;
-    uint8_t * bitmapData = [fBitmap bitmapData];
-    int bytesPerRow = [fBitmap bytesPerRow];
-    
-    if (!fPieces)
-    {
-        fPieces = malloc(MAX_PIECES);
-        int i;
-        for (i = 0; i < MAX_PIECES; i++)
-            fPieces[i] = BLANK_PIECE;
-    }
-    
-    Torrent * torrent = [self representedObject];
-    int pieceCount = [torrent pieceCount];
-    int8_t * piecesAvailablity = malloc(pieceCount);
-    [torrent getAvailability: piecesAvailablity size: pieceCount];
-    
-    //lines 2 to 14: blue, green, or gray depending on piece availability
-    int i, h, index = 0;
-    float increment = (float)pieceCount / MAX_PIECES, indexValue = 0;
-    uint32_t color;
-    BOOL change;
-    for (i = 0; i < MAX_PIECES; i++)
-    {
-        change = NO;
-        if (piecesAvailablity[index] < 0)
-        {
-            if (fPieces[i] != -1)
-            {
-                color = kBlue;
-                fPieces[i] = -1;
-                change = YES;
-            }
-        }
-        else if (piecesAvailablity[index] == 0)
-        {
-            if (fPieces[i] != 0)
-            {
-                color = kGray;
-                fPieces[i] = 0;
-                change = YES;
-            }
-        }
-        else if (piecesAvailablity[index] <= 4)
-        {
-            if (fPieces[i] != 1)
-            {
-                color = kGreen1;
-                fPieces[i] = 1;
-                change = YES;
-            }
-        }
-        else if (piecesAvailablity[index] <= 8)
-        {
-            if (fPieces[i] != 2)
-            {
-                color = kGreen2;
-                fPieces[i] = 2;
-                change = YES;
-            }
-        }
-        else
-        {
-            if (fPieces[i] != 3)
-            {
-                color = kGreen3;
-                fPieces[i] = 3;
-                change = YES;
-            }
-        }
-        
-        if (change)
-        {
-            //point to pixel (i, 2) and draw "vertically"
-            p = (uint32_t *)(bitmapData + 2 * bytesPerRow) + i;
-            for (h = 2; h < BAR_HEIGHT; h++)
-            {
-                p[0] = color;
-                p = (uint32_t *)((uint8_t *)p + bytesPerRow);
-            }
-        }
-        
-        indexValue += increment;
-        index = (int)indexValue;
-    }
-    
-    //determine percentage finished and available
-    int have = rintf((float)MAX_PIECES * [torrent progress]), avail;
-    if (![torrent isActive] || [torrent progress] >= 1.0 || [torrent totalPeersConnected] <= 0)
-        avail = 0;
+    NSRect barBounds;
+    if ([[self controlView] isFlipped])
+        barBounds = NSMakeRect(point.x, point.y, width, BAR_HEIGHT);
     else
+        barBounds = NSMakeRect(point.x, point.y - BAR_HEIGHT, width, BAR_HEIGHT);
+    [fTransparentGradient fillRect: barBounds angle: -90];
+    [[NSColor colorWithDeviceWhite: 0.0 alpha: 0.2] set];
+    [NSBezierPath strokeRect: NSInsetRect(barBounds, 0.5, 0.5)];
+}
+
+- (void) toggleMinimalStatus
+{
+    [fDefaults setBool: ![fDefaults boolForKey: @"SmallStatusRegular"] forKey: @"SmallStatusRegular"];
+}
+
+- (void) drawWithFrame: (NSRect) cellFrame inView: (NSView *) view
+{
+    BOOL highlighted = [self isHighlighted] && [[self highlightColorWithFrame: cellFrame inView: view]
+                                                        isEqual: [NSColor alternateSelectedControlColor]];
+    
+    NSMutableParagraphStyle * paragraphStyle = [[NSParagraphStyle defaultParagraphStyle] mutableCopy];
+    [paragraphStyle setLineBreakMode: NSLineBreakByTruncatingTail];
+    
+    NSDictionary * nameAttributes = [[NSDictionary alloc] initWithObjectsAndKeys:
+                    highlighted ? [NSColor whiteColor] : [NSColor controlTextColor], NSForegroundColorAttributeName,
+                    [NSFont messageFontOfSize: 12.0], NSFontAttributeName,
+                    paragraphStyle, NSParagraphStyleAttributeName, nil];
+    NSDictionary * statusAttributes = [[NSDictionary alloc] initWithObjectsAndKeys:
+                    highlighted ? [NSColor whiteColor] : [NSColor darkGrayColor], NSForegroundColorAttributeName,
+                    [NSFont messageFontOfSize: 9.0], NSFontAttributeName,
+                    paragraphStyle, NSParagraphStyleAttributeName, nil];
+    [paragraphStyle release];
+
+    NSPoint pen = cellFrame.origin;
+    const float PADDING = 3.0, LINE_PADDING = 2.0, EXTRA_NAME_SHIFT = 1.0;
+    
+    NSDictionary * info = [self objectValue];
+    
+    if (![fDefaults boolForKey: @"SmallView"]) //regular size
     {
-        float * piecesFinished = malloc(pieceCount * sizeof(float));
-        [torrent getAmountFinished: piecesFinished size: pieceCount];
+        //icon
+        NSImage * icon = [info objectForKey: @"Icon"];
+        NSSize iconSize = [icon size];
         
-        float available = 0;
-        for (i = 0; i < pieceCount; i++)
-            if (piecesAvailablity[i] > 0)
-                available += 1.0 - piecesFinished[i];
+        pen.x += PADDING;
+        pen.y += (cellFrame.size.height - iconSize.height) * 0.5;
         
-        avail = rintf(MAX_PIECES * available / (float)pieceCount);
-        if (have + avail > MAX_PIECES) //case if both end in .5 and all pieces are available
-            avail--;
+        [icon drawAtPoint: pen fromRect: NSMakeRect(0, 0, iconSize.width, iconSize.height)
+                operation: NSCompositeSourceOver fraction: 1.0];
         
-        free(piecesFinished);
+        //error badge
+        if ([[info objectForKey: @"Error"] boolValue])
+        {
+            NSSize errorIconSize = [fErrorImage size];
+            [fErrorImage drawAtPoint: NSMakePoint(pen.x + iconSize.width - errorIconSize.width,
+                                                    pen.y + iconSize.height  - errorIconSize.height)
+                fromRect: NSMakeRect(0, 0, errorIconSize.width, errorIconSize.height)
+                operation: NSCompositeSourceOver fraction: 1.0];
+        }
+
+        float mainWidth = cellFrame.size.width - iconSize.width - 3.0 * PADDING - EXTRA_NAME_SHIFT;
+
+        //name string
+        pen.x += iconSize.width + PADDING + EXTRA_NAME_SHIFT;
+        pen.y = cellFrame.origin.y + PADDING;
+        
+        NSString * nameString = [info objectForKey: @"Name"];
+        NSSize nameSize = [nameString sizeWithAttributes: nameAttributes];
+        [nameString drawInRect: NSMakeRect(pen.x, pen.y, mainWidth, nameSize.height) withAttributes: nameAttributes];
+        
+        //progress string
+        pen.y += nameSize.height + LINE_PADDING - 1.0;
+        
+        NSString * progressString = [info objectForKey: @"ProgressString"];
+        NSSize progressSize = [progressString sizeWithAttributes: statusAttributes];
+        [progressString drawInRect: NSMakeRect(pen.x, pen.y, mainWidth, progressSize.height) withAttributes: statusAttributes];
+
+        //progress bar
+        pen.x -= EXTRA_NAME_SHIFT;
+        pen.y += progressSize.height + LINE_PADDING + BAR_HEIGHT;
+        
+        float barWidth = mainWidth + EXTRA_NAME_SHIFT - BUTTONS_TOTAL_WIDTH + PADDING;
+        
+        if ([fDefaults boolForKey: @"UseAdvancedBar"])
+            [self buildAdvancedBar: barWidth point: pen];
+        else
+            [self buildSimpleBar: barWidth point: pen];
+
+        //status string
+        pen.x += EXTRA_NAME_SHIFT;
+        pen.y += LINE_PADDING;
+        
+        NSString * statusString = [info objectForKey: @"StatusString"];
+        NSSize statusSize = [statusString sizeWithAttributes: statusAttributes];
+        [statusString drawInRect: NSMakeRect(pen.x, pen.y, mainWidth, statusSize.height) withAttributes: statusAttributes];
     }
-    
-    free(piecesAvailablity);
-    
-    //first two lines: dark blue to show progression, green to show available
-    p = (uint32_t *)bitmapData;
-    for (i = 0; i < have; i++)
+    else //small size
     {
-        p[i] = kBlue2;
-        p[i + bytesPerRow / 4] = kBlue2;
+        //icon
+        NSImage * icon = ![[info objectForKey: @"Error"] boolValue] ? [info objectForKey: @"Icon"] : fErrorImage;
+        NSSize iconSize = [icon size];
+        
+        pen.x += PADDING;
+        pen.y += (cellFrame.size.height - iconSize.height) * 0.5;
+        
+        [icon drawAtPoint: pen fromRect: NSMakeRect(0, 0, iconSize.width, iconSize.height)
+                operation: NSCompositeSourceOver fraction: 1.0];
+
+        //name and status string
+        float mainWidth = cellFrame.size.width - iconSize.width - 3.0 * PADDING - EXTRA_NAME_SHIFT;
+                     
+        //place name string
+        pen.x += iconSize.width + PADDING + EXTRA_NAME_SHIFT;
+        pen.y = cellFrame.origin.y + LINE_PADDING;
+
+        NSString * nameString = [info objectForKey: @"Name"];
+        NSSize nameSize = [nameString sizeWithAttributes: nameAttributes];
+        
+        NSString * statusString = ![fDefaults boolForKey: @"SmallStatusRegular"] && [[info objectForKey: @"Active"] boolValue]
+                                        ? [info objectForKey: @"RemainingTimeString"]
+                                        : [info objectForKey: @"ShortStatusString"];
+        NSSize statusSize = [statusString sizeWithAttributes: statusAttributes];
+        
+        [nameString drawInRect: NSMakeRect(pen.x, pen.y, mainWidth - statusSize.width - 2.0 * LINE_PADDING, nameSize.height)
+                        withAttributes: nameAttributes];
+        
+        //place status string
+        pen.x = NSMaxX(cellFrame) - PADDING - statusSize.width;
+        pen.y += (nameSize.height - statusSize.height) * 0.5;
+        
+        [statusString drawInRect: NSMakeRect(pen.x, pen.y, statusSize.width, statusSize.height)
+                        withAttributes: statusAttributes];
+        
+        //progress bar
+        pen.x = cellFrame.origin.x + iconSize.width + 2.0 * PADDING;
+        pen.y = cellFrame.origin.y + nameSize.height + LINE_PADDING + PADDING + BAR_HEIGHT;
+        
+        float barWidth = mainWidth + EXTRA_NAME_SHIFT - BUTTONS_TOTAL_WIDTH + PADDING;
+        
+        if ([fDefaults boolForKey: @"UseAdvancedBar"])
+            [self buildAdvancedBar: barWidth point: pen];
+        else
+            [self buildSimpleBar: barWidth point: pen];
     }
-    for (; i < avail + have; i++)
-    {
-        p[i] = kGreen3;
-        p[i + bytesPerRow / 4] = kGreen3;
-    }
-    for (; i < MAX_PIECES; i++)
-    {
-        p[i] = kWhite;
-        p[i + bytesPerRow / 4] = kWhite;
-    }
     
-    //actually draw image
-    NSImage * bar = [[NSImage alloc] initWithSize: [fBitmap size]];
-    [bar setFlipped: YES];
-    [bar addRepresentation: fBitmap];
-    
-    return [bar autorelease];
-}
-
-- (NSRect) rectForMinimalStatusWithString: (NSAttributedString *) string inBounds: (NSRect) bounds
-{
-    if (![fDefaults boolForKey: @"SmallView"])
-        return NSZeroRect;
-    
-    NSRect result = bounds;
-    result.size = [string size];
-    
-    result.origin.x += bounds.size.width - result.size.width - PADDING_HORIZONAL;
-    result.origin.y += PADDING_ABOVE_MIN_STATUS;
-    
-    return result;
-}
-
-- (NSRect) rectForTitleWithString: (NSAttributedString *) string basedOnMinimalStatusRect: (NSRect) statusRect
-            inBounds: (NSRect) bounds
-{
-    BOOL minimal = [fDefaults boolForKey: @"SmallView"];
-    
-    NSRect result = bounds;
-    result.origin.y += PADDING_ABOVE_TITLE;
-    result.origin.x += PADDING_HORIZONAL + (minimal ? IMAGE_SIZE_MIN : IMAGE_SIZE_REG) + PADDING_BETWEEN_IMAGE_AND_TITLE;
-    
-    result.size = [string size];
-    result.size.width = MIN(result.size.width, NSMaxX(bounds) - result.origin.x - PADDING_HORIZONAL
-                            - (minimal ? PADDING_BETWEEN_TITLE_AND_MIN_STATUS + statusRect.size.width : 0));
-    
-    return result;
-}
-
-- (NSRect) rectForProgressWithString: (NSAttributedString *) string inBounds: (NSRect) bounds
-{
-    if ([fDefaults boolForKey: @"SmallView"])
-        return NSZeroRect;
-    
-    NSRect result = bounds;
-    result.origin.y += PADDING_ABOVE_TITLE + HEIGHT_TITLE + PADDING_BETWEEN_TITLE_AND_PROGRESS;
-    result.origin.x += PADDING_HORIZONAL + IMAGE_SIZE_REG + PADDING_BETWEEN_IMAGE_AND_TITLE;
-    
-    result.size = [string size];
-    result.size.width = MIN(result.size.width, NSMaxX(bounds) - result.origin.x - PADDING_HORIZONAL);
-    
-    return result;
-}
-
-- (NSRect) rectForStatusWithString: (NSAttributedString *) string inBounds: (NSRect) bounds
-{
-    if ([fDefaults boolForKey: @"SmallView"])
-        return NSZeroRect;
-    
-    NSRect result = bounds;
-    result.origin.y += PADDING_ABOVE_TITLE + HEIGHT_TITLE + PADDING_BETWEEN_TITLE_AND_PROGRESS + HEIGHT_STATUS
-                        + PADDING_BETWEEN_PROGRESS_AND_BAR + BAR_HEIGHT + PADDING_BETWEEN_BAR_AND_STATUS;
-    result.origin.x += PADDING_HORIZONAL + IMAGE_SIZE_REG + PADDING_BETWEEN_IMAGE_AND_TITLE;
-    
-    result.size = [string size];
-    result.size.width = MIN(result.size.width, NSMaxX(bounds) - result.origin.x - PADDING_HORIZONAL);
-    
-    return result;
-}
-
-- (NSAttributedString *) attributedTitleWithColor: (NSColor *) color
-{
-    if (color)
-        [fTitleAttributes setObject: color forKey: NSForegroundColorAttributeName];
-    
-    NSString * title = [[self representedObject] name];
-    return [[[NSAttributedString alloc] initWithString: title attributes: fTitleAttributes] autorelease];
-}
-
-- (NSAttributedString *) attributedStatusString: (NSString *) string withColor: (NSColor *) color
-{
-    if (color)
-        [fStatusAttributes setObject: color forKey: NSForegroundColorAttributeName];
-    
-    return [[[NSAttributedString alloc] initWithString: string attributes: fStatusAttributes] autorelease];
+    [nameAttributes release];
+    [statusAttributes release];
 }
 
 @end

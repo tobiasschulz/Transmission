@@ -56,6 +56,7 @@ static int getannounce( tr_info_t * inf, benc_val_t * meta );
 static char * announceToScrape( const char * announce );
 static int parseFiles( tr_info_t * inf, benc_val_t * name,
                        benc_val_t * files, benc_val_t * length );
+static void strcatUTF8( char *, int, const char *, int );
 
 /***********************************************************************
  * tr_metainfoParse
@@ -204,14 +205,14 @@ realparse( tr_info_t * inf, const uint8_t * buf, size_t size )
     val = tr_bencDictFindFirst( &meta, "comment.utf-8", "comment", NULL );
     if( NULL != val && TYPE_STR == val->type )
     {
-        strlcat_utf8( inf->comment, val->val.s.s, sizeof( inf->comment ), 0 );
+        strcatUTF8( inf->comment, sizeof( inf->comment ), val->val.s.s, 0 );
     }
     
     /* Creator info */
     val = tr_bencDictFindFirst( &meta, "created by.utf-8", "created by", NULL );
     if( NULL != val && TYPE_STR == val->type )
     {
-        strlcat_utf8( inf->creator, val->val.s.s, sizeof( inf->creator ), 0 );
+        strcatUTF8( inf->creator, sizeof( inf->creator ), val->val.s.s, 0 );
     }
     
     /* Date created */
@@ -309,16 +310,20 @@ realparse( tr_info_t * inf, const uint8_t * buf, size_t size )
 
 void tr_metainfoFree( tr_info_t * inf )
 {
-    int i, j;
+    int ii, jj;
 
     tr_free( inf->pieces );
     tr_free( inf->files );
-    tr_free( inf->primaryAddress );
     
-    for( i=0; i<inf->trackerTiers; ++i ) {
-        for( j=0; j<inf->trackerList[i].count; ++j )
-            tr_trackerInfoClear( &inf->trackerList[i].list[j] );
-        tr_free( inf->trackerList[i].list );
+    for( ii = 0; ii < inf->trackerTiers; ii++ )
+    {
+        for( jj = 0; jj < inf->trackerList[ii].count; jj++ )
+        {
+            tr_free( inf->trackerList[ii].list[jj].address );
+            tr_free( inf->trackerList[ii].list[jj].announce );
+            tr_free( inf->trackerList[ii].list[jj].scrape );
+        }
+        tr_free( inf->trackerList[ii].list );
     }
     tr_free( inf->trackerList );
 
@@ -370,11 +375,11 @@ static int getfile( char * buf, int size,
         return TR_EINVALID;
     }
 
-    strlcat_utf8( buf, prefix, size, 0 );
+    strcatUTF8( buf, size, prefix, 0 );
     for( ii = 0; jj > ii; ii++ )
     {
-        strlcat_utf8( buf, TR_PATH_DELIMITER_STR, size, 0 );
-        strlcat_utf8( buf, list[ii], size, TR_PATH_DELIMITER );
+        strcatUTF8( buf, size, TR_PATH_DELIMITER_STR, 0 );
+        strcatUTF8( buf, size, list[ii], 1 );
     }
     free( list );
 
@@ -411,26 +416,24 @@ static int getannounce( tr_info_t * inf, benc_val_t * meta )
             /* iterate through the tier's items */
             for( jj = 0; jj < subval->val.l.count; jj++ )
             {
-                tr_tracker_info_t tmp;
-
                 urlval = &subval->val.l.vals[jj];
                 if( TYPE_STR != urlval->type ||
-                    tr_trackerInfoInit( &tmp, urlval->val.s.s, urlval->val.s.i ) )
+                    tr_httpParseUrl( urlval->val.s.s, urlval->val.s.i,
+                                     &address, &port, &announce ) )
                 {
                     continue;
-                }
-
-                if( !inf->primaryAddress ) {
-                     char buf[1024];
-                     snprintf( buf, sizeof(buf), "%s:%d", tmp.address, tmp.port );
-                     inf->primaryAddress = tr_strdup( buf );
                 }
 
                 /* place the item info in a random location in the sublist */
                 random = tr_rand( subcount + 1 );
                 if( random != subcount )
+                {
                     sublist[subcount] = sublist[random];
-                sublist[random] = tmp;
+                }
+                sublist[random].address  = address;
+                sublist[random].port     = port;
+                sublist[random].announce = announce;
+                sublist[random].scrape   = announceToScrape( announce );
                 subcount++;
             }
 
@@ -478,15 +481,14 @@ static int getannounce( tr_info_t * inf, benc_val_t * meta )
     }
 
     /* Regular announce value */
-    val = tr_bencDictFind( meta, "announce" );
-    if( NULL == val || TYPE_STR != val->type )
+    if( 0 == inf->trackerTiers )
     {
-        tr_err( "No \"announce\" entry" );
-        return TR_EINVALID;
-    }
-
-    if( !inf->trackerTiers )
-    {
+        val = tr_bencDictFind( meta, "announce" );
+        if( NULL == val || TYPE_STR != val->type )
+        {
+            tr_err( "No \"announce\" entry" );
+            return TR_EINVALID;
+        }
 
         if( tr_httpParseUrl( val->val.s.s, val->val.s.i,
                              &address, &port, &announce ) )
@@ -494,6 +496,7 @@ static int getannounce( tr_info_t * inf, benc_val_t * meta )
             tr_err( "Invalid announce URL (%s)", val->val.s.s );
             return TR_EINVALID;
         }
+
         sublist                   = calloc( 1, sizeof( sublist[0] ) );
         sublist[0].address        = address;
         sublist[0].port           = port;
@@ -503,20 +506,13 @@ static int getannounce( tr_info_t * inf, benc_val_t * meta )
         inf->trackerList[0].list  = sublist;
         inf->trackerList[0].count = 1;
         inf->trackerTiers         = 1;
-
-        if( !inf->primaryAddress ) {
-            char buf[1024];
-            snprintf( buf, sizeof(buf), "%s:%d", sublist[0].address, sublist[0].port );
-            inf->primaryAddress = tr_strdup( buf );
-        }
-
     }
 
     return TR_OK;
 }
 
 static char * announceToScrape( const char * announce )
-{
+{   
     char old[]  = "announce";
     int  oldlen = 8;
     char new[]  = "scrape";
@@ -556,31 +552,6 @@ static char * announceToScrape( const char * announce )
 
     return scrape;
 }
-
-int
-tr_trackerInfoInit( tr_tracker_info_t  * info,
-                    const char         * address,
-                    int                  address_len )
-{
-    int ret = tr_httpParseUrl( address, address_len,
-                               &info->address,
-                               &info->port,
-                               &info->announce );
-    if( !ret )
-        info->scrape = announceToScrape( info->announce );
-
-    return ret;
-}
-
-void
-tr_trackerInfoClear( tr_tracker_info_t * info )
-{
-    tr_free( info->address );
-    tr_free( info->announce );
-    tr_free( info->scrape );
-    memset( info, '\0', sizeof(tr_tracker_info_t) );
-}
-
 
 static void
 savedname( char * name, size_t len, const char * hash, const char * tag )
@@ -702,8 +673,7 @@ parseFiles( tr_info_t * inf, benc_val_t * name,
         return TR_EINVALID;
     }
 
-    strlcat_utf8( inf->name, name->val.s.s, sizeof( inf->name ),
-                  TR_PATH_DELIMITER );
+    strcatUTF8( inf->name, sizeof( inf->name ), name->val.s.s, 1 );
     if( '\0' == inf->name[0] )
     {
         tr_err( "Invalid \"name\" string" );
@@ -757,8 +727,8 @@ parseFiles( tr_info_t * inf, benc_val_t * name,
             return TR_EINVALID;
         }
 
-        strlcat_utf8( inf->files[0].name, name->val.s.s,
-                      sizeof( inf->files[0].name ), TR_PATH_DELIMITER );
+        strcatUTF8( inf->files[0].name, sizeof( inf->files[0].name ),
+                    name->val.s.s, 1 );
 
         inf->files[0].length = length->val.i;
         inf->totalSize      += length->val.i;
@@ -771,4 +741,81 @@ parseFiles( tr_info_t * inf, benc_val_t * name,
     }
 
     return TR_OK;
+}
+
+/***********************************************************************
+ * strcatUTF8
+ ***********************************************************************
+ * According to the official specification, all strings in the torrent
+ * file are supposed to be UTF-8 encoded. However, there are
+ * non-compliant torrents around... If we encounter an invalid UTF-8
+ * character, we assume it is ISO 8859-1 and convert it to UTF-8.
+ **********************************************************************/
+#define WANTBYTES( want, got ) \
+    if( (want) > (got) ) { return; } else { (got) -= (want); }
+static void strcatUTF8( char * s, int len, const char * append, int deslash )
+{
+    const char * p;
+
+    /* don't overwrite the nul at the end */
+    len--;
+
+    /* Go to the end of the destination string */
+    while( s[0] )
+    {
+        s++;
+        len--;
+    }
+
+    /* Now start appending, converting on the fly if necessary */
+    for( p = append; p[0]; )
+    {
+        /* skip over / if requested */
+        if( deslash && '/' == p[0] )
+        {
+            p++;
+            continue;
+        }
+
+        if( !( p[0] & 0x80 ) )
+        {
+            /* ASCII character */
+            WANTBYTES( 1, len );
+            *(s++) = *(p++);
+            continue;
+        }
+
+        if( ( p[0] & 0xE0 ) == 0xC0 && ( p[1] & 0xC0 ) == 0x80 )
+        {
+            /* 2-bytes UTF-8 character */
+            WANTBYTES( 2, len );
+            *(s++) = *(p++); *(s++) = *(p++);
+            continue;
+        }
+
+        if( ( p[0] & 0xF0 ) == 0xE0 && ( p[1] & 0xC0 ) == 0x80 &&
+            ( p[2] & 0xC0 ) == 0x80 )
+        {
+            /* 3-bytes UTF-8 character */
+            WANTBYTES( 3, len );
+            *(s++) = *(p++); *(s++) = *(p++);
+            *(s++) = *(p++);
+            continue;
+        }
+
+        if( ( p[0] & 0xF8 ) == 0xF0 && ( p[1] & 0xC0 ) == 0x80 &&
+            ( p[2] & 0xC0 ) == 0x80 && ( p[3] & 0xC0 ) == 0x80 )
+        {
+            /* 4-bytes UTF-8 character */
+            WANTBYTES( 4, len );
+            *(s++) = *(p++); *(s++) = *(p++);
+            *(s++) = *(p++); *(s++) = *(p++);
+            continue;
+        }
+
+        /* ISO 8859-1 -> UTF-8 conversion */
+        WANTBYTES( 2, len );
+        *(s++) = 0xC0 | ( ( *p & 0xFF ) >> 6 );
+        *(s++) = 0x80 | ( *(p++) & 0x3F );
+    }
 }

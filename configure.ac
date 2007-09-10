@@ -1,12 +1,12 @@
-AC_INIT([Transmission],[0.82+],[http://transmission.m0k.org/trac/newticket])
-PEERID_PREFIX="-TR082Z-"
-USERAGENT_PREFIX="0.82+"
+AC_INIT([Transmission],[0.82],[http://transmission.m0k.org/trac/newticket])
+PEERID_PREFIX="-TR0820-"
+USERAGENT_PREFIX="0.82"
 
 AC_PREREQ(2.54)
 dnl AM_CONFIG_HEADER(config.h)
 AC_CONFIG_SRCDIR(libtransmission/transmission.h)
 AM_INIT_AUTOMAKE(AC_PACKAGE_NAME,AC_PACKAGE_VERSION)
-AC_PROG_LIBTOOL
+AM_MAINTAINER_MODE
 
 GLIB_MINIMUM=2.6.0
 GTK_MINIMUM=2.6.0
@@ -17,10 +17,6 @@ AC_SUBST(WX_MINIMUM)
 
 AC_PROG_CC
 AC_PROG_CXX
-if test "x$GCC" = "xyes" ; then
-    CFLAGS="-g -Wall -W -O3 -funroll-loops"
-    CXXFLAGS="-g -Wall -W -O3 -funroll-loops"
-fi
 AC_HEADER_STDC
 AC_HEADER_TIME
 AC_CHECK_FUNCS([lrintf strlcpy strlcat daemon dirname basename])
@@ -33,7 +29,7 @@ dnl AC_PROG_INTLTOOL([0.23],[no-xml])
 GETTEXT_PACKAGE=transmission
 AC_SUBST(GETTEXT_PACKAGE)
 AC_DEFINE_UNQUOTED([GETTEXT_PACKAGE],["$GETTEXT_PACKAGE"],[Gettext package])
-ALL_LINGUAS="bg es fi fr it pl ro ru sk sv"
+ALL_LINGUAS="bg es fi fr it pl ro ru sv"
 AM_GLIB_GNU_GETTEXT
 transmissionlocaledir='${prefix}/${DATADIRNAME}/locale'
 
@@ -44,37 +40,45 @@ AC_SEARCH_LIBS([gethostbyname], [nsl bind])
 
 dnl ----------------------------------------------------------------------------
 dnl
-dnl  libevent fun
+dnl  libevent detection for the Daemon
 
-AC_CONFIG_SUBDIRS([third-party/libevent])
-AC_MSG_NOTICE([invoking libevent's configure script])
-LIBEVENT_CPPFLAGS="-I\$(top_srcdir)/third-party/libevent"
-AC_SUBST(LIBEVENT_CPPFLAGS)
+
+AC_CHECK_LIB([event],[event_init],[have_libevent=yes],[have_libevent=no])
+AC_ARG_WITH(libevent,
+            AC_HELP_STRING([--with-libevent], [Build Daemon]),
+            [want_libevent=$withval],
+            [want_libevent=$have_libevent])
+use_libevent=no
+if test "x$want_libevent" = "xyes" ; then
+    if test "x$have_libevent" = "xyes"; then
+      use_libevent=yes
+    else
+      AC_MSG_ERROR("libevent not found!")
+    fi
+fi
+AM_CONDITIONAL([WITH_LIBEVENT],[test "x$use_libevent" = "xyes"])
+
 
 
 dnl ----------------------------------------------------------------------------
 dnl
 dnl  detection for the GTK+ client
 
-have_gtk=yes
-PKG_CHECK_MODULES(GTK, [gtk+-2.0 >= $GTK_MINIMUM
-                        glib-2.0 >= $GLIB_MINIMUM
-                        gmodule-2.0 >= $GLIB_MINIMUM
-                        gthread-2.0 >= $GLIB_MINIMUM],, [have_gtk=no])
+AM_PATH_GTK_2_0($GTK_MINIMUM,[have_gtk=yes],[have_gtk=no][gthread])
 AC_ARG_WITH(gtk, AC_HELP_STRING([--with-gtk], [Build gtk client]),
                  [want_gtk=$withval],
                  [want_gtk=$have_gtk])
 use_gtk=no
 if test "x$want_gtk" = "xyes" ; then
     if test "x$have_gtk" = "xyes"; then
+      AM_PATH_GLIB_2_0($GLIB_MINIMUM,,exit 1,gobject gmodule gthread)
+      AM_PATH_GTK_2_0($GTK_MINIMUM,,exit 1,gthread)
       use_gtk=yes
     else
       AC_MSG_ERROR("GTK+ not found!")
     fi
 fi
 AM_CONDITIONAL([WITH_GTK],[test "x$use_gtk" = "xyes"])
-AC_SUBST(GTK_LIBS)
-AC_SUBST(GTK_CFLAGS)
 
 
 dnl ----------------------------------------------------------------------------
@@ -203,12 +207,10 @@ AC_CONFIG_FILES([Makefile
                  gtk/Makefile
                  libtransmission/Makefile
                  libtransmission/version.h
-                 third-party/Makefile
                  macosx/Makefile
                  wx/Makefile
                  wx/images/Makefile])
 
-ac_configure_args="$ac_configure_args --enable-static --disable-shared -q"
 AC_OUTPUT
 
 echo "
@@ -217,9 +219,8 @@ Configuration:
 
         Source code location:    ${srcdir}
         Compiler:                ${CXX}
-        Build libtransmission:   yes
-        Build Daemon:            yes
         Build BeOS client:       ${beos}
+        Build Daemon:            ${use_libevent}
         Build GTK+ client:       ${use_gtk}
         Build OS X client:       ${darwin}
         Build wxWidgets client:  ${use_wx}

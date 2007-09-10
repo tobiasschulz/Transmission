@@ -22,27 +22,22 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-@class CTGradient;
+#ifndef TORRENTCELL_H
+#define TORRENTCELL_H
+
+#import "Torrent.h"
+#import "CTGradient.h"
 
 @interface TorrentCell : NSCell
 {
-    NSUserDefaults * fDefaults;
     NSImage * fErrorImage;
-    
-    NSMutableDictionary * fTitleAttributes, * fStatusAttributes;
-    
-    NSColor * fBarOverlayColor;
     CTGradient * fWhiteGradient, * fGrayGradient, * fLightGrayGradient, * fBlueGradient, * fDarkBlueGradient, 
                 * fGreenGradient, * fLightGreenGradient, * fDarkGreenGradient, * fYellowGradient, * fTransparentGradient;
-    NSBitmapImageRep * fBitmap;
-    int8_t * fPieces;
+    NSUserDefaults * fDefaults;
 }
 
-- (NSRect) iconRectForBounds: (NSRect) bounds;
-- (NSRect) titleRectForBounds: (NSRect) bounds;
-- (NSRect) progressRectForBounds: (NSRect) bounds;
-- (NSRect) barRectForBounds: (NSRect) bounds;
-- (NSRect) statusRectForBounds: (NSRect) bounds;
-- (NSRect) minimalStatusRectForBounds: (NSRect) bounds;
+- (void) toggleMinimalStatus;
 
 @end
+
+#endif

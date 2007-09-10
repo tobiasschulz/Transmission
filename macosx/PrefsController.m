@@ -23,14 +23,16 @@
  *****************************************************************************/
 
 #import "PrefsController.h"
-#import "NSStringAdditions.h"
+#import "StringAdditions.h"
 #import "UKKQueue.h"
 
 #define DOWNLOAD_FOLDER     0
 #define DOWNLOAD_TORRENT    2
 #define DOWNLOAD_ASK        3
 
-#define UPDATE_SECONDS 86400
+#define UPDATE_DAILY    0
+#define UPDATE_WEEKLY   1
+#define UPDATE_NEVER    2
 
 #define TOOLBAR_GENERAL     @"TOOLBAR_GENERAL"
 #define TOOLBAR_TRANSFERS   @"TOOLBAR_TRANSFERS"
@@ -62,9 +64,6 @@
             [fDefaults setInteger: 20 forKey: @"UploadLimit"];
             [fDefaults setBool: NO forKey: @"CheckUpload"];
         }
-        
-        //set check for update to right value
-        [self setCheckForUpdate: nil];
         
         //set auto import
         NSString * autoPath;
@@ -158,6 +157,15 @@
     
     //set stalled value
     [fStalledField setIntValue: [fDefaults integerForKey: @"StalledMinutes"]];
+    
+    //set update check
+    NSString * updateCheck = [fDefaults stringForKey: @"UpdateCheck"];
+    if ([updateCheck isEqualToString: @"Weekly"])
+        [fUpdatePopUp selectItemAtIndex: UPDATE_WEEKLY];
+    else if ([updateCheck isEqualToString: @"Never"])
+        [fUpdatePopUp selectItemAtIndex: UPDATE_NEVER];
+    else
+        [fUpdatePopUp selectItemAtIndex: UPDATE_DAILY];
 }
 
 - (void) setUpdater: (SUUpdater *) updater
@@ -438,10 +446,30 @@
     [fDefaults setBool: YES forKey: @"WarningRemainingSpace"];
 }
 
-- (void) setCheckForUpdate: (id) sender
+- (void) setUpdate: (id) sender
 {
-    NSTimeInterval seconds = [fDefaults boolForKey: @"CheckForUpdates"] ? UPDATE_SECONDS : 0;
+    int index = [fUpdatePopUp indexOfSelectedItem];
+    NSString * update;
+    NSTimeInterval seconds;
+    if (index == UPDATE_DAILY)
+    {
+        update = @"Daily";
+        seconds = 86400;
+    }
+    else if (index == UPDATE_WEEKLY)
+    {
+        update = @"Weekly";
+        seconds = 604800;
+    }
+    else
+    {
+        update = @"Never";
+        seconds = 0;
+    }
+    
+    [fDefaults setObject: update forKey: @"UpdateCheck"];
     [fDefaults setInteger: seconds forKey: @"SUScheduledCheckInterval"];
+    
     if (fUpdater)
         [fUpdater scheduleCheckWithInterval: seconds];
 }
@@ -599,7 +627,7 @@
         return;
     
     NSRect windowRect = [window frame];
-    float difference = ([view frame].size.height - [[window contentView] frame].size.height) * [window userSpaceScaleFactor];
+    float difference = [view frame].size.height - [[window contentView] frame].size.height;
     windowRect.origin.y -= difference;
     windowRect.size.height += difference;
     
