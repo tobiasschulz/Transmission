@@ -38,6 +38,7 @@ TorrentFilter :: GetFlags( const tr_torrent * tor )
             flags |= FLAG_SEEDING;
             break;
 
+        case TR_STATUS_STOPPING:
         case TR_STATUS_STOPPED:
         case TR_STATUS_CHECK:
         case TR_STATUS_CHECK_WAIT:

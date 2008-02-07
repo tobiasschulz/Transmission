@@ -70,7 +70,7 @@ getProgressString( const tr_info * info, const tr_stat * torStat )
     const int isDone = torStat->leftUntilDone == 0;
     const uint64_t haveTotal = torStat->haveUnchecked + torStat->haveValid;
     const int isSeed = torStat->haveValid >= info->totalSize;
-    char buf1[32], buf2[32], buf3[32], buf4[32];
+    char buf1[32], buf2[32], buf3[32];
     char * str;
 
     if( !isDone )
@@ -81,18 +81,18 @@ getProgressString( const tr_info * info, const tr_stat * torStat )
                   torStat->percentDone * 100.0 );
     else if( !isSeed )
         str = g_strdup_printf(
-                  _("%s of %s (%.2f%%), uploaded %s (Ratio: %s)"),
+                  _("%s of %s (%.2f%%), uploaded %s (Ratio: %.1f"),
                   tr_strlsize( buf1, haveTotal, sizeof(buf1) ),
                   tr_strlsize( buf2, info->totalSize, sizeof(buf2) ),
                   torStat->percentComplete * 100.0,
                   tr_strlsize( buf3, torStat->uploadedEver, sizeof(buf3) ),
-                  tr_strlratio( buf4, torStat->ratio, sizeof( buf4 ) ) );
+                  torStat->ratio );
     else
         str = g_strdup_printf(
-                  _("%s, uploaded %s (Ratio: %s)"),
+                  _("%s, uploaded %s (Ratio: %.1f)"),
                   tr_strlsize( buf1, info->totalSize, sizeof(buf1) ),
                   tr_strlsize( buf2, torStat->uploadedEver, sizeof(buf2) ),
-                  tr_strlratio( buf3, torStat->ratio, sizeof( buf3 ) ) );
+                  torStat->ratio );
 
     return str;
 }
@@ -144,10 +144,8 @@ getShortStatusString( const tr_stat * torStat )
         case TR_STATUS_SEED:
         case TR_STATUS_DONE: {
             char buf[128];
-            if( torStat->status != TR_STATUS_DOWNLOAD ) {
-                tr_strlratio( buf, torStat->ratio, sizeof( buf ) );
-                g_string_append_printf( gstr, _("Ratio: %s, " ), buf );
-            }
+            if( torStat->status != TR_STATUS_DOWNLOAD )
+                g_string_append_printf( gstr, _("Ratio: %.1f, " ), torStat->ratio );
             getShortTransferString( torStat, buf, sizeof( buf ) );
             g_string_append( gstr, buf );
             break;
@@ -224,7 +222,6 @@ struct TorrentCellRendererPrivate
 {
     tr_torrent * tor;
     GtkCellRenderer * text_renderer;
-    GtkCellRenderer * text_renderer_err;
     int bar_height;
     gboolean minimal;
     gboolean show_unavailable;
@@ -260,23 +257,20 @@ torrent_cell_renderer_get_size( GtkCellRenderer  * cell,
         char * str;
         int w=0, h=0;
         struct TorrentCellRendererPrivate * p = self->priv;
-        GtkCellRenderer * text_renderer = torStat->error != 0
-            ? p->text_renderer_err
-            : p->text_renderer;
 
-        g_object_set( text_renderer, "ellipsize", PANGO_ELLIPSIZE_NONE, NULL );
+        g_object_set( p->text_renderer, "ellipsize", PANGO_ELLIPSIZE_NONE, NULL );
 
         /* above the progressbar */
         if( p->minimal )
         {
             int w1, w2, h1, h2;
             char * shortStatus = getShortStatusString( torStat );
-            g_object_set( text_renderer, "text", name, NULL );
-            gtk_cell_renderer_get_size( text_renderer,
+            g_object_set( p->text_renderer, "text", name, NULL );
+            gtk_cell_renderer_get_size( p->text_renderer,
                                         widget, NULL, NULL, NULL, &w1, &h1 );
             str = g_markup_printf_escaped( "<small>%s</small>", shortStatus );
-            g_object_set( text_renderer, "markup", str, NULL );
-            gtk_cell_renderer_get_size( text_renderer,
+            g_object_set( p->text_renderer, "markup", str, NULL );
+            gtk_cell_renderer_get_size( p->text_renderer,
                                         widget, NULL, NULL, NULL, &w2, &h2 );
             h += MAX( h1, h2 );
             w = MAX( w, w1+GUI_PAD_BIG+w2 );
@@ -289,8 +283,8 @@ torrent_cell_renderer_get_size( GtkCellRenderer  * cell,
             char * progressString = getProgressString( info, torStat );
             str = g_markup_printf_escaped( "<b>%s</b>\n<small>%s</small>",
                                            name, progressString );
-            g_object_set( text_renderer, "markup", str, NULL );
-            gtk_cell_renderer_get_size( text_renderer,
+            g_object_set( p->text_renderer, "markup", str, NULL );
+            gtk_cell_renderer_get_size( p->text_renderer,
                                         widget, NULL, NULL, NULL, &w1, &h1 );
             h += h1;
             w = MAX( w, w1 );
@@ -304,8 +298,8 @@ torrent_cell_renderer_get_size( GtkCellRenderer  * cell,
             int w1, h1;
             char * statusString = getStatusString( torStat );
             str = g_markup_printf_escaped( "<small>%s</small>", statusString );
-            g_object_set( text_renderer, "markup", str, NULL );
-            gtk_cell_renderer_get_size( text_renderer,
+            g_object_set( p->text_renderer, "markup", str, NULL );
+            gtk_cell_renderer_get_size( p->text_renderer,
                                         widget, NULL, NULL, NULL, &w1, &h1 );
             h += h1;
             w = MAX( w, w1 );
@@ -502,10 +496,6 @@ torrent_cell_renderer_render( GtkCellRenderer      * cell,
         int xpad, ypad;
         int w, h;
         struct TorrentCellRendererPrivate * p = self->priv;
-        GtkCellRenderer * text_renderer = torStat->error != 0
-            ? p->text_renderer_err
-            : p->text_renderer;
-
         g_object_get( self, "xpad", &xpad, "ypad", &ypad, NULL );
 
         my_bg = *background_area; 
@@ -520,17 +510,17 @@ torrent_cell_renderer_render( GtkCellRenderer      * cell,
             char * progressString = getProgressString( info, torStat );
             char * str = g_markup_printf_escaped( "<b>%s</b>\n<small>%s</small>",
                                                   name, progressString );
-            g_object_set( text_renderer, "markup", str,
+            g_object_set( p->text_renderer, "markup", str,
                                             "ellipsize", PANGO_ELLIPSIZE_NONE,
                                             NULL );
-            gtk_cell_renderer_get_size( text_renderer,
+            gtk_cell_renderer_get_size( p->text_renderer,
                                         widget, NULL, NULL, NULL, &w, &h );
             my_bg.height     = 
             my_cell.height   =
             my_expose.height = h;
-            g_object_set( text_renderer, "ellipsize", PANGO_ELLIPSIZE_END,
+            g_object_set( p->text_renderer, "ellipsize", PANGO_ELLIPSIZE_END,
                                             NULL );
-            gtk_cell_renderer_render( text_renderer,
+            gtk_cell_renderer_render( p->text_renderer,
                                       window, widget,
                                       &my_bg, &my_cell, &my_expose, flags );
             my_bg.y += h;
@@ -548,17 +538,17 @@ torrent_cell_renderer_render( GtkCellRenderer      * cell,
             GdkRectangle tmp_bg, tmp_cell, tmp_expose;
 
             /* get the dimensions for the name */
-            g_object_set( text_renderer, "text", name,
-                                         "ellipsize", PANGO_ELLIPSIZE_NONE,
-                                         NULL );
-            gtk_cell_renderer_get_size( text_renderer,
+            g_object_set( p->text_renderer, "text", name,
+                                            "ellipsize", PANGO_ELLIPSIZE_NONE,
+                                            NULL );
+            gtk_cell_renderer_get_size( p->text_renderer,
                                         widget, NULL, NULL, NULL, &w1, &h1 );
 
             /* get the dimensions for the short status string */
-            g_object_set( text_renderer, "markup", str,
-                                         "ellipsize", PANGO_ELLIPSIZE_NONE,
-                                         NULL );
-            gtk_cell_renderer_get_size( text_renderer,
+            g_object_set( p->text_renderer, "markup", str,
+                                            "ellipsize", PANGO_ELLIPSIZE_NONE,
+                                            NULL );
+            gtk_cell_renderer_get_size( p->text_renderer,
                                         widget, NULL, NULL, NULL, &w2, &h2 );
 
             tmp_h = MAX( h1, h2 );
@@ -569,10 +559,10 @@ torrent_cell_renderer_render( GtkCellRenderer      * cell,
             tmp_bg.width = w2;
             tmp_bg.height = tmp_h;
             tmp_expose = tmp_cell = tmp_bg;
-            g_object_set( text_renderer, "markup", str,
-                                         "ellipsize", PANGO_ELLIPSIZE_END,
-                                         NULL );
-            gtk_cell_renderer_render( text_renderer,
+            g_object_set( p->text_renderer, "markup", str,
+                                            "ellipsize", PANGO_ELLIPSIZE_END,
+                                            NULL );
+            gtk_cell_renderer_render( p->text_renderer,
                                       window, widget,
                                       &tmp_bg, &tmp_cell, &tmp_expose, flags );
 
@@ -580,10 +570,10 @@ torrent_cell_renderer_render( GtkCellRenderer      * cell,
             tmp_bg.x = my_bg.x;
             tmp_bg.width = my_bg.width - w2 - GUI_PAD_BIG;
             tmp_expose = tmp_cell = tmp_bg;
-            g_object_set( text_renderer, "text", name,
-                                         "ellipsize", PANGO_ELLIPSIZE_END,
-                                         NULL );
-            gtk_cell_renderer_render( text_renderer,
+            g_object_set( p->text_renderer, "text", name,
+                                            "ellipsize", PANGO_ELLIPSIZE_END,
+                                            NULL );
+            gtk_cell_renderer_render( p->text_renderer,
                                       window, widget,
                                       &tmp_bg, &tmp_cell, &tmp_expose, flags );
 
@@ -608,15 +598,15 @@ torrent_cell_renderer_render( GtkCellRenderer      * cell,
             char * statusString = getStatusString( torStat );
             char * str = g_markup_printf_escaped( "<small>%s</small>",
                                                   statusString );
-            g_object_set( text_renderer, "markup", str,
-                                         "ellipsize", PANGO_ELLIPSIZE_END,
-                                         NULL );
-            gtk_cell_renderer_get_size( text_renderer,
+            g_object_set( p->text_renderer, "markup", str,
+                                            "ellipsize", PANGO_ELLIPSIZE_END,
+                                            NULL );
+            gtk_cell_renderer_get_size( p->text_renderer,
                                         widget, NULL, NULL, NULL, &w, &h );
             my_bg.height      =
             my_cell.height    =
             my_expose.height  = h;
-            gtk_cell_renderer_render( text_renderer,
+            gtk_cell_renderer_render( p->text_renderer,
                                       window, widget,
                                       &my_bg, &my_cell, &my_expose, flags );
 
@@ -718,18 +708,6 @@ torrent_cell_renderer_get_property( GObject      * object,
 }
 
 static void
-torrent_cell_renderer_dispose( GObject * o )
-{
-    TorrentCellRenderer * r = TORRENT_CELL_RENDERER( o );
-    if( r && r->priv )
-    {
-        g_object_unref( G_OBJECT( r->priv->text_renderer ) );
-        g_object_unref( G_OBJECT( r->priv->text_renderer_err ) );
-        r->priv = NULL;
-    }
-}
-
-static void
 torrent_cell_renderer_class_init( TorrentCellRendererClass * klass )
 {
     GObjectClass * gobject_class = G_OBJECT_CLASS( klass );
@@ -744,7 +722,6 @@ torrent_cell_renderer_class_init( TorrentCellRendererClass * klass )
     cell_class->get_size = torrent_cell_renderer_get_size;
     gobject_class->set_property = torrent_cell_renderer_set_property;
     gobject_class->get_property = torrent_cell_renderer_get_property;
-    gobject_class->dispose = torrent_cell_renderer_dispose;
 
     g_object_class_install_property( gobject_class, P_TORRENT,
         g_param_spec_pointer( "torrent", NULL, "tr_torrent*",
@@ -835,11 +812,6 @@ torrent_cell_renderer_init( GTypeInstance * instance, gpointer g_class UNUSED )
 
     p->tor = NULL;
     p->text_renderer = gtk_cell_renderer_text_new( );
-    p->text_renderer_err = gtk_cell_renderer_text_new(  );
-    g_object_set( p->text_renderer_err, "foreground", "red", NULL );
-    tr_object_ref_sink( p->text_renderer );
-    tr_object_ref_sink( p->text_renderer_err );
-
     p->gradient = TRUE;
     p->show_unavailable = TRUE;
     p->bar_height = DEFAULT_BAR_HEIGHT;

@@ -29,6 +29,7 @@
 #include <stdarg.h>
 
 /* macro to shut up "unused parameter" warnings */
+#define SHUTUP G_GNUC_UNUSED
 #define UNUSED G_GNUC_UNUSED
 
 /* NULL-safe version of strcmp */
@@ -48,9 +49,6 @@ char* tr_strlsize( char * buf, guint64 size, size_t buflen );
 
 /* return a human-readable string for the transfer rate given in bytes. */
 char* tr_strlspeed (char * buf, double KiBps, size_t buflen );
-
-/* return a human-readable string for the given ratio. */
-char* tr_strlratio( char * buf, double ratio, size_t buflen );
 
 /* return a human-readable string for the time given in seconds. */
 char* tr_strltime( char * buf, int secs, size_t buflen );
@@ -76,7 +74,7 @@ freestrlist(GList *list);
 
 /* decodes a string that has been urlencoded */
 char *
-decode_uri( const char * uri );
+urldecode(const char *str, int len);
 
 /* return a list of cleaned-up paths, with invalid directories removed */
 GList *
@@ -131,8 +129,6 @@ gboolean
 on_tree_view_button_pressed (GtkWidget       * view,
                              GdkEventButton  * event,
                              gpointer          unused);
-
-gpointer tr_object_ref_sink (gpointer object);
 
 #endif /* GTK_MAJOR_VERSION */
 

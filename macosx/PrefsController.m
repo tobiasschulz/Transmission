@@ -29,6 +29,7 @@
 
 #define DOWNLOAD_FOLDER     0
 #define DOWNLOAD_TORRENT    2
+#define DOWNLOAD_ASK        3
 
 #define UPDATE_SECONDS 86400
 
@@ -56,26 +57,11 @@
         fDefaults = [NSUserDefaults standardUserDefaults];
         fHandle = handle;
         
-        //checks for old version speeds of -1
+        //checks for old version upload speed of -1
         if ([fDefaults integerForKey: @"UploadLimit"] < 0)
         {
             [fDefaults setInteger: 20 forKey: @"UploadLimit"];
             [fDefaults setBool: NO forKey: @"CheckUpload"];
-        }
-        if ([fDefaults integerForKey: @"DownloadLimit"] < 0)
-        {
-            [fDefaults setInteger: 20 forKey: @"DownloadLimit"];
-            [fDefaults setBool: NO forKey: @"CheckDownload"];
-        }
-        
-        //check for old version download location
-        NSString * choice;
-        if ((choice = [fDefaults stringForKey: @"DownloadChoice"]))
-        {
-            [fDefaults setBool: [choice isEqualToString: @"Constant"] forKey: @"DownloadLocationConstant"];
-            [fDefaults setBool: YES forKey: @"DownloadAsk"];
-            
-            [fDefaults removeObjectForKey: @"DownloadChoice"];
         }
         
         //set check for update to right value
@@ -125,7 +111,13 @@
     [self setPrefView: nil];
     
     //set download folder
-    [fFolderPopUp selectItemAtIndex: [fDefaults boolForKey: @"DownloadLocationConstant"] ? DOWNLOAD_FOLDER : DOWNLOAD_TORRENT];
+    NSString * downloadChoice = [fDefaults stringForKey: @"DownloadChoice"];
+    if ([downloadChoice isEqualToString: @"Constant"])
+        [fFolderPopUp selectItemAtIndex: DOWNLOAD_FOLDER];
+    else if ([downloadChoice isEqualToString: @"Torrent"])
+        [fFolderPopUp selectItemAtIndex: DOWNLOAD_TORRENT];
+    else
+        [fFolderPopUp selectItemAtIndex: DOWNLOAD_ASK];
     
     //set stop ratio
     [self updateRatioStopField];
@@ -146,7 +138,7 @@
                         selector: @selector(updatePortStatus) userInfo: nil repeats: YES];
     
     //set peer connections
-    [fPeersGlobalField setIntValue: [fDefaults integerForKey: @"PeersTotal"]];
+    [fPeersGlobalField setIntValue: [fDefaults integerForKey: @"PeersGlobal"]];
     [fPeersTorrentField setIntValue: [fDefaults integerForKey: @"PeersTorrent"]];
     
     //set queue values
@@ -247,7 +239,7 @@
 
 - (void) updatePortStatus
 {
-    const tr_handle_status * stat = tr_handleStatus(fHandle);
+    tr_handle_status * stat = tr_handleStatus(fHandle);
     if (fNatStatus != stat->natTraversalStatus || fPublicPort != stat->publicPort)
     {
         fNatStatus = stat->natTraversalStatus;
@@ -333,7 +325,7 @@
 - (void) setPeersGlobal: (id) sender
 {
     int count = [sender intValue];
-    [fDefaults setInteger: count forKey: @"PeersTotal"];
+    [fDefaults setInteger: count forKey: @"PeersGlobal"];
     tr_setGlobalPeerLimit(fHandle, count);
 }
 
@@ -451,7 +443,6 @@
 {
     [fDefaults setBool: YES forKey: @"WarningDuplicate"];
     [fDefaults setBool: YES forKey: @"WarningRemainingSpace"];
-    [fDefaults setBool: YES forKey: @"WarningFolderDataSameName"];
 }
 
 - (void) setCheckForUpdate: (id) sender
@@ -486,7 +477,18 @@
 
 - (void) setDownloadLocation: (id) sender
 {
-    [fDefaults setBool: [fFolderPopUp indexOfSelectedItem] ==  DOWNLOAD_FOLDER forKey: @"DownloadLocationConstant"];
+    switch ([fFolderPopUp indexOfSelectedItem])
+    {
+        case DOWNLOAD_FOLDER:
+            [fDefaults setObject: @"Constant" forKey: @"DownloadChoice"];
+            break;
+        case DOWNLOAD_TORRENT:
+            [fDefaults setObject: @"Torrent" forKey: @"DownloadChoice"];
+            break;
+        case DOWNLOAD_ASK:
+            [fDefaults setObject: @"Ask" forKey: @"DownloadChoice"];
+            break;
+    }
 }
 
 - (void) folderSheetShow: (id) sender
@@ -628,7 +630,13 @@
     else
     {
         //reset if cancelled
-        [fFolderPopUp selectItemAtIndex: [fDefaults boolForKey: @"DownloadLocationConstant"] ? DOWNLOAD_FOLDER : DOWNLOAD_TORRENT];
+        NSString * downloadChoice = [fDefaults stringForKey: @"DownloadChoice"];
+        if ([downloadChoice isEqualToString: @"Constant"])
+            [fFolderPopUp selectItemAtIndex: DOWNLOAD_FOLDER];
+        else if ([downloadChoice isEqualToString: @"Torrent"])
+            [fFolderPopUp selectItemAtIndex: DOWNLOAD_TORRENT];
+        else
+            [fFolderPopUp selectItemAtIndex: DOWNLOAD_ASK];
     }
 }
 

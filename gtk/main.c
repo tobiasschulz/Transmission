@@ -35,12 +35,6 @@
 #include <glib/gi18n.h>
 #include <glib/gstdio.h>
 
-#include <gdk/gdk.h>
-#ifdef GDK_WINDOWING_X11
-#include <X11/Xatom.h>
-#include <gdk/gdkx.h>
-#endif
-
 #include "actions.h"
 #include "conf.h"
 #include "dialogs.h"
@@ -102,20 +96,15 @@ static const char * LICENSE =
 "SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.";
 #endif
 
-struct cbdata
-{
-    guint          idle_hide_mainwindow_tag;
+struct cbdata {
     GtkWindow    * wind;
     TrCore       * core;
-    gpointer       icon;
+    GtkWidget    * icon;
     GtkWidget    * msgwin;
     GtkWidget    * prefs;
     guint          timer;
     gboolean       closing;
     GList        * errqueue;
-    GHashTable   * tor2details;
-    GHashTable   * details2tor;
-    gboolean       minimized;
 };
 
 #define CBDATA_PTR "callback-data-pointer"
@@ -128,8 +117,7 @@ static gboolean
 sendremote( GList * files, gboolean sendquit );
 static void
 appsetup( TrWindow * wind, GList * args,
-          struct cbdata *,
-          gboolean paused, gboolean minimized );
+          struct cbdata * , gboolean paused );
 static void
 winsetup( struct cbdata * cbdata, TrWindow * wind );
 static void
@@ -231,30 +219,21 @@ int
 main( int argc, char ** argv )
 {
     char * err;
-    struct cbdata * cbdata;
+    struct cbdata * cbdata = g_new (struct cbdata, 1);
     GList * argfiles;
     GError * gerr;
     gboolean didinit = FALSE;
     gboolean didlock = FALSE;
     gboolean sendquit = FALSE;
     gboolean startpaused = FALSE;
-    gboolean startminimized = FALSE;
     char * domain = "transmission";
     GOptionEntry entries[] = {
         { "paused", 'p', 0, G_OPTION_ARG_NONE, &startpaused,
           _("Start with all torrents paused"), NULL },
         { "quit", 'q', 0, G_OPTION_ARG_NONE, &sendquit,
           _( "Request that the running instance quit"), NULL },
-#ifdef STATUS_ICON_SUPPORTED
-        { "minimized", 'm', 0, G_OPTION_ARG_NONE, &startminimized,
-          _( "Start minimized in system tray"), NULL },
-#endif
         { NULL, 0, 0, 0, NULL, NULL, NULL }
     };
-
-    cbdata = g_new0( struct cbdata, 1 );
-    cbdata->tor2details = g_hash_table_new( g_str_hash, g_str_equal );
-    cbdata->details2tor = g_hash_table_new( g_direct_hash, g_direct_equal );
 
     /* bind the gettext domain */
     bindtextdomain( domain, TRANSMISSIONLOCALEDIR );
@@ -294,7 +273,7 @@ main( int argc, char ** argv )
         /* set message level here before tr_init() */
         msgwin_loadpref( );
 
-        appsetup( mainwind, argfiles, cbdata, startpaused, startminimized );
+        appsetup( mainwind, argfiles, cbdata, startpaused );
     }
     else
     {
@@ -328,8 +307,7 @@ sendremote( GList * files, gboolean sendquit )
 
 static void
 appsetup( TrWindow * wind, GList * args,
-          struct cbdata * cbdata,
-          gboolean paused, gboolean minimized )
+          struct cbdata * cbdata, gboolean paused )
 {
     enum tr_torrent_action action;
 
@@ -341,7 +319,6 @@ appsetup( TrWindow * wind, GList * args,
     cbdata->timer      = 0;
     cbdata->closing    = FALSE;
     cbdata->errqueue   = NULL;
-    cbdata->minimized  = minimized;
 
     actions_set_core( cbdata->core );
 
@@ -357,9 +334,6 @@ appsetup( TrWindow * wind, GList * args,
                       G_CALLBACK( prefschanged ), cbdata );
 
     /* apply a few prefs */
-
-    if( minimized )
-        tr_core_set_pref_bool( cbdata->core, PREF_KEY_SYSTRAY, TRUE );
     initializeFromPrefs( cbdata );
 
     /* add torrents from command-line and saved state */
@@ -383,85 +357,7 @@ appsetup( TrWindow * wind, GList * args,
     updatemodel( cbdata );
 
     /* show the window */
-    if( minimized ) {
-        gtk_window_iconify( wind );
-        gtk_window_set_skip_taskbar_hint( cbdata->wind, cbdata->icon != NULL );
-    }
-    gtk_widget_show( GTK_WIDGET( wind ) );
-}
-
-
-/**
- * hideMainWindow, and the timeout hack in toggleMainWindow,
- * are loosely cribbed from Colin Walters' tr-shell.c in Rhythmbox
- */
-static gboolean
-idle_hide_mainwindow( gpointer window )
-{
-    gtk_widget_hide( window );
-    return FALSE;
-}
-static void
-hideMainWindow( struct cbdata * cbdata )
-{
-#if defined(STATUS_ICON_SUPPORTED) && defined(GDK_WINDOWING_X11)
-    GdkRectangle  bounds;
-    gulong        data[4];
-    Display      *dpy;
-    GdkWindow    *gdk_window;
-
-    gtk_status_icon_get_geometry( GTK_STATUS_ICON( cbdata->icon ), NULL, &bounds, NULL );
-    gdk_window = GTK_WIDGET (cbdata->wind)->window;
-    dpy = gdk_x11_drawable_get_xdisplay (gdk_window);
-
-    data[0] = bounds.x;
-    data[1] = bounds.y;
-    data[2] = bounds.width;
-    data[3] = bounds.height;
-
-    XChangeProperty (dpy,
-                     GDK_WINDOW_XID (gdk_window),
-                     gdk_x11_get_xatom_by_name_for_display (gdk_drawable_get_display (gdk_window),
-                     "_NET_WM_ICON_GEOMETRY"),
-                     XA_CARDINAL, 32, PropModeReplace,
-                     (guchar*)&data, 4);
-
-    gtk_window_set_skip_taskbar_hint( cbdata->wind, TRUE );
-#endif
-    gtk_window_iconify( cbdata->wind );
-}
-
-static void
-clearTag( guint * tag )
-{
-    if( *tag )
-        g_source_remove( *tag );
-    *tag = 0;
-}
-
-static void
-toggleMainWindow( struct cbdata * cbdata )
-{
-    GtkWindow * window = GTK_WINDOW( cbdata->wind );
-    const int hide = cbdata->minimized = !cbdata->minimized;
-
-    if( hide )
-    {
-        clearTag( &cbdata->idle_hide_mainwindow_tag );
-        hideMainWindow( cbdata );
-        cbdata->idle_hide_mainwindow_tag = g_timeout_add( 250, idle_hide_mainwindow, window );
-    }
-    else
-    {
-        gtk_window_set_skip_taskbar_hint( window, FALSE );
-        gtk_widget_show( GTK_WIDGET( window ) );
-        gtk_window_deiconify( window );
-#if GTK_CHECK_VERSION(2,8,0)
-        gtk_window_present_with_time( window, gtk_get_current_event_time( ) );
-#else
-        gtk_window_present( window );
-#endif
-    }
+    gtk_widget_show( GTK_WIDGET(wind) );
 }
 
 static gboolean
@@ -470,7 +366,7 @@ winclose( GtkWidget * w UNUSED, GdkEvent * event UNUSED, gpointer gdata )
     struct cbdata * cbdata = gdata;
 
     if( cbdata->icon != NULL )
-        action_activate ("toggle-main-window");
+        gtk_widget_hide( GTK_WIDGET( cbdata->wind ) );
     else
         askquit( cbdata->core, cbdata->wind, wannaquit, cbdata );
 
@@ -511,7 +407,7 @@ static void
 makeicon( struct cbdata * cbdata )
 {
     if( cbdata->icon == NULL )
-        cbdata->icon = tr_icon_new( cbdata->core );
+        cbdata->icon = tr_icon_new( );
 }
 
 static gpointer
@@ -533,9 +429,6 @@ quitThreadFunc( gpointer gdata )
         g_list_foreach( cbdata->errqueue, (GFunc)g_free, NULL );
         g_list_free( cbdata->errqueue );
     }
-
-    g_hash_table_destroy( cbdata->details2tor );
-    g_hash_table_destroy( cbdata->tor2details );
     g_free( cbdata );
 
     /* exit the gtk main loop */
@@ -652,7 +545,7 @@ gotdrag( GtkWidget         * widget UNUSED,
                 continue;
 
             /* decode the filename */
-            filename = decode_uri( files[i] );
+            filename = urldecode( files[i], -1 );
             freeme = g_list_prepend( freeme, filename );
             if( !g_utf8_validate( filename, -1, NULL ) )
                 continue;
@@ -946,38 +839,16 @@ updateTrackerForeach (GtkTreeModel * model,
 }
 
 static void
-detailsClosed( gpointer user_data, GObject * details )
-{
-    struct cbdata * data = user_data;
-    gpointer hashString = g_hash_table_lookup( data->details2tor, details );
-    g_hash_table_remove( data->details2tor, details );
-    g_hash_table_remove( data->tor2details, hashString );
-}
-
-static void
 showInfoForeach (GtkTreeModel * model,
                  GtkTreePath  * path UNUSED,
                  GtkTreeIter  * iter,
-                 gpointer       user_data )
+                 gpointer       data UNUSED)
 {
-    const char * hashString;
-    struct cbdata * data = user_data;
     TrTorrent * tor = NULL;
     GtkWidget * w;
-
     gtk_tree_model_get( model, iter, MC_TORRENT, &tor, -1 );
-    hashString = tr_torrent_info(tor)->hashString;
-    w = g_hash_table_lookup( data->tor2details, hashString );
-    if( w != NULL )
-        gtk_window_present( GTK_WINDOW( w ) );
-    else {
-        w = torrent_inspector_new( GTK_WINDOW( data->wind ), tor );
-        gtk_widget_show( w );
-        g_hash_table_insert( data->tor2details, (gpointer)hashString, w );
-        g_hash_table_insert( data->details2tor, w, (gpointer)hashString );
-        g_object_weak_ref( G_OBJECT( w ), detailsClosed, data );
-    }
-
+    w = torrent_inspector_new( GTK_WINDOW(data), tor );
+    gtk_widget_show( w );
     g_object_unref( G_OBJECT( tor ) );
 }
 
@@ -1003,10 +874,10 @@ msgwinclosed()
 void
 doAction ( const char * action_name, gpointer user_data )
 {
-    struct cbdata * data = user_data;
+    struct cbdata * data = (struct cbdata *) user_data;
     gboolean changed = FALSE;
 
-    if ( !strcmp (action_name, "open-torrent-menu") || !strcmp( action_name, "open-torrent-toolbar" ))
+    if (!strcmp (action_name, "add-torrent"))
     {
         makeaddwind( data->wind, data->core );
     }
@@ -1037,14 +908,14 @@ doAction ( const char * action_name, gpointer user_data )
     else if (!strcmp (action_name, "show-torrent-details"))
     {
         GtkTreeSelection * s = tr_window_get_selection(data->wind);
-        gtk_tree_selection_selected_foreach( s, showInfoForeach, data );
+        gtk_tree_selection_selected_foreach( s, showInfoForeach, data->wind );
     }
     else if (!strcmp( action_name, "update-tracker"))
     {
         GtkTreeSelection * s = tr_window_get_selection(data->wind);
         gtk_tree_selection_selected_foreach( s, updateTrackerForeach, data->wind );
     }
-    else if (!strcmp (action_name, "new-torrent"))
+    else if (!strcmp (action_name, "create-torrent"))
     {
         GtkWidget * w = make_meta_ui( GTK_WINDOW( data->wind ),
                                       tr_core_handle( data->core ) );
@@ -1119,7 +990,11 @@ doAction ( const char * action_name, gpointer user_data )
     }
     else if (!strcmp (action_name, "toggle-main-window"))
     {
-        toggleMainWindow( data );
+        GtkWidget * w = GTK_WIDGET (data->wind);
+        if (GTK_WIDGET_VISIBLE(w))
+            gtk_widget_hide (w);
+        else
+            gtk_window_present (GTK_WINDOW(w));
     }
     else g_error ("Unhandled action: %s", action_name );
 

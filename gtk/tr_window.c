@@ -224,7 +224,6 @@ privateFree( gpointer vprivate )
 {
     PrivateData * p = ( PrivateData * ) vprivate;
     g_signal_handler_disconnect( p->core, p->pref_handler_id );
-    g_free( p->filter_text );
     g_free( p );
 }
 
@@ -395,9 +394,8 @@ filter_entry_changed( GtkEditable * e, gpointer vprivate )
 {
     char * pch;
     PrivateData * p = (PrivateData*) vprivate;
-
-    pch = gtk_editable_get_chars( e, 0, -1 );
     g_free( p->filter_text );
+    pch = gtk_editable_get_chars( e, 0, -1 );
     p->filter_text = g_ascii_strdown( pch, -1 );
     refilter( p );
     g_free( pch );
@@ -412,6 +410,17 @@ entry_icon_released( SexyIconEntry         * entry UNUSED,
     if ( icon_pos == SEXY_ICON_ENTRY_PRIMARY )
         gtk_menu_popup ( GTK_MENU( menu ), 0, 0, 0, 0, 0, gtk_get_current_event_time( ) );
 }
+
+static void
+entry_icon_released_2( SexyIconEntry         * entry,
+                       SexyIconEntryPosition   icon_pos,
+                       int                     button UNUSED,
+                       gpointer                vprivate UNUSED )
+{
+    if ( icon_pos == SEXY_ICON_ENTRY_SECONDARY )
+        gtk_editable_delete_text( GTK_EDITABLE( entry ), 0, -1 );
+}
+
 
 /***
 ****  PUBLIC
@@ -460,34 +469,6 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
     w = p->toolbar = action_get_widget( "/main-window-toolbar" );
     gtk_box_pack_start( GTK_BOX(vbox), w, FALSE, FALSE, 0 ); 
 
-    /* filter */
-    toggles = NULL;
-    h = p->filter = gtk_hbox_new( FALSE, 0 );
-    gtk_container_set_border_width( GTK_CONTAINER( h ), GUI_PAD_SMALL );
-    for( i=0; i<FILTER_MODE_QTY; ++i ) {
-        const char * mnemonic = _( filter_names[i] );
-        w = gtk_toggle_button_new_with_mnemonic( mnemonic );
-        g_object_set_data( G_OBJECT( w ), FILTER_MODE_KEY, GINT_TO_POINTER( i ) );
-        gtk_button_set_relief( GTK_BUTTON( w ), GTK_RELIEF_NONE );
-        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( w ), i==FILTER_MODE_ALL );
-        toggles = g_slist_prepend( toggles, w );
-        g_signal_connect( w, "toggled", G_CALLBACK(filter_toggled_cb), p );
-        gtk_box_pack_start( GTK_BOX( h ), w, FALSE, FALSE, 0 ); 
-    }
-    for( l=toggles; l!=NULL; l=l->next )
-        g_object_set_data( G_OBJECT( l->data ), FILTER_TOGGLES_KEY, toggles );
-    s = sexy_icon_entry_new( );
-    sexy_icon_entry_add_clear_button( SEXY_ICON_ENTRY(s) );
-    image = gtk_image_new_from_stock( GTK_STOCK_FIND, GTK_ICON_SIZE_MENU );
-    sexy_icon_entry_set_icon( SEXY_ICON_ENTRY(s), SEXY_ICON_ENTRY_PRIMARY, GTK_IMAGE(image) );
-    sexy_icon_entry_set_icon_highlight( SEXY_ICON_ENTRY(s), SEXY_ICON_ENTRY_PRIMARY, TRUE );
-    gtk_box_pack_end( GTK_BOX( h ), s, FALSE, FALSE, 0 );
-    gtk_box_pack_start( GTK_BOX(vbox), h, FALSE, FALSE, 0 ); 
-    g_signal_connect( s, "changed", G_CALLBACK( filter_entry_changed ), p );
-
-    w = gtk_hseparator_new( );
-    gtk_box_pack_start( GTK_BOX(vbox), w, FALSE, FALSE, 0 ); 
-
     /* status menu */
     menu = p->status_menu = gtk_menu_new( );
     status_stats_mode = 0;
@@ -506,34 +487,61 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
     }
     g_free( pch );
 
-    /* status */
+    /* statusbar */
     h = p->status = gtk_hbox_new( FALSE, GUI_PAD );
-    gtk_container_set_border_width( GTK_CONTAINER( h ), GUI_PAD );
-    w = p->gutter_lb = gtk_label_new( "N transfers" );
-    gtk_box_pack_start( GTK_BOX(h), w, 0, 0, 0 );
+    gtk_container_set_border_width( GTK_CONTAINER(h), GUI_PAD );
+     
     w = p->ul_lb = gtk_label_new( NULL );
     gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
-    w = gtk_image_new_from_stock( GTK_STOCK_GO_UP, GTK_ICON_SIZE_MENU );
+    w = gtk_image_new_from_stock( "tr-arrow-up", (GtkIconSize)-1 );
     gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
     w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
-    gtk_widget_set_size_request( w, GUI_PAD, 0u );
+    gtk_widget_set_usize( w, GUI_PAD, 0u );
     gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
     w = p->dl_lb = gtk_label_new( NULL );
     gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
-    w = gtk_image_new_from_stock( GTK_STOCK_GO_DOWN, GTK_ICON_SIZE_MENU );
+    w = gtk_image_new_from_stock( "tr-arrow-down", (GtkIconSize)-1 );
     gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
-    w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
-    gtk_widget_set_size_request( w, GUI_PAD, 0u );
-    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
-    w = p->stats_lb = gtk_label_new( NULL );
-    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
-    w = gtk_image_new_from_stock( GTK_STOCK_REFRESH, GTK_ICON_SIZE_MENU );
+
+    w = gtk_image_new_from_stock( "tr-yin-yang", (GtkIconSize)-1 );
     c = gtk_event_box_new( );
     gtk_container_add( GTK_CONTAINER(c), w );
     w = c;
-    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
     g_signal_connect( w, "button-release-event", G_CALLBACK(onYinYangReleased), p );
+    gtk_box_pack_start( GTK_BOX(h), w, FALSE, FALSE, 0 );
+    w = p->stats_lb = gtk_label_new( NULL );
+    gtk_box_pack_start( GTK_BOX(h), w, FALSE, FALSE, 0 );
     gtk_box_pack_start( GTK_BOX(vbox), h, FALSE, FALSE, 0 );
+
+    w = gtk_hseparator_new( );
+    gtk_box_pack_start( GTK_BOX(vbox), w, FALSE, FALSE, 0 ); 
+
+    /* filter */
+    toggles = NULL;
+    h = p->filter = gtk_hbox_new( FALSE, 0 );
+    gtk_container_set_border_width( GTK_CONTAINER( h ), GUI_PAD_SMALL );
+    for( i=0; i<FILTER_MODE_QTY; ++i ) {
+        const char * mnemonic = _( filter_names[i] );
+        w = gtk_toggle_button_new_with_mnemonic( mnemonic );
+        g_object_set_data( G_OBJECT( w ), FILTER_MODE_KEY, GINT_TO_POINTER( i ) );
+        gtk_button_set_relief( GTK_BUTTON( w ), GTK_RELIEF_NONE );
+        gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( w ), i==FILTER_MODE_ALL );
+        toggles = g_slist_prepend( toggles, w );
+        g_signal_connect( w, "toggled", G_CALLBACK(filter_toggled_cb), p );
+        gtk_box_pack_start( GTK_BOX( h ), w, FALSE, FALSE, 0 ); 
+    }
+    for( l=toggles; l!=NULL; l=l->next )
+        g_object_set_data( G_OBJECT( l->data ), FILTER_TOGGLES_KEY, toggles );
+    s = sexy_icon_entry_new( );
+    image = gtk_image_new_from_stock(GTK_STOCK_CLEAR, GTK_ICON_SIZE_MENU );
+    sexy_icon_entry_set_icon( SEXY_ICON_ENTRY(s), SEXY_ICON_ENTRY_SECONDARY, GTK_IMAGE(image) );
+    sexy_icon_entry_set_icon_highlight( SEXY_ICON_ENTRY(s), SEXY_ICON_ENTRY_SECONDARY, TRUE );
+    image = gtk_image_new_from_stock( "tr-search-pulldown", GTK_ICON_SIZE_MENU );
+    sexy_icon_entry_set_icon( SEXY_ICON_ENTRY(s), SEXY_ICON_ENTRY_PRIMARY, GTK_IMAGE(image) );
+    sexy_icon_entry_set_icon_highlight( SEXY_ICON_ENTRY(s), SEXY_ICON_ENTRY_PRIMARY, TRUE );
+    gtk_box_pack_end( GTK_BOX( h ), s, FALSE, FALSE, 0 );
+    gtk_box_pack_start( GTK_BOX(vbox), h, FALSE, FALSE, 0 ); 
+    g_signal_connect( s, "changed", G_CALLBACK( filter_entry_changed ), p );
 
     menu = gtk_menu_new( );
     l = NULL;
@@ -548,6 +556,8 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
         gtk_widget_show( w );
     }
     g_signal_connect( s, "icon-released", G_CALLBACK(entry_icon_released), menu );
+    g_signal_connect( s, "icon-released", G_CALLBACK( entry_icon_released_2 ), p );
+
 
     /* workarea */
     p->view = makeview( p, core );
@@ -555,6 +565,17 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
     gtk_container_add( GTK_CONTAINER(w), p->view );
     gtk_box_pack_start_defaults( GTK_BOX(vbox), w );
     gtk_container_set_focus_child( GTK_CONTAINER( vbox ), w );
+
+    /* spacer */
+    w = gtk_alignment_new (0.0f, 0.0f, 0.0f, 0.0f);
+    gtk_widget_set_usize (w, 0u, 6u);
+    gtk_box_pack_start( GTK_BOX(vbox), w, FALSE, FALSE, 0 ); 
+
+    /* status */
+    h = gtk_hbox_new( FALSE, GUI_PAD );
+    w = p->gutter_lb = gtk_label_new( "N transfers" );
+    gtk_box_pack_start_defaults( GTK_BOX(h), w );
+    gtk_box_pack_start( GTK_BOX(vbox), h, FALSE, FALSE, 0 ); 
 
     /* show all but the window */
     gtk_widget_show_all( vbox );
@@ -569,7 +590,6 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
     p->pref_handler_id = g_signal_connect( core, "prefs-changed",
                                            G_CALLBACK(prefsChanged), self );
 
-    filter_entry_changed( GTK_EDITABLE( s ), p );
     return self;
 }
 
@@ -600,7 +620,7 @@ static void
 updateStats( PrivateData * p )
 {
     char * pch;
-    char up[32], down[32], ratio[32], buf[128];
+    char up[32], down[32], buf[128];
     struct tr_session_stats stats;
     tr_handle * handle = tr_core_handle( p->core );
 
@@ -608,8 +628,7 @@ updateStats( PrivateData * p )
     pch = pref_string_get( PREF_KEY_STATUS_BAR_STATS );
     if( !strcmp( pch, "session-ratio" ) ) {
         tr_getSessionStats( handle, &stats );
-        tr_strlratio( ratio, stats.ratio, sizeof( ratio ) );
-        g_snprintf( buf, sizeof(buf), _("Ratio: %s"), ratio );
+        g_snprintf( buf, sizeof(buf), _("Ratio: %.1f"), stats.ratio );
     } else if( !strcmp( pch, "session-transfer" ) ) {
         tr_getSessionStats( handle, &stats );
         tr_strlsize( up, stats.uploadedBytes, sizeof( up ) );
@@ -622,8 +641,7 @@ updateStats( PrivateData * p )
         g_snprintf( buf, sizeof( buf ), _( "Down: %s  Up: %s" ), down, up );
     } else { /* default is total-ratio */
         tr_getCumulativeSessionStats( handle, &stats );
-        tr_strlratio( ratio, stats.ratio, sizeof( ratio ) );
-        g_snprintf( buf, sizeof(buf), _("Ratio: %s"), ratio );
+        g_snprintf( buf, sizeof(buf), _("Ratio: %.1f"), stats.ratio );
     }
     g_free( pch );
     gtk_label_set_text( GTK_LABEL( p->stats_lb ), buf );

@@ -43,19 +43,19 @@
     if (!(path = [CreatorWindowController chooseFile]))
         return;
     
-    CreatorWindowController * creator = [[self alloc] initWithHandle: handle path: path];
+    CreatorWindowController * creator = [[self alloc] initWithWindowNibName: @"Creator" handle: handle path: path];
     [creator showWindow: nil];
 }
 
 + (void) createTorrentFile: (tr_handle *) handle forFile: (NSString *) file
 {
-    CreatorWindowController * creator = [[self alloc] initWithHandle: handle path: file];
+    CreatorWindowController * creator = [[self alloc] initWithWindowNibName: @"Creator" handle: handle path: file];
     [creator showWindow: nil];
 }
 
-- (id) initWithHandle: (tr_handle *) handle path: (NSString *) path
+- (id) initWithWindowNibName: (NSString *) name handle: (tr_handle *) handle path: (NSString *) path
 {
-    if ((self = [super initWithWindowNibName: @"Creator"]))
+    if ((self = [super initWithWindowNibName: name]))
     {
         fStarted = NO;
         
@@ -367,8 +367,6 @@
             [window setContentView: fProgressView];
             [window setFrame: windowRect display: YES animate: YES];
             [fProgressView setHidden: NO];
-            
-            [[window standardWindowButton:NSWindowCloseButton] setEnabled: NO];
             
             fStarted = YES;
         }

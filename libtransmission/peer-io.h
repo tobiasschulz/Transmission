@@ -80,9 +80,7 @@ int   tr_peerIoReconnect( tr_peerIo * io );
 
 int   tr_peerIoIsIncoming( const tr_peerIo * io );
 
-void  tr_peerIoSetTimeoutSecs( tr_peerIo * io, int secs );
-
-int   tr_peerIoGetAge( const tr_peerIo * io );
+void tr_peerIoSetTimeoutSecs( tr_peerIo * io, int secs );
 
 
 /**

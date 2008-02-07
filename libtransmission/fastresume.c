@@ -111,7 +111,10 @@ enum
     FR_ID_PEX = 13,
 
     /* max connected peers -- uint16_t */
-    FR_ID_MAX_PEERS = 14
+    FR_ID_MAX_PEERS = 14,
+
+    /* max unchoked peers -- uint8_t */
+    FR_ID_MAX_UNCHOKED = 15
 };
 
 
@@ -208,7 +211,7 @@ tr_fastResumeSave( const tr_torrent * tor )
 
     /* Write progress data */
     if (1) {
-        int i, n;
+        int n;
         tr_time_t * mtimes;
         uint8_t * buf = malloc( FR_PROGRESS_LEN( tor ) );
         uint8_t * walk = buf;
@@ -216,9 +219,6 @@ tr_fastResumeSave( const tr_torrent * tor )
 
         /* mtimes */
         mtimes = getMTimes( tor, &n );
-        for( i=0; i<n; ++i )
-            if( !tr_torrentIsFileChecked( tor, i ) )
-                mtimes[i] = ~(tr_time_t)0; /* force a recheck next time */
         memcpy( walk, mtimes, n*sizeof(tr_time_t) );
         walk += n * sizeof(tr_time_t);
 
@@ -315,6 +315,10 @@ tr_fastResumeSave( const tr_torrent * tor )
                          &tor->maxConnectedPeers,
                          sizeof(uint16_t), 1, file );
 
+    fastResumeWriteData( FR_ID_MAX_UNCHOKED,
+                         &tor->maxUnchokedPeers,
+                         sizeof(uint8_t), 1, file );
+
     if( !tor->info.isPrivate )
     {
         tr_pex * pex;
@@ -352,6 +356,7 @@ internalIdToPublicBitfield( uint8_t id )
         case FR_ID_PEERS:          ret = TR_FR_PEERS;         break;
         case FR_ID_DESTINATION:    ret = TR_FR_DESTINATION;   break;
         case FR_ID_MAX_PEERS:      ret = TR_FR_MAX_PEERS;     break;
+        case FR_ID_MAX_UNCHOKED:   ret = TR_FR_MAX_UNCHOKED;  break;
     }
 
     return ret;
@@ -401,6 +406,15 @@ parseConnections( tr_torrent * tor, const uint8_t * buf, uint32_t len )
 }
 
 static uint64_t
+parseUnchoked( tr_torrent * tor, const uint8_t * buf, uint32_t len )
+{
+    if( len != sizeof(uint8_t) )
+        return 0;
+    readBytes( &tor->maxUnchokedPeers, &buf, sizeof(uint8_t) );
+    return TR_FR_MAX_UNCHOKED;
+}
+
+static uint64_t
 parseProgress( tr_torrent     * tor,
                const uint8_t  * buf,
                uint32_t         len )
@@ -416,17 +430,15 @@ parseProgress( tr_torrent     * tor,
         /* compare file mtimes */
         tr_time_t * curMTimes = getMTimes( tor, &n );
         const uint8_t * walk = buf;
-        tr_time_t mtime;
+        const tr_time_t * oldMTimes = (const tr_time_t *) walk;
         for( i=0; i<n; ++i ) {
-            readBytes( &mtime, &walk, sizeof(tr_time_t) );
-            if ( curMTimes[i] == mtime )
+            if ( curMTimes[i] == oldMTimes[i] )
                 tr_torrentSetFileChecked( tor, i, TRUE );
-            else {
-                tr_torrentSetFileChecked( tor, i, FALSE );
+            else
                 tr_dbg( "File '%s' recheck needed", tor->info.files[i].name );
-            }
         }
         free( curMTimes );
+        walk += n * sizeof(tr_time_t);
 
         /* get the completion bitfield */
         memset( &bitfield, 0, sizeof bitfield );
@@ -536,16 +548,11 @@ parsePeers( tr_torrent * tor, const uint8_t * buf, uint32_t len )
 
     if( !tor->info.isPrivate )
     {
-        int i;
         const int count = len / sizeof(tr_pex);
-
-        for( i=0; i<count; ++i )
-        {
-            tr_pex pex;
-            readBytes( &pex, &buf, sizeof( tr_pex ) );
-            tr_peerMgrAddPex( tor->handle->peerMgr, tor->info.hash, TR_PEER_FROM_CACHE, &pex );
-        }
-
+        tr_peerMgrAddPex( tor->handle->peerMgr,
+                          tor->info.hash,
+                          TR_PEER_FROM_CACHE,
+                          (tr_pex*)buf, count );
         tr_dbg( "found %i peers in resume file", count );
         ret = TR_FR_PEERS;
     }
@@ -591,6 +598,7 @@ parseVersion1( tr_torrent * tor, const uint8_t * buf, const uint8_t * end,
             case FR_ID_CORRUPT:      ret |= parseCorrupt( tor, buf, len ); break;
             case FR_ID_PEERS:        ret |= parsePeers( tor, buf, len ); break;
             case FR_ID_MAX_PEERS:    ret |= parseConnections( tor, buf, len ); break;
+            case FR_ID_MAX_UNCHOKED: ret |= parseUnchoked( tor, buf, len ); break;
             case FR_ID_DESTINATION:  ret |= parseDestination( tor, buf, len ); break;
             default:                 tr_dbg( "Skipping unknown resume code %d", (int)id ); break;
         }
@@ -666,6 +674,10 @@ setFromCtor( tr_torrent * tor, uint64_t fields, const tr_ctor * ctor, int mode )
             ret |= TR_FR_RUN;
         }
     }
+
+    if( fields & TR_FR_MAX_UNCHOKED )
+        if( !tr_ctorGetMaxUnchokedPeers( ctor, mode, &tor->maxUnchokedPeers ) )
+            ret |= TR_FR_MAX_UNCHOKED;
 
     if( fields & TR_FR_MAX_PEERS ) 
         if( !tr_ctorGetMaxConnectedPeers( ctor, mode, &tor->maxConnectedPeers ) )

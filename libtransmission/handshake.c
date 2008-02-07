@@ -34,7 +34,7 @@
 #define ENABLE_LTEP */
 
 /* enable fast peers extension protocol */
-/* #define ENABLE_FASTPEER */
+#define ENABLE_FASTPEER
 
 /***
 ****
@@ -84,6 +84,8 @@ enum
    azureus protocol is supported, they indicate which protocol is preferred */
 #define HANDSHAKE_GET_EXTPREF( reserved )      ( (reserved)[5] & 0x03 )
 #define HANDSHAKE_SET_EXTPREF( reserved, val ) ( (reserved)[5] |= 0x03 & (val) )
+
+extern const char* getPeerId( void ) ;
 
 struct tr_handshake
 {
@@ -199,7 +201,6 @@ buildHandshakeMessage( tr_handshake * handshake,
     uint8_t * buf = tr_new0( uint8_t, HANDSHAKE_SIZE );
     uint8_t * walk = buf;
     const uint8_t * torrentHash = tr_cryptoGetTorrentHash( handshake->crypto );
-    const uint8_t * peerId = tr_getPeerId( );
 
     memcpy( walk, HANDSHAKE_NAME, HANDSHAKE_NAME_LEN );
     walk += HANDSHAKE_NAME_LEN;
@@ -210,10 +211,9 @@ buildHandshakeMessage( tr_handshake * handshake,
     walk += HANDSHAKE_FLAGS_LEN;
     memcpy( walk, torrentHash, SHA_DIGEST_LENGTH );
     walk += SHA_DIGEST_LENGTH;
-    memcpy( walk, peerId, PEER_ID_LEN );
-    walk += PEER_ID_LEN;
+    memcpy( walk, getPeerId(), TR_ID_LEN );
+    walk += TR_ID_LEN;
 
-    assert( strlen( ( const char* )peerId ) == PEER_ID_LEN );
     assert( walk-buf == HANDSHAKE_SIZE );
     *setme_len = walk - buf;
     return buf;
@@ -267,7 +267,7 @@ parseHandshake( tr_handshake     * handshake,
     /* peer id */
     handshake->havePeerID = TRUE;
     dbgmsg( handshake, "peer-id is [%*.*s]", PEER_ID_LEN, PEER_ID_LEN, handshake->peer_id );
-    if( !memcmp( handshake->peer_id, tr_getPeerId(), PEER_ID_LEN ) ) {
+    if( !memcmp( handshake->peer_id, getPeerId(), PEER_ID_LEN ) ) {
         dbgmsg( handshake, "streuth!  we've connected to ourselves." );
         return HANDSHAKE_PEER_IS_SELF;
     }
@@ -524,14 +524,7 @@ readCryptoSelect( tr_handshake * handshake, struct evbuffer * inbuf )
 
     tr_peerIoReadUint16( handshake->io, inbuf, &pad_d_len );
     dbgmsg( handshake, "pad_d_len is %d", (int)pad_d_len );
-
-    if( pad_d_len > 512 )
-    {
-        dbgmsg( handshake, "encryption handshake: pad_d_len is too long" );
-        tr_handshakeDone( handshake, FALSE );
-        return READ_DONE;
-    }
-
+    assert( pad_d_len <= 512 );
     handshake->pad_d_len = pad_d_len;
 
     setState( handshake, AWAITING_PAD_D );
@@ -705,9 +698,9 @@ readPeerId( tr_handshake * handshake, struct evbuffer * inbuf )
     tr_free( client );
 
     /* if we've somehow connected to ourselves, don't keep the connection */
-    peerIsGood = memcmp( handshake->peer_id, tr_getPeerId(), PEER_ID_LEN ) ? 1 : 0;
-    dbgmsg( handshake, "isPeerGood == %d", peerIsGood );
+    peerIsGood = memcmp( handshake->peer_id, getPeerId(), PEER_ID_LEN ) ? 1 : 0;
     tr_handshakeDone( handshake, peerIsGood );
+    dbgmsg( handshake, "isPeerGood == %d", peerIsGood );
     return READ_DONE;
 }
 
@@ -1048,7 +1041,6 @@ tr_handshakeNew( tr_peerIo           * io,
     handshake->doneCB = doneCB;
     handshake->doneUserData = doneUserData;
     handshake->handle = tr_peerIoGetHandle( io );
-    tr_peerIoSetTimeoutSecs( io, 15 );
     
     tr_peerIoSetIOFuncs( handshake->io, canRead, NULL, gotError, handshake );
 

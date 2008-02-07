@@ -84,7 +84,6 @@ void tr_torrentInitFilePriority( tr_torrent   * tor,
 
 int  tr_torrentCountUncheckedPieces( const tr_torrent * );
 int  tr_torrentIsPieceChecked      ( const tr_torrent *, int piece );
-int  tr_torrentIsFileChecked       ( const tr_torrent *, int file );
 void tr_torrentSetPieceChecked     ( tr_torrent *, int piece, int isChecked );
 void tr_torrentSetFileChecked      ( tr_torrent *, int file, int isChecked );
 void tr_torrentUncheck             ( tr_torrent * );
@@ -96,6 +95,8 @@ typedef enum
    TR_RECHECK_NOW
 }
 tr_recheck_state;
+
+#define TR_ID_LEN  20
 
 struct tr_torrent
 {
@@ -148,12 +149,10 @@ struct tr_torrent
     tr_torrent_status_func   * status_func;
     void                     * status_func_user_data;
 
-    tr_torrent_active_func   * active_func;
-    void                     * active_func_user_data;
-
     unsigned int               statCur : 1;
     unsigned int               isRunning : 1;
 
+    uint8_t                    maxUnchokedPeers;
     uint16_t                   maxConnectedPeers;
 
     tr_recheck_state           recheckState;

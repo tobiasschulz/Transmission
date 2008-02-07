@@ -51,39 +51,30 @@
    characters, where x is the major version number, y is the
    minor version number, z is the maintenance number, and b
    designates beta (Azureus-style) */
-uint8_t*
-tr_peerIdNew( void )
+void
+tr_peerIdNew ( char * buf, int buflen )
 {
     int i;
-    int val;
-    int total = 0;
-    uint8_t * buf = tr_new( uint8_t, 21 );
-    const char * pool = "0123456789abcdefghijklmnopqrstuvwxyz";
-    const int base = 36;
+    assert( buflen == TR_ID_LEN + 1 );
 
-    memcpy( buf, PEERID_PREFIX, 8 );
-
-    for( i=8; i<19; ++i ) {
-        val = tr_rand( base );
-        total += val;
-        buf[i] = pool[val];
+    snprintf( buf, TR_ID_LEN, "%s", PEERID_PREFIX );
+    assert( strlen(buf) == 8 );
+    for( i=8; i<TR_ID_LEN; ++i ) {
+        const int r = tr_rand( 36 );
+        buf[i] = ( r < 26 ) ? ( 'a' + r ) : ( '0' + r - 26 ) ;
     }
-
-    val = total % base ? base - (total % base) : 0;
-    total += val;
-    buf[19] = pool[val];
-    buf[20] = '\0';
-
-    return buf;
+    buf[TR_ID_LEN] = '\0';
 }
 
-const uint8_t*
-tr_getPeerId( void )
+const char*
+getPeerId( void )
 {
-    static uint8_t * id = NULL;
-    if( id == NULL )
-        id = tr_peerIdNew( );
-    return id;
+    static char * peerId = NULL;
+    if( !peerId ) {
+        peerId = tr_new0( char, TR_ID_LEN + 1 );
+        tr_peerIdNew( peerId, TR_ID_LEN + 1 );
+    }
+    return peerId;
 }
 
 /***
@@ -189,7 +180,7 @@ tr_handle * tr_init( const char * tag )
                         -1, /* upload speed limit */
                         FALSE, /* use download speed limit? */
                         -1, /* download speed limit */
-                        200, /* globalPeerLimit */
+                        512, /* globalPeerLimit */
                         TR_MSG_INF, /* message level */
                         FALSE ); /* is message queueing enabled? */
 }
@@ -264,8 +255,7 @@ void tr_natTraversalEnable( tr_handle * h, int enable )
     tr_globalUnlock( h );
 }
 
-const tr_handle_status *
-tr_handleStatus( tr_handle * h )
+tr_handle_status * tr_handleStatus( tr_handle * h )
 {
     tr_handle_status * s;
 
@@ -354,7 +344,7 @@ tr_torrentRates( tr_handle * h, float * toClient, float * toPeer )
 }
 
 int
-tr_torrentCount( const tr_handle * h )
+tr_torrentCount( tr_handle * h )
 {
     return h->torrentCount;
 }
@@ -393,8 +383,6 @@ tr_close( tr_handle * h )
     const int maxwait_msec = SHUTDOWN_MAX_SECONDS * 1000;
     const uint64_t deadline = tr_date( ) + maxwait_msec;
 
-    tr_statsClose( h );
-
     tr_runInEventThread( h, tr_closeImpl, h );
     while( !h->isClosed && !deadlineReached( deadline ) )
         tr_wait( 100 );
@@ -404,6 +392,7 @@ tr_close( tr_handle * h )
         tr_wait( 100 );
 
     tr_fdClose( );
+    tr_statsClose( h );
     tr_lockFree( h->lock );
     free( h->tag );
     free( h );

@@ -40,26 +40,11 @@ FILE* tr_getLog( void );
 
 char* tr_getLogTimeStr( char * buf, int buflen );
 
-/** Returns a random number in the range of [0...n) */
-int tr_rand ( int n );
+int tr_rand ( int );
 
-/**
- * a portability wrapper around mkdir().
- * On WIN32, the `permissions' argument is unused.
- *
- * @return zero on success, or -1 if an error occurred
- * (in which case errno is set appropriately).
- */
-int tr_mkdir( const char * path, int permissions );
-
-/**
- * Like mkdir, but makes parent directories as needed.
- *
- * @return zero on success, or -1 if an error occurred
- * (in which case errno is set appropriately).
- */
 int tr_mkdirp( const char * path, int permissions );
 
+int tr_mkdir( const char * path, int permissions );
 
 uint8_t* tr_loadFile( const char * filename, size_t * size );
 
@@ -76,9 +61,9 @@ void tr_buildPath( char* buf, size_t buflen,
 struct timeval timevalMsec( uint64_t milliseconds );
 
 
-int tr_ioErrorFromErrno( int err );
+int    tr_ioErrorFromErrno( void );
 
-const char * tr_errorString( int code );
+char * tr_errorString( int code );
 
 /* return the current date in milliseconds */
 uint64_t tr_date( void );
@@ -164,7 +149,5 @@ int    tr_bitfieldIsEmpty( const tr_bitfield* );
 size_t tr_bitfieldCountTrueBits( const tr_bitfield* );
 
 tr_bitfield* tr_bitfieldOr( tr_bitfield*, const tr_bitfield* );
-
-double tr_getRatio( double numerator, double denominator );
 
 #endif
