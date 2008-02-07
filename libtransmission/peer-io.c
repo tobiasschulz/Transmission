@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -14,14 +14,10 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
-
-#ifdef WIN32
-#include <winsock2.h>
-#else
 #include <netinet/in.h> /* struct in_addr */
 #include <arpa/inet.h> /* inet_ntoa */
-#endif
 
+#include <sys/types.h> /* event.h needs this */
 #include <event.h>
 
 #include "transmission.h"
@@ -33,9 +29,6 @@
 #include "utils.h"
 
 #define IO_TIMEOUT_SECS 8
-
-/* arbitrary */
-#define TR_RDBUF (1024*8)
 
 /**
 ***
@@ -55,10 +48,8 @@ struct tr_peerIo
     int port;
     int socket;
     int encryptionMode;
-    int timeout;
     struct bufferevent * bufev;
     uint8_t peerId[20];
-    time_t timeCreated;
 
     tr_extensions extensions;
 
@@ -90,7 +81,7 @@ static void
 canReadWrapper( struct bufferevent * e, void * userData )
 {
     int done = 0;
-    tr_peerIo * c = userData;
+    tr_peerIo * c = (tr_peerIo *) userData;
     tr_handle * handle = c->handle;
 
     if( c->canRead == NULL )
@@ -108,6 +99,7 @@ canReadWrapper( struct bufferevent * e, void * userData )
                 if( EVBUFFER_LENGTH( e->input ) )
                     continue;
             case READ_MORE:
+                tr_peerIoSetIOMode( c, EV_READ, 0 );
             case READ_DONE:
                 done = 1;
         }
@@ -119,7 +111,7 @@ canReadWrapper( struct bufferevent * e, void * userData )
 static void
 gotErrorWrapper( struct bufferevent * e, short what, void * userData )
 {
-    tr_peerIo * c = userData;
+    tr_peerIo * c = (tr_peerIo *) userData;
     if( c->gotError != NULL )
         (*c->gotError)( e, what, c->userData );
 }
@@ -127,8 +119,6 @@ gotErrorWrapper( struct bufferevent * e, short what, void * userData )
 /**
 ***
 **/
-
-void bufferevent_setwatermark(struct bufferevent *, short, size_t, size_t);
 
 static tr_peerIo*
 tr_peerIoNew( struct tr_handle     * handle,
@@ -146,17 +136,13 @@ tr_peerIoNew( struct tr_handle     * handle,
     c->port = port;
     c->socket = socket;
     c->isIncoming = isIncoming ? 1 : 0;
-    c->timeout = IO_TIMEOUT_SECS;
-    c->timeCreated = time( NULL );
     c->bufev = bufferevent_new( c->socket,
                                 canReadWrapper,
                                 didWriteWrapper,
                                 gotErrorWrapper,
                                 c );
-    bufferevent_settimeout( c->bufev, c->timeout, c->timeout );
+    bufferevent_settimeout( c->bufev, IO_TIMEOUT_SECS, IO_TIMEOUT_SECS );
     bufferevent_enable( c->bufev, EV_READ|EV_WRITE );
-    bufferevent_setwatermark( c->bufev, EV_READ, 0, TR_RDBUF );
-
     return c;
 }
 
@@ -181,18 +167,14 @@ tr_peerIoNewOutgoing( struct tr_handle      * handle,
                       int                     port,
                       const uint8_t         * torrentHash )
 {
-    int socket;
-
     assert( handle != NULL );
     assert( in_addr != NULL );
     assert( port >= 0 );
     assert( torrentHash != NULL );
 
-    socket = tr_netOpenTCP( in_addr, port, 0 );
-
-    return socket < 0
-        ? NULL 
-        : tr_peerIoNew( handle, in_addr, port, torrentHash, 0, socket );
+    return tr_peerIoNew( handle, in_addr, port,
+                         torrentHash, 0,
+                         tr_netOpenTCP( in_addr, port, 0 ) );
 }
 
 static void
@@ -242,7 +224,7 @@ const char*
 tr_peerIoAddrStr( const struct in_addr * addr, uint16_t port )
 {
     static char buf[512];
-    snprintf( buf, sizeof(buf), "%s:%u", inet_ntoa( *addr ), ntohs( port ) );
+    snprintf( buf, sizeof(buf), "%s:%u", inet_ntoa( *addr ), (unsigned int)port );
     return buf;
 }
 
@@ -250,13 +232,6 @@ const char*
 tr_peerIoGetAddrStr( const tr_peerIo * io )
 {
     return tr_peerIoAddrStr( &io->in_addr, io->port );
-}
-
-void
-tr_peerIoTryRead( tr_peerIo * io )
-{
-    if( EVBUFFER_LENGTH( io->bufev->input ) )
-        canReadWrapper( io->bufev, io );
 }
 
 void 
@@ -271,7 +246,14 @@ tr_peerIoSetIOFuncs( tr_peerIo          * io,
     io->gotError = errcb;
     io->userData = userData;
 
-    tr_peerIoTryRead( io );
+    if( EVBUFFER_LENGTH( io->bufev->input ) )
+        canReadWrapper( io->bufev, io );
+}
+
+void
+tr_peerIoSetIOMode( tr_peerIo * c, short enable, short disable )
+{
+    tr_setBufferEventMode( c->handle, c->bufev, enable, disable );
 }
 
 int
@@ -299,9 +281,8 @@ tr_peerIoReconnect( tr_peerIo * io )
                                      didWriteWrapper,
                                      gotErrorWrapper,
                                      io );
-        bufferevent_settimeout( io->bufev, io->timeout, io->timeout );
+        bufferevent_settimeout( io->bufev, IO_TIMEOUT_SECS, IO_TIMEOUT_SECS );
         bufferevent_enable( io->bufev, EV_READ|EV_WRITE );
-        bufferevent_setwatermark( io->bufev, EV_READ, 0, TR_RDBUF );
 
         return 0;
     }
@@ -312,8 +293,7 @@ tr_peerIoReconnect( tr_peerIo * io )
 void
 tr_peerIoSetTimeoutSecs( tr_peerIo * io, int secs )
 {
-    io->timeout = secs;
-    bufferevent_settimeout( io->bufev, io->timeout, io->timeout );
+    bufferevent_settimeout( io->bufev, secs, secs );
 }
 
 /**
@@ -424,17 +404,15 @@ tr_peerIoWrite( tr_peerIo   * io,
                 const void  * writeme,
                 int           writeme_len )
 {
-    assert( tr_amInEventThread( io->handle ) );
-    bufferevent_write( io->bufev, writeme, writeme_len );
+    tr_bufferevent_write( io->handle, io->bufev, writeme, writeme_len );
 }
 
 void
 tr_peerIoWriteBuf( tr_peerIo       * io,
                    struct evbuffer * buf )
 {
-    const size_t n = EVBUFFER_LENGTH( buf );
-    tr_peerIoWrite( io, EVBUFFER_DATA(buf), n );
-    evbuffer_drain( buf, n );
+    tr_peerIoWrite( io, EVBUFFER_DATA(buf), EVBUFFER_LENGTH(buf) );
+    evbuffer_drain( buf, ~0 );
 }
 
 /**
@@ -463,15 +441,11 @@ tr_peerIoIsEncrypted( const tr_peerIo * io )
     return io!=NULL && io->encryptionMode==PEER_ENCRYPTION_RC4;
 }
 
-/**
-***
-**/
-
 void
 tr_peerIoWriteBytes( tr_peerIo        * io,
                      struct evbuffer  * outbuf,
                      const void       * bytes,
-                     size_t             byteCount )
+                     int                byteCount )
 {
     uint8_t * tmp;
 
@@ -494,20 +468,20 @@ tr_peerIoWriteBytes( tr_peerIo        * io,
 }
 
 void
-tr_peerIoWriteUint8( tr_peerIo        * io,
-                     struct evbuffer  * outbuf,
-                     uint8_t            writeme )
-{
-    tr_peerIoWriteBytes( io, outbuf, &writeme, sizeof(uint8_t) );
-}
-
-void
 tr_peerIoWriteUint16( tr_peerIo        * io,
                       struct evbuffer  * outbuf,
                       uint16_t           writeme )
 {
     uint16_t tmp = htons( writeme );
     tr_peerIoWriteBytes( io, outbuf, &tmp, sizeof(uint16_t) );
+}
+
+void
+tr_peerIoWriteUint8( tr_peerIo        * io,
+                     struct evbuffer  * outbuf,
+                     uint8_t            writeme )
+{
+    tr_peerIoWriteBytes( io, outbuf, &writeme, sizeof(uint8_t) );
 }
 
 void
@@ -519,40 +493,28 @@ tr_peerIoWriteUint32( tr_peerIo        * io,
     tr_peerIoWriteBytes( io, outbuf, &tmp, sizeof(uint32_t) );
 }
 
-/***
-****
-***/
-
 void
 tr_peerIoReadBytes( tr_peerIo        * io,
                     struct evbuffer  * inbuf,
                     void             * bytes,
-                    size_t             byteCount )
+                    int                byteCount )
 {
-    assert( EVBUFFER_LENGTH( inbuf ) >= byteCount );
+    assert( (int)EVBUFFER_LENGTH( inbuf ) >= byteCount );
 
     switch( io->encryptionMode )
     {
         case PEER_ENCRYPTION_NONE:
-            evbuffer_remove( inbuf, bytes, byteCount );
+            evbuffer_remove(  inbuf, bytes, byteCount );
             break;
 
         case PEER_ENCRYPTION_RC4:
-            evbuffer_remove( inbuf, bytes, byteCount );
+            evbuffer_remove(  inbuf, bytes, byteCount );
             tr_cryptoDecrypt( io->crypto, byteCount, bytes, bytes );
             break;
 
         default:
             assert( 0 );
     }
-}
-
-void
-tr_peerIoReadUint8( tr_peerIo         * io,
-                    struct evbuffer   * inbuf,
-                    uint8_t           * setme )
-{
-    tr_peerIoReadBytes( io, inbuf, setme, sizeof(uint8_t) );
 }
 
 void
@@ -563,6 +525,14 @@ tr_peerIoReadUint16( tr_peerIo         * io,
     uint16_t tmp;
     tr_peerIoReadBytes( io, inbuf, &tmp, sizeof(uint16_t) );
     *setme = ntohs( tmp );
+}
+
+void
+tr_peerIoReadUint8( tr_peerIo         * io,
+                    struct evbuffer   * inbuf,
+                    uint8_t           * setme )
+{
+    tr_peerIoReadBytes( io, inbuf, setme, sizeof(uint8_t) );
 }
 
 void
@@ -578,15 +548,9 @@ tr_peerIoReadUint32( tr_peerIo         * io,
 void
 tr_peerIoDrain( tr_peerIo        * io,
                 struct evbuffer  * inbuf,
-                size_t             byteCount )
+                int                byteCount )
 {
     uint8_t * tmp = tr_new( uint8_t, byteCount );
     tr_peerIoReadBytes( io, inbuf, tmp, byteCount );
     tr_free( tmp );
-}
-
-int
-tr_peerIoGetAge( const tr_peerIo * io )
-{
-    return time( NULL ) - io->timeCreated;
 }

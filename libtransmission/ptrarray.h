@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -25,13 +25,11 @@ tr_ptrArray * tr_ptrArrayDup     ( tr_ptrArray* );
 void    tr_ptrArrayForeach       ( tr_ptrArray*, PtrArrayForeachFunc func );
 void    tr_ptrArrayFree          ( tr_ptrArray*, PtrArrayForeachFunc func );
 void*   tr_ptrArrayNth           ( tr_ptrArray*, int n );
-void*   tr_ptrArrayBack          ( tr_ptrArray* );
 void**  tr_ptrArrayPeek          ( tr_ptrArray*, int * size );
 void**  tr_ptrArrayBase          ( tr_ptrArray* );
 void    tr_ptrArrayClear         ( tr_ptrArray* );
 int     tr_ptrArrayInsert        ( tr_ptrArray*, void*, int pos );
 int     tr_ptrArrayAppend        ( tr_ptrArray*, void* );
-void*   tr_ptrArrayPop           ( tr_ptrArray* );
 void    tr_ptrArrayErase         ( tr_ptrArray*, int begin, int end );
 int     tr_ptrArraySize          ( const tr_ptrArray* );
 int     tr_ptrArrayEmpty         ( const tr_ptrArray* );

@@ -2,21 +2,19 @@
 #
 # $Id$
 
-# convention: -TR MAJOR MINOR MAINT STATUS - (each a single char)
-# STATUS: "X" for prerelease test builds,
-#         "Z" for unsupported trunk builds,
-#         "0" for stable, supported releases
+# convention: -TR MAJOR MINOR MAINT BETA - (each a single char)
+# BETA: "Z" for beta, "0" for stable 
 # these should be the only two lines you need to change
-PEERID_PREFIX="-TR104Z-"
-USERAGENT_PREFIX="1.04+"
+PEERID_PREFIX="-TR0930-"
+USERAGENT_PREFIX="0.93"
 
 
-SVN_REVISION=`find ./ -name "*\.[chmp]" -o -name "*\.cpp" -o -name "*\.po" -o -name "*\.sh" | \
+SVN_REVISION=`find ./ -name "*\.[ch]" -o -name "*\.cpp" -o -name "*\.po" | \
               xargs grep "\$Id:" | \
               grep -v third-party | \
               cut -d"$Id:" -f3 | cut -d" " -f3 | sort -n | tail -n 1`
 
-if [[ "x${PEERID_PREFIX//0-/}" != "x$PEERID_PREFIX" ]]
+if test "x${PEERID_PREFIX//Z/}" = "x$PEERID_PREFIX";
 then
     STABLE_RELEASE=yes
 else

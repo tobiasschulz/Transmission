@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,15 +23,11 @@
  *****************************************************************************/
 
 #import "NSBezierPathAdditions.h"
-#import "NSApplicationAdditions.h"
 
 @implementation NSBezierPath (NSBezierPathAdditions)
 
 + (NSBezierPath *) bezierPathWithRoundedRect: (NSRect) rect radius: (float) radius
 {
-    if ([NSApp isOnLeopardOrBetter])
-        return [self bezierPathWithRoundedRect: rect xRadius: radius yRadius: radius];
-    
     float minX = NSMinX(rect),
         minY = NSMinY(rect),
         maxX = NSMaxX(rect),

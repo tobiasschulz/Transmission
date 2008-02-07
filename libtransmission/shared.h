@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -29,11 +29,33 @@
 
 typedef struct tr_shared tr_shared;
 
-tr_shared* tr_sharedInit            ( tr_handle *, int isEnabled, int publicPort );
-void       tr_sharedShuttingDown    ( tr_shared * );
-void       tr_sharedSetPort         ( tr_shared *, int publicPort );
-void       tr_sharedTraversalEnable ( tr_shared *, int isEnabled );
-int        tr_sharedGetPublicPort   ( const tr_shared * s );
-int        tr_sharedTraversalStatus ( const tr_shared * );
+/***********************************************************************
+ * tr_sharedInit, tr_sharedClose
+ ***********************************************************************
+ * Starts / stops a thread to handle running things that are shared
+ * among the torrents: NAT-PMP/UPnP, incoming connections, peer choking
+ **********************************************************************/
+tr_shared * tr_sharedInit           ( tr_handle * );
+void        tr_sharedClose          ( tr_shared * );
+
+/***********************************************************************
+ * tr_sharedSetPort
+ ***********************************************************************
+ * Changes the port for incoming connections.  tr_sharedGetPublicPort
+ * should be called with the shared lock held.
+ **********************************************************************/
+void         tr_sharedSetPort         ( tr_shared *, int port );
+int          tr_sharedGetPublicPort   ( const tr_shared * s );
+
+/***********************************************************************
+ * tr_sharedTraversalEnable, tr_sharedTraversalStatus
+ ***********************************************************************
+ * Enables/disables and retrieves the status of NAT traversal.  Should
+ * be called with the shared lock held.
+ **********************************************************************/
+void         tr_sharedTraversalEnable ( tr_shared *, int enable );
+int          tr_sharedTraversalStatus ( const tr_shared * );
+
 
 #endif
+

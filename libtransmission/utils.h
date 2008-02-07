@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -32,41 +32,51 @@
 
 void tr_msgInit( void );
 
-#define tr_err( a... ) tr_msg( __FILE__, __LINE__, TR_MSG_ERR, ## a )
-#define tr_inf( a... ) tr_msg( __FILE__, __LINE__, TR_MSG_INF, ## a )
-#define tr_dbg( a... ) tr_msg( __FILE__, __LINE__, TR_MSG_DBG, ## a )
-void tr_msg  ( const char * file, int line, int level, const char * msg, ... );
+#define tr_err( a... ) tr_msg( TR_MSG_ERR, ## a )
+#define tr_inf( a... ) tr_msg( TR_MSG_INF, ## a )
+#define tr_dbg( a... ) tr_msg( TR_MSG_DBG, ## a )
+void tr_msg  ( int level, const char * msg, ... );
 FILE* tr_getLog( void );
 
 char* tr_getLogTimeStr( char * buf, int buflen );
 
-/** Returns a random number in the range of [0...n) */
-int tr_rand ( int n );
+int  tr_rand ( int );
 
-/**
- * a portability wrapper around mkdir().
- * On WIN32, the `permissions' argument is unused.
- *
- * @return zero on success, or -1 if an error occurred
- * (in which case errno is set appropriately).
- */
-int tr_mkdir( const char * path, int permissions );
+void * tr_memmem( const void *, size_t, const void *, size_t );
 
-/**
- * Like mkdir, but makes parent directories as needed.
- *
- * @return zero on success, or -1 if an error occurred
- * (in which case errno is set appropriately).
- */
+/***********************************************************************
+ * tr_mkdirp
+ ***********************************************************************
+ * Create a directory and any needed parent directories.
+ * Note that the string passed in must be writable!
+ **********************************************************************/
 int tr_mkdirp( const char * path, int permissions );
 
+int tr_mkdir( const char * path, int permissions );
 
 uint8_t* tr_loadFile( const char * filename, size_t * size );
 
-int tr_vasprintf( char **strp, const char *fmt, va_list ap );
+/***********************************************************************
+ * tr_strcasecmp
+ ***********************************************************************
+ * A case-insensitive strncmp()
+ **********************************************************************/
+#define tr_strcasecmp( ff, ss ) ( tr_strncasecmp( (ff), (ss), ULONG_MAX ) )
+int tr_strncasecmp( const char * first, const char * second, size_t len );
 
-int tr_asprintf( char **strp, const char *fmt, ...);
-
+/***********************************************************************
+ * tr_sprintf
+ ***********************************************************************
+ * Appends to the end of a buffer using printf formatting,
+ * growing the buffer if needed
+ **********************************************************************/
+int tr_sprintf( char ** buf, int * used, int * max,
+                const char * format, ... );
+/* gee, it sure would be nice if BeOS had va_copy() */
+int tr_vsprintf( char **, int *, int *, const char *, va_list, va_list );
+/* this concatenates some binary data onto the end of a buffer */
+int tr_concat( char ** buf, int * used, int * max,
+               const char * data, int len );
 
 /* creates a filename from a series of elements using the
    correct separator for filenames. */
@@ -76,9 +86,9 @@ void tr_buildPath( char* buf, size_t buflen,
 struct timeval timevalMsec( uint64_t milliseconds );
 
 
-int tr_ioErrorFromErrno( int err );
+int    tr_ioErrorFromErrno( void );
 
-const char * tr_errorString( int code );
+char * tr_errorString( int code );
 
 /* return the current date in milliseconds */
 uint64_t tr_date( void );
@@ -163,8 +173,6 @@ int    tr_bitfieldHas( const tr_bitfield*, size_t bit );
 int    tr_bitfieldIsEmpty( const tr_bitfield* );
 size_t tr_bitfieldCountTrueBits( const tr_bitfield* );
 
-tr_bitfield* tr_bitfieldOr( tr_bitfield*, const tr_bitfield* );
-
-double tr_getRatio( double numerator, double denominator );
+tr_bitfield* tr_bitfieldAnd( tr_bitfield*, const tr_bitfield* );
 
 #endif

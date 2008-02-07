@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -17,8 +17,11 @@
 #include <stdio.h>
 
 #include <signal.h>
+#include <sys/queue.h> /* for evhttp */
+#include <sys/types.h> /* for evhttp */
 
 #include <event.h>
+#include <evdns.h>
 #include <evhttp.h>
 
 #include "transmission.h"
@@ -60,7 +63,11 @@ static int writes = 0;
 
 enum mode
 {
+    TR_EV_EVHTTP_MAKE_REQUEST,
+    TR_EV_BUFFEREVENT_SET,
+    TR_EV_BUFFEREVENT_WRITE,
     TR_EV_TIMER_ADD,
+    TR_EV_TIMER_DEL,
     TR_EV_EXEC
 };
 
@@ -126,6 +133,27 @@ pumpList( int i UNUSED, short s UNUSED, void * veh )
                 ++eh->timerCount;
                 break;
 
+            case TR_EV_TIMER_DEL:
+                event_del( &cmd->timer->event );
+                tr_free( cmd->timer );
+                --eh->timerCount;
+                break;
+
+            case TR_EV_EVHTTP_MAKE_REQUEST:
+                evhttp_make_request( cmd->evcon, cmd->req, cmd->evtype, cmd->uri );
+                tr_free( cmd->uri );
+                break;
+
+           case TR_EV_BUFFEREVENT_SET:
+                bufferevent_enable( cmd->bufev, cmd->enable );
+                bufferevent_disable( cmd->bufev, cmd->disable );
+                break;
+
+            case TR_EV_BUFFEREVENT_WRITE:
+                bufferevent_write( cmd->bufev, cmd->buf, cmd->buflen );
+                tr_free( cmd->buf );
+                break;
+
             case TR_EV_EXEC:
                 (cmd->func)( cmd->user_data );
                 break;
@@ -142,6 +170,7 @@ pumpList( int i UNUSED, short s UNUSED, void * veh )
         timeout_add( &eh->pulse, &eh->pulseInterval );
     else {
         assert( eh->timerCount ==  0 );
+        evdns_shutdown( FALSE );
         event_del( &eh->pulse );
     }
 }
@@ -175,6 +204,7 @@ libeventThreadFunc( void * veh )
 #endif
 
     eh->base = event_init( );
+    evdns_init( );
     timeout_set( &eh->pulse, pumpList, veh );
     timeout_add( &eh->pulse, &eh->pulseInterval );
     eh->h->events = eh;
@@ -225,10 +255,62 @@ pushList( struct tr_event_handle * eh, struct tr_event_command * command )
     tr_lockUnlock( eh->lock );
 }
 
-int
-tr_amInEventThread( struct tr_handle * handle )
+void
+tr_evhttp_make_request (tr_handle                 * handle,
+                        struct evhttp_connection  * evcon,
+                        struct evhttp_request     * req,
+                        enum   evhttp_cmd_type      type,
+                        char                      * uri)
 {
-    return tr_amInThread( handle->events->thread );
+    if( tr_amInThread( handle->events->thread ) ) {
+        evhttp_make_request( evcon, req, type, uri );
+        tr_free( uri );
+    } else {
+        struct tr_event_command * cmd = tr_new0( struct tr_event_command, 1 );
+        cmd->mode = TR_EV_EVHTTP_MAKE_REQUEST;
+        cmd->evcon = evcon;
+        cmd->req = req;
+        cmd->evtype = type;
+        cmd->uri = uri;
+        pushList( handle->events, cmd );
+    }
+}
+
+void
+tr_bufferevent_write( tr_handle             * handle,
+                      struct bufferevent    * bufev,
+                      const void            * buf,
+                      size_t                  buflen )
+{
+    if( tr_amInThread( handle->events->thread ) )
+        bufferevent_write( bufev, (void*)buf, buflen );
+    else {
+        struct tr_event_command * cmd = tr_new0( struct tr_event_command, 1 );
+        cmd->mode = TR_EV_BUFFEREVENT_WRITE;
+        cmd->bufev = bufev;
+        cmd->buf = tr_strndup( buf, buflen );
+        cmd->buflen = buflen;
+        pushList( handle->events, cmd );
+    }
+}
+
+void
+tr_setBufferEventMode( struct tr_handle   * handle,
+                       struct bufferevent * bufev,
+                       short                mode_enable,
+                       short                mode_disable )
+{
+    if( tr_amInThread( handle->events->thread ) ) {
+        bufferevent_enable( bufev, mode_enable );
+        bufferevent_disable( bufev, mode_disable );
+    } else {
+        struct tr_event_command * cmd = tr_new0( struct tr_event_command, 1 );
+        cmd->mode = TR_EV_BUFFEREVENT_SET;
+        cmd->bufev = bufev;
+        cmd->enable = mode_enable;
+        cmd->disable = mode_disable;
+        pushList( handle->events, cmd );
+    }
 }
 
 /**
@@ -280,13 +362,18 @@ tr_timerFree( tr_timer ** ptimer )
 
     /* destroy the timer directly or via the command queue */
     if( timer!=NULL && !timer->inCallback ) {
-        void * del;
-        assert( tr_amInEventThread( timer->eh->h ) );
-        del = tr_list_remove( &timer->eh->commands, timer, timerCompareFunc );
-        --timer->eh->timerCount;
-        event_del( &timer->event );
-        tr_free( timer );
-        tr_free( del );
+        if( tr_amInThread( timer->eh->thread ) ) {
+            void * del = tr_list_remove( &timer->eh->commands, timer, timerCompareFunc );
+            --timer->eh->timerCount;
+            event_del( &timer->event );
+            tr_free( timer );
+            tr_free( del );
+        } else {
+            struct tr_event_command * cmd = tr_new0( struct tr_event_command, 1 );
+            cmd->mode = TR_EV_TIMER_DEL;
+            cmd->timer = timer;
+            pushList( timer->eh, cmd );
+        }
     }
 }
 

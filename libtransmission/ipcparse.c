@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2008 Joshua Elsasser
+ * Copyright (c) 2007 Joshua Elsasser
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -30,7 +30,6 @@
 #include <string.h>
 
 #include "transmission.h"
-#include "utils.h"
 
 #include "ipcparse.h"
 #include "bsdtree.h"
@@ -141,13 +140,11 @@ static struct msg gl_msgs[] =
     { "automap",             2, IPC_MSG_AUTOMAP,      RB_ENTRY_INITIALIZER() },
     { "autostart",           2, IPC_MSG_AUTOSTART,    RB_ENTRY_INITIALIZER() },
     { "bad-format",          2, IPC_MSG_BAD,          RB_ENTRY_INITIALIZER() },
-    { "encryption",          2, IPC_MSG_CRYPTO,       RB_ENTRY_INITIALIZER() },
     { "directory",           2, IPC_MSG_DIR,          RB_ENTRY_INITIALIZER() },
     { "downlimit",           2, IPC_MSG_DOWNLIMIT,    RB_ENTRY_INITIALIZER() },
     { "failed",              2, IPC_MSG_FAIL,         RB_ENTRY_INITIALIZER() },
     { "get-automap",         2, IPC_MSG_GETAUTOMAP,   RB_ENTRY_INITIALIZER() },
     { "get-autostart",       2, IPC_MSG_GETAUTOSTART, RB_ENTRY_INITIALIZER() },
-    { "get-encryption",      2, IPC_MSG_GETCRYPTO,    RB_ENTRY_INITIALIZER() },
     { "get-directory",       2, IPC_MSG_GETDIR,       RB_ENTRY_INITIALIZER() },
     { "get-downlimit",       2, IPC_MSG_GETDOWNLIMIT, RB_ENTRY_INITIALIZER() },
     { "get-info",            2, IPC_MSG_GETINFO,      RB_ENTRY_INITIALIZER() },
@@ -364,24 +361,40 @@ ipc_initval( struct ipc_info * info, enum ipc_msg id, int64_t tag,
 }
 
 uint8_t *
-ipc_mkval( benc_val_t * pk, size_t * setmeSize )
+ipc_mkval( benc_val_t * pk, size_t * len )
 {
-    int bencSize = 0;
-    char * benc = tr_bencSave( pk, &bencSize );
-    uint8_t * ret = NULL;
+    char * buf, hex[IPC_MIN_MSG_LEN+1];
+    int    used, max;
 
-    if( bencSize > IPC_MAX_MSG_LEN )
-        errno = EFBIG;
-    else {
-        const size_t size = IPC_MIN_MSG_LEN + bencSize;
-        ret = tr_new( uint8_t, size );
-        snprintf( (char*)ret, size, "%0*X", IPC_MIN_MSG_LEN, bencSize );
-        memcpy( ret + IPC_MIN_MSG_LEN, benc, bencSize );
-        *setmeSize = size;
+    used = IPC_MIN_MSG_LEN;
+    max  = IPC_MIN_MSG_LEN;
+    buf  = malloc( IPC_MIN_MSG_LEN );
+    if( NULL == buf )
+    {
+        return NULL;
     }
 
-    tr_free( benc );
-    return ret;
+    if( tr_bencSave( pk, &buf, &used, &max ) )
+    {
+        SAFEFREE( buf );
+        return NULL;
+    }
+
+    /* ok, this check is pretty laughable */
+    if( IPC_MAX_MSG_LEN < used )
+    {
+        free( buf );
+        errno = EFBIG;
+        return NULL;
+    }
+
+    assert( 0 <= used );
+    snprintf( hex, sizeof hex, "%0*X",
+              IPC_MIN_MSG_LEN, used - IPC_MIN_MSG_LEN );
+    memcpy( buf, hex, IPC_MIN_MSG_LEN );
+    *len = used;
+
+    return ( uint8_t * )buf;
 }
 
 uint8_t *
@@ -712,7 +725,7 @@ ipc_addstat( benc_val_t * list, int tor,
 {
     benc_val_t  * dict, * item;
     int           ii, used;
-    tr_errno      error;
+    unsigned int  error;
 
     /* always send torrent id */
     types |= IPC_ST_ID;
@@ -761,43 +774,39 @@ ipc_addstat( benc_val_t * list, int tor,
                 error = st->error;
                 if( TR_OK == error )
                 {
-                    tr_bencInitStr( item, "", -1, 1 );
+                    tr_bencInitStr( item, "other", -1, 1 );
                 }
-                else if( error == TR_ERROR_ASSERT )
+                else if( TR_ERROR_ISSET( TR_ERROR_ASSERT, error ) )
                 {
                     tr_bencInitStr( item, "assert", -1, 1 );
                 }
-                else if( error == TR_ERROR_IO_PERMISSIONS )
+                else if( TR_ERROR_ISSET( TR_ERROR_IO_PERMISSIONS, error ) )
                 {
                     tr_bencInitStr( item, "io-permissions", -1, 1 );
                 }
-                else if( error == TR_ERROR_IO_SPACE )
+                else if( TR_ERROR_ISSET( TR_ERROR_IO_SPACE, error ) )
                 {
                     tr_bencInitStr( item, "io-space", -1, 1 );
                 }
-                else if( error == TR_ERROR_IO_FILE_TOO_BIG )
+                else if( TR_ERROR_ISSET( TR_ERROR_IO_FILE_TOO_BIG, error ) )
                 {
                     tr_bencInitStr( item, "io-file-too-big", -1, 1 );
                 }
-                else if( error == TR_ERROR_IO_OPEN_FILES )
+                else if( TR_ERROR_ISSET( TR_ERROR_IO_OPEN_FILES, error ) )
                 {
                     tr_bencInitStr( item, "io-open-files", -1, 1 );
                 }
-                else if( TR_ERROR_IS_IO( error ) )
+                else if( TR_ERROR_ISSET( TR_ERROR_IO_MASK, error ) )
                 {
                     tr_bencInitStr( item, "io-other", -1, 1 );
                 }
-                else if( error == TR_ERROR_TC_ERROR )
+                else if( TR_ERROR_ISSET( TR_ERROR_TC_ERROR, error ) )
                 {
                     tr_bencInitStr( item, "tracker-error", -1, 1 );
                 }
-                else if( error == TR_ERROR_TC_WARNING )
+                else if( TR_ERROR_ISSET( TR_ERROR_TC_WARNING, error ) )
                 {
                     tr_bencInitStr( item, "tracker-warning", -1, 1 );
-                }
-                else if( TR_ERROR_IS_TC( error ) )
-                {
-                    tr_bencInitStr( item, "tracker-other", -1, 1 );
                 }
                 else
                 {
@@ -805,11 +814,7 @@ ipc_addstat( benc_val_t * list, int tor,
                 }
                 break;
             case IPC_ST_ERRMSG:
-                if( TR_OK == st->error )
-                {
-                    tr_bencInitStr( item, "", -1, 1 );
-                }
-                else if( '\0' == st->errorString[0] )
+                if( '\0' == st->errorString[0] )
                 {
                     tr_bencInitStr( item, "other", -1, 1 );
                 }
@@ -843,7 +848,7 @@ ipc_addstat( benc_val_t * list, int tor,
                                 st->peersFrom[TR_PEER_FROM_PEX] );
                 break;
             case IPC_ST_PEERTOTAL:
-                tr_bencInitInt( item, st->peersConnected );
+                tr_bencInitInt( item, st->peersKnown );
                 break;
             case IPC_ST_PEERUP:
                 tr_bencInitInt( item, st->peersGettingFromUs );
@@ -864,7 +869,7 @@ ipc_addstat( benc_val_t * list, int tor,
                 {
                     tr_bencInitStr( item, "downloading", -1, 1 );
                 }
-                else if( ( TR_STATUS_DONE | TR_STATUS_SEED ) & st->status )
+                else if( TR_STATUS_SEED & st->status )
                 {
                     tr_bencInitStr( item, "seeding", -1, 1 );
                 }

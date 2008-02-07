@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -36,31 +36,26 @@
     
     IBOutlet NSView         * fGeneralView, * fTransfersView, * fBandwidthView, * fAdvancedView;
     
-    NSString * fInitialString;
-    
-    IBOutlet NSPopUpButton  * fFolderPopUp, * fIncompleteFolderPopUp, * fImportFolderPopUp;
+    IBOutlet NSPopUpButton  * fFolderPopUp, * fIncompleteFolderPopUp, * fImportFolderPopUp,
+                            * fDownloadSoundPopUp, * fSeedingSoundPopUp;
     IBOutlet NSTextField    * fRatioStopField, * fQueueDownloadField, * fQueueSeedField, * fStalledField;
     
     SUUpdater               * fUpdater;
 
     IBOutlet NSTextField    * fUploadField, * fDownloadField,
                             * fSpeedLimitUploadField, * fSpeedLimitDownloadField;
-    
-    IBOutlet NSTextField    * fPeersGlobalField, * fPeersTorrentField;
-    
-    PortChecker                     * fPortChecker;
-    IBOutlet NSTextField            * fPortField, * fPortStatusField;
+
+    IBOutlet NSTextField            * fPortField, * fNatStatusField, * fPortStatusField;
     IBOutlet NSButton               * fNatCheck;
-    IBOutlet NSImageView            * fPortStatusImage;
+    IBOutlet NSImageView            * fNatStatusImage, * fPortStatusImage;
     IBOutlet NSProgressIndicator    * fPortStatusProgress;
-    NSTimer                         * fPortStatusTimer;
+    NSTimer                         * fNatStatusTimer;
     int                             fPublicPort, fNatStatus;
 }
 
 - (id) initWithHandle: (tr_handle *) handle;
 - (void) setUpdater: (SUUpdater *) updater;
 
-- (void) updatePortField;
 - (void) setPort: (id) sender;
 - (void) setNat: (id) sender;
 - (void) updatePortStatus;
@@ -69,12 +64,7 @@
 - (NSArray *) sounds;
 - (void) setSound: (id) sender;
 
-- (void) setPeersGlobal: (id) sender;
-- (void) setPeersTorrent: (id) sender;
-
-- (void) setPEX: (id) sender;
-
-- (void) setEncryptionMode: (id) sender;
+- (void) setEncryptionRequired: (id) sender;
 
 - (void) setBadge: (id) sender;
 - (void) resetWarnings: (id) sender;

@@ -282,17 +282,16 @@ MyFrame :: OnDeselectAllUpdate( wxUpdateUIEvent& event )
 void
 MyFrame :: OnStartUpdate( wxUpdateUIEvent& event )
 {
-    bool enable = false;
+    unsigned long l = 0;
     foreach( torrents_v, mySelectedTorrents, it )
-        if( tr_torrentStatCached(*it)->status == TR_STATUS_STOPPED )
-            enable = true;
-    event.Enable( enable );
+        l |= tr_torrentStat(*it)->status;
+    event.Enable( (l & TR_STATUS_INACTIVE)!=0 );
 }
 void
 MyFrame :: OnStart( wxCommandEvent& WXUNUSED(unused) )
 {
     foreach( torrents_v, mySelectedTorrents, it )
-        if( tr_torrentStatCached(*it)->status == TR_STATUS_STOPPED )
+        if( tr_torrentStat(*it)->status & TR_STATUS_INACTIVE )
             tr_torrentStart( *it );
 }
 
@@ -302,17 +301,16 @@ MyFrame :: OnStart( wxCommandEvent& WXUNUSED(unused) )
 void
 MyFrame :: OnStopUpdate( wxUpdateUIEvent& event )
 {
-    bool enable = false;
+    unsigned long l = 0;
     foreach( torrents_v, mySelectedTorrents, it )
-        if( tr_torrentStatCached(*it)->status != TR_STATUS_STOPPED )
-            enable = true;
-    event.Enable( enable );
+        l |= tr_torrentStat(*it)->status;
+    event.Enable( (l & TR_STATUS_ACTIVE)!=0 );
 }
 void
 MyFrame :: OnStop( wxCommandEvent& WXUNUSED(unused) )
 {
     foreach( torrents_v, mySelectedTorrents, it )
-        if( tr_torrentStat(*it)->status != TR_STATUS_STOPPED )
+        if( tr_torrentStat(*it)->status & TR_STATUS_ACTIVE )
             tr_torrentStop( *it );
 }
 
@@ -370,12 +368,10 @@ void MyFrame :: OnOpen( wxCommandEvent& WXUNUSED(event) )
         for( size_t i=0; i<nPaths; ++i )
         {
             const std::string filename = toStr( paths[i] );
-            tr_ctor * ctor = tr_ctorNew( handle );
-            tr_ctorSetMetainfoFromFile( ctor, filename.c_str() );
-            tr_ctorSetDestination( ctor, TR_FALLBACK, mySavePath.c_str() );
-            tr_torrent * tor = tr_torrentNew( handle, ctor, NULL );
-            tr_ctorFree( ctor );
-
+            tr_torrent * tor = tr_torrentInit( handle,
+                                               filename.c_str(),
+                                               mySavePath.c_str(),
+                                               false, NULL );
             if( tor )
                 myTorrents.push_back( tor );
         }
@@ -388,8 +384,7 @@ void MyFrame :: OnOpen( wxCommandEvent& WXUNUSED(event) )
 }
 
 
-bool
-MyApp :: OnInit( )
+bool MyApp::OnInit()
 {
     handle = tr_init( "wx" );
 
@@ -516,7 +511,7 @@ MyFrame :: MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size
 
     long port;
     wxString key = _T("port");
-    if( !myConfig->Read( key, &port, TR_DEFAULT_PORT ) )
+    if( !myConfig->Read( key, &port, 9090 ) )
         myConfig->Write( key, port );
     tr_setBindPort( handle, port );
 
@@ -679,28 +674,25 @@ MyFrame :: MyFrame(const wxString& title, const wxPoint& pos, const wxSize& size
     **/
 
     int count = 0;
-    tr_ctor * ctor = tr_ctorNew( handle );
-    tr_ctorSetPaused( ctor, TR_FORCE, paused );
-    tr_ctorSetDestination( ctor, TR_FALLBACK, mySavePath.c_str() );
-    tr_torrent ** torrents = tr_loadTorrents ( handle, ctor, &count );
+    tr_torrent ** torrents = tr_loadTorrents ( handle, mySavePath.c_str(), paused, &count );
     myTorrents.insert( myTorrents.end(), torrents, torrents+count );
     tr_free( torrents );
-    tr_ctorFree( ctor );
 
     wxTimerEvent dummy;
     OnPulse( dummy );
 }
 
-void
-MyFrame :: OnExit( wxCommandEvent& WXUNUSED( event ) )
+void MyFrame::OnExit(wxCommandEvent& WXUNUSED(event))
 {
     Enable( false );
 
-    myTorrents.clear( );
-    mySelectedTorrents.clear( );
-    ApplyCurrentFilter( );
+    foreach( torrents_v, myTorrents, it )
+        tr_torrentClose( *it );
 
-    tr_close( handle );
+    myTorrents.clear ();
+    mySelectedTorrents.clear ();
+
+    ApplyCurrentFilter ();
 
     /* give the connections a max of 10 seconds to shut themselves down */
     myExitTime = time(0) + 10;
@@ -716,7 +708,7 @@ void MyFrame::OnAbout(wxCommandEvent& WXUNUSED(event))
     info.SetVersion(_T(LONG_VERSION_STRING));
     info.SetCopyright(_T("Copyright 2005-2007 The Transmission Project"));
     info.SetDescription(_T("A fast and easy BitTorrent client"));
-    info.SetWebSite( _T( "http://www.transmissionbt.com/" ) );
+    info.SetWebSite( _T( "http://transmission.m0k.org/" ) );
     info.SetIcon( ico );
     info.AddDeveloper( _T("Charles Kerr (Back-end, GTK+, wxWidgets)") );
     info.AddDeveloper( _T("Mitchell Livingston (Back-end; OS X)")  );
