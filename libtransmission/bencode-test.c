@@ -3,7 +3,7 @@
 #include "bencode.h"
 #include "utils.h" /* tr_free */
 
-#define VERBOSE 1
+#define VERBOSE 0
 
 int test = 0;
 
@@ -24,7 +24,7 @@ testInt( void )
 {
     uint8_t buf[128];
     int64_t val;
-    int err;
+    unsigned int err;
     const uint8_t * end;
 
     /* good int string */
@@ -85,7 +85,7 @@ static int
 testStr( void )
 {
     uint8_t buf[128];
-    int err;
+    unsigned int err;
     const uint8_t * end;
     uint8_t * str;
     size_t len;
@@ -137,29 +137,6 @@ testStr( void )
 }
 
 static int
-testString( const char * str, int isGood )
-{
-    benc_val_t val;
-    const uint8_t * end = NULL;
-    char * saved;
-    const size_t len = strlen( str );
-    int savedLen;
-    int err = tr_bencParse( str, str+len, &val , &end );
-    if( !isGood ) {
-        check( err );
-    } else {
-        check( !err );
-        check( end == (const uint8_t*)str + len );
-        saved = tr_bencSave( &val, &savedLen );
-        check( !strcmp( saved, str ) );
-        check( len == (size_t)savedLen );
-        tr_free( saved );
-        tr_bencFree( &val );
-    }
-    return 0;
-}
-
-static int
 testParse( void )
 {
     benc_val_t val;
@@ -207,22 +184,15 @@ testParse( void )
     tr_free( saved );
     tr_bencFree( &val );
 
-    if(( err = testString( "llleee", TRUE )))
-        return err;
-    if(( err = testString( "d3:cow3:moo4:spam4:eggse", TRUE )))
-        return err;
-    if(( err = testString( "d4:spaml1:a1:bee", TRUE )))
-        return err;
-    if(( err = testString( "d9:publisher3:bob17:publisher-webpage15:www.example.com18:publisher.location4:homee", TRUE )))
-        return err;
-    if(( err = testString( "d8:completei1e8:intervali1800e12:min intervali1800e5:peers0:e", TRUE )))
-        return err;
-    if(( err = testString( "d1:ai0e1:be", FALSE ))) /* odd number of children */
-        return err;
-    if(( err = testString( "", FALSE )))
-        return err;
-    if(( err = testString( " ", FALSE )))
-        return err;
+    end = NULL;
+    snprintf( (char*)buf, sizeof( buf ), "llleee" );
+    err = tr_bencParse( buf, buf + sizeof( buf ), &val , &end );
+    check( !err );
+    check( end == buf + 6 );
+    saved = tr_bencSave( &val, &len );
+    check( !strcmp( saved, "llleee" ) );
+    tr_free( saved );
+    tr_bencFree( &val );
 
     /* nested containers
      * parse an unsorted dict
@@ -239,28 +209,12 @@ testParse( void )
     tr_free( saved );
     tr_bencFree( &val );
 
-    /* too many endings */
     end = NULL;
-    snprintf( (char*)buf, sizeof( buf ), "leee" );
-    err = tr_bencParse( buf, buf + sizeof( buf ), &val, &end );
+    snprintf( (char*)buf, sizeof( buf ), "d8:completei1e8:intervali1800e12:min intervali1800e5:peers0:e" );
+    err = tr_bencParse( buf, buf+sizeof( buf ), &val, &end );
     check( !err );
-    check( end == buf + 2 );
-    saved = tr_bencSave( &val, &len );
-    check( !strcmp( saved, "le" ) );
-    tr_free( saved );
+    check( end == buf + strlen( (const char*)buf ) );
     tr_bencFree( &val );
-
-    /* no ending */
-    end = NULL;
-    snprintf( (char*)buf, sizeof( buf ), "l1:a1:b1:c" );
-    err = tr_bencParse( buf, buf + strlen( (char*)buf ), &val, &end );
-    check( err );
-
-    /* incomplete string */
-    end = NULL;
-    snprintf( (char*)buf, sizeof( buf ), "1:" );
-    err = tr_bencParse( buf, buf + strlen( (char*)buf ), &val, &end );
-    check( err );
 
     return 0;
 }

@@ -51,7 +51,7 @@
 - (void) setIcon: (NSImage *) image
 {
     [fIcon release];
-    fIcon = [image retain];
+    fIcon = image ? [image retain] : nil;
     
     if (fRegularImage)
     {
@@ -97,12 +97,13 @@
     {
         if (fIcon)
         {
-            NSSize iconSize = [fIcon size], tabSize = [tabImage size];
-            NSPoint point = NSMakePoint(floorf((tabSize.width - iconSize.width) * 0.5),
-                                        floorf((tabSize.height - iconSize.height) * 0.5));
-            
+            NSSize iconSize = [fIcon size];
+            NSRect imageRect = NSMakeRect(0, 0, [tabImage size].width, [tabImage size].height);
+            NSRect rect = NSMakeRect(imageRect.origin.x + (imageRect.size.width - iconSize.width) * 0.5,
+                            imageRect.origin.y + (imageRect.size.height - iconSize.height) * 0.5, iconSize.width, iconSize.height);
+
             [tabImage lockFocus];
-            [fIcon compositeToPoint: point operation: NSCompositeSourceOver];
+            [fIcon drawInRect: rect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
             [tabImage unlockFocus];
         }
     }
@@ -112,8 +113,11 @@
 
 - (void) updateControlTint: (NSNotification *) notification
 {
-    [fSelectedImage release];
-    fSelectedImage = nil;
+    if (fSelectedImage)
+    {
+        [fSelectedImage release];
+        fSelectedImage = nil;
+    }
     
     if (fSelected)
         [self setSelectedTab: YES];

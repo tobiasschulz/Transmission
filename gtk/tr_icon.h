@@ -26,12 +26,11 @@
 #define TR_ICON_H
 
 #include <gtk/gtk.h>
-#include "tr_core.h"
 
 #if GTK_CHECK_VERSION(2,10,0)
 #define STATUS_ICON_SUPPORTED
 #endif
 
-gpointer tr_icon_new( TrCore * core );
+gpointer tr_icon_new( void );
 
 #endif

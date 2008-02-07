@@ -214,57 +214,33 @@ target_invert_cb( GtkWidget * widget, gpointer target )
     gtk_widget_set_sensitive( GTK_WIDGET(target), !gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON(widget) ) );
 }
 
-struct test_port_data
-{
-    GtkWidget * label;
-    gboolean * alive;
-};
-
 static gpointer
-test_port( gpointer data_gpointer )
+test_port( gpointer l )
 {
-    struct test_port_data * data = data_gpointer;
+    GObject * o = G_OBJECT( l );
+    GtkSpinButton * spin = GTK_SPIN_BUTTON( g_object_get_data( o, "tr-port-spin" ) );
 
-    if( *data->alive )
-    {
-        GObject * o = G_OBJECT( data->label );
-        GtkSpinButton * spin = GTK_SPIN_BUTTON( g_object_get_data( o, "tr-port-spin" ) );
-        const int port = gtk_spin_button_get_value_as_int( spin );
-        int isOpen;
-        int size;
-        char * text;
-        char url[256];
+    const int port = gtk_spin_button_get_value_as_int( spin );
+    int isOpen;
+    int size;
+    char * text;
+    char url[256];
 
-        g_usleep( G_USEC_PER_SEC * 3 ); /* give portmapping time to kick in */
-        snprintf( url, sizeof(url), "http://portcheck.transmissionbt.com/%d", port );
-        text = miniwget( url, &size );
-        /*g_message(" got len %d, [%*.*s]", size, size, size, text );*/
-        isOpen = text && *text=='1';
+    g_usleep( G_USEC_PER_SEC * 3 ); /* give portmapping time to kick in */
+    snprintf( url, sizeof(url), "http://www.transmissionbt.com/PortCheck.php?port=%d", port );
+    text = miniwget( url, &size );
+    /*g_message(" got len %d, [%*.*s]", size, size, size, text );*/
+    isOpen = text && *text=='1';
+    gtk_label_set_markup( GTK_LABEL(l), isOpen ? _("Port is <b>open</b>") : _("Port is <b>closed</b>") );
 
-        if( *data->alive )
-            gtk_label_set_markup( GTK_LABEL(data->label), isOpen
-                ? _("Port is <b>open</b>")
-                : _("Port is <b>closed</b>") );
-    }
-
-    g_free( data );
     return NULL;
 }
 
 static void
 testing_port_cb( GtkWidget * unused UNUSED, gpointer l )
 {
-    struct test_port_data * data = g_new0( struct test_port_data, 1 );
-    data->alive = g_object_get_data( G_OBJECT( l ), "alive" );
-    data->label = l;
     gtk_label_set_markup( GTK_LABEL(l), _( "<i>Testing port...</i>" ) );
-    g_thread_create( test_port, data, FALSE, NULL );
-}
-
-static void
-dialogDestroyed( gpointer alive, GObject * dialog UNUSED )
-{
-    *(gboolean*)alive = FALSE;
+    g_thread_create( test_port, l, FALSE, NULL );
 }
 
 GtkWidget *
@@ -278,10 +254,6 @@ tr_prefs_dialog_new( GObject * core, GtkWindow * parent )
     GtkWidget * h;
     GtkWidget * d;
     GtkTooltips * tips;
-    gboolean * alive;
-
-    alive = g_new( gboolean, 1 );
-    *alive = TRUE;
 
     tips = gtk_tooltips_new( );
 
@@ -292,7 +264,6 @@ tr_prefs_dialog_new( GObject * core, GtkWindow * parent )
     gtk_window_set_role( GTK_WINDOW(d), "transmission-preferences-dialog" );
     gtk_dialog_set_has_separator( GTK_DIALOG( d ), FALSE );
     gtk_container_set_border_width( GTK_CONTAINER( d ), GUI_PAD );
-    g_object_weak_ref( G_OBJECT( d ), dialogDestroyed, alive );
 
     g_signal_connect( d, "response", G_CALLBACK(response_cb), core );
 
@@ -301,14 +272,14 @@ tr_prefs_dialog_new( GObject * core, GtkWindow * parent )
     hig_workarea_add_section_title (t, &row, _("Speed Limits"));
     hig_workarea_add_section_spacer (t, row, 2);
 
-        s = _("_Limit upload speed (KiB/s)");
+        s = _("_Limit Upload Speed (KiB/s)");
         w = new_check_button( s, PREF_KEY_UL_LIMIT_ENABLED, core );
         w2 = new_spin_button( PREF_KEY_UL_LIMIT, core, 0, INT_MAX, 5 );
         gtk_widget_set_sensitive( GTK_WIDGET(w2), pref_flag_get( PREF_KEY_UL_LIMIT_ENABLED ) );
         g_signal_connect( w, "toggled", G_CALLBACK(target_cb), w2 );
         hig_workarea_add_double_control( t, &row, w, w2 );
 
-        s = _("Li_mit download speed (KiB/s)");
+        s = _("Li_mit Download Speed (KiB/s)");
         w = new_check_button( s, PREF_KEY_DL_LIMIT_ENABLED, core );
         w2 = new_spin_button( PREF_KEY_DL_LIMIT, core, 0, INT_MAX, 5 );
         gtk_widget_set_sensitive( GTK_WIDGET(w2), pref_flag_get( PREF_KEY_DL_LIMIT_ENABLED ) );
@@ -334,6 +305,7 @@ tr_prefs_dialog_new( GObject * core, GtkWindow * parent )
         s = _("For torrents added from _command-line:");
         l = hig_workarea_add_row( t, &row, s, w, NULL );
 
+#if 0
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title( t, &row, _( "Peer Connections" ) );
     hig_workarea_add_section_spacer(t , row, 2 );
@@ -342,6 +314,7 @@ tr_prefs_dialog_new( GObject * core, GtkWindow * parent )
         hig_workarea_add_row( t, &row, _( "Global maximum connected peers:" ), w, NULL );
         w = new_spin_button( PREF_KEY_MAX_PEERS_PER_TORRENT, core, 1, 300, 5 );
         hig_workarea_add_row( t, &row, _( "Maximum connected peers for new torrents:" ), w, NULL );
+#endif
 
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title (t, &row, _("Network"));
@@ -361,7 +334,7 @@ tr_prefs_dialog_new( GObject * core, GtkWindow * parent )
         hig_workarea_add_row( t, &row, _("Incoming TCP _Port"), h, w );
 
         g_object_set_data( G_OBJECT(l), "tr-port-spin", w2 );
-        g_object_set_data( G_OBJECT(l), "alive", alive );
+        g_object_set_data( G_OBJECT(l), "tr-core", core );
         testing_port_cb( NULL, l );
 
         g_signal_connect( w, "toggled", G_CALLBACK(toggled_cb), l );
@@ -371,15 +344,15 @@ tr_prefs_dialog_new( GObject * core, GtkWindow * parent )
     hig_workarea_add_section_title (t, &row, _("Options"));
     hig_workarea_add_section_spacer (t, row, 3);
         
-        s = _("Use peer _exchange if possible");
+        s = _("Use Peer _Exchange if Possible");
         w = new_check_button( s, PREF_KEY_PEX, core );
         hig_workarea_add_wide_control( t, &row, w );
         
-        s = _("_Ignore unencrypted peers");
+        s = _("_Ignore Unencrypted Peers");
         w = new_check_button( s, PREF_KEY_ENCRYPTED_ONLY, core );
         hig_workarea_add_wide_control( t, &row, w );
         
-        s = _("Show an icon in the system _tray");
+        s = _("Show an Icon in the System _Tray");
         w = new_check_button( s, PREF_KEY_SYSTRAY, core );
         hig_workarea_add_wide_control( t, &row, w );
         

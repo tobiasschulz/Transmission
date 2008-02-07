@@ -42,16 +42,12 @@
 	<true/>
 	<key>DisplayStatusProgressSelected</key>
 	<false/>
-	<key>DownloadAsk</key>
-	<true/>
-	<key>DownloadAskMulti</key>
-	<false/>
+	<key>DownloadChoice</key>
+	<string>Constant</string>
 	<key>DownloadFolder</key>
 	<string>~/Downloads</string>
 	<key>DownloadLimit</key>
 	<integer>100</integer>
-	<key>DownloadLocationConstant</key>
-	<false/>
 	<key>DownloadSound</key>
 	<string>Glass</string>
 	<key>EncryptionPrefer</key>
@@ -141,8 +137,6 @@
 	<key>UseIncompleteDownloadFolder</key>
 	<false/>
 	<key>WarningDuplicate</key>
-	<true/>
-	<key>WarningFolderDataSameName</key>
 	<true/>
 	<key>WarningRemainingSpace</key>
 	<true/>

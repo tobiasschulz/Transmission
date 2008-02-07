@@ -66,6 +66,7 @@ typedef enum
     TR_PEERMSG_PIECE_DATA,
     TR_PEERMSG_PEER_PROGRESS,
     TR_PEERMSG_ERROR,
+    TR_PEERMSG_GOT_ASSERT_ERROR,
     TR_PEERMSG_CANCEL,
     TR_PEERMSG_NEED_REQ
 }
@@ -78,7 +79,6 @@ typedef struct
     uint32_t offset;     /* for TR_PEERMSG_GOT_BLOCK */
     uint32_t length;     /* for TR_PEERMSG_GOT_BLOCK */
     float progress;      /* for TR_PEERMSG_PEER_PROGRESS */
-    tr_errno err;        /* for TR_PEERMSG_GOT_ERROR */
 }
 tr_peermsgs_event;
 

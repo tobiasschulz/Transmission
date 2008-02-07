@@ -41,8 +41,8 @@ typedef struct benc_val_s
         struct
         {
             int    i;
-            int    nofree;
             char * s;
+            int    nofree;
         } s;
         struct
         {

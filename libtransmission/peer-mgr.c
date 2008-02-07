@@ -922,14 +922,12 @@ msgsCallbackFunc( void * vpeer, void * vevent, void * vt )
             broadcastGotBlock( t, e->pieceIndex, e->offset, e->length );
             break;
 
+        case TR_PEERMSG_GOT_ASSERT_ERROR:
+            addStrike( t, peer );
+            peer->doPurge = 1;
+            break;
+
         case TR_PEERMSG_ERROR:
-            if( TR_ERROR_IS_IO( e->err ) ) {
-                t->tor->error = e->err;
-                strlcpy( t->tor->errorString, tr_errorString( e->err ), sizeof(t->tor->errorString) );
-                tr_torrentStop( t->tor );
-            } else if( e->err == TR_ERROR_ASSERT ) {
-                addStrike( t, peer );
-            }
             peer->doPurge = 1;
             break;
 
@@ -1457,11 +1455,11 @@ tr_peerMgrTorrentStats( const tr_peerMgr * manager,
 
         ++setmePeersFrom[atom->from];
 
-        if( clientIsDownloadingFrom( peer ) )
-            ++*setmePeersSendingToUs;
-
         if( clientIsUploadingTo( peer ) )
             ++*setmePeersGettingFromUs;
+
+        if( clientIsDownloadingFrom( peer ) )
+            ++*setmePeersSendingToUs;
     }
 
     managerUnlock( (tr_peerMgr*)manager );
@@ -1486,39 +1484,21 @@ tr_peerMgrPeerStats( const tr_peerMgr  * manager,
 
     for( i=0; i<size; ++i )
     {
-        char * pch;
         const tr_peer * peer = peers[i];
         const struct peer_atom * atom = getExistingAtom( t, &peer->in_addr );
         tr_peer_stat * stat = ret + i;
 
         tr_netNtop( &peer->in_addr, stat->addr, sizeof(stat->addr) );
         strlcpy( stat->client, (peer->client ? peer->client : ""), sizeof(stat->client) );
-        stat->port               = peer->port;
-        stat->from               = atom->from;
-        stat->progress           = peer->progress;
-        stat->isEncrypted        = tr_peerIoIsEncrypted( peer->io ) ? 1 : 0;
-        stat->uploadToRate       = peer->rateToPeer;
-        stat->downloadFromRate   = peer->rateToClient;
-        stat->peerIsChoked       = peer->peerIsChoked;
-        stat->peerIsInterested   = peer->peerIsInterested;
-        stat->clientIsChoked     = peer->clientIsChoked;
-        stat->clientIsInterested = peer->clientIsInterested;
-        stat->isIncoming         = tr_peerIoIsIncoming( peer->io );
-        stat->isDownloadingFrom  = clientIsDownloadingFrom( peer );
-        stat->isUploadingTo      = clientIsUploadingTo( peer );
-
-        pch = stat->flagStr;
-        if( t->optimistic == peer ) *pch++ = 'O';
-        if( stat->isDownloadingFrom ) *pch++ = 'D';
-        else if( stat->clientIsInterested ) *pch++ = 'd';
-        if( stat->isUploadingTo ) *pch++ = 'U';
-        else if( stat->peerIsInterested ) *pch++ = 'u';
-        if( !stat->clientIsChoked && !stat->clientIsInterested ) *pch++ = 'K';
-        if( !stat->peerIsChoked && !stat->peerIsInterested ) *pch++ = '?';
-        if( stat->isEncrypted ) *pch++ = 'E';
-        if( stat->from == TR_PEER_FROM_PEX ) *pch++ = 'X';
-        if( stat->isIncoming ) *pch++ = 'I';
-        *pch = '\0';
+        stat->port             = peer->port;
+        stat->from             = atom->from;
+        stat->progress         = peer->progress;
+        stat->isEncrypted      = tr_peerIoIsEncrypted( peer->io ) ? 1 : 0;
+        stat->uploadToRate     = peer->rateToPeer;
+        stat->downloadFromRate = peer->rateToClient;
+        stat->isDownloading    = clientIsDownloadingFrom( peer );
+        stat->isUploading      = clientIsUploadingTo( peer );
+        stat->status           = peer->status;
     }
 
     *setmeCount = size;

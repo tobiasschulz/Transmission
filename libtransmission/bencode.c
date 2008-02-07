@@ -29,43 +29,54 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-#include <event.h> /* evbuffer */
+#include <event.h>
 
 #include "transmission.h"
 #include "bencode.h"
 #include "ptrarray.h"
-#include "utils.h" /* tr_new(), tr_free() */
+#include "utils.h"
 
 /**
 ***
 **/
 
 static int
-isType( const benc_val_t * val, int type )
+tr_bencIsInt( const benc_val_t * val )
 {
-    return ( ( val != NULL ) && ( val->type == type ) );
+    return val!=NULL && val->type==TYPE_INT;
 }
 
-#define isInt(v)    ( isType( ( v ), TYPE_INT ) )
-#define isString(v) ( isType( ( v ), TYPE_STR ) )
-#define isList(v)   ( isType( ( v ), TYPE_LIST ) )
-#define isDict(v)   ( isType( ( v ), TYPE_DICT ) )
+static int
+tr_bencIsList( const benc_val_t * val )
+{
+    return val!=NULL && val->type==TYPE_LIST;
+}
+
+static int
+tr_bencIsDict( const benc_val_t * val )
+{
+    return val!=NULL && val->type==TYPE_DICT;
+}
 
 static int
 isContainer( const benc_val_t * val )
 {
-    return isList(val) || isDict(val);
-}
-static int
-isSomething( const benc_val_t * val )
-{
-    return isContainer(val) || isInt(val) || isString(val);
+    return val!=NULL && ( val->type & ( TYPE_DICT | TYPE_LIST ) );
 }
 
-/***
-****  tr_bencParse()
-****  tr_bencLoad()
-***/
+benc_val_t*
+tr_bencListGetNthChild( benc_val_t * val, int i )
+{
+    benc_val_t * ret = NULL;
+    if( tr_bencIsList( val ) && ( i >= 0 ) && ( i < val->val.l.count ) )
+        ret = val->val.l.vals + i;
+    return ret;
+}
+
+
+/**
+***
+**/
 
 /**
  * The initial i and trailing e are beginning and ending delimiters.
@@ -203,9 +214,9 @@ getNode( benc_val_t * top, tr_ptrArray * parentStack, int type )
 }
 
 /**
- * This function's previous recursive implementation was
- * easier to read, but was vulnerable to a smash-stacking
- * attack via maliciously-crafted bencoded data. (#667)
+ * this function's awkward stack-based implementation
+ * is to prevent maliciously-crafed bencode data from
+ * smashing our stack through deep recursion. (#667)
  */
 int
 tr_bencParse( const void     * buf_in,
@@ -217,8 +228,6 @@ tr_bencParse( const void     * buf_in,
     const uint8_t * buf = buf_in;
     const uint8_t * bufend = bufend_in;
     tr_ptrArray * parentStack = tr_ptrArrayNew( );
-
-    tr_bencInit( top, 0 );
 
     while( buf != bufend )
     {
@@ -265,15 +274,9 @@ tr_bencParse( const void     * buf_in,
         }
         else if( *buf=='e' ) /* end of list or dict */
         {
-            benc_val_t * node;
             ++buf;
             if( tr_ptrArrayEmpty( parentStack ) )
                 return TR_ERROR;
-
-            node = tr_ptrArrayBack( parentStack );
-            if( isDict( node ) && ( node->val.l.count % 2 ) )
-                return TR_ERROR; /* odd # of children in dict */
-
             tr_ptrArrayPop( parentStack );
             if( tr_ptrArrayEmpty( parentStack ) )
                 break;
@@ -305,7 +308,7 @@ tr_bencParse( const void     * buf_in,
         }
     }
 
-    err = !isSomething( top ) || !tr_ptrArrayEmpty( parentStack );
+    err = tr_ptrArrayEmpty( parentStack ) ? 0 : 1;
 
     if( !err && ( setme_end != NULL ) )
         *setme_end = buf;
@@ -328,17 +331,15 @@ tr_bencLoad( const void  * buf_in,
     return ret;
 }
 
-/***
-****
-***/
-
 benc_val_t *
 tr_bencDictFind( benc_val_t * val, const char * key )
 {
     int len, ii;
 
-    if( !isDict( val ) )
+    if( val->type != TYPE_DICT )
+    {
         return NULL;
+    }
 
     len = strlen( key );
     
@@ -363,6 +364,13 @@ tr_bencDictFindType( benc_val_t * val, const char * key, int type )
     return ret && ret->type == type ? ret : NULL;
 }
 
+int64_t
+tr_bencGetInt ( const benc_val_t * val )
+{
+    assert( tr_bencIsInt( val ) );
+    return val->val.i;
+}
+
 benc_val_t *
 tr_bencDictFindFirst( benc_val_t * val, ... )
 {
@@ -372,41 +380,26 @@ tr_bencDictFindFirst( benc_val_t * val, ... )
 
     ret = NULL;
     va_start( ap, val );
-    while(( key = va_arg( ap, const char * )))
-        if(( ret = tr_bencDictFind( val, key )))
+    while( ( key = va_arg( ap, const char * ) ) )
+    {
+        ret = tr_bencDictFind( val, key );
+        if( NULL != ret )
+        {
             break;
+        }
+    }
     va_end( ap );
 
     return ret;
 }
 
-benc_val_t*
-tr_bencListGetNthChild( benc_val_t * val, int i )
-{
-    benc_val_t * ret = NULL;
-    if( isList( val ) && ( i >= 0 ) && ( i < val->val.l.count ) )
-        ret = val->val.l.vals + i;
-    return ret;
-}
-
-int64_t
-tr_bencGetInt ( const benc_val_t * val )
-{
-    assert( isInt( val ) );
-    return val->val.i;
-}
-
 char *
 tr_bencStealStr( benc_val_t * val )
 {
-    assert( isString( val ) );
+    assert( TYPE_STR == val->type );
     val->val.s.nofree = 1;
     return val->val.s.s;
 }
-
-/***
-****
-***/
 
 void
 _tr_bencInitStr( benc_val_t * val, char * str, int len, int nofree )
@@ -442,7 +435,7 @@ tr_bencInitInt( benc_val_t * val, int64_t num )
 int
 tr_bencListReserve( benc_val_t * val, int count )
 {
-    assert( isList( val ) );
+    assert( TYPE_LIST == val->type );
 
     return makeroom( val, count );
 }
@@ -450,7 +443,7 @@ tr_bencListReserve( benc_val_t * val, int count )
 int
 tr_bencDictReserve( benc_val_t * val, int count )
 {
-    assert( isDict( val ) );
+    assert( TYPE_DICT == val->type );
 
     return makeroom( val, count * 2 );
 }
@@ -460,7 +453,7 @@ tr_bencListAdd( benc_val_t * list )
 {
     benc_val_t * item;
 
-    assert( isList( list ) );
+    assert( tr_bencIsList( list ) );
     assert( list->val.l.count < list->val.l.alloc );
 
     item = &list->val.l.vals[list->val.l.count];
@@ -475,7 +468,7 @@ tr_bencDictAdd( benc_val_t * dict, const char * key )
 {
     benc_val_t * keyval, * itemval;
 
-    assert( isDict( dict ) );
+    assert( tr_bencIsDict( dict ) );
     assert( dict->val.l.count + 2 <= dict->val.l.alloc );
 
     keyval = dict->val.l.vals + dict->val.l.count++;
@@ -486,6 +479,7 @@ tr_bencDictAdd( benc_val_t * dict, const char * key )
 
     return itemval;
 }
+
 
 /***
 ****  BENC WALKING
@@ -508,7 +502,7 @@ compareKeyIndex( const void * va, const void * vb )
 struct SaveNode
 {
     const benc_val_t * val;
-    int valIsVisited;
+    int valIsSaved;
     int childCount;
     int childIndex;
     int * children;
@@ -517,21 +511,20 @@ struct SaveNode
 static struct SaveNode*
 nodeNewDict( const benc_val_t * val )
 {
-    int i, j;
-    int nKeys;
+    int i, j, n;
     struct SaveNode * node;
     struct KeyIndex * indices;
 
-    assert( isDict( val ) );
+    assert( tr_bencIsDict( val ) );
 
-    nKeys = val->val.l.count / 2;
+    n = val->val.l.count;
     node = tr_new0( struct SaveNode, 1 );
     node->val = val;
-    node->children = tr_new0( int, nKeys * 2 );
+    node->children = tr_new0( int, n );
 
     /* ugh, a dictionary's children have to be sorted by key... */
-    indices = tr_new( struct KeyIndex, nKeys );
-    for( i=j=0; i<(nKeys*2); i+=2, ++j ) {
+    indices = tr_new( struct KeyIndex, n );
+    for( i=j=0; i<n; i+=2, ++j ) {
         indices[j].key = val->val.l.vals[i].val.s.s;
         indices[j].index = i;
     }
@@ -542,7 +535,7 @@ nodeNewDict( const benc_val_t * val )
         node->children[ node->childCount++ ] = index + 1;
     }
 
-    assert( node->childCount == nKeys * 2 );
+    assert( node->childCount == n );
     tr_free( indices );
     return node;
 }
@@ -553,7 +546,7 @@ nodeNewList( const benc_val_t * val )
     int i, n;
     struct SaveNode * node;
 
-    assert( isList( val ) );
+    assert( tr_bencIsList( val ) );
 
     n = val->val.l.count;
     node = tr_new0( struct SaveNode, 1 );
@@ -583,9 +576,9 @@ nodeNew( const benc_val_t * val )
 {
     struct SaveNode * node;
 
-    if( isList( val ) )
+    if( val->type == TYPE_LIST )
         node = nodeNewList( val );
-    else if( isDict( val ) )
+    else if( val->type == TYPE_DICT )
         node = nodeNewDict( val );
     else
         node = nodeNewLeaf( val );
@@ -605,9 +598,9 @@ struct WalkFuncs
 };
 
 /**
- * This function's previous recursive implementation was
- * easier to read, but was vulnerable to a smash-stacking
- * attack via maliciously-crafted bencoded data. (#667)
+ * this function's awkward stack-based implementation
+ * is to prevent maliciously-crafed bencode data from
+ * smashing our stack through deep recursion. (#667)
  */
 static void
 bencWalk( const benc_val_t   * top,
@@ -622,10 +615,10 @@ bencWalk( const benc_val_t   * top,
         struct SaveNode * node = tr_ptrArrayBack( stack );
         const benc_val_t * val;
 
-        if( !node->valIsVisited )
+        if( !node->valIsSaved )
         {
             val = node->val;
-            node->valIsVisited = TRUE;
+            node->valIsSaved = TRUE;
         }
         else if( node->childIndex < node->childCount )
         {
