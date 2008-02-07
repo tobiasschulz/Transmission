@@ -1,45 +1,10 @@
 NEWS file for Transmission <http://www.transmissionbt.com/>
 
-1.10 (2008/xx/yy)
-- Mac:
-   + Window when adding torrents to select files and other settings
-   + Leopard: Group dividers
-   + Use the file icon as the per-torrent action button
-
-1.05 (2008/02/yy)
-- All Platforms:
-   + Fix 1.04 crash
-   + Packaging improvements
-- Mac
-   + Fix bug remembering reordered groups
-- GTK+
-   + Fix glitch that occurred when specifying which files to download
-   + Fix "Sort by Progress"
-   + Various interface and HIG improvements
-   + Updated Swedish, Italian translations
-- Daemon
-   + Fix "transmission-remote -x"
-
-1.04 (2008/01/31)
-- All Platforms:
-   + Fix (potential) remote crash bug with extension protocol
-   + Fix bug when verifying a torrent and pressing `pause'
-
-1.03 (2008/01/29)
-- All Platforms:
-   + Fix bug setting maximum peer limits
-   + Fix overflow issue with very large torrents
-   + Fix LTEP handshake bug
-   + Fix handshake bug with mainline BitTorrent
-   + Fix bug when talking to lighttpd-based trackers
-- GTK+
-   + Various packaging, HiG, and interface improvements
-
 1.02 (2008/01/22)
 - All Platforms:
    + Fix 1.00 bug that choked some models of routers
    + Fix 1.00 crash in peer handshake
-   + Fix 1.00 bug that sometimes froze the app for a long time
+   + Fix 1.01 bug that sometimes froze the app for a long time
    + Minor improvements to the command-line client
 - GTK+
    + Fix crash when removing a torrent while its details window is open

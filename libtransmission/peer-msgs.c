@@ -262,7 +262,7 @@ protocolSendChoke( tr_peermsgs * msgs, int choke )
 ***  EVENTS
 **/
 
-static const tr_peermsgs_event blankEvent = { 0, 0, 0, 0, 0.0f, 0 };
+static const tr_peermsgs_event blankEvent = { 0, 0, 0, 0, 0.0f };
 
 static void
 publish( tr_peermsgs * msgs, tr_peermsgs_event * e )
@@ -271,11 +271,18 @@ publish( tr_peermsgs * msgs, tr_peermsgs_event * e )
 }
 
 static void
-fireError( tr_peermsgs * msgs, tr_errno err )
+fireGotAssertError( tr_peermsgs * msgs )
+{
+    tr_peermsgs_event e = blankEvent;
+    e.eventType = TR_PEERMSG_GOT_ASSERT_ERROR;
+    publish( msgs, &e );
+}
+
+static void
+fireGotError( tr_peermsgs * msgs )
 {
     tr_peermsgs_event e = blankEvent;
     e.eventType = TR_PEERMSG_ERROR;
-    e.err = err;
     publish( msgs, &e );
 }
 
@@ -849,11 +856,10 @@ parseLtepHandshake( tr_peermsgs * msgs, int len, struct evbuffer * inbuf )
                                       : ENCRYPTION_PREFERENCE_NO;
 
     /* check supported messages for utorrent pex */
-    msgs->peerSupportsPex = 0;
     if(( sub = tr_bencDictFindType( &val, "m", TYPE_DICT ))) {
         if(( sub = tr_bencDictFindType( sub, "ut_pex", TYPE_INT ))) {
+            msgs->peerSupportsPex = 1;
             msgs->ut_pex_id = (uint8_t) sub->val.i;
-            msgs->peerSupportsPex = msgs->ut_pex_id == 0 ? 0 : 1;
             dbgmsg( msgs, "msgs->ut_pex is %d", (int)msgs->ut_pex_id );
         }
     }
@@ -1144,7 +1150,7 @@ readBtPiece( tr_peermsgs * msgs, struct evbuffer * inbuf, size_t inlen )
         if( !err )
             return READ_AGAIN;
         else {
-            fireError( msgs, err );
+            fireGotAssertError( msgs );
             return READ_DONE;
         }
     }
@@ -1168,7 +1174,7 @@ readBtMessage( tr_peermsgs * msgs, struct evbuffer * inbuf, size_t inlen )
     if( !messageLengthIsCorrect( msgs, id, msglen+1 ) )
     {
         dbgmsg( msgs, "bad packet - BT message #%d with a length of %d", (int)id, (int)msglen );
-        fireError( msgs, TR_ERROR );
+        fireGotError( msgs );
         return READ_DONE;
     }
 
@@ -1380,7 +1386,7 @@ addPeerToBlamefield( tr_peermsgs * msgs, uint32_t index )
     tr_bitfieldAdd( msgs->info->blame, index );
 }
 
-static tr_errno
+static int
 clientGotBlock( tr_peermsgs                * msgs,
                 const uint8_t              * data,
                 const struct peer_request  * req )
@@ -1397,7 +1403,7 @@ clientGotBlock( tr_peermsgs                * msgs,
     {
         dbgmsg( msgs, "wrong block size -- expected %u, got %d",
                 tr_torBlockCountBytes( msgs->torrent, block ), req->length );
-        return TR_ERROR;
+        return TR_ERROR_ASSERT;
     }
 
     /* save the block */
@@ -1565,6 +1571,40 @@ popNextRequest( tr_peermsgs * msgs )
     return ret;
 }
 
+static void
+updatePeerStatus( tr_peermsgs * msgs )
+{
+    const time_t now = time( NULL );
+    tr_peer * peer = msgs->info;
+    tr_peer_status status = 0;
+
+    if( !msgs->peerSentBitfield )
+        status |= TR_PEER_STATUS_HANDSHAKE;
+
+    if( msgs->info->peerIsChoked )
+        status |= TR_PEER_STATUS_PEER_IS_CHOKED;
+
+    if( msgs->info->peerIsInterested )
+        status |= TR_PEER_STATUS_PEER_IS_INTERESTED;
+
+    if( msgs->info->clientIsChoked )
+        status |= TR_PEER_STATUS_CLIENT_IS_CHOKED;
+
+    if( msgs->info->clientIsInterested )
+        status |= TR_PEER_STATUS_CLIENT_IS_INTERESTED;
+
+    if( ( now - msgs->clientSentPieceDataAt ) < 3 )
+        status |= TR_PEER_STATUS_CLIENT_IS_SENDING;
+
+    if( ( now - msgs->peerSentPieceDataAt ) < 3 )
+        status |= TR_PEER_STATUS_PEER_IS_SENDING;
+
+    if( msgs->clientAskedFor != NULL )
+        status |= TR_PEER_STATUS_CLIENT_SENT_REQUEST;
+
+    peer->status = status;
+}
+
 static int
 pulse( void * vmsgs )
 {
@@ -1575,6 +1615,7 @@ pulse( void * vmsgs )
     tr_peerIoTryRead( msgs->io );
     pumpRequestQueue( msgs );
     expireOldRequests( msgs );
+    updatePeerStatus( msgs );
 
     if( msgs->sendingBlock )
     {
@@ -1648,7 +1689,7 @@ gotError( struct bufferevent * evbuf UNUSED, short what, void * vmsgs )
     if( what & ( EVBUFFER_EOF | EVBUFFER_ERROR ) )
         dbgmsg( vmsgs, "libevent got an error! what=%hd, errno=%d (%s)",
                 what, errno, strerror(errno) );
-    fireError( vmsgs, TR_ERROR );
+    fireGotError( vmsgs );
 }
 
 static void
@@ -1832,6 +1873,7 @@ tr_peerMsgsNew( struct tr_torrent * torrent,
     m->handle = torrent->handle;
     m->torrent = torrent;
     m->io = info->io;
+    m->info->status = TR_PEER_STATUS_HANDSHAKE;
     m->info->clientIsChoked = 1;
     m->info->peerIsChoked = 1;
     m->info->clientIsInterested = 0;
@@ -1848,11 +1890,14 @@ tr_peerMsgsNew( struct tr_torrent * torrent,
     m->clientAllowedPieces = tr_bitfieldNew( m->torrent->info.pieceCount );
     m->clientSuggestedPieces = tr_bitfieldNew( m->torrent->info.pieceCount );
     *setme = tr_publisherSubscribe( m->publisher, func, userData );
+    
+    tr_peerIoSetTimeoutSecs( m->io, 150 ); /* timeout after N seconds of inactivity */
+    tr_peerIoSetIOFuncs( m->io, canRead, didWrite, gotError, m );
+    ratePulse( m );
 
     if ( tr_peerIoSupportsLTEP( m->io ) )
         sendLtepHandshake( m );
 
-    /* bitfield/have-all/have-none must preceed other non-handshake messages... */
     if ( !tr_peerIoSupportsFEXT( m->io ) )
         sendBitfield( m );
     else {
@@ -1866,10 +1911,6 @@ tr_peerMsgsNew( struct tr_torrent * torrent,
             sendBitfield( m );
         }
     }
-    
-    tr_peerIoSetTimeoutSecs( m->io, 150 ); /* timeout after N seconds of inactivity */
-    tr_peerIoSetIOFuncs( m->io, canRead, didWrite, gotError, m );
-    ratePulse( m );
 
     return m;
 }

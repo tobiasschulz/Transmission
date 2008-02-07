@@ -488,9 +488,9 @@ tr_buildPath ( char *buf, size_t buflen, const char *first_element, ... )
 }
 
 int
-tr_ioErrorFromErrno( int err )
+tr_ioErrorFromErrno( void )
 {
-    switch( err )
+    switch( errno )
     {
         case 0:
             return TR_OK;
@@ -522,8 +522,6 @@ tr_errorString( int code )
         case TR_ERROR_ASSERT:
             return "Assert error";
 
-        case TR_ERROR_IO_PARENT:
-            return "Download folder does not exist";
         case TR_ERROR_IO_PERMISSIONS:
             return "Insufficient permissions";
         case TR_ERROR_IO_SPACE:
@@ -647,7 +645,7 @@ tr_bitfieldClear( tr_bitfield * bitfield )
 int
 tr_bitfieldIsEmpty( const tr_bitfield * bitfield )
 {
-    size_t i;
+    unsigned int i;
 
     for( i=0; i<bitfield->len; ++i )
         if( bitfield->bits[i] )
@@ -677,7 +675,7 @@ tr_bitfieldAddRange( tr_bitfield  * bitfield,
                      size_t         end )
 {
     /* TODO: there are faster ways to do this */
-    size_t i;
+    unsigned int i;
     for( i=begin; i<end; ++i )
         tr_bitfieldAdd( bitfield, i );
 }
@@ -700,7 +698,7 @@ tr_bitfieldRemRange ( tr_bitfield  * b,
                       size_t         end )
 {
     /* TODO: there are faster ways to do this */
-    size_t i;
+    unsigned int i;
     for( i=begin; i<end; ++i )
         tr_bitfieldRem( b, i );
 }

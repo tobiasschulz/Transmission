@@ -127,29 +127,19 @@ static struct tr_fd_s * gFd = NULL;
 ****
 ***/
 
-static tr_errno
-TrOpenFile( int           i,
-            const char  * folder,
-            const char  * torrentFile,
-            int           write )
+static int
+TrOpenFile( int i, const char * filename, int write )
 {
     struct tr_openfile * file = &gFd->open[i];
     int flags;
-    char filename[MAX_PATH_LENGTH];
-    struct stat sb;
-
-    /* confirm the parent folder exists */
-    if( stat( folder, &sb ) || !S_ISDIR( sb.st_mode ) )
-        return TR_ERROR_IO_PARENT;
 
     /* create subfolders, if any */
-    tr_buildPath ( filename, sizeof(filename), folder, torrentFile, NULL );
     if( write ) {
         char * tmp = tr_strdup( filename );
-        const int err = tr_mkdirp( dirname(tmp), 0777 ) ? errno : 0;
+        const int err = tr_mkdirp( dirname(tmp), 0777 );
         tr_free( tmp );
         if( err )
-            return tr_ioErrorFromErrno( err );
+            return tr_ioErrorFromErrno( );
     }
 
     /* open the file */
@@ -164,7 +154,7 @@ TrOpenFile( int           i,
     if( file->fd == -1 ) {
         const int err = errno;
         tr_err( "Couldn't open '%s': %s", filename, strerror(err) );
-        return tr_ioErrorFromErrno( err );
+        return TR_ERROR_IO_OTHER;
     }
 
     return TR_OK;
@@ -197,19 +187,14 @@ fileIsCheckedOut( const struct tr_openfile * o )
 }
 
 int
-tr_fdFileCheckout( const char * folder,
-                   const char * torrentFile, 
-                   int          write )
+tr_fdFileCheckout( const char * filename, int write )
 {
     int i, winner = -1;
     struct tr_openfile * o;
-    char filename[MAX_PATH_LENGTH];
 
-    assert( folder && *folder );
-    assert( torrentFile && *torrentFile );
+    assert( filename && *filename );
     assert( write==0 || write==1 );
 
-    tr_buildPath ( filename, sizeof(filename), folder, torrentFile, NULL );
     dbgmsg( "looking for file '%s', writable %c", filename, write?'y':'n' );
 
     tr_lockLock( gFd->lock );
@@ -284,7 +269,7 @@ tr_fdFileCheckout( const char * folder,
     o = &gFd->open[winner];
     if( !fileIsOpen( o ) )
     {
-        const tr_errno err = TrOpenFile( winner, folder, torrentFile, write );
+        const int err = TrOpenFile( winner, filename, write );
         if( err ) {
             tr_lockUnlock( gFd->lock );
             return err;
@@ -376,7 +361,11 @@ socketWasReserved( int fd )
 static int
 getSocketMax( struct tr_fd_s * gFd )
 {
+#if 0
     return gFd->normalMax;
+#else
+    return MIN( gFd->normalMax, 200 );
+#endif
 }
 
 int

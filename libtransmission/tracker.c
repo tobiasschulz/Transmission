@@ -7,7 +7,7 @@
  * This exemption does not extend to derived works not owned by
  * the Transmission project.
  *
- * $Id$
+ * $Id:$
  */
 
 #include <assert.h>
@@ -278,7 +278,14 @@ parseBencResponse( struct evhttp_request * req, benc_val_t * setme )
 {
     const unsigned char * body = EVBUFFER_DATA( req->input_buffer );
     const int bodylen = EVBUFFER_LENGTH( req->input_buffer );
-    return tr_bencLoad( body, bodylen, setme, NULL );
+    int ret = 1;
+    int i;
+
+    for( i=0; ret && i<bodylen; ++i )
+        if( !tr_bencLoad( body+i, bodylen-1, setme, NULL ) )
+            ret = 0;
+
+    return ret;
 }
 
 static const char*
@@ -656,6 +663,7 @@ addCommonHeaders( const tr_tracker * t,
     snprintf( buf, sizeof(buf), "%s:%d", address->address, address->port );
     evhttp_add_header( req->output_headers, "Host", buf );
     evhttp_add_header( req->output_headers, "Connection", "close" );
+    evhttp_add_header( req->output_headers, "Content-Length", "0" );
     evhttp_add_header( req->output_headers, "User-Agent",
                                          TR_NAME "/" LONG_VERSION_STRING );
 }

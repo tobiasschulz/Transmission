@@ -47,48 +47,6 @@
 
 @implementation FileNameCell
 
-- (id) init
-{
-    if ((self = [super init]))
-    {
-        NSMutableParagraphStyle * paragraphStyle = [[NSParagraphStyle defaultParagraphStyle] mutableCopy];
-        [paragraphStyle setLineBreakMode: NSLineBreakByTruncatingTail];
-        
-        fTitleAttributes = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
-                            [NSFont messageFontOfSize: 12.0], NSFontAttributeName,
-                            paragraphStyle, NSParagraphStyleAttributeName, nil];
-        
-        fStatusAttributes = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
-                                [NSFont messageFontOfSize: 9.0], NSFontAttributeName,
-                                paragraphStyle, NSParagraphStyleAttributeName, nil];
-        
-        [paragraphStyle release];
-    }
-    return self;
-}
-
-- (void) dealloc
-{
-    [fTitleAttributes release];
-    [fStatusAttributes release];
-    
-    [fFolderImage release];
-    
-    [super dealloc];
-}
-
-- (id) copyWithZone: (NSZone *) zone
-{
-    FileNameCell * copy = [super copyWithZone: zone];
-    
-    copy->fTitleAttributes = [fTitleAttributes retain];
-    copy->fStatusAttributes = [fStatusAttributes retain];
-    
-    copy->fFolderImage = [fFolderImage retain];
-    
-    return copy;
-}
-
 - (NSImage *) image
 {
     NSImage * image = [[self objectValue] objectForKey: @"Icon"];
@@ -201,6 +159,18 @@
 
 - (NSAttributedString *) attributedTitleWithColor: (NSColor *) color
 {
+    if (!fTitleAttributes)
+    {
+        NSMutableParagraphStyle * paragraphStyle = [[NSParagraphStyle defaultParagraphStyle] mutableCopy];
+        [paragraphStyle setLineBreakMode: NSLineBreakByTruncatingTail];
+        
+        fTitleAttributes = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
+                            [NSFont messageFontOfSize: 12.0], NSFontAttributeName,
+                            paragraphStyle, NSParagraphStyleAttributeName, nil];
+        
+        [paragraphStyle release];
+    }
+    
     if (color)
         [fTitleAttributes setObject: color forKey: NSForegroundColorAttributeName];
         
@@ -210,6 +180,18 @@
 
 - (NSAttributedString *) attributedStatusWithColor: (NSColor *) color
 {
+    if (!fStatusAttributes)
+    {
+        NSMutableParagraphStyle * paragraphStyle = [[NSParagraphStyle defaultParagraphStyle] mutableCopy];
+        [paragraphStyle setLineBreakMode: NSLineBreakByTruncatingTail];
+        
+        fStatusAttributes = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
+                                [NSFont messageFontOfSize: 9.0], NSFontAttributeName,
+                                paragraphStyle, NSParagraphStyleAttributeName, nil];
+        
+        [paragraphStyle release];
+    }
+    
     if (color)
         [fStatusAttributes setObject: color forKey: NSForegroundColorAttributeName];
     

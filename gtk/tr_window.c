@@ -516,14 +516,14 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
     w = gtk_image_new_from_stock( GTK_STOCK_GO_UP, GTK_ICON_SIZE_MENU );
     gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
     w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
-    gtk_widget_set_size_request( w, GUI_PAD, 0u );
+    gtk_widget_set_usize( w, GUI_PAD, 0u );
     gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
     w = p->dl_lb = gtk_label_new( NULL );
     gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
     w = gtk_image_new_from_stock( GTK_STOCK_GO_DOWN, GTK_ICON_SIZE_MENU );
     gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
     w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
-    gtk_widget_set_size_request( w, GUI_PAD, 0u );
+    gtk_widget_set_usize( w, GUI_PAD, 0u );
     gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
     w = p->stats_lb = gtk_label_new( NULL );
     gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
@@ -600,7 +600,7 @@ static void
 updateStats( PrivateData * p )
 {
     char * pch;
-    char up[32], down[32], ratio[32], buf[128];
+    char up[32], down[32], buf[128];
     struct tr_session_stats stats;
     tr_handle * handle = tr_core_handle( p->core );
 
@@ -608,8 +608,7 @@ updateStats( PrivateData * p )
     pch = pref_string_get( PREF_KEY_STATUS_BAR_STATS );
     if( !strcmp( pch, "session-ratio" ) ) {
         tr_getSessionStats( handle, &stats );
-        tr_strlratio( ratio, stats.ratio, sizeof( ratio ) );
-        g_snprintf( buf, sizeof(buf), _("Ratio: %s"), ratio );
+        g_snprintf( buf, sizeof(buf), _("Ratio: %.1f"), stats.ratio );
     } else if( !strcmp( pch, "session-transfer" ) ) {
         tr_getSessionStats( handle, &stats );
         tr_strlsize( up, stats.uploadedBytes, sizeof( up ) );
@@ -622,8 +621,7 @@ updateStats( PrivateData * p )
         g_snprintf( buf, sizeof( buf ), _( "Down: %s  Up: %s" ), down, up );
     } else { /* default is total-ratio */
         tr_getCumulativeSessionStats( handle, &stats );
-        tr_strlratio( ratio, stats.ratio, sizeof( ratio ) );
-        g_snprintf( buf, sizeof(buf), _("Ratio: %s"), ratio );
+        g_snprintf( buf, sizeof(buf), _("Ratio: %.1f"), stats.ratio );
     }
     g_free( pch );
     gtk_label_set_text( GTK_LABEL( p->stats_lb ), buf );
