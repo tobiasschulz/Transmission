@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -80,9 +80,7 @@ int   tr_peerIoReconnect( tr_peerIo * io );
 
 int   tr_peerIoIsIncoming( const tr_peerIo * io );
 
-void  tr_peerIoSetTimeoutSecs( tr_peerIo * io, int secs );
-
-int   tr_peerIoGetAge( const tr_peerIo * io );
+void tr_peerIoSetTimeoutSecs( tr_peerIo * io, int secs );
 
 
 /**
@@ -101,12 +99,10 @@ const uint8_t*
 
 typedef enum { READ_MORE, READ_AGAIN, READ_DONE } ReadState;
 typedef ReadState (*tr_can_read_cb)(struct bufferevent*, void* user_data);
-typedef void (*tr_did_write_cb)(struct bufferevent *, void *);
 typedef void (*tr_net_error_cb)(struct bufferevent *, short what, void *);
 
 void  tr_peerIoSetIOFuncs( tr_peerIo        * io,
                            tr_can_read_cb     readcb,
-                           tr_did_write_cb    writecb,
                            tr_net_error_cb    errcb,
                            void             * user_data );
 

@@ -1,7 +1,7 @@
 /******************************************************************************
- * $Id$
+ * $Id: StringAdditions.m 2869 2007-08-19 03:03:28Z livings124 $
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -71,11 +71,18 @@
 
 + (NSString *) stringForSpeed: (float) speed
 {
-    return [[self stringForSpeedAbbrev: speed] stringByAppendingString: NSLocalizedString(@"B/s", "Transfer speed (Bytes per second)")];
+    if (speed < 0)
+        return NSLocalizedString(@"error", "Transfer speed invalid");
+    
+    return [[self stringForSpeedAbbrev: speed] stringByAppendingString:
+                    NSLocalizedString(@"B/s", "Transfer speed (Bytes per second)")];
 }
 
 + (NSString *) stringForSpeedAbbrev: (float) speed
 {
+    if (speed < 0)
+        return NSLocalizedString(@"error", "Transfer speed invalid");
+    
     if (speed < 1000.0) //0.0 K to 999.9 K
         return [NSString stringWithFormat: @"%.1f K", speed];
     else if (speed < 102400.0) //0.98 M to 99.99 M
@@ -90,8 +97,8 @@
 {
     if (ratio == TR_RATIO_NA)
         return NSLocalizedString(@"N/A", "No Ratio");
-    else if (ratio == TR_RATIO_INF)
-        return [NSString stringWithUTF8String: "\xE2\x88\x9E"];
+    else if (ratio < 0)
+        return NSLocalizedString(@"error", "Ratio invalid");
     else;
     
     if (ratio < 10.0)

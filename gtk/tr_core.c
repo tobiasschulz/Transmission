@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -39,8 +39,8 @@
 #include "util.h"
 
 static void
-tr_core_marshal_err( GClosure * closure, GValue * ret UNUSED, guint count,
-                     const GValue * vals, gpointer hint UNUSED,
+tr_core_marshal_err( GClosure * closure, GValue * ret SHUTUP, guint count,
+                     const GValue * vals, gpointer hint SHUTUP,
                      gpointer marshal )
 {
     typedef void (*TRMarshalErr)
@@ -64,8 +64,8 @@ tr_core_marshal_err( GClosure * closure, GValue * ret UNUSED, guint count,
 }
 
 static void
-tr_core_marshal_prompt( GClosure * closure, GValue * ret UNUSED, guint count,
-                        const GValue * vals, gpointer hint UNUSED,
+tr_core_marshal_prompt( GClosure * closure, GValue * ret SHUTUP, guint count,
+                        const GValue * vals, gpointer hint SHUTUP,
                         gpointer marshal )
 {
     typedef void (*TRMarshalPrompt)
@@ -91,8 +91,8 @@ tr_core_marshal_prompt( GClosure * closure, GValue * ret UNUSED, guint count,
 }
 
 static void
-tr_core_marshal_data( GClosure * closure, GValue * ret UNUSED, guint count,
-                      const GValue * vals, gpointer hint UNUSED,
+tr_core_marshal_data( GClosure * closure, GValue * ret SHUTUP, guint count,
+                      const GValue * vals, gpointer hint SHUTUP,
                       gpointer marshal )
 {
     typedef void (*TRMarshalPrompt)
@@ -134,7 +134,7 @@ tr_core_dispose( GObject * obj )
 
 
 static void
-tr_core_class_init( gpointer g_class, gpointer g_class_data UNUSED )
+tr_core_class_init( gpointer g_class, gpointer g_class_data SHUTUP )
 {
     GObjectClass * gobject_class;
     TrCoreClass  * core_class;
@@ -171,203 +171,124 @@ tr_core_class_init( gpointer g_class, gpointer g_class_data UNUSED )
 }
 
 static int
-compareDouble( double a, double b )
+compareProgress( GtkTreeModel   * model,
+                 GtkTreeIter    * a,
+                 GtkTreeIter    * b,
+                 gpointer         user_data UNUSED )
 {
-    if( a < b ) return -1;
-    if( b < a ) return 1;
+    int ia, ib;
+    gfloat rateUpA, rateUpB;
+    gfloat rateDownA, rateDownB;
+    gfloat percentDoneA, percentDoneB;
+    guint64 uploadedEverA, uploadedEverB;
+
+    gtk_tree_model_get( model, a, MC_PROG_D, &percentDoneA,
+                                  MC_DRATE, &rateDownA,
+                                  MC_URATE, &rateUpA,
+                                  MC_UP, &uploadedEverA,
+                                  -1 );
+    gtk_tree_model_get( model, b, MC_PROG_D, &percentDoneB,
+                                  MC_DRATE, &rateDownB,
+                                  MC_URATE, &rateUpB,
+                                  MC_UP, &uploadedEverB,
+                                  -1 );
+
+    ia = (int)( rateUpA + rateDownA );
+    ib = (int)( rateUpB + rateDownB );
+    if( ia != ib )
+        return ia - ib;
+
+    ia = (int)( 100.0 * percentDoneA );
+    ib = (int)( 100.0 * percentDoneB );
+    if( ia != ib )
+        return ia - ib;
+
+    if( uploadedEverA != uploadedEverB )
+        return uploadedEverA < uploadedEverB ? -1 : 1;
+
     return 0;
 }
 
-static int
-compareByActivity( GtkTreeModel * model,
-                   GtkTreeIter  * a,
-                   GtkTreeIter  * b,
-                   gpointer       user_data UNUSED )
-{
-    int i;
-    tr_torrent *ta, *tb;
-    const tr_stat *sa, *sb;
-
-    gtk_tree_model_get( model, a, MC_TORRENT_RAW, &ta, -1 );
-    gtk_tree_model_get( model, b, MC_TORRENT_RAW, &tb, -1 );
-
-    sa = tr_torrentStatCached( ta );
-    sb = tr_torrentStatCached( tb );
-
-    if(( i = compareDouble( sa->rateUpload + sa->rateDownload,
-                            sb->rateUpload + sb->rateDownload ) ))
-        return i;
-
-    if( sa->uploadedEver != sb->uploadedEver )
-        return sa->uploadedEver < sa->uploadedEver ? -1 : 1;
-
-    return 0;
-}
-
-static int
-compareByDateAdded( GtkTreeModel   * model UNUSED,
-                    GtkTreeIter    * a UNUSED,
-                    GtkTreeIter    * b UNUSED,
-                    gpointer         user_data UNUSED )
-{
-    return 0; /* FIXME */
-}
-
-static int
-compareByName( GtkTreeModel   * model,
-               GtkTreeIter    * a,
-               GtkTreeIter    * b,
-               gpointer         user_data UNUSED )
-{
-    int ret;
-    char *ca, *cb;
-    gtk_tree_model_get( model, a, MC_NAME_COLLATED, &ca, -1 );
-    gtk_tree_model_get( model, b, MC_NAME_COLLATED, &cb, -1 );
-    ret = strcmp( ca, cb );
-    g_free( cb );
-    g_free( ca );
-    return ret;
-}
-
-static int
-compareByProgress( GtkTreeModel   * model,
-                   GtkTreeIter    * a,
-                   GtkTreeIter    * b,
-                   gpointer         user_data UNUSED )
-{
-    int ret;
-    tr_torrent *ta, *tb;
-    const tr_stat *sa, *sb;
-    gtk_tree_model_get( model, a, MC_TORRENT_RAW, &ta, -1 );
-    gtk_tree_model_get( model, b, MC_TORRENT_RAW, &tb, -1 );
-    sa = tr_torrentStatCached( ta );
-    sb = tr_torrentStatCached( tb );
-    ret = compareDouble( sa->percentDone, sb->percentDone );
-    if( !ret )
-        ret = compareDouble( sa->ratio, sb->ratio );
-    return ret;
-}
-
-static int
-compareByState( GtkTreeModel   * model,
-                GtkTreeIter    * a,
-                GtkTreeIter    * b,
-                gpointer         user_data )
-{
-    int sa, sb, ret;
-
-    /* first by state */
-    gtk_tree_model_get( model, a, MC_STATUS, &sa, -1 );
-    gtk_tree_model_get( model, b, MC_STATUS, &sb, -1 );
-    ret = sa - sb;
-
-    /* second by progress */
-    if( !ret )
-        ret = compareByProgress( model, a, b, user_data );
-
-    return ret;
-}
-
-static int
-compareByTracker( GtkTreeModel   * model,
-                  GtkTreeIter    * a,
-                  GtkTreeIter    * b,
-                  gpointer         user_data UNUSED )
-{
-    const tr_torrent *ta, *tb;
-    gtk_tree_model_get( model, a, MC_TORRENT_RAW, &ta, -1 );
-    gtk_tree_model_get( model, b, MC_TORRENT_RAW, &tb, -1 );
-    return strcmp( tr_torrentInfo(ta)->primaryAddress,
-                   tr_torrentInfo(tb)->primaryAddress );
-}
-
-/***
-****
-***/
-
+#define STR_REVERSE "reverse-"
+#define STR_PROGRESS "progress"
+#define STR_NAME "name"
 
 static void
-setSort( TrCore * core, const char * mode, gboolean isReversed  )
+onSortColumnChanged( GtkTreeSortable * sortable, gpointer unused UNUSED )
 {
-    int col = MC_TORRENT_RAW;
-    GtkSortType type = isReversed ? GTK_SORT_ASCENDING : GTK_SORT_DESCENDING;
-    GtkTreeSortable * sortable = GTK_TREE_SORTABLE( core->model );
-
-    if( !strcmp( mode, "sort-by-activity" ) )
-        gtk_tree_sortable_set_sort_func( sortable, col, compareByActivity, NULL, NULL );
-    else if( !strcmp( mode, "sort-by-date-added" ) )
-        gtk_tree_sortable_set_sort_func( sortable, col, compareByDateAdded, NULL, NULL );
-    else if( !strcmp( mode, "sort-by-progress" ) )
-        gtk_tree_sortable_set_sort_func( sortable, col, compareByProgress, NULL, NULL );
-    else if( !strcmp( mode, "sort-by-state" ) )
-        gtk_tree_sortable_set_sort_func( sortable, col, compareByState, NULL, NULL );
-    else if( !strcmp( mode, "sort-by-tracker" ) )
-        gtk_tree_sortable_set_sort_func( sortable, col, compareByTracker, NULL, NULL );
-    else {
-        type = isReversed ? GTK_SORT_DESCENDING : GTK_SORT_ASCENDING;
-        gtk_tree_sortable_set_sort_func( sortable, col, compareByName, NULL, NULL );
-    }
-
-    gtk_tree_sortable_set_sort_column_id( sortable, col, type );
-}
-
-static void
-prefsChanged( TrCore * core, const char * key, gpointer data UNUSED )
-{
-    if( !strcmp( key, PREF_KEY_SORT_MODE ) || !strcmp( key, PREF_KEY_SORT_REVERSED ) )
+    int column;
+    GtkSortType order;
+    if( gtk_tree_sortable_get_sort_column_id( sortable, &column, &order ) )
     {
-        char * mode = pref_string_get( PREF_KEY_SORT_MODE );
-        gboolean isReversed = pref_flag_get( PREF_KEY_SORT_REVERSED );
-        setSort( core, mode, isReversed );
-        g_free( mode );
-    }
-    else if( !strcmp( key, PREF_KEY_MAX_PEERS_GLOBAL ) )
-    {
-        const uint16_t val = pref_int_get( key );
-        tr_setGlobalPeerLimit( core->handle, val );
+        GString * gstr = g_string_new( NULL );
+        switch( column ) {
+            case MC_PROG_D: g_string_assign( gstr, STR_PROGRESS ); break;
+            default: g_string_assign( gstr, STR_NAME ); break;
+        }
+        if( order == GTK_SORT_DESCENDING )
+            g_string_prepend( gstr, STR_REVERSE );
+        pref_string_set( PREF_KEY_SORT_COLUMN, gstr->str );
+        g_string_free( gstr, TRUE );
     }
 }
 
-static void
-tr_core_init( GTypeInstance * instance, gpointer g_class UNUSED )
+void
+tr_core_set_sort_column_from_prefs( TrCore * core )
 {
-    tr_handle * h;
+    char * val = pref_string_get( PREF_KEY_SORT_COLUMN );
+    char * freeme = val;
+    gint column;
+    GtkSortType order = GTK_SORT_ASCENDING;
+    if( g_str_has_prefix( val, STR_REVERSE ) ) {
+        order = GTK_SORT_DESCENDING;
+        val += strlen( STR_REVERSE );
+    }
+    if( !strcmp( val, STR_PROGRESS ) )
+        column = MC_PROG_D;
+    else /* default */
+        column = MC_NAME;
+    gtk_tree_sortable_set_sort_column_id ( GTK_TREE_SORTABLE( core->model ), column, order );
+    g_free( freeme );
+}
+
+static void
+tr_core_init( GTypeInstance * instance, gpointer g_class SHUTUP )
+{
     TrCore * self = (TrCore *) instance;
     GtkListStore * store;
 
     /* column types for the model used to store torrent information */
     /* keep this in sync with the enum near the bottom of tr_core.h */
-    GType types[] = {
-        G_TYPE_STRING,    /* name */
-        G_TYPE_STRING,    /* collated name */
-        G_TYPE_STRING,    /* hash string */
-        TR_TORRENT_TYPE,  /* TrTorrent object */
-        G_TYPE_POINTER,   /* tr_torrent* */
-        G_TYPE_INT,       /* tr_stat()->status */
-        G_TYPE_INT        /* ID for IPC */
+    GType types[] =
+    {
+        /* info->name, info->totalSize, info->hashString, status, */
+        G_TYPE_STRING, G_TYPE_UINT64,   G_TYPE_STRING,    G_TYPE_INT,
+        /* error,   errorString,   percentComplete, percentDone,  rateDownload, rateUpload, */
+        G_TYPE_INT, G_TYPE_STRING, G_TYPE_FLOAT,    G_TYPE_FLOAT, G_TYPE_FLOAT, G_TYPE_FLOAT,
+        /* eta,     peersConnected, peersUploading, peersDownloading, seeders, */
+        G_TYPE_INT, G_TYPE_INT,     G_TYPE_INT,     G_TYPE_INT,       G_TYPE_INT,
+        /* leechers, completedFromTracker, downloaded,    uploaded */
+        G_TYPE_INT,  G_TYPE_INT,           G_TYPE_UINT64, G_TYPE_UINT64,
+        /* ratio,      left,          TrTorrent object, ID for IPC */
+        G_TYPE_FLOAT,  G_TYPE_UINT64, TR_TORRENT_TYPE,  G_TYPE_INT,
     };
 
-    h = tr_initFull( "gtk",
-                     pref_flag_get( PREF_KEY_PEX ),
-                     pref_flag_get( PREF_KEY_NAT ),
-                     pref_int_get( PREF_KEY_PORT ),
-                     pref_flag_get( PREF_KEY_ENCRYPTED_ONLY )
-                         ? TR_ENCRYPTION_REQUIRED
-                         : TR_ENCRYPTION_PREFERRED,
-                     pref_flag_get( PREF_KEY_UL_LIMIT_ENABLED ),
-                     pref_int_get( PREF_KEY_UL_LIMIT ),
-                     pref_flag_get( PREF_KEY_DL_LIMIT_ENABLED ),
-                     pref_int_get( PREF_KEY_DL_LIMIT ),
-                     pref_int_get( PREF_KEY_MAX_PEERS_GLOBAL ),
-                     pref_int_get( PREF_KEY_MSGLEVEL ),
-                     TRUE );
+#ifdef REFDBG
+    fprintf( stderr, "core    %p init\n", self );
+#endif
 
     /* create the model used to store torrent data */
     g_assert( ALEN( types ) == MC_ROW_COUNT );
     store = gtk_list_store_newv( MC_ROW_COUNT, types );
+    g_signal_connect( store, "sort-column-changed", G_CALLBACK(onSortColumnChanged), NULL );
+
+    gtk_tree_sortable_set_sort_func( GTK_TREE_SORTABLE(store),
+                                     MC_PROG_D,
+                                     compareProgress,
+                                     NULL, NULL );
 
     self->model    = GTK_TREE_MODEL( store );
-    self->handle   = h;
+    self->handle   = tr_init( "gtk" );
     self->nextid   = 1;
     self->quitting = FALSE;
     self->disposed = FALSE;
@@ -378,7 +299,7 @@ tr_core_get_type( void )
 {
     static GType type = 0;
 
-    if( !type )
+    if( 0 == type )
     {
         static const GTypeInfo info =
         {
@@ -406,15 +327,7 @@ tr_core_get_type( void )
 TrCore *
 tr_core_new( void )
 {
-    TrCore * core = TR_CORE( g_object_new( TR_CORE_TYPE, NULL ) );
-
-    /* init from prefs & listen to pref changes */
-    prefsChanged( core, PREF_KEY_SORT_MODE, NULL );
-    prefsChanged( core, PREF_KEY_SORT_REVERSED, NULL );
-    prefsChanged( core, PREF_KEY_MAX_PEERS_GLOBAL, NULL );
-    g_signal_connect( core, "prefs-changed", G_CALLBACK(prefsChanged), NULL );
-
-    return core;
+    return g_object_new( TR_CORE_TYPE, NULL );
 }
 
 GtkTreeModel *
@@ -433,49 +346,23 @@ tr_core_handle( TrCore * self )
     return self->disposed ? NULL : self->handle;
 }
 
-static char*
-doCollate( const char * in )
-{
-    const char * end = in + strlen( in );
-    char * casefold;
-    char * ret;
-
-    while( in < end ) {
-        const gunichar ch = g_utf8_get_char( in );
-        if (!g_unichar_isalnum (ch)) // eat everything before the first alnum
-            in += g_unichar_to_utf8( ch, NULL );
-        else
-            break;
-    }
-
-    if ( in == end )
-        return g_strdup ("");
-
-    casefold = g_utf8_casefold( in, end-in );
-    ret = g_utf8_collate_key( casefold, -1 );
-    g_free( casefold );
-    return ret;
-}
-
 static void
 tr_core_insert( TrCore * self, TrTorrent * tor )
 {
-    const tr_info * inf = tr_torrent_info( tor );
-    const tr_stat * torStat = tr_torrent_stat( tor );
-    char * collated = doCollate( inf->name );
-    GtkTreeIter unused;
-    gtk_list_store_insert_with_values( GTK_LIST_STORE( self->model ), &unused, 0, 
-                                       MC_NAME,          inf->name,
-                                       MC_NAME_COLLATED, collated,
-                                       MC_HASH,          inf->hashString,
-                                       MC_TORRENT,       tor,
-                                       MC_TORRENT_RAW,   tor->handle,
-                                       MC_STATUS,        torStat->status,
-                                       MC_ID,            self->nextid,
-                                       -1);
-    self->nextid++;
+    GtkTreeIter iter;
+    const tr_info * inf;
+
+    gtk_list_store_append( GTK_LIST_STORE( self->model ), &iter );
+    inf = tr_torrent_info( tor );
+    gtk_list_store_set( GTK_LIST_STORE( self->model ), &iter,
+                        MC_NAME,    inf->name,
+                        MC_SIZE,    inf->totalSize,
+                        MC_HASH,    inf->hashString,
+                        MC_TORRENT, tor,
+                        MC_ID,      self->nextid,
+                        -1);
     g_object_unref( tor );
-    g_free( collated );
+    self->nextid++;
 }
 
 int
@@ -485,25 +372,17 @@ tr_core_load( TrCore * self, gboolean paused )
     int count = 0;
     tr_torrent ** torrents;
     char * path;
-    tr_ctor * ctor;
 
     TR_IS_CORE( self );
 
     path = getdownloaddir( );
 
-    ctor = tr_ctorNew( self->handle );
-    tr_ctorSetPaused( ctor, TR_FORCE, paused );
-    tr_ctorSetDestination( ctor, TR_FALLBACK, path );
-    tr_ctorSetMaxConnectedPeers( ctor, TR_FALLBACK, pref_int_get( PREF_KEY_MAX_PEERS_PER_TORRENT ) );
-
-    torrents = tr_loadTorrents ( self->handle, ctor, &count );
+    torrents = tr_loadTorrents ( self->handle, path, paused, &count );
     for( i=0; i<count; ++i )
         tr_core_insert( self, tr_torrent_new_preexisting( torrents[i] ) );
-
     tr_free( torrents );
-    tr_ctorFree( ctor );
-    g_free( path );
 
+    g_free( path );
     return count;
 }
 
@@ -646,43 +525,44 @@ tr_core_delete_torrent( TrCore * self, GtkTreeIter * iter )
     gtk_list_store_remove( GTK_LIST_STORE( self->model ), iter );
     tr_torrentRemoveSaved( tr_torrent_handle( tor ) );
 
-    g_object_unref( G_OBJECT( tor ) );
+    tr_torrent_sever( tor );
 }
 
 static gboolean
 update_foreach( GtkTreeModel * model,
                 GtkTreePath  * path UNUSED,
                 GtkTreeIter  * iter,
-                gpointer       data )
+                gpointer       data UNUSED)
 {
-    TrTorrent * gtor;
-    int oldStatus;
-    const tr_stat * torStat;
-    struct core_stats * stats = data;
+    TrTorrent * tor;
+    const tr_stat * st;
 
-    gtk_tree_model_get( model, iter, MC_TORRENT, &gtor,
-                                     MC_STATUS, &oldStatus,
-                                     -1 );
+    gtk_tree_model_get( model, iter, MC_TORRENT, &tor, -1 );
+    st = tr_torrent_stat( tor );
+    tr_torrent_check_seeding_cap ( tor );
+    g_object_unref( tor );
 
-    torStat = tr_torrent_stat( gtor );
+    gtk_list_store_set( GTK_LIST_STORE( model ), iter,
+                        MC_STAT,        st->status,
+                        MC_ERR,         st->error,
+                        MC_TERR,        st->errorString,
+                        MC_PROG_C,      st->percentComplete,
+                        MC_PROG_D,      st->percentDone,
+                        MC_DRATE,       st->rateDownload,
+                        MC_URATE,       st->rateUpload,
+                        MC_ETA,         st->eta,
+                        MC_PEERS,       st->peersConnected,
+                        MC_UPEERS,      st->peersGettingFromUs,
+                        MC_DPEERS,      st->peersSendingToUs,
+                        MC_SEED,        st->seeders,
+                        MC_LEECH,       st->leechers,
+                        MC_DONE,        st->completedFromTracker,
+                        MC_DOWN,        st->downloadedEver,
+                        MC_UP,          st->uploadedEver,
+                        MC_RATIO,       st->ratio,
+                        MC_LEFT,        st->leftUntilDone,
+                        -1 );
 
-    /* sum the torrents' cumulative stats... */
-    if( torStat->status == TR_STATUS_DOWNLOAD )
-        ++stats->downloadCount;
-    else if( torStat->status == TR_STATUS_SEED )
-        ++stats->seedingCount;
-    stats->clientDownloadSpeed += torStat->rateDownload;
-    stats->clientUploadSpeed += torStat->rateUpload;
-
-    /* update the model's status if necessary */
-    if( oldStatus != (int) torStat->status )
-        gtk_list_store_set( GTK_LIST_STORE( model ), iter,
-                            MC_STATUS, torStat->status,
-                            -1 );
-
-    tr_torrent_check_seeding_cap ( gtor );
-
-    g_object_unref( gtor );
     return FALSE;
 }
 
@@ -699,8 +579,7 @@ tr_core_update( TrCore * self )
     gtk_tree_sortable_set_sort_column_id( sortable, GTK_TREE_SORTABLE_UNSORTED_SORT_COLUMN_ID, order );
 
     /* refresh the model */
-    memset( &self->stats, 0, sizeof( struct core_stats ) );
-    gtk_tree_model_foreach( self->model, update_foreach, &self->stats );
+    gtk_tree_model_foreach( self->model, update_foreach, NULL );
 
     /* resume sorting */
     gtk_tree_sortable_set_sort_column_id( sortable, column, order );

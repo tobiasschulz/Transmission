@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,6 @@
 #import "FileNameCell.h"
 #import "FilePriorityCell.h"
 #import "Torrent.h"
-#import "CTGradient.h"
 
 @implementation FileOutlineView
 
@@ -43,28 +42,18 @@
     [self setAutoresizesOutlineColumn: NO];
     [self setIndentationPerLevel: 14.0];
     
-    NSColor * endingColor = [NSColor colorWithCalibratedRed: 217.0/255.0 green: 250.0/255.0 blue: 211.0/255.0 alpha: 1.0];
-    NSColor * beginningColor = [endingColor blendedColorWithFraction: 0.3 ofColor: [NSColor whiteColor]];
-    fHighPriorityGradient = [[CTGradient gradientWithBeginningColor: beginningColor endingColor: endingColor] retain];
+    fHighPriorityColor = [[NSColor colorWithCalibratedRed: 0.8588 green: 0.9961 blue: 0.8311 alpha: 1.0] retain];
+    fLowPriorityColor = [[NSColor colorWithCalibratedRed: 1.0 green: 0.9529 blue: 0.8078 alpha: 1.0] retain];
+    fMixedPriorityColor = [[NSColor colorWithCalibratedRed: 0.9216 green: 0.9059 blue: 1.0 alpha: 1.0] retain];
     
-    endingColor = [NSColor colorWithCalibratedRed: 255.0/255.0 green: 243.0/255.0 blue: 206.0/255.0 alpha: 1.0];
-    beginningColor = [endingColor blendedColorWithFraction: 0.3 ofColor: [NSColor whiteColor]];
-    fLowPriorityGradient = [[CTGradient gradientWithBeginningColor: beginningColor endingColor: endingColor] retain];
-    
-    endingColor = [NSColor colorWithCalibratedRed: 225.0/255.0 green: 218.0/255.0 blue: 255.0/255.0 alpha: 1.0];
-    beginningColor = [endingColor blendedColorWithFraction: 0.3 ofColor: [NSColor whiteColor]];
-    fMixedPriorityGradient = [[CTGradient gradientWithBeginningColor: beginningColor endingColor: endingColor] retain];
-    
-    fMouseRow = -1;
+    fHoverRow = -1;
 }
 
 - (void) dealloc
 {
-    [fHighPriorityGradient release];
-    [fLowPriorityGradient release];
-    [fMixedPriorityGradient release];
-    
-    [fMouseCell release];
+    [fHighPriorityColor release];
+    [fLowPriorityColor release];
+    [fMixedPriorityColor release];
     
     [super dealloc];
 }
@@ -100,123 +89,69 @@
     return [self menu];
 }
 
-- (void) updateTrackingAreas
+- (void) setHoverRowForEvent: (NSEvent *) event
 {
-    [super updateTrackingAreas];
-    
-    NSEnumerator * enumerator = [[self trackingAreas] objectEnumerator];
-    NSTrackingArea * area;
-    while ((area = [enumerator nextObject]))
+    int row = -1;
+    if (event)
     {
-        if ([area owner] == self && [[area userInfo] objectForKey: @"Row"])
-            [self removeTrackingArea: area];
+        NSPoint point = [self convertPoint: [event locationInWindow] fromView: nil];
+        if ([self columnAtPoint: point] == [self columnWithIdentifier: @"Priority"])
+            row = [self rowAtPoint: point];
     }
     
-    NSRange visibleRows = [self rowsInRect: [self visibleRect]];
-    if (visibleRows.length == 0)
-        return;
-    
-    int col = [self columnWithIdentifier: @"Priority"];
-    NSPoint mouseLocation = [self convertPoint: [[self window] convertScreenToBase: [NSEvent mouseLocation]] fromView: nil];
-    
-    int row;
-    for (row = visibleRows.location; row < NSMaxRange(visibleRows); row++)
+    if (row != fHoverRow)
     {
-        FilePriorityCell * cell = (FilePriorityCell *)[self preparedCellAtColumn: col row: row];
-        
-        NSDictionary * userInfo = [NSDictionary dictionaryWithObject: [NSNumber numberWithInt: row] forKey: @"Row"];
-        [cell addTrackingAreasForView: self inRect: [self frameOfCellAtColumn: col row: row] withUserInfo: userInfo
-                mouseLocation: mouseLocation];
+        if (fHoverRow != -1)
+            [self reloadItem: [self itemAtRow: fHoverRow]];
+        fHoverRow = row;
+        if (fHoverRow != -1)
+            [self reloadItem: [self itemAtRow: fHoverRow]];
     }
 }
 
-- (void) mouseEntered: (NSEvent *) event
+- (int) hoverRow
 {
-    NSNumber * row;
-    if ((row = [(NSDictionary *)[event userData] objectForKey: @"Row"]))
-    {
-        int rowVal = [row intValue];
-        FilePriorityCell * cell = (FilePriorityCell *)[self preparedCellAtColumn: [self columnWithIdentifier: @"Priority"] row: rowVal];
-        if (fMouseCell != cell)
-        {
-            [fMouseCell release];
-            
-            fMouseRow = rowVal;
-            fMouseCell = [cell copy];
-            
-            [fMouseCell setControlView: self];
-            [fMouseCell mouseEntered: event];
-            [fMouseCell setRepresentedObject: [cell representedObject]];
-        }
-    }
-}
-
-- (void) mouseExited: (NSEvent *) event
-{
-    NSNumber * row;
-    if ((row = [(NSDictionary *)[event userData] objectForKey: @"Row"]))
-    {
-        FilePriorityCell * cell = (FilePriorityCell *)[self preparedCellAtColumn: [self columnWithIdentifier: @"Priority"]
-                                                        row: [row intValue]];
-        [cell setControlView: self];
-        [cell mouseExited: event];
-        
-        [fMouseCell release];
-        fMouseCell = nil;
-        fMouseRow = -1;
-    }
-}
-
-- (NSCell *) preparedCellAtColumn: (NSInteger) column row: (NSInteger) row
-{
-    if (![self selectedCell] && row == fMouseRow && column == [self columnWithIdentifier: @"Priority"])
-        return fMouseCell;
-    else
-        return [super preparedCellAtColumn: column row: row];
-}
-
-- (void) updateCell: (NSCell *) cell
-{
-    if (cell == fMouseCell)
-        [self setNeedsDisplayInRect: [self frameOfCellAtColumn: [self columnWithIdentifier: @"Priority"] row: fMouseRow]];
-    else
-        [super updateCell: cell];
+    return fHoverRow;
 }
 
 - (void) drawRow: (int) row clipRect: (NSRect) clipRect
 {
     if (![self isRowSelected: row])
     {
-        NSDictionary * item = [self itemAtRow: row]; 
+        NSDictionary * item = [self itemAtRow: row];
         NSIndexSet * indexes = [item objectForKey: @"Indexes"];
         
         if ([fTorrent checkForFiles: indexes] != NSOffState)
         {
-            CTGradient * gradient = nil;
-            
             NSSet * priorities = [fTorrent filePrioritiesForIndexes: indexes];
             int count = [priorities count];
-            if (count == 1)
+            if (count > 0)
             {
-                switch ([[priorities anyObject] intValue])
+                BOOL custom = YES;
+                if (count > 1)
+                    [fMixedPriorityColor set];
+                else
                 {
-                    case TR_PRI_LOW:
-                        gradient = fLowPriorityGradient;
-                        break;
-                    case TR_PRI_HIGH:
-                        gradient = fHighPriorityGradient;
-                        break;
+                    switch ([[priorities anyObject] intValue])
+                    {
+                        case TR_PRI_LOW:
+                            [fLowPriorityColor set];
+                            break;
+                        case TR_PRI_HIGH:
+                            [fHighPriorityColor set];
+                            break;
+                        default:
+                            custom = NO;
+                    }
                 }
-            }
-            else if (count > 1)
-                gradient = fMixedPriorityGradient;
-            else;
+                
+                if (custom)
+                {
+                    NSRect rect = [self rectOfRow: row];
+                    rect.size.height -= 1.0;
             
-            if (gradient)
-            {
-                NSRect rect = [self rectOfRow: row];
-                rect.size.height -= 1.0;
-                [gradient fillRect: rect angle: 90];
+                    NSRectFill(rect);
+                }
             }
         }
     }

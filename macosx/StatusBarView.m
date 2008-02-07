@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,44 +23,23 @@
  *****************************************************************************/
 
 #import "StatusBarView.h"
-#import "NSApplicationAdditions.h"
-#import "CTGradient.h"
 
 @implementation StatusBarView
 
-- (id) initWithFrame: (NSRect) rect
+- (void) awakeFromNib
 {
-    if ((self = [super initWithFrame: rect]))
-    {
-        fShow = [NSApp isOnLeopardOrBetter];
-            
-        NSColor * startingColor = [NSColor colorWithCalibratedRed: 208.0/255.0 green: 208.0/255.0 blue: 208.0/255.0 alpha: 1.0];
-        NSColor * endingColor = [NSColor colorWithCalibratedRed: 233.0/255.0 green: 233.0/255.0 blue: 233.0/255.0 alpha: 1.0];
-        fGradient = [[CTGradient gradientWithBeginningColor: startingColor endingColor: endingColor] retain];
-    }
-    return self;
-}
-
-- (void) dealloc
-{
-    [fGradient release];
-    [super dealloc];
-}
-
-- (void) setShowOnTiger: (BOOL) show
-{
-    fShow = show || [NSApp isOnLeopardOrBetter];
+    [self setBackgroundImage: [NSImage imageNamed: @"StatusBarBackground.png"]];
 }
 
 - (BOOL) isOpaque
 {
-    return fShow;
+    return [[self window] isMainWindow];
 }
 
 - (void) drawRect: (NSRect) rect
 {
-    if (fShow)
-        [fGradient fillRect: rect angle: 90];
+    if ([[self window] isMainWindow])
+        [super drawRect: rect];
 }
 
 @end

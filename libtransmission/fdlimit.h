@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2006 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -29,33 +29,26 @@
  ***********************************************************************
  * Detect the maximum number of open files and initializes things.
  **********************************************************************/
-void tr_fdInit( int globalPeerLimit );
+void tr_fdInit( void );
 
 void tr_fdClose( void );
 
 /**
  * Returns an fd to the specified filename.
  *
- * A small pool of open files is kept to avoid the overhead of
- * continually opening and closing the same files when downloading
- * piece data.    It's also used to ensure only one caller can
- * write to the file at a time.  Callers check out a file, use it,
- * and then check it back in via tr_fdFileReturn() when done.
+ * A small repository of open files is kept to avoid the overhead of continually
+ * opening and closing the same files when writing piece data during download.
+ * It's also used to ensure that only one client uses the file at a time.
+ * Clients must check out a file to use it, then return it, like a library, when done.
  *
- * - if `folder' doesn't exist, TR_ERROR_IO_PARENT is returned.
- * - if doWrite is true, subfolders in torrentFile are created if necessary.
- * - if doWrite is true, the target file is created if necessary.
- *
- * on success, a file descriptor >= 0 is returned.
- * on failure, a negative number corresponding to tr_errno is returned.
+ * if write is nonzero and dirname(filename) doesn't exist, dirname is created.
+ * if write is nonzero and filename doesn't exist, filename is created.
+ * returns the fd if successful; otherwise, one of TR_ERROR_IO_*
  *
  * @see tr_fdFileReturn
  * @see tr_fdFileClose
- * @see tr_errno
  */
-int tr_fdFileCheckout( const char * folder,
-                       const char * torrentFile,
-                       int          doWrite );
+int tr_fdFileCheckout( const char * filename, int write );
 
 /**
  * Returns an fd from tr_fdFileCheckout() so that other clients may borrow it.
@@ -91,9 +84,4 @@ void tr_fdSocketClose( int s );
  * Frees resources allocated by tr_fdInit.
  **********************************************************************/
 void tr_fdClose( void );
-
-
-void tr_fdSetPeerLimit( uint16_t n );
-
-uint16_t tr_fdGetPeerLimit( void );
 

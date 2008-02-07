@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,107 +22,246 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#include <errno.h>
+#include <assert.h>
+#include <stdlib.h>
 #include <string.h>
 #include <stdio.h>
 
 #include <sys/types.h>
 
 #include "transmission.h"
+#include "handshake.h"
 #include "natpmp.h"
 #include "net.h"
+#include "peer-io.h"
 #include "peer-mgr.h"
+#include "platform.h"
 #include "shared.h"
-#include "torrent.h"
 #include "trevent.h"
 #include "upnp.h"
 #include "utils.h"
 
 struct tr_shared
 {
-    tr_handle * h;
-    tr_timer  * pulseTimer;
+    tr_handle    * h;
+    tr_timer     * pulseTimer;
 
     /* Incoming connections */
+    int publicPort;
     int bindPort;
     int bindSocket;
 
-    /* port forwarding */
-    int isEnabled;
-    int publicPort;
-    tr_nat_traversal_status natStatus;
-    tr_upnp * upnp;
-    tr_natpmp  * natpmp;
-
-    int isShuttingDown;
+    /* NAT-PMP/UPnP */
+    tr_natpmp_t  * natpmp;
+    tr_upnp_t    * upnp;
 };
 
-#define NATKEY "Port Mapping: "
+/***********************************************************************
+ * Local prototypes
+ **********************************************************************/
+static int SharedLoop( void * );
+static void SetPublicPort( tr_shared *, int );
+static void AcceptPeers( tr_shared * );
 
-/***
-****
-***/
 
-static const char*
-getNatStateStr( int state )
+/***********************************************************************
+ * tr_sharedInit
+ ***********************************************************************
+ *
+ **********************************************************************/
+tr_shared * tr_sharedInit( tr_handle * h )
 {
-    switch( state )
-    {
-        case TR_NAT_TRAVERSAL_MAPPING:   return "mapping";
-        case TR_NAT_TRAVERSAL_MAPPED:    return "mapped";
-        case TR_NAT_TRAVERSAL_UNMAPPING: return "unmapping";
-        case TR_NAT_TRAVERSAL_UNMAPPED:  return "not mapped";
-        case TR_NAT_TRAVERSAL_ERROR:     return "error";
-    }
+    tr_shared * s = calloc( 1, sizeof( tr_shared ) );
 
-    return "notfound";
+    s->h          = h;
+    s->publicPort = -1;
+    s->bindPort   = -1;
+    s->bindSocket = -1;
+    s->natpmp     = tr_natpmpInit();
+    s->upnp       = tr_upnpInit();
+    s->pulseTimer   = tr_timerNew( h, SharedLoop, s, 500 );
+
+    return s;
 }
 
-static void
-natPulse( tr_shared * s )
+/***********************************************************************
+ * tr_sharedClose
+ ***********************************************************************
+ *
+ **********************************************************************/
+void tr_sharedClose( tr_shared * s )
 {
-    tr_nat_traversal_status status;
-    const int port = s->publicPort;
-    const int isEnabled = s->isEnabled && !s->isShuttingDown;
+    tr_timerFree( &s->pulseTimer );
 
-    status = tr_natpmpPulse( s->natpmp, port, isEnabled );
-    if( status == TR_NAT_TRAVERSAL_ERROR )
-        status = tr_upnpPulse( s->upnp, port, isEnabled );
-    if( status != s->natStatus ) {
-        tr_inf( NATKEY "mapping state changed from '%s' to '%s'", getNatStateStr(s->natStatus), getNatStateStr(status) );
-        s->natStatus = status;
-    }
+    tr_netClose( s->bindSocket );
+    tr_natpmpClose( s->natpmp );
+    tr_upnpClose( s->upnp );
+    free( s );
 }
 
-static void
-incomingPeersPulse( tr_shared * s )
+/***********************************************************************
+ * tr_sharedSetPort
+ ***********************************************************************
+ *
+ **********************************************************************/
+void tr_sharedSetPort( tr_shared * s, int port )
 {
-    if( s->bindSocket >= 0 && ( s->bindPort != s->publicPort ) )
+#ifdef BEOS_NETSERVER
+    /* BeOS net_server seems to be unable to set incoming connections
+     * to non-blocking. Too bad. */
+    return;
+#endif
+
+    tr_globalLock( s->h );
+
+    if( port == s->bindPort )
     {
-        tr_inf( NATKEY "closing port %d", s->bindPort );
+        tr_globalUnlock( s->h );
+        return;
+    }
+    s->bindPort = port;
+
+    /* Close the previous accept socket, if any */
+    if( s->bindSocket > -1 )
+    {
         tr_netClose( s->bindSocket );
-        s->bindSocket = -1;
     }
 
-    if( s->bindPort != s->publicPort )
+    /* Create the new one */
+    s->bindSocket = tr_netBindTCP( port );
+
+    /* Notify the trackers */
+    SetPublicPort( s, port );
+
+    /* XXX should handle failure here in a better way */
+    if( s->bindSocket < 0 )
     {
-        int socket;
-        errno = 0;
-        socket = tr_netBindTCP( s->publicPort );
-        if( socket >= 0 ) {
-            tr_inf( NATKEY "opened port %d to listen for incoming peer connections", s->publicPort );
-            s->bindPort = s->publicPort;
-            s->bindSocket = socket;
-            listen( s->bindSocket, 5 );
-        } else {
-            tr_err( NATKEY "unable to open port %d to listen for incoming peer connections (errno is %d - %s)",
-                    s->publicPort, errno, strerror(errno) );
-            s->bindPort = -1;
-            s->bindSocket = -1;
+        /* Remove the forwarding for the old port */
+        tr_natpmpRemoveForwarding( s->natpmp );
+        tr_upnpRemoveForwarding( s->upnp );
+    }
+    else
+    {
+        tr_inf( "Bound listening port %d", port );
+        listen( s->bindSocket, 5 );
+        /* Forward the new port */
+        tr_natpmpForwardPort( s->natpmp, port );
+        tr_upnpForwardPort( s->upnp, port );
+    }
+
+    tr_globalUnlock( s->h );
+}
+
+int
+tr_sharedGetPublicPort( const tr_shared * s )
+{
+    return s->publicPort;
+}
+
+/***********************************************************************
+ * tr_sharedTraversalEnable, tr_sharedTraversalStatus
+ ***********************************************************************
+ *
+ **********************************************************************/
+void tr_sharedTraversalEnable( tr_shared * s, int enable )
+{
+    if( enable )
+    {
+        tr_natpmpStart( s->natpmp );
+        tr_upnpStart( s->upnp );
+    }
+    else
+    {
+        tr_natpmpStop( s->natpmp );
+        tr_upnpStop( s->upnp );
+    }
+}
+
+int tr_sharedTraversalStatus( const tr_shared * s )
+{
+    const int statuses[] = {
+        TR_NAT_TRAVERSAL_MAPPED,
+        TR_NAT_TRAVERSAL_MAPPING,
+        TR_NAT_TRAVERSAL_UNMAPPING,
+        TR_NAT_TRAVERSAL_ERROR,
+        TR_NAT_TRAVERSAL_NOTFOUND,
+        TR_NAT_TRAVERSAL_DISABLED,
+        -1,
+    };
+    int natpmp, upnp, ii;
+
+    natpmp = tr_natpmpStatus( s->natpmp );
+    upnp = tr_upnpStatus( s->upnp );
+
+    for( ii = 0; 0 <= statuses[ii]; ii++ )
+    {
+        if( statuses[ii] == natpmp || statuses[ii] == upnp )
+        {
+            return statuses[ii];
         }
     }
-    
-    for( ;; ) /* check for new incoming peer connections */    
+
+    assert( 0 );
+
+    return TR_NAT_TRAVERSAL_ERROR;
+
+}
+
+
+/***********************************************************************
+ * Local functions
+ **********************************************************************/
+
+/***********************************************************************
+ * SharedLoop
+ **********************************************************************/
+static int
+SharedLoop( void * vs )
+{
+    int newPort;
+    tr_shared * s = vs;
+
+    tr_globalLock( s->h );
+
+    /* NAT-PMP and UPnP pulses */
+    newPort = -1;
+    tr_natpmpPulse( s->natpmp, &newPort );
+    if( 0 < newPort && newPort != s->publicPort )
+        SetPublicPort( s, newPort );
+    tr_upnpPulse( s->upnp );
+
+    /* Handle incoming connections */
+    AcceptPeers( s );
+
+    tr_globalUnlock( s->h );
+
+    return TRUE;
+}
+
+/***********************************************************************
+ * SetPublicPort
+ **********************************************************************/
+static void SetPublicPort( tr_shared * s, int port )
+{
+    tr_handle * h = s->h;
+    tr_torrent * tor;
+
+    s->publicPort = port;
+
+    for( tor = h->torrentList; tor; tor = tor->next )
+        tr_torrentChangeMyPort( tor );
+}
+
+/***********************************************************************
+ * AcceptPeers
+ ***********************************************************************
+ * Check incoming connections and add the peers to our local list
+ **********************************************************************/
+
+static void
+AcceptPeers( tr_shared * s )
+{
+    for( ;; )
     {
         int socket;
         uint16_t port;
@@ -137,87 +276,4 @@ incomingPeersPulse( tr_shared * s )
 
         tr_peerMgrAddIncoming( s->h->peerMgr, &addr, port, socket );
     }
-}
-
-static int
-sharedPulse( void * vshared )
-{
-    int keepPulsing = 1;
-    tr_shared * shared = vshared;
-
-    natPulse( shared );
-
-    if( !shared->isShuttingDown )
-    {
-        incomingPeersPulse( shared );
-    }
-    else if( ( shared->natStatus == TR_NAT_TRAVERSAL_ERROR ) || ( shared->natStatus == TR_NAT_TRAVERSAL_UNMAPPED ) )
-    {
-        tr_dbg( NATKEY "port mapping shut down" );
-        shared->h->shared = NULL;
-        tr_netClose( shared->bindSocket );
-        tr_natpmpClose( shared->natpmp );
-        tr_upnpClose( shared->upnp );
-        tr_free( shared );
-        keepPulsing = 0;
-    }
-
-    return keepPulsing;
-}
-
-/***
-****
-***/
-
-tr_shared *
-tr_sharedInit( tr_handle * h, int isEnabled, int publicPort )
-{
-    tr_shared * s = tr_new0( tr_shared, 1 );
-
-    s->h            = h;
-    s->publicPort   = publicPort;
-    s->bindPort     = -1;
-    s->bindSocket   = -1;
-    s->natpmp       = tr_natpmpInit();
-    s->upnp         = tr_upnpInit();
-    s->pulseTimer   = tr_timerNew( h, sharedPulse, s, 500 );
-    s->isEnabled    = isEnabled ? 1 : 0;
-    s->natStatus    = TR_NAT_TRAVERSAL_UNMAPPED;
-
-    return s;
-}
-
-void
-tr_sharedShuttingDown( tr_shared * s )
-{
-    s->isShuttingDown = 1;
-}
-
-void
-tr_sharedSetPort( tr_shared * s, int port )
-{
-    tr_torrent * tor;
-
-    s->publicPort = port;
-
-    for( tor = s->h->torrentList; tor; tor = tor->next )
-        tr_torrentChangeMyPort( tor );
-}
-
-int
-tr_sharedGetPublicPort( const tr_shared * s )
-{
-    return s->publicPort;
-}
-
-void
-tr_sharedTraversalEnable( tr_shared * s, int isEnabled )
-{
-    s->isEnabled = isEnabled;
-}
-
-int
-tr_sharedTraversalStatus( const tr_shared * s )
-{
-    return s->natStatus;
 }

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -49,7 +49,7 @@
 + (void) createTorrentFile: (tr_handle *) handle;
 + (void) createTorrentFile: (tr_handle *) handle forFile: (NSString *) file;
 
-- (id) initWithHandle: (tr_handle *) handle path: (NSString *) path;
+- (id) initWithWindowNibName: (NSString *) name handle: (tr_handle *) handle path: (NSString *) path;
 
 - (void) setLocation: (id) sender;
 - (void) create: (id) sender;

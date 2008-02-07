@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -141,6 +141,9 @@ tr_rcTransferred( tr_ratecontrol * r, size_t size )
 {
     uint64_t now;
 
+    if( size < 100 ) /* don't count small messages */
+        return;
+    
     tr_lockLock( (tr_lock*)r->lock );
 
     now = tr_date ();

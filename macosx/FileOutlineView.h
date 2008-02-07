@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -25,20 +25,20 @@
 #import <Cocoa/Cocoa.h>
 
 @class Torrent;
-@class FilePriorityCell;
-@class CTGradient;
 
 @interface FileOutlineView : NSOutlineView
 {
     Torrent * fTorrent;
     
-    CTGradient * fHighPriorityGradient, * fLowPriorityGradient, * fMixedPriorityGradient;
+    NSColor * fHighPriorityColor, * fLowPriorityColor, * fMixedPriorityColor;
     
-    int fMouseRow;
-    FilePriorityCell * fMouseCell;
+    int fHoverRow;
 }
 
 - (void) setTorrent: (Torrent *) torrent;
 - (Torrent *) torrent;
+
+- (void) setHoverRowForEvent: (NSEvent *) event;
+- (int) hoverRow;
 
 @end

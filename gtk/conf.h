@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -55,7 +55,5 @@ gboolean
 cf_lock(char **errstr);
 char *
 cf_sockname(void);
-void
-cf_check_older_configs(void);
 
 #endif /* TG_CONF_H */

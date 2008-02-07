@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>AutoImport</key>
@@ -42,32 +42,24 @@
 	<true/>
 	<key>DisplayStatusProgressSelected</key>
 	<false/>
-	<key>DownloadAsk</key>
-	<true/>
-	<key>DownloadAskMulti</key>
-	<false/>
+	<key>DownloadChoice</key>
+	<string>Constant</string>
 	<key>DownloadFolder</key>
-	<string>~/Downloads</string>
+	<string>~/Desktop</string>
 	<key>DownloadLimit</key>
 	<integer>100</integer>
-	<key>DownloadLocationConstant</key>
-	<false/>
 	<key>DownloadSound</key>
 	<string>Glass</string>
-	<key>EncryptionPrefer</key>
-	<true/>
 	<key>EncryptionRequire</key>
 	<false/>
 	<key>Filter</key>
 	<string>None</string>
 	<key>FilterBar</key>
 	<false/>
-	<key>FilterGroup</key>
-	<integer>-2</integer>
 	<key>FilterSearchType</key>
 	<string>Name</string>
 	<key>IncompleteDownloadFolder</key>
-	<string>~/Downloads</string>
+	<string>~/Desktop</string>
 	<key>InfoVisible</key>
 	<false/>
 	<key>InspectorSelected</key>
@@ -76,16 +68,10 @@
 	<integer>1</integer>
 	<key>MoveChoice</key>
 	<string>Constant</string>
+	<key>MoveFolder</key>
+	<string>~/Desktop</string>
 	<key>NatTraversal</key>
 	<true/>
-	<key>PEXGlobal</key>
-	<true/>
-	<key>PeersTorrent</key>
-	<integer>60</integer>
-	<key>PeersTotal</key>
-	<integer>200</integer>
-	<key>PiecesBar</key>
-	<false/>
 	<key>PiecesViewShowAvailability</key>
 	<false/>
 	<key>PlayDownloadSound</key>
@@ -114,8 +100,6 @@
 	<false/>
 	<key>Sort</key>
 	<string>Order</string>
-	<key>SortByGroup</key>
-	<false/>
 	<key>SortReverse</key>
 	<false/>
 	<key>SpeedLimit</key>
@@ -134,15 +118,13 @@
 	<integer>30</integer>
 	<key>StatusBar</key>
 	<true/>
-	<key>StatusLabel</key>
-	<string>RatioTotal</string>
 	<key>UploadLimit</key>
 	<integer>20</integer>
 	<key>UseIncompleteDownloadFolder</key>
 	<false/>
-	<key>WarningDuplicate</key>
+	<key>WarningDebug</key>
 	<true/>
-	<key>WarningFolderDataSameName</key>
+	<key>WarningDuplicate</key>
 	<true/>
 	<key>WarningRemainingSpace</key>
 	<true/>
