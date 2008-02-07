@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,7 @@
 typedef struct tr_lock   tr_lock;
 typedef struct tr_thread tr_thread;
 
+const char * tr_getHomeDirectory( void );
 const char * tr_getCacheDirectory( void );
 const char * tr_getTorrentsDirectory( void );
 
@@ -39,5 +40,9 @@ void         tr_lockFree       ( tr_lock * );
 void         tr_lockLock       ( tr_lock * );
 void         tr_lockUnlock     ( tr_lock * );
 int          tr_lockHave       ( const tr_lock * );
+
+struct in_addr; /* forward declaration to calm gcc down */
+int
+tr_getDefaultRoute( struct in_addr * addr );
 
 #endif

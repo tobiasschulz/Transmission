@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,15 +23,11 @@
  *****************************************************************************/
 
 #import "Badger.h"
-#import "BadgeView.h"
-#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
-#import "NSBezierPathAdditions.h"
 
 #define COMPLETED_BOTTOM_PADDING 5.0
 #define SPEED_BOTTOM_PADDING 2.0
 #define SPEED_BETWEEN_PADDING 2.0
-#define BADGE_HEIGHT 30.0
 
 @interface Badger (Private)
 
@@ -50,18 +46,6 @@
         fCompleted = 0;
         fCompletedBadged = 0;
         fSpeedBadge = NO;
-        
-        if ([NSApp isOnLeopardOrBetter])
-        {
-            BadgeView * view = [[BadgeView alloc] initWithFrame: [[[NSApp dockTile] contentView] frame] lib: lib];
-            [[NSApp dockTile] setContentView: view];
-            [view release];
-        }
-        else
-            fQuittingTiger = NO;
-        
-        //change that just impacts the dock badge
-        [[NSNotificationCenter defaultCenter] addObserver: self selector: @selector(updateBadge) name: @"DockBadgeChange" object: nil];
     }
     
     return self;
@@ -69,10 +53,6 @@
 
 - (void) dealloc
 {
-    [[NSNotificationCenter defaultCenter] removeObserver: self];
-    
-    [NSApp setApplicationIconImage: nil]; //needed on 10.4
-    
     [fDockIcon release];
     [fAttributes release];
     
@@ -81,15 +61,6 @@
 
 - (void) updateBadge
 {
-    if ([NSApp isOnLeopardOrBetter])
-    {
-        [[NSApp dockTile] display];
-        return;
-    }
-    else if (fQuittingTiger)
-        return;
-    else;
-    
     //set completed badge to top right
     BOOL completedChange = fCompleted != fCompletedBadged;
     if (completedChange)
@@ -156,8 +127,11 @@
                 fDockIcon = [[NSImage imageNamed: @"NSApplicationIcon"] copy];
             dockIcon = [fDockIcon copy];
             
+            if (!fUploadBadge)
+                fUploadBadge = [NSImage imageNamed: @"UploadBadge"];
+            
             NSRect badgeRect;
-            badgeRect.size = [[NSImage imageNamed: @"UploadBadge.png"] size];
+            badgeRect.size = [fUploadBadge size];
             badgeRect.origin = NSZeroPoint;
             
             //ignore shadow of badge when placing string
@@ -170,7 +144,7 @@
             if (uploadRateString)
             {
                 //place badge and text
-                [[NSImage imageNamed: @"UploadBadge.png"] compositeToPoint: badgeRect.origin operation: NSCompositeSourceOver];
+                [fUploadBadge compositeToPoint: badgeRect.origin operation: NSCompositeSourceOver];
                 [self badgeString: uploadRateString forRect: stringRect];
             }
             
@@ -184,8 +158,11 @@
                     stringRect.origin.y += spaceBetween;
                 }
                 
+                if (!fDownloadBadge)
+                    fDownloadBadge = [NSImage imageNamed: @"DownloadBadge"];
+                
                 //place badge and text
-                [[NSImage imageNamed: @"DownloadBadge.png"] compositeToPoint: badgeRect.origin operation: NSCompositeSourceOver];
+                [fDownloadBadge compositeToPoint: badgeRect.origin operation: NSCompositeSourceOver];
                 [self badgeString: downloadRateString forRect: stringRect];
             }
             
@@ -194,7 +171,7 @@
     }
     
     //update dock badge
-    if (fSpeedBadge || speedBadge || completedChange)
+    if (completedChange || fSpeedBadge || speedBadge)
     {
         [NSApp setApplicationIconImage: dockIcon ? dockIcon : fDockIcon];
         [dockIcon release];
@@ -206,11 +183,7 @@
 - (void) incrementCompleted
 {
     fCompleted++;
-    
-    if ([NSApp isOnLeopardOrBetter])
-        [[NSApp dockTile] setBadgeLabel: [NSString stringWithFormat: @"%d", fCompleted]];
-    else
-        [self updateBadge];
+    [self updateBadge];
 }
 
 - (void) clearCompleted
@@ -218,45 +191,16 @@
     if (fCompleted != 0)
     {
         fCompleted = 0;
-        if ([NSApp isOnLeopardOrBetter])
-            [[NSApp dockTile] setBadgeLabel: @""];
-        else
-            [self updateBadge];
+        [self updateBadge];
     }
 }
 
-- (void) setQuitting
+- (void) clearBadge
 {
-    if ([NSApp isOnLeopardOrBetter])
-    {
-        [self clearCompleted];
-        [(BadgeView *)[[NSApp dockTile] contentView] setQuitting];
-        [self updateBadge];
-    }
-    else
-    {
-        fQuittingTiger = YES;
-        
-        fSpeedBadge = NO;
-        fCompleted = 0;
-        fCompletedBadged = 0;
-        
-        NSImage * quitIcon = [[NSImage imageNamed: @"NSApplicationIcon"] copy];
-        NSRect rect = NSZeroRect;
-        rect.size = [quitIcon size];
-        
-        NSRect badgeRect = NSMakeRect(0.0, (rect.size.height - BADGE_HEIGHT) * 0.5, rect.size.width, BADGE_HEIGHT);
-        
-        [quitIcon lockFocus];
-        
-        [[NSImage imageNamed: @"QuitBadge.png"] compositeToPoint: badgeRect.origin operation: NSCompositeSourceOver];
-        [self badgeString: NSLocalizedString(@"Quitting", "Dock Badger -> quit message") forRect: badgeRect];
-        
-        [quitIcon unlockFocus];
-        
-        [NSApp setApplicationIconImage: quitIcon];
-        [quitIcon release];
-    }
+    fCompleted = 0;
+    fCompletedBadged = 0;
+    fSpeedBadge = NO;
+    [NSApp setApplicationIconImage: [NSImage imageNamed: @"NSApplicationIcon"]];
 }
 
 @end
@@ -284,9 +228,8 @@
     //string is in center of image
     rect.origin.x += (rect.size.width - stringSize.width) * 0.5;
     rect.origin.y += (rect.size.height - stringSize.height) * 0.5;
-    rect.size = stringSize;
                         
-    [string drawInRect: rect withAttributes: fAttributes];
+    [string drawAtPoint: rect.origin withAttributes: fAttributes];
 }
 
 @end

@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -30,6 +30,12 @@ enum evhttp_cmd_type;
 struct evhttp_request;
 struct evhttp_connection;
 struct bufferevent;
+
+void tr_evhttp_make_request (struct tr_handle          * tr_handle,
+                             struct evhttp_connection  * evcon,
+                             struct evhttp_request     * req,
+                             enum evhttp_cmd_type        type,
+                             char                      * uri);
 
 /**
 ***

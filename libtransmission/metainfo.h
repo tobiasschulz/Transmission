@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,12 +27,12 @@
 
 #include "transmission.h"
 
-struct benc_val_t;
-
-int tr_metainfoParse( tr_info *, const struct benc_val_s *, const char * tag );
+int tr_metainfoParseFile( tr_info *, const char * tag,
+                          const char * path, int save );
+int tr_metainfoParseData( tr_info *, const char * tag,
+                          const uint8_t * data, size_t size, int save );
+int tr_metainfoParseHash( tr_info *, const char * tag, const char * hash );
 void tr_metainfoFree( tr_info * inf );
 void tr_metainfoRemoveSaved( const char * hashString, const char * tag );
-
-int tr_metainfoSave( const char *hashString, const char * tag, const uint8_t * metainfo, size_t len );
 
 #endif

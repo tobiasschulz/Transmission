@@ -2,13 +2,11 @@
 #
 # $Id$
 
-# convention: -TR MAJOR MINOR MAINT STATUS - (each a single char)
-# STATUS: "X" for prerelease test builds,
-#         "Z" for unsupported trunk builds,
-#         "0" for stable, supported releases
+# convention: -TR MAJOR MINOR MAINT BETA - (each a single char)
+# BETA: "Z" for developmental, "X" for beta, "0" for stable 
 # these should be the only two lines you need to change
-PEERID_PREFIX="-TR104Z-"
-USERAGENT_PREFIX="1.04+"
+PEERID_PREFIX="-TR0950-"
+USERAGENT_PREFIX="0.95"
 
 
 SVN_REVISION=`find ./ -name "*\.[chmp]" -o -name "*\.cpp" -o -name "*\.po" -o -name "*\.sh" | \

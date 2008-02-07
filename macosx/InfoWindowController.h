@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,22 +24,24 @@
 
 #import <Cocoa/Cocoa.h>
 #import "Torrent.h"
-#import "FileOutlineController.h"
+#import "FileOutlineView.h"
+#import "ImageBackgroundView.h"
 #import "PiecesView.h"
 #import <transmission.h>
 
 @interface InfoWindowController : NSWindowController
 {
-    NSArray * fTorrents, * fPeers;
+    NSArray * fTorrents, * fPeers, * fFiles;
+    NSImage * fAppIcon, * fLockImage;
     
     IBOutlet NSView * fInfoView, * fActivityView, * fPeersView, * fFilesView, * fOptionsView;
     int fCurrentTabTag;
     IBOutlet NSMatrix * fTabMatrix;
+    IBOutlet ImageBackgroundView * fTabBackBar;
 
     IBOutlet NSImageView * fImageView;
-    IBOutlet NSTextField * fNameField, * fBasicInfoField;
-    
-    IBOutlet NSTextField * fTrackerField, * fPiecesField, * fHashField, * fSecureField,
+    IBOutlet NSTextField * fNameField, * fSizeField, * fTrackerField,
+                        * fPiecesField, * fHashField, * fSecureField,
                         * fTorrentLocationField, * fDataLocationField,
                         * fDateAddedField, * fDateCompletedField, * fDateActivityField,
                         * fCreatorField, * fDateCreatedField,
@@ -56,13 +58,15 @@
     IBOutlet PiecesView * fPiecesView;
     IBOutlet NSSegmentedControl * fPiecesControl;
     
-    IBOutlet FileOutlineController * fFileController;
+    IBOutlet FileOutlineView * fFileOutline;
+    IBOutlet NSTextField * fFileTableStatusField;
+    IBOutlet NSMenuItem * fFileCheckItem, * fFileUncheckItem,
+                        * fFilePriorityNormal, * fFilePriorityHigh, * fFilePriorityLow;
     
     IBOutlet NSPopUpButton * fRatioPopUp, * fUploadLimitPopUp, * fDownloadLimitPopUp;
-    IBOutlet NSTextField * fUploadLimitField, * fDownloadLimitField, * fRatioLimitField, * fPeersConnectField,
+    IBOutlet NSTextField * fUploadLimitField, * fDownloadLimitField, * fRatioLimitField,
                         * fUploadLimitLabel, * fDownloadLimitLabel;
-    
-    NSString * fInitialString;
+    IBOutlet NSButton * fPexCheck;
 }
 
 - (void) setInfoForTorrents: (NSArray *) torrents;
@@ -79,6 +83,11 @@
 
 - (void) revealTorrentFile: (id) sender;
 - (void) revealDataFile: (id) sender;
+- (void) revealFile: (id) sender;
+
+- (void) setCheck: (id) sender;
+- (void) setOnlySelectedCheck: (id) sender;
+- (void) setPriority: (id) sender;
 
 - (void) setSpeedMode: (id) sender;
 - (void) setSpeedLimit: (id) sender;
@@ -86,6 +95,6 @@
 - (void) setRatioSetting: (id) sender;
 - (void) setRatioLimit: (id) sender;
 
-- (void) setPeersConnectLimit: (id) sender;
+- (void) setPex: (id) sender;
 
 @end

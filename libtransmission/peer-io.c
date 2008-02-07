@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -14,13 +14,8 @@
 #include <string.h>
 #include <stdio.h>
 #include <unistd.h>
-
-#ifdef WIN32
-#include <winsock2.h>
-#else
 #include <netinet/in.h> /* struct in_addr */
 #include <arpa/inet.h> /* inet_ntoa */
-#endif
 
 #include <event.h>
 
@@ -58,7 +53,6 @@ struct tr_peerIo
     int timeout;
     struct bufferevent * bufev;
     uint8_t peerId[20];
-    time_t timeCreated;
 
     tr_extensions extensions;
 
@@ -147,7 +141,6 @@ tr_peerIoNew( struct tr_handle     * handle,
     c->socket = socket;
     c->isIncoming = isIncoming ? 1 : 0;
     c->timeout = IO_TIMEOUT_SECS;
-    c->timeCreated = time( NULL );
     c->bufev = bufferevent_new( c->socket,
                                 canReadWrapper,
                                 didWriteWrapper,
@@ -181,18 +174,14 @@ tr_peerIoNewOutgoing( struct tr_handle      * handle,
                       int                     port,
                       const uint8_t         * torrentHash )
 {
-    int socket;
-
     assert( handle != NULL );
     assert( in_addr != NULL );
     assert( port >= 0 );
     assert( torrentHash != NULL );
 
-    socket = tr_netOpenTCP( in_addr, port, 0 );
-
-    return socket < 0
-        ? NULL 
-        : tr_peerIoNew( handle, in_addr, port, torrentHash, 0, socket );
+    return tr_peerIoNew( handle, in_addr, port,
+                         torrentHash, 0,
+                         tr_netOpenTCP( in_addr, port, 0 ) );
 }
 
 static void
@@ -242,7 +231,7 @@ const char*
 tr_peerIoAddrStr( const struct in_addr * addr, uint16_t port )
 {
     static char buf[512];
-    snprintf( buf, sizeof(buf), "%s:%u", inet_ntoa( *addr ), ntohs( port ) );
+    snprintf( buf, sizeof(buf), "%s:%u", inet_ntoa( *addr ), (unsigned int)port );
     return buf;
 }
 
@@ -583,10 +572,4 @@ tr_peerIoDrain( tr_peerIo        * io,
     uint8_t * tmp = tr_new( uint8_t, byteCount );
     tr_peerIoReadBytes( io, inbuf, tmp, byteCount );
     tr_free( tmp );
-}
-
-int
-tr_peerIoGetAge( const tr_peerIo * io )
-{
-    return time( NULL ) - io->timeCreated;
 }

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -30,6 +30,8 @@
 
 typedef struct benc_val_s
 {
+    char * begin;
+    char * end;
 #define TYPE_INT  1
 #define TYPE_STR  2
 #define TYPE_LIST 4
@@ -41,29 +43,21 @@ typedef struct benc_val_s
         struct
         {
             int    i;
-            int    nofree;
             char * s;
+            int    nofree;
         } s;
         struct
         {
-            int alloc;
-            int count;
+            int                 alloc;
+            int                 count;
             struct benc_val_s * vals;
         } l;
     } val;
 } benc_val_t;
 
-
-int          tr_bencParse( const void      * buf,
-                           const void      * bufend,
-                           benc_val_t      * setme_benc,
-                           const uint8_t  ** setme_end );
-
-int          tr_bencLoad( const void  * buf,
-                          int           buflen,
-                          benc_val_t  * setme_benc,
-                          char       ** setme_end );
-
+#define tr_bencLoad(b,l,v,e) _tr_bencLoad((char*)(b),(l),(v),(char**)(e))
+int          _tr_bencLoad( char * buf, int len, benc_val_t * val,
+                           char ** end );
 void         tr_bencPrint( benc_val_t * val );
 void         tr_bencFree( benc_val_t * val );
 benc_val_t * tr_bencDictFind( benc_val_t * val, const char * key );
@@ -96,31 +90,5 @@ benc_val_t * tr_bencDictAdd( benc_val_t * dict, const char * key );
 char*  tr_bencSave( const benc_val_t * val, int * len );
 
 int64_t  tr_bencGetInt ( const benc_val_t * val );
-
-
-/**
-***  Treat these as private -- they're only made public here
-***  so that the unit tests can find them
-**/
-
-int  tr_bencParseInt( const uint8_t  * buf,
-                      const uint8_t  * bufend,
-                      const uint8_t ** setme_end, 
-                      int64_t        * setme_val );
-
-int  tr_bencParseStr( const uint8_t  * buf,
-                      const uint8_t  * bufend,
-                      const uint8_t ** setme_end, 
-                      uint8_t       ** setme_str,
-                      size_t         * setme_strlen );
-
-/**
-***
-**/
-
-benc_val_t* tr_bencListGetNthChild( benc_val_t * val, int i );
-
-
-
 
 #endif

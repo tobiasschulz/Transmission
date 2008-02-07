@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -17,8 +17,11 @@
 #include <stdio.h>
 
 #include <signal.h>
+#include <sys/queue.h> /* for evhttp */
+#include <sys/types.h> /* for evhttp */
 
 #include <event.h>
+#include <evdns.h>
 #include <evhttp.h>
 
 #include "transmission.h"
@@ -60,6 +63,7 @@ static int writes = 0;
 
 enum mode
 {
+    TR_EV_EVHTTP_MAKE_REQUEST,
     TR_EV_TIMER_ADD,
     TR_EV_EXEC
 };
@@ -126,6 +130,11 @@ pumpList( int i UNUSED, short s UNUSED, void * veh )
                 ++eh->timerCount;
                 break;
 
+            case TR_EV_EVHTTP_MAKE_REQUEST:
+                evhttp_make_request( cmd->evcon, cmd->req, cmd->evtype, cmd->uri );
+                tr_free( cmd->uri );
+                break;
+
             case TR_EV_EXEC:
                 (cmd->func)( cmd->user_data );
                 break;
@@ -142,6 +151,7 @@ pumpList( int i UNUSED, short s UNUSED, void * veh )
         timeout_add( &eh->pulse, &eh->pulseInterval );
     else {
         assert( eh->timerCount ==  0 );
+        evdns_shutdown( FALSE );
         event_del( &eh->pulse );
     }
 }
@@ -175,6 +185,7 @@ libeventThreadFunc( void * veh )
 #endif
 
     eh->base = event_init( );
+    evdns_init( );
     timeout_set( &eh->pulse, pumpList, veh );
     timeout_add( &eh->pulse, &eh->pulseInterval );
     eh->h->events = eh;
@@ -229,6 +240,28 @@ int
 tr_amInEventThread( struct tr_handle * handle )
 {
     return tr_amInThread( handle->events->thread );
+}
+
+
+void
+tr_evhttp_make_request (tr_handle                 * handle,
+                        struct evhttp_connection  * evcon,
+                        struct evhttp_request     * req,
+                        enum   evhttp_cmd_type      type,
+                        char                      * uri)
+{
+    if( tr_amInThread( handle->events->thread ) ) {
+        evhttp_make_request( evcon, req, type, uri );
+        tr_free( uri );
+    } else {
+        struct tr_event_command * cmd = tr_new0( struct tr_event_command, 1 );
+        cmd->mode = TR_EV_EVHTTP_MAKE_REQUEST;
+        cmd->evcon = evcon;
+        cmd->req = req;
+        cmd->evtype = type;
+        cmd->uri = uri;
+        pushList( handle->events, cmd );
+    }
 }
 
 /**

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -29,6 +29,7 @@
 #include <stdarg.h>
 
 /* macro to shut up "unused parameter" warnings */
+#define SHUTUP G_GNUC_UNUSED
 #define UNUSED G_GNUC_UNUSED
 
 /* NULL-safe version of strcmp */
@@ -43,17 +44,21 @@ enum tr_torrent_action { TR_TOR_LEAVE, TR_TOR_COPY, TR_TOR_MOVE };
 /* used for a callback function with a data parameter */
 typedef void (*callbackfunc_t)(void*);
 
-/* return a human-readable string for the size given in bytes. */
-char* tr_strlsize( char * buf, guint64 size, size_t buflen );
+/* return a human-readable string for the size given in bytes.
+   the string must be g_free()d */
+char *
+readablesize(guint64 size);
 
-/* return a human-readable string for the transfer rate given in bytes. */
-char* tr_strlspeed (char * buf, double KiBps, size_t buflen );
+/* return a human-readable string for the transfer rate given in bytes.
+   the string must be g_free()d */
+char *
+readablespeed (double KiBps);
 
-/* return a human-readable string for the given ratio. */
-char* tr_strlratio( char * buf, double ratio, size_t buflen );
 
-/* return a human-readable string for the time given in seconds. */
-char* tr_strltime( char * buf, int secs, size_t buflen );
+/* return a human-readable string for the time given in seconds.
+   the string must be g_free()d */
+char *
+readabletime(int secs);
 
 char *
 rfc822date (guint64 epoch_msec);
@@ -76,7 +81,7 @@ freestrlist(GList *list);
 
 /* decodes a string that has been urlencoded */
 char *
-decode_uri( const char * uri );
+urldecode(const char *str, int len);
 
 /* return a list of cleaned-up paths, with invalid directories removed */
 GList *
@@ -131,8 +136,6 @@ gboolean
 on_tree_view_button_pressed (GtkWidget       * view,
                              GdkEventButton  * event,
                              gpointer          unused);
-
-gpointer tr_object_ref_sink (gpointer object);
 
 #endif /* GTK_MAJOR_VERSION */
 

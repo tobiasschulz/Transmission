@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -56,32 +56,27 @@ typedef enum
 
     NSImage * fIcon;
     
-    NSString * fHashString;
-    
     tr_file_stat * fileStat;
     NSArray * fFileList;
     
     NSMenu * fFileMenu;
     
-    float * fPreviousFinishedPieces;
-    NSDate * fFinishedPiecesDate;
+    float   fRatioLimit;
+    int     fRatioSetting;
+    BOOL    fFinishedSeeding, fWaitToStart, fError, fChecking, fStalled;
     
-    float fRatioLimit;
-    int fRatioSetting;
-    BOOL fFinishedSeeding, fWaitToStart, fStalled;
-    
-    int fOrderValue, fGroupValue;
+    NSNumber * fOrderValue;
     
     NSDictionary * fQuickPauseDict;
 }
 
 - (id) initWithPath: (NSString *) path location: (NSString *) location deleteTorrentFile: (torrentFileState) torrentDelete
         lib: (tr_handle *) lib;
-- (id) initWithData: (NSData *) data location: (NSString *) location lib: (tr_handle *) lib;
 - (id) initWithHistory: (NSDictionary *) history lib: (tr_handle *) lib;
 
 - (NSDictionary *) history;
 
+- (void) closeTorrent;
 - (void) closeRemoveTorrent;
 
 - (void) changeIncompleteDownloadFolder: (NSString *) folder;
@@ -90,8 +85,6 @@ typedef enum
 
 - (void) getAvailability: (int8_t *) tab size: (int) size;
 - (void) getAmountFinished: (float *) tab size: (int) size;
-- (float *) getPreviousAmountFinished;
--(void) setPreviousAmountFinished: (float *) tab;
 
 - (void) update;
 
@@ -118,9 +111,6 @@ typedef enum
 - (int) speedLimit: (BOOL) upload;
 - (void) setSpeedLimit: (int) limit upload: (BOOL) upload;
 
-- (void) setMaxPeerConnect: (uint16_t) count;
-- (uint16_t) maxPeerConnect;
-
 - (void) setWaitToStart: (BOOL) wait;
 - (BOOL) waitingToStart;
 
@@ -138,12 +128,10 @@ typedef enum
 - (NSImage *) icon;
 
 - (NSString *) name;
-- (BOOL) folder;
 - (uint64_t) size;
 - (uint64_t) sizeLeft;
 - (NSString *) trackerAddress;
 - (NSString *) trackerAddressAnnounce;
-- (NSArray *) allTrackers;
 
 - (NSString *) comment;
 - (NSString *) creator;
@@ -163,11 +151,8 @@ typedef enum
 - (float) progress;
 - (float) progressDone;
 - (float) progressLeft;
-- (float) checkingProgress;
-
 - (int) eta;
-- (int) etaRatio;
-- (NSString *) etaString: (int) eta;
+- (NSString * ) etaString;
 
 - (float) notAvailableDesired;
 
@@ -204,7 +189,6 @@ typedef enum
 
 - (float) downloadRate;
 - (float) uploadRate;
-- (float) totalRate;
 - (uint64_t) haveVerified;
 - (uint64_t) haveTotal;
 - (uint64_t) downloadedTotal;
@@ -212,13 +196,11 @@ typedef enum
 - (uint64_t) failedHash;
 - (float) swarmSpeed;
 
-- (int) orderValue;
-- (void) setOrderValue: (int) orderValue;
+- (BOOL) pex;
+- (void) setPex: (BOOL) enable;
 
-- (int) groupValue;
-- (void) setGroupValue: (int) groupValue;
-- (int) groupOrderValue;
-- (void) checkGroupValueForRemoval: (NSNotification *) notification;
+- (NSNumber *) orderValue;
+- (void) setOrderValue: (int) orderValue;
 
 - (NSArray *) fileList;
 - (int) fileCount;
@@ -239,12 +221,14 @@ typedef enum
 - (NSDate *) dateAdded;
 - (NSDate *) dateCompleted;
 - (NSDate *) dateActivity;
-- (NSDate *) dateActivityOrAdd;
 
 - (int) stalledMinutes;
 - (BOOL) isStalled;
 
 - (NSNumber *) stateSortKey;
+- (NSNumber *) progressSortKey;
+- (NSNumber *) ratioSortKey;
+- (NSNumber *) ratioProgressSortKey;
 
 - (int) torrentID;
 - (const tr_info *) torrentInfo;

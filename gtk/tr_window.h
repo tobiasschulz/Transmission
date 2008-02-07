@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -26,14 +26,14 @@
 #define TR_WINDOW_H
 
 #include <gtk/gtk.h>
-#include "tr_core.h"
 
 typedef GtkWindow TrWindow;
 
 GtkTreeSelection * tr_window_get_selection( TrWindow* wind );
 
-GtkWidget * tr_window_new( GtkUIManager*, TrCore * core );
+GtkWidget * tr_window_new( GtkUIManager* );
 
-void tr_window_update( TrWindow * wind );
+void
+tr_window_update( TrWindow * wind, float downspeed, float upspeed );
 
 #endif
