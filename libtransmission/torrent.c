@@ -881,35 +881,13 @@ freeTorrent( tr_torrent * tor )
     tr_globalUnlock( h );
 }
 
-/**
-***  Start/Stop Callback
-**/
-
-static void
-fireActiveChange( tr_torrent * tor, int isRunning )
+enum
 {
-    assert( tor != NULL );
-
-    if( tor->active_func != NULL )
-        (tor->active_func)( tor, isRunning, tor->active_func_user_data );
-}
-
-void
-tr_torrentSetActiveCallback( tr_torrent             * tor,
-                             tr_torrent_active_func   func,
-                             void                   * user_data )
-{
-    assert( tor != NULL );
-    tor->active_func = func;
-    tor->active_func_user_data = user_data;
-}
-
-void
-tr_torrentClearActiveCallback( tr_torrent * torrent )
-{
-    tr_torrentSetActiveCallback( torrent, NULL, NULL );
-}
-
+    AFTER_RECHECK_NONE,
+    AFTER_RECHECK_START,
+    AFTER_RECHECK_STOP,
+    AFTER_RECHECK_CLOSE
+};
 
 static void
 checkAndStartImpl( void * vtor )
@@ -919,7 +897,6 @@ checkAndStartImpl( void * vtor )
     tr_globalLock( tor->handle );
 
     tor->isRunning  = 1;
-    fireActiveChange( tor, tor->isRunning );
     *tor->errorString = '\0';
     tr_torrentResetTransferStats( tor );
     tor->cpStatus = tr_cpGetStatus( tor->completion );
@@ -983,7 +960,6 @@ stopTorrent( void * vtor )
     tr_ioRecheckRemove( tor );
     tr_peerMgrStopTorrent( tor->handle->peerMgr, tor->info.hash );
     tr_trackerStop( tor->tracker );
-    fireActiveChange( tor, 0 );
 
     for( i=0; i<tor->info.fileCount; ++i )
     {
@@ -1315,22 +1291,6 @@ tr_torrentSetFileChecked( tr_torrent * tor, int fileIndex, int isChecked )
         tr_bitfieldAddRange ( tor->checkedPieces, begin, end );
     else
         tr_bitfieldRemRange ( tor->checkedPieces, begin, end );
-}
-
-int
-tr_torrentIsFileChecked( const tr_torrent * tor, int fileIndex )
-{
-    const tr_file * file = &tor->info.files[fileIndex];
-    const size_t begin = file->firstPiece;
-    const size_t end = file->lastPiece + 1;
-    size_t i;
-    int isChecked = TRUE;
-
-    for( i=begin; isChecked && i<end; ++i )
-        if( !tr_torrentIsPieceChecked( tor, i ) )
-            isChecked = FALSE;
-
-    return isChecked;
 }
 
 void

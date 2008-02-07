@@ -488,9 +488,9 @@ tr_buildPath ( char *buf, size_t buflen, const char *first_element, ... )
 }
 
 int
-tr_ioErrorFromErrno( int err )
+tr_ioErrorFromErrno( void )
 {
-    switch( err )
+    switch( errno )
     {
         case 0:
             return TR_OK;
@@ -522,8 +522,6 @@ tr_errorString( int code )
         case TR_ERROR_ASSERT:
             return "Assert error";
 
-        case TR_ERROR_IO_PARENT:
-            return "Download folder does not exist";
         case TR_ERROR_IO_PERMISSIONS:
             return "Insufficient permissions";
         case TR_ERROR_IO_SPACE:

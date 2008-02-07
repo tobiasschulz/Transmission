@@ -24,24 +24,19 @@
 
 @class CTGradient;
 
-@interface TorrentCell : NSActionCell
+@interface TorrentCell : NSCell
 {
     NSUserDefaults * fDefaults;
     NSImage * fErrorImage;
     
     NSMutableDictionary * fTitleAttributes, * fStatusAttributes;
     
-    BOOL fTracking, fMouseDownControlButton, fMouseDownRevealButton, fMouseDownActionButton,
-            fHoverControl, fHoverReveal, fHoverAction,
-            fMouseDownProgressField, fMouseDownMinimalStatusField;
-    
     NSColor * fBarOverlayColor;
     CTGradient * fWhiteGradient, * fGrayGradient, * fLightGrayGradient, * fBlueGradient, * fDarkBlueGradient, 
                 * fGreenGradient, * fLightGreenGradient, * fDarkGreenGradient, * fYellowGradient, * fRedGradient,
                 * fTransparentGradient;
     
-    NSColor * fGrayColor, * fBlueColor, * fBlue1Color, * fBlue2Color, * fBlue3Color, * fBlue4Color, * fOrangeColor,
-            * fFieldBackColor;
+    NSColor * fGrayColor, * fBlueColor, * fBlue1Color, * fBlue2Color, * fBlue3Color, * fBlue4Color, * fOrangeColor;
     
     NSBitmapImageRep * fBitmap;
 }
@@ -52,16 +47,5 @@
 - (NSRect) barRectForBounds: (NSRect) bounds;
 - (NSRect) statusRectForBounds: (NSRect) bounds;
 - (NSRect) minimalStatusRectForBounds: (NSRect) bounds;
-
-- (NSRect) controlButtonRectForBounds: (NSRect) bounds;
-- (NSRect) revealButtonRectForBounds: (NSRect) bounds;
-- (NSRect) actionButtonRectForBounds: (NSRect) bounds;
-
-- (void) addTrackingAreasForView: (NSView *) controlView inRect: (NSRect) cellFrame withUserInfo: (NSDictionary *) userInfo
-            mouseLocation: (NSPoint) mouseLocation;
-- (void) setControlHover: (BOOL) hover;
-- (void) setRevealHover: (BOOL) hover;
-- (void) setActionHover: (BOOL) hover;
-- (void) setActionPushed: (BOOL) pushed;
 
 @end

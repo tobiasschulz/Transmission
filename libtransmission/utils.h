@@ -76,7 +76,7 @@ void tr_buildPath( char* buf, size_t buflen,
 struct timeval timevalMsec( uint64_t milliseconds );
 
 
-int tr_ioErrorFromErrno( int err );
+int tr_ioErrorFromErrno( void );
 
 const char * tr_errorString( int code );
 

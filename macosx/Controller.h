@@ -27,7 +27,6 @@
 #import "PrefsController.h"
 #import "InfoWindowController.h"
 #import "MessageWindowController.h"
-#import "AddWindowController.h"
 #import "DragOverlayWindow.h"
 #import "Badger.h"
 #import "StatusBarView.h"
@@ -38,14 +37,6 @@
 #import <Growl/Growl.h>
 
 @class TorrentTableView;
-
-typedef enum
-{
-    ADD_NORMAL,
-    ADD_SHOW_OPTIONS,
-    ADD_URL,
-    ADD_CREATED
-} addType;
 
 @interface Controller : NSObject <GrowlApplicationBridgeDelegate>
 {
@@ -62,6 +53,7 @@ typedef enum
     
     IBOutlet NSWindow               * fWindow;
     DragOverlayWindow               * fOverlayWindow;
+    IBOutlet NSScrollView           * fScrollView;
     IBOutlet TorrentTableView       * fTableView;
     
     IBOutlet NSMenuItem             * fOpenIgnoreDownloadFolder;
@@ -90,7 +82,6 @@ typedef enum
     IBOutlet NSMenuItem             * fUploadLimitItem, * fUploadNoLimitItem,
                                     * fDownloadLimitItem, * fDownloadNoLimitItem;
     
-    IBOutlet NSMenu                 * fRatioStopMenu;
     IBOutlet NSMenuItem             * fCheckRatioItem, * fNoCheckRatioItem;
     
     IBOutlet NSMenu                 * fGroupsSetMenu, * fGroupsSetContextMenu, * fGroupFilterMenu;
@@ -117,10 +108,13 @@ typedef enum
     BOOL                            fRemoteQuit;
 }
 
-- (void) openFiles:             (NSArray *) filenames addType: (addType) type forcePath: (NSString *) path;
-- (void) askOpenConfirmed:      (AddWindowController *) addController add: (BOOL) add;
+- (void) openFiles:             (NSArray *) filenames;
+- (void) openFiles:             (NSArray *) filenames forcePath: (NSString *) path ignoreDownloadFolder: (BOOL) ignore
+                                            deleteTorrentFile: (torrentFileState) deleteTorrent;
 - (void) openCreatedFile:       (NSNotification *) notification;
 - (void) openFilesWithDict:     (NSDictionary *) dictionary;
+- (void) openFilesAsk:          (NSMutableArray *) files deleteTorrentFile: (torrentFileState) deleteTorrent;
+- (void) openFilesAskWithDict:  (NSDictionary *) dictionary;
 - (void) openShowSheet:         (id) sender;
 
 - (void) duplicateOpenAlert: (NSString *) name;
@@ -181,8 +175,6 @@ typedef enum
 
 - (void) updateUI;
 
-- (void) setBottomCountTextFiltering: (BOOL) filtering;
-
 - (void) updateTorrentsInQueue;
 - (int) numToStartFromQueue: (BOOL) downloadQueue;
 
@@ -191,14 +183,13 @@ typedef enum
 
 - (void) updateTorrentHistory;
 
-- (void) applyFilter: (id) sender;
-
 - (void) sortTorrents;
 - (void) sortTorrentsIgnoreSelected;
 - (void) setSort: (id) sender;
 - (void) setSortByGroup: (id) sender;
 - (void) setSortReverse: (id) sender;
 
+- (void) applyFilter: (id) sender;
 - (void) setFilter: (id) sender;
 - (void) setFilterSearchType: (id) sender;
 - (void) switchFilter: (id) sender;
@@ -246,8 +237,6 @@ typedef enum
 
 - (void) setWindowSizeToFit;
 - (NSRect) sizedWindowFrame;
-
-- (void) updateForExpandCollape;
 
 - (void) showMainWindow: (id) sender;
 

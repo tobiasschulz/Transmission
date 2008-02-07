@@ -49,7 +49,7 @@
 + (void) createTorrentFile: (tr_handle *) handle;
 + (void) createTorrentFile: (tr_handle *) handle forFile: (NSString *) file;
 
-- (id) initWithHandle: (tr_handle *) handle path: (NSString *) path;
+- (id) initWithWindowNibName: (NSString *) name handle: (tr_handle *) handle path: (NSString *) path;
 
 - (void) setLocation: (id) sender;
 - (void) create: (id) sender;
