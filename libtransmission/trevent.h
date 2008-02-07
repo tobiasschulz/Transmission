@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -31,6 +31,23 @@ struct evhttp_request;
 struct evhttp_connection;
 struct bufferevent;
 
+void tr_evhttp_make_request (struct tr_handle          * tr_handle,
+                             struct evhttp_connection  * evcon,
+                             struct evhttp_request     * req,
+                             enum evhttp_cmd_type        type,
+                             char                      * uri);
+
+void tr_bufferevent_write( struct tr_handle    * tr_handle,
+                           struct bufferevent  * bufferEvent,
+                           const void          * buf,
+                           size_t                buflen );
+
+
+void tr_setBufferEventMode( struct tr_handle   * tr_handle,
+                            struct bufferevent * bufferEvent,
+                            short                mode_enable,
+                            short                mode_disable );
+
 /**
 ***
 **/
@@ -51,9 +68,6 @@ tr_timer* tr_timerNew( struct tr_handle  * handle,
  * Frees a timer and sets the timer pointer to NULL.
  */
 void tr_timerFree( tr_timer ** timer );
-
-
-int tr_amInEventThread( struct tr_handle * handle );
 
 void tr_runInEventThread( struct tr_handle * handle,
                           void               func( void* ),

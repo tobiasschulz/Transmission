@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
  *****************************************************************************/
 
 #include <assert.h>
+#include <ctype.h>
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -34,18 +35,19 @@
 #include <sys/stat.h>
 #include <unistd.h> /* usleep, stat */
 
-#include "event.h"
-
 #ifdef WIN32
     #include <windows.h> /* for Sleep */
 #elif defined(__BEOS__)
     #include <kernel/OS.h>
+    extern int vasprintf( char **, const char *, va_list );
 #endif
 
 #include "transmission.h"
 #include "trcompat.h"
 #include "utils.h"
 #include "platform.h"
+
+#define SPRINTF_BUFSIZE         100
 
 static tr_lock      * messageLock = NULL;
 static int            messageLevel = 0;
@@ -94,11 +96,7 @@ tr_getLogTimeStr( char * buf, int buflen )
     now = time( NULL );
     gettimeofday( &tv, NULL );
 
-#ifdef WIN32
-    now_tm = *localtime( &now );
-#else
     localtime_r( &now, &now_tm );
-#endif
     strftime( tmp, sizeof(tmp), "%H:%M:%S", &now_tm );
     milliseconds = (int)(tv.tv_usec / 1000);
     snprintf( buf, buflen, "%s.%03d", tmp, milliseconds );
@@ -162,38 +160,12 @@ void tr_freeMessageList( tr_msg_list * list )
     }
 }
 
-int
-tr_vasprintf( char **strp, const char *fmt, va_list ap )
+void tr_msg( int level, const char * msg, ... )
 {
-    int ret;
-    struct evbuffer * buf = evbuffer_new( );
-    *strp = NULL;
-    if( evbuffer_add_vprintf( buf, fmt, ap ) < 0 )
-        ret = -1;
-    else {
-        ret = EVBUFFER_LENGTH( buf );
-        *strp = tr_strndup( (char*)EVBUFFER_DATA(buf), ret );
-    }
-    evbuffer_free( buf );
-    return ret;
-
-}
-
-int
-tr_asprintf( char **strp, const char *fmt, ...)
-{
-    int ret;
-    va_list ap;
-    va_start( ap, fmt );
-    ret = tr_vasprintf( strp, fmt, ap );
-    va_end( ap );
-    return ret;
-}
-
-void
-tr_msg( const char * file, int line, int level, const char * fmt, ... )
-{
-    FILE * fp;
+    va_list       args1, args2;
+    tr_msg_list * newmsg;
+    int           len1, len2;
+    FILE        * fp;
 
     assert( NULL != messageLock );
     tr_lockLock( messageLock );
@@ -202,45 +174,49 @@ tr_msg( const char * file, int line, int level, const char * fmt, ... )
 
     if( !messageLevel )
     {
-        char * env = getenv( "TR_DEBUG" );
+        char * env;
+        env          = getenv( "TR_DEBUG" );
         messageLevel = ( env ? atoi( env ) : 0 ) + 1;
         messageLevel = MAX( 1, messageLevel );
     }
 
     if( messageLevel >= level )
     {
-        va_list ap;
-        char * text;
-
-        /* build the text message */
-        va_start( ap, fmt );
-        tr_vasprintf( &text, fmt, ap );
-        va_end( ap );
-
-        if( text != NULL )
+        va_start( args1, msg );
+        if( messageQueuing )
         {
-            if( messageQueuing )
+            newmsg = calloc( 1, sizeof( *newmsg ) );
+            if( NULL != newmsg )
             {
-                tr_msg_list * newmsg;
-                newmsg = tr_new0( tr_msg_list, 1 );
                 newmsg->level = level;
                 newmsg->when = time( NULL );
-                newmsg->message = text;
-                newmsg->file = file;
-                newmsg->line = line;
-
-                *messageQueueTail = newmsg;
-                messageQueueTail = &newmsg->next;
-            }
-            else
-            {
-                if( fp == NULL )
-                    fp = stderr;
-                fprintf( stderr, "%s\n", text );
-                tr_free( text );
-                fflush( fp );
+                len1 = len2 = 0;
+                va_start( args2, msg );
+                tr_vsprintf( &newmsg->message, &len1, &len2, msg,
+                             args1, args2 );
+                va_end( args2 );
+                if( fp != NULL )
+                    fprintf( fp, "%s\n", newmsg->message );
+                if( NULL == newmsg->message )
+                {
+                    free( newmsg );
+                }
+                else
+                {
+                    *messageQueueTail = newmsg;
+                    messageQueueTail = &newmsg->next;
+                }
             }
         }
+        else
+        {
+            if( fp == NULL )
+                fp = stderr;
+            vfprintf( fp, msg, args1 );
+            fputc( '\n', fp );
+            fflush( fp );
+        }
+        va_end( args1 );
     }
 
     tr_lockUnlock( messageLock );
@@ -318,6 +294,40 @@ tr_set_compare( const void * va, size_t aCount,
 /***
 ****
 ***/
+
+void * tr_memmem ( const void *vbig, size_t big_len,
+                   const void *vlittle, size_t little_len )
+{
+    const char *big = vbig;
+    const char *little = vlittle;
+    size_t ii, jj;
+
+    if( 0 == big_len || 0 == little_len )
+    {
+        return NULL;
+    }
+
+    for( ii = 0; ii + little_len <= big_len; ii++ )
+    {
+        for( jj = 0; jj < little_len; jj++ )
+        {
+            if( big[ii + jj] != little[jj] )
+            {
+                break;
+            }
+        }
+        if( jj == little_len )
+        {
+            return (char*)big + ii;
+        }
+    }
+
+    return NULL;
+}
+
+/**
+***
+**/
 
 int
 tr_compareUint16( uint16_t a, uint16_t b )
@@ -414,86 +424,202 @@ tr_mkdir( const char * path, int permissions
 }
 
 int
-tr_mkdirp( const char * path_in, int permissions )
+tr_mkdirp( char * path, int permissions )
 {
-    char * path = tr_strdup( path_in );
-    char * p, * pp;
+    char      * p, * pp;
     struct stat sb;
     int done;
 
-    /* walk past the root */
     p = path;
-    while( *p == TR_PATH_DELIMITER )
-        ++p;
-
+    while( '/' == *p )
+      p++;
     pp = p;
     done = 0;
-    while( ( p = strchr( pp, TR_PATH_DELIMITER ) ) || ( p = strchr( pp, '\0' ) ) )
+    while( ( p = strchr( pp, '/' ) ) || ( p = strchr( pp, '\0' ) ) )
     {
-        if( !*p )
+        if( '\0' == *p)
+        {
             done = 1;
+        }
         else
+        {
             *p = '\0';
-
+        }
         if( stat( path, &sb ) )
         {
             /* Folder doesn't exist yet */
-            if( tr_mkdir( path, permissions ) ) {
-                const int err = errno;
-                tr_err( "Couldn't create directory %s (%s)", path, strerror( err ) );
-                tr_free( path );
-                errno = err;
-                return -1;
+            if( tr_mkdir( path, permissions ) )
+            {
+                tr_err( "Could not create directory %s (%s)", path,
+                        strerror( errno ) );
+                *p = '/';
+                return 1;
             }
         }
         else if( ( sb.st_mode & S_IFMT ) != S_IFDIR )
         {
             /* Node exists but isn't a folder */
             tr_err( "Remove %s, it's in the way.", path );
-            tr_free( path );
-            errno = ENOTDIR;
-            return -1;
+            *p = '/';
+            return 1;
         }
-
         if( done )
+        {
             break;
-
-        *p = TR_PATH_DELIMITER;
+        }
+        *p = '/';
         p++;
         pp = p;
     }
 
-    tr_free( path );
+    return 0;
+}
+
+int
+tr_strncasecmp( const char * s1, const char * s2, size_t n )
+{
+    if ( !n )
+        return 0;
+
+    while( n-- != 0 && tolower( *s1 ) == tolower( *s2 ) ) {
+        if( !n || !*s1 || !*s2 )
+	    break;
+        ++s1;
+        ++s2;
+    }
+
+    return tolower(*(unsigned char *) s1) - tolower(*(unsigned char *) s2);
+}
+
+int tr_sprintf( char ** buf, int * used, int * max, const char * format, ... )
+{
+    va_list ap1, ap2;
+    int     ret;
+
+    va_start( ap1, format );
+    va_start( ap2, format );
+    ret = tr_vsprintf( buf, used, max, format, ap1, ap2 );
+    va_end( ap2 );
+    va_end( ap1 );
+
+    return ret;
+}
+
+int tr_vsprintf( char ** buf, int * used, int * max, const char * fmt,
+                 va_list ap1, va_list ap2 )
+{
+    int     want;
+
+    want = vsnprintf( NULL, 0, fmt, ap1 );
+
+    if( tr_concat( buf, used, max, NULL, want ) )
+    {
+        return 1;
+    }
+    assert( *used + want + 1 <= *max );
+
+    *used += vsnprintf( *buf + *used, *max - *used, fmt, ap2 );
+
+    return 0;
+}
+
+#ifndef HAVE_ASPRINTF
+
+int
+asprintf( char ** buf, const char * format, ... )
+{
+    va_list ap;
+    int     ret;
+
+    va_start( ap, format );
+    ret = vasprintf( buf, format, ap );
+    va_end( ap );
+
+    return ret;
+}
+
+int
+vasprintf( char ** buf, const char * format, va_list ap )
+{
+    va_list ap2;
+    int     used, max;
+
+    va_copy( ap2, ap );
+
+    *buf = NULL;
+    used = 0;
+    max  = 0;
+
+    if( tr_vsprintf( buf, &used, &max, format, ap, ap2 ) )
+    {
+        free( *buf );
+        return -1;
+    }
+
+    return used;
+}
+
+#endif /* HAVE_ASPRINTF */
+
+int tr_concat( char ** buf, int * used, int * max, const char * data, int len )
+{
+    int     newmax;
+    char  * newbuf;
+
+    newmax = *max;
+    while( *used + len + 1 > newmax )
+    {
+        newmax += SPRINTF_BUFSIZE;
+    }
+    if( newmax > *max )
+    {
+        newbuf = realloc( *buf, newmax );
+        if( NULL == newbuf )
+        {
+            return 1;
+        }
+        *buf = newbuf;
+        *max = newmax;
+    }
+
+    if( NULL != data )
+    {
+        memcpy( *buf + *used, data, len );
+        *used += len;
+    }
+
     return 0;
 }
 
 void
 tr_buildPath ( char *buf, size_t buflen, const char *first_element, ... )
 {
-    struct evbuffer * evbuf = evbuffer_new( );
-    const char * element = first_element;
     va_list vl;
+    char* walk = buf;
+    const char * element = first_element;
+
+    if( first_element == NULL )
+        return;
+
     va_start( vl, first_element );
-    while( element ) {
-        if( EVBUFFER_LENGTH(evbuf) )
-            evbuffer_add_printf( evbuf, "%c", TR_PATH_DELIMITER );
-        evbuffer_add_printf( evbuf, "%s", element );
+    for( ;; ) {
+        const size_t n = strlen( element );
+        memcpy( walk, element, n );
+        walk += n;
         element = (const char*) va_arg( vl, const char* );
+        if( element == NULL )
+            break;
+        *walk++ = TR_PATH_DELIMITER;
     }
-    if( EVBUFFER_LENGTH(evbuf) )
-        strlcpy( buf, (char*)EVBUFFER_DATA(evbuf), buflen );
-    else
-        *buf = '\0';
-    evbuffer_free( evbuf );
+    *walk = '\0';
+    assert( walk-buf <= (int)buflen );
 }
 
 int
-tr_ioErrorFromErrno( int err )
+tr_ioErrorFromErrno( void )
 {
-    switch( err )
+    switch( errno )
     {
-        case 0:
-            return TR_OK;
         case EACCES:
         case EROFS:
             return TR_ERROR_IO_PERMISSIONS;
@@ -509,37 +635,33 @@ tr_ioErrorFromErrno( int err )
     }
 }
 
-const char *
+char *
 tr_errorString( int code )
 {
     switch( code )
     {
         case TR_OK:
             return "No error";
-
         case TR_ERROR:
             return "Generic error";
         case TR_ERROR_ASSERT:
             return "Assert error";
-
         case TR_ERROR_IO_PARENT:
             return "Download folder does not exist";
         case TR_ERROR_IO_PERMISSIONS:
             return "Insufficient permissions";
         case TR_ERROR_IO_SPACE:
             return "Insufficient free space";
+        case TR_ERROR_IO_DUP_DOWNLOAD:
+            return "Already active transfer with same name and download folder";
         case TR_ERROR_IO_FILE_TOO_BIG:
             return "File too large";
         case TR_ERROR_IO_OPEN_FILES:
             return "Too many open files";
-        case TR_ERROR_IO_DUP_DOWNLOAD:
-            return "Already active transfer with same name and download folder";
         case TR_ERROR_IO_OTHER:
             return "Generic I/O error";
-
-        default:
-            return "Unknown error";
     }
+    return "Unknown error";
 }
 
 /****
@@ -557,11 +679,7 @@ tr_strndup( const char * in, int len )
 {
     char * out = NULL;
 
-    if( len < 0 )
-    {
-        out = tr_strdup( in );
-    }
-    else if( in != NULL )
+    if( in != NULL )
     {
         out = tr_malloc( len+1 );
         memcpy( out, in, len );
@@ -647,7 +765,7 @@ tr_bitfieldClear( tr_bitfield * bitfield )
 int
 tr_bitfieldIsEmpty( const tr_bitfield * bitfield )
 {
-    size_t i;
+    unsigned int i;
 
     for( i=0; i<bitfield->len; ++i )
         if( bitfield->bits[i] )
@@ -668,7 +786,6 @@ tr_bitfieldAdd( tr_bitfield  * bitfield, size_t nth )
 {
     static const uint8_t ands[8] = { 128, 64, 32, 16, 8, 4, 2, 1 };
     bitfield->bits[nth>>3u] |= ands[nth&7u];
-    assert( tr_bitfieldHas( bitfield, nth ) );
 }
 
 void
@@ -677,7 +794,7 @@ tr_bitfieldAddRange( tr_bitfield  * bitfield,
                      size_t         end )
 {
     /* TODO: there are faster ways to do this */
-    size_t i;
+    unsigned int i;
     for( i=begin; i<end; ++i )
         tr_bitfieldAdd( bitfield, i );
 }
@@ -690,8 +807,6 @@ tr_bitfieldRem( tr_bitfield   * bitfield,
 
     if( bitfield != NULL )
         bitfield->bits[nth>>3u] &= rems[nth&7u];
-
-    assert( !tr_bitfieldHas( bitfield, nth ) );
 }
 
 void
@@ -700,21 +815,21 @@ tr_bitfieldRemRange ( tr_bitfield  * b,
                       size_t         end )
 {
     /* TODO: there are faster ways to do this */
-    size_t i;
+    unsigned int i;
     for( i=begin; i<end; ++i )
         tr_bitfieldRem( b, i );
 }
 
 tr_bitfield*
-tr_bitfieldOr( tr_bitfield * a, const tr_bitfield * b )
+tr_bitfieldAnd( tr_bitfield * a, const tr_bitfield * b )
 {
     uint8_t *ait;
     const uint8_t *aend, *bit;
 
     assert( a->len == b->len );
 
-    for( ait=a->bits, bit=b->bits, aend=ait+a->len; ait!=aend; )
-        *ait++ |= *bit++;
+    for( ait=a->bits, bit=b->bits, aend=ait+a->len; ait!=aend; ++ait, ++bit )
+        *ait &= *bit;
 
     return a;
 }
@@ -774,103 +889,4 @@ tr_wait( uint64_t delay_milliseconds )
 #else
     usleep( 1000 * delay_milliseconds );
 #endif
-}
-
-/***
-****
-***/
-
-
-#ifndef HAVE_STRLCPY
-
-/*
- * Copy src to string dst of size siz.  At most siz-1 characters
- * will be copied.  Always NUL terminates (unless siz == 0).
- * Returns strlen(src); if retval >= siz, truncation occurred.
- */
-size_t
-strlcpy(char *dst, const char *src, size_t siz)
-{
-	char *d = dst;
-	const char *s = src;
-	size_t n = siz;
-
-	/* Copy as many bytes as will fit */
-	if (n != 0) {
-		while (--n != 0) {
-			if ((*d++ = *s++) == '\0')
-				break;
-		}
-	}
-
-	/* Not enough room in dst, add NUL and traverse rest of src */
-	if (n == 0) {
-		if (siz != 0)
-			*d = '\0';		/* NUL-terminate dst */
-		while (*s++)
-			;
-	}
-
-	return(s - src - 1);	/* count does not include NUL */
-}
-
-#endif /* HAVE_STRLCPY */
-
-
-#ifndef HAVE_STRLCAT
-
-/*
- * Appends src to string dst of size siz (unlike strncat, siz is the
- * full size of dst, not space left).  At most siz-1 characters
- * will be copied.  Always NUL terminates (unless siz <= strlen(dst)).
- * Returns strlen(src) + MIN(siz, strlen(initial dst)).
- * If retval >= siz, truncation occurred.
- */
-size_t
-strlcat(char *dst, const char *src, size_t siz)
-{
-	char *d = dst;
-	const char *s = src;
-	size_t n = siz;
-	size_t dlen;
-
-	/* Find the end of dst and adjust bytes left but don't go past end */
-	while (n-- != 0 && *d != '\0')
-		d++;
-	dlen = d - dst;
-	n = siz - dlen;
-
-	if (n == 0)
-		return(dlen + strlen(s));
-	while (*s != '\0') {
-		if (n != 1) {
-			*d++ = *s;
-			n--;
-		}
-		s++;
-	}
-	*d = '\0';
-
-	return(dlen + (s - src));	/* count does not include NUL */
-}
-
-#endif /* HAVE_STRLCAT */
-
-/***
-****
-***/
-
-double
-tr_getRatio( double numerator, double denominator )
-{
-    double ratio;
-
-    if( denominator )
-        ratio = numerator / denominator;
-    else if( numerator )
-        ratio = TR_RATIO_INF;
-    else
-        ratio = TR_RATIO_NA;
-
-    return ratio;
 }

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,15 +27,12 @@
 
 @interface Badger : NSObject
 {
-    tr_handle * fLib;
-    
-    NSImage * fDockIcon, * fBadge;
-    
-    NSDictionary * fAttributes;
-    int fCompleted, fCompletedBadged;
-    BOOL fSpeedBadge;
-    
-    BOOL fQuittingTiger;
+    tr_handle       * fLib;
+
+    NSImage         * fDockIcon, * fBadge, * fUploadBadge, * fDownloadBadge;
+    NSDictionary    * fAttributes;
+    int             fCompleted, fCompletedBadged;
+    BOOL            fSpeedBadge;
 }
 
 - (id) initWithLib: (tr_handle *) lib;
@@ -43,6 +40,6 @@
 - (void) updateBadge;
 - (void) incrementCompleted;
 - (void) clearCompleted;
-- (void) setQuitting;
+- (void) clearBadge;
 
 @end

@@ -72,7 +72,6 @@ struct opts
     struct strlist    remove;
     char              dir[MAXPATHLEN];
     int               pex;
-    const char *      crypto;
 };
 
 struct torinfo
@@ -175,7 +174,6 @@ main( int argc, char ** argv )
     if( ( o.sendquit                &&   0 > client_quit     (           ) ) ||
         ( '\0' != o.dir[0]          &&   0 > client_dir      ( o.dir     ) ) ||
         ( !SLIST_EMPTY( &o.files )  &&   0 > client_addfiles ( &o.files  ) ) ||
-        ( o.crypto                  &&   0 > client_crypto   ( o.crypto  ) ) ||
         ( o.startall                &&   0 > client_start    ( 0, NULL   ) ) ||
         ( o.stopall                 &&   0 > client_stop     ( 0, NULL   ) ) ||
         ( o.removeall               &&   0 > client_remove   ( 0, NULL   ) ) ||
@@ -225,15 +223,12 @@ usage( const char * msg, ... )
     }
 
     printf(
-  "usage: %s [options] [files...]\n"
-  "       %s -x [options] proxy-command [args...]\n"
+  "usage: %s [options]\n"
   "\n"
-  "Transmission %s http://www.transmissionbt.com/\n"
+  "Transmission %s http://transmission.m0k.org/\n"
   "A fast and easy BitTorrent client\n"
   "\n"
   "  -a --add <torrent>        Add a torrent\n"
-  "  -c --encryption preferred Prefer peers to use encryption\n"
-  "  -c --encryption required  Require encryption for all peers\n"
   "  -d --download-limit <int> Max download rate in KiB/s\n"
   "  -D --download-unlimited   No download rate limit\n"
   "  -e --enable-pex           Enable peer exchange\n"
@@ -258,18 +253,17 @@ usage( const char * msg, ... )
   "  -u --upload-limit <int>   Max upload rate in KiB/s\n"
   "  -U --upload-unlimited     No upload rate limit\n"
   "  -x --proxy                Use proxy command to connect to frontend\n",
-            getmyname(), getmyname(), LONG_VERSION_STRING );
+            getmyname(), LONG_VERSION_STRING );
     exit( 0 );
 }
 
 int
 readargs( int argc, char ** argv, struct opts * opts )
 {
-    char optstr[] = "a:c:d:DeEf:hilmMp:qr:s:S:t:u:Ux";
+    char optstr[] = "a:d:DeEf:hilmMp:qr:s:S:t:u:Ux";
     struct option longopts[] =
     {
         { "add",                required_argument, NULL, 'a' },
-        { "encryption",         required_argument, NULL, 'c' },
         { "download-limit",     required_argument, NULL, 'd' },
         { "download-unlimited", no_argument,       NULL, 'D' },
         { "enable-pex",         no_argument,       NULL, 'e' },
@@ -288,7 +282,7 @@ readargs( int argc, char ** argv, struct opts * opts )
         { "type",               required_argument, NULL, 't' },
         { "upload-limit",       required_argument, NULL, 'u' },
         { "upload-unlimited",   no_argument,       NULL, 'U' },
-        { "proxy",              no_argument,       NULL, 'x' },
+        { "proxy",              no_argument,       NULL, 'U' },
         { NULL, 0, NULL, 0 }
     };
     int opt, gotmsg;
@@ -312,14 +306,6 @@ readargs( int argc, char ** argv, struct opts * opts )
                 {
                     return -1;
                 }
-                break;
-            case 'c':
-                if(!strcasecmp(optarg, "preferred"))
-                    opts->crypto = "preferred";
-                else if(!strcasecmp(optarg, "required"))
-                    opts->crypto = "required";
-                else
-                    usage("invalid encryption mode: %s", optarg);
                 break;
             case 'd':
                 opts->downlimit = 1;
@@ -412,7 +398,7 @@ readargs( int argc, char ** argv, struct opts * opts )
                 break;
             case 'x':
                 opts->proxy     = 1;
-                continue; /* don't set gotmsg, -x isn't a message */
+                break;
             default:
                 usage( NULL );
                 break;
@@ -427,8 +413,6 @@ readargs( int argc, char ** argv, struct opts * opts )
 
     if( opts->proxy )
     {
-        if( argc == optind )
-            usage( "can't use -x without any arguments" );
         opts->proxycmd = argv + optind;
     }
     else if( 0 > fileargs( &opts->files, argc - optind, argv + optind ) )

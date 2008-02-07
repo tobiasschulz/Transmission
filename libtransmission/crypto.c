@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -10,11 +10,13 @@
  * $Id$
  */
 
-#include <sys/types.h> /* for event.h, as well as netinet/in.h on some platforms */
 #include <assert.h>
 #include <inttypes.h> /* uint8_t */
 #include <string.h> /* memcpy */
 #include <stdarg.h>
+
+#include <sys/types.h> /* for event.h, as well as netinet/in.h on some platforms */
+#include <netinet/in.h> /* struct in_addr */
 
 #include <openssl/bn.h>
 #include <openssl/dh.h>

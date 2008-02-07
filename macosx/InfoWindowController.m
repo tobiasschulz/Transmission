@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,8 +24,9 @@
 
 #import "InfoWindowController.h"
 #import "InfoTabButtonCell.h"
-#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
+
+#define FILE_ROW_SMALL_HEIGHT 18.0
 
 #define TAB_INFO_IDENT @"Info"
 #define TAB_ACTIVITY_IDENT @"Activity"
@@ -47,10 +48,10 @@
 typedef enum
 {
     TAB_INFO_TAG = 0,
-    TAB_ACTIVITY_TAG = 1,
-    TAB_PEERS_TAG = 2,
-    TAB_FILES_TAG = 3,
-    TAB_OPTIONS_TAG = 4
+    TAB_ACTIVITY_TAG,
+    TAB_PEERS_TAG,
+    TAB_FILES_TAG,
+    TAB_OPTIONS_TAG,
 } tabTag;
 
 @interface InfoWindowController (Private)
@@ -59,6 +60,7 @@ typedef enum
 - (void) updateInfoActivity;
 - (void) updateInfoPeers;
 - (void) updateInfoFiles;
+- (void) updateInfoOptions;
 
 - (NSView *) tabViewForTag: (int) tag;
 - (NSArray *) peerSortDescriptors;
@@ -74,6 +76,9 @@ typedef enum
 
 - (void) awakeFromNib
 {
+    //get images
+    fAppIcon = [NSImage imageNamed: @"NSApplicationIcon"];
+    
     //window location and size
     NSPanel * window = (NSPanel *)[self window];
     
@@ -88,13 +93,26 @@ typedef enum
     [window setFrame: windowRect display: NO];
     
     [window setBecomesKeyOnlyIfNeeded: YES];
+    [window setAcceptsMouseMovedEvents: YES];
     
     //set tab images and tooltips
+    [fTabBackBar setBackgroundImage: [NSImage imageNamed: @"InfoTabBorder.tif"]];
     [[fTabMatrix cellWithTag: TAB_INFO_TAG] setIcon: [NSImage imageNamed: @"InfoGeneral.png"]];
     [[fTabMatrix cellWithTag: TAB_ACTIVITY_TAG] setIcon: [NSImage imageNamed: @"InfoActivity.png"]];
     [[fTabMatrix cellWithTag: TAB_PEERS_TAG] setIcon: [NSImage imageNamed: @"InfoPeers.png"]];
     [[fTabMatrix cellWithTag: TAB_FILES_TAG] setIcon: [NSImage imageNamed: @"InfoFiles.png"]];
     [[fTabMatrix cellWithTag: TAB_OPTIONS_TAG] setIcon: [NSImage imageNamed: @"InfoOptions.png"]];
+    
+    [fTabMatrix setToolTip: NSLocalizedString(@"General Info", "Inspector -> tab tooltip")
+                    forCell: [fTabMatrix cellWithTag: TAB_INFO_TAG]];
+    [fTabMatrix setToolTip: NSLocalizedString(@"Activity", "Inspector -> tab tooltip")
+                    forCell: [fTabMatrix cellWithTag: TAB_ACTIVITY_TAG]];
+    [fTabMatrix setToolTip: NSLocalizedString(@"Peers", "Inspector -> tab tooltip")
+                    forCell: [fTabMatrix cellWithTag:  TAB_PEERS_TAG]];
+    [fTabMatrix setToolTip: NSLocalizedString(@"Files", "Inspector -> tab tooltip")
+                    forCell: [fTabMatrix cellWithTag: TAB_FILES_TAG]];
+    [fTabMatrix setToolTip: NSLocalizedString(@"Options", "Inspector -> tab tooltip")
+                    forCell: [fTabMatrix cellWithTag: TAB_OPTIONS_TAG]];
     
     //set selected tab
     fCurrentTabTag = INVALID;
@@ -118,45 +136,25 @@ typedef enum
     [fTabMatrix selectCellWithTag: tag];
     [self setTab: nil];
     
-    //reset images for reveal buttons, since the images are also used in the main table
-    NSImage * revealOn = [[NSImage imageNamed: @"RevealOn.png"] copy],
-            * revealOff = [[NSImage imageNamed: @"RevealOff.png"] copy];
-    [revealOn setFlipped: NO];
-    [revealOff setFlipped: NO];
-    
-    [fRevealDataButton setImage: revealOff];
-    [fRevealDataButton setAlternateImage: revealOn];
-    [fRevealTorrentButton setImage: revealOff];
-    [fRevealTorrentButton setAlternateImage: revealOn];
-    
-    [revealOn release];
-    [revealOff release];
-    
     //initially sort peer table by IP
     if ([[fPeerTable sortDescriptors] count] == 0)
         [fPeerTable setSortDescriptors: [NSArray arrayWithObject: [[fPeerTable tableColumnWithIdentifier: @"IP"]
                                             sortDescriptorPrototype]]];
     
-    //set table header tool tips
-    if ([NSApp isOnLeopardOrBetter])
-    {
-        [[fPeerTable tableColumnWithIdentifier: @"Encryption"] setHeaderToolTip: NSLocalizedString(@"Encrypted Connection",
-                                                                            "inspector -> peer table -> header tool tip")];
-        [[fPeerTable tableColumnWithIdentifier: @"Progress"] setHeaderToolTip: NSLocalizedString(@"Available",
-                                                                            "inspector -> peer table -> header tool tip")];
-        [[fPeerTable tableColumnWithIdentifier: @"UL To"] setHeaderToolTip: NSLocalizedString(@"Uploading To Peer",
-                                                                            "inspector -> peer table -> header tool tip")];
-        [[fPeerTable tableColumnWithIdentifier: @"DL From"] setHeaderToolTip: NSLocalizedString(@"Downloading From Peer",
-                                                                            "inspector -> peer table -> header tool tip")];                                                             
-    }
+    //set file table
+    [fFileOutline setDoubleAction: @selector(revealFile:)];
+    
+    //set priority item images
+    [fFilePriorityNormal setImage: [NSImage imageNamed: @"PriorityNormal.png"]];
+    [fFilePriorityLow setImage: [NSImage imageNamed: @"PriorityLow.png"]];
+    [fFilePriorityHigh setImage: [NSImage imageNamed: @"PriorityHigh.png"]];
     
     //set blank inspector
-    [self setInfoForTorrents: [NSArray array]];
+    [self updateInfoForTorrents: [NSArray array]];
     
     //allow for update notifications
     NSNotificationCenter * nc = [NSNotificationCenter defaultCenter];
     [nc addObserver: self selector: @selector(updateInfoStats) name: @"UpdateStats" object: nil];
-    [nc addObserver: self selector: @selector(updateOptions) name: @"UpdateOptions" object: nil];
 }
 
 - (void) dealloc
@@ -170,11 +168,12 @@ typedef enum
     
     [fTorrents release];
     [fPeers release];
+    [fFiles release];
     
     [super dealloc];
 }
 
-- (void) setInfoForTorrents: (NSArray *) torrents
+- (void) updateInfoForTorrents: (NSArray *) torrents
 {
     [fTorrents release];
     fTorrents = [torrents retain];
@@ -184,34 +183,22 @@ typedef enum
     {
         if (numberSelected > 0)
         {
-            [fImageView setImage: [NSImage imageNamed: [NSApp isOnLeopardOrBetter]
-                                    ? NSImageNameMultipleDocuments : @"NSApplicationIcon"]];
-            
             [fNameField setStringValue: [NSString stringWithFormat: NSLocalizedString(@"%d Torrents Selected",
                                             "Inspector -> above tabs -> selected torrents"), numberSelected]];
         
             uint64_t size = 0;
-            int fileCount = 0;
             NSEnumerator * enumerator = [torrents objectEnumerator];
             Torrent * torrent;
             while ((torrent = [enumerator nextObject]))
-            {
                 size += [torrent size];
-                fileCount += [torrent fileCount];
-            }
             
-            [fBasicInfoField setStringValue: [NSString stringWithFormat: NSLocalizedString(@"%d Files, %@ Total",
-                                    "Inspector -> above tabs -> selected torrents"), fileCount, [NSString stringForFileSize: size]]];
-            [fBasicInfoField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%u bytes",
-                                            "Inspector -> above tabs -> selected torrents"), size]];
+            [fSizeField setStringValue: [NSString stringWithFormat: NSLocalizedString(@"%@ Total",
+                "Inspector -> above tabs -> total size (several torrents selected)"), [NSString stringForFileSize: size]]];
         }
         else
         {
-            [fImageView setImage: [NSImage imageNamed: @"NSApplicationIcon"]];
-            
             [fNameField setStringValue: NSLocalizedString(@"No Torrents Selected", "Inspector -> above tabs -> selected torrents")];
-            [fBasicInfoField setStringValue: @""];
-            [fBasicInfoField setToolTip: @""];
+            [fSizeField setStringValue: @""];
     
             [fHaveField setStringValue: @""];
             [fDownloadedTotalField setStringValue: @""];
@@ -236,11 +223,14 @@ typedef enum
             [fRatioLimitField setHidden: YES];
             [fRatioLimitField setStringValue: @""];
             
-            [fPeersConnectField setEnabled: NO];
-            [fPeersConnectField setStringValue: @""];
+            [fPexCheck setEnabled: NO];
+            [fPexCheck setState: NSOffState];
+            [fPexCheck setToolTip: nil];
         }
         
-        [fFileController setTorrent: nil];
+        [fFileOutline setTorrent: nil];
+        
+        [fImageView setImage: fAppIcon];
         
         [fNameField setToolTip: nil];
 
@@ -301,12 +291,20 @@ typedef enum
             [fPeers release];
             fPeers = nil;
         }
+        
+        if (fFiles)
+        {
+            [fFiles release];
+            fFiles = nil;
+        }
+        [fFileTableStatusField setStringValue: NSLocalizedString(@"info not available",
+                                        "Inspector -> Files tab -> bottom text (number of files)")];
     }
     else
     {    
         Torrent * torrent = [fTorrents objectAtIndex: 0];
         
-        [fFileController setTorrent: torrent];
+        [fFileOutline setTorrent: torrent];
         
         NSImage * icon = [[torrent icon] copy];
         [icon setFlipped: NO];
@@ -316,29 +314,7 @@ typedef enum
         NSString * name = [torrent name];
         [fNameField setStringValue: name];
         [fNameField setToolTip: name];
-        
-        NSString * basicString = [NSString stringForFileSize: [torrent size]];
-        if ([torrent folder])
-        {
-            NSString * fileString;
-            int fileCount = [torrent fileCount];
-            if (fileCount == 1)
-                fileString = NSLocalizedString(@"1 File, ", "Inspector -> above tabs -> selected torrents");
-            else
-                fileString= [NSString stringWithFormat: NSLocalizedString(@"%d Files, ",
-                                "Inspector -> above tabs -> selected torrents"), fileCount];
-            basicString = [fileString stringByAppendingString: basicString];
-        }
-        [fBasicInfoField setStringValue: basicString];
-        [fBasicInfoField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%u bytes",
-                                        "Inspector -> above tabs -> selected torrents"), [torrent size]]];
-        
-        NSArray * allTrackers = [torrent allTrackers], * subTrackers;
-        NSMutableArray * trackerStrings = [NSMutableArray arrayWithCapacity: [allTrackers count]];
-        NSEnumerator * enumerator = [allTrackers objectEnumerator];
-        while ((subTrackers = [enumerator nextObject]))
-            [trackerStrings addObject: [subTrackers componentsJoinedByString: @", "]];
-        [fTrackerField setToolTip: [trackerStrings componentsJoinedByString: @"\n"]];
+        [fSizeField setStringValue: [NSString stringForFileSize: [torrent size]]];
         
         NSString * hashString = [torrent hashString];
         [fPiecesField setStringValue: [NSString stringWithFormat: @"%d, %@", [torrent pieceCount],
@@ -346,8 +322,8 @@ typedef enum
         [fHashField setStringValue: hashString];
         [fHashField setToolTip: hashString];
         [fSecureField setStringValue: [torrent privateTorrent]
-                        ? NSLocalizedString(@"Private Torrent, PEX automatically disabled", "Inspector -> private torrent")
-                        : NSLocalizedString(@"Public Torrent", "Inspector -> private torrent")];
+                        ? NSLocalizedString(@"Private Torrent, PEX disabled", "Inspector -> is private torrent")
+                        : NSLocalizedString(@"Public Torrent", "Inspector -> is not private torrent")];
         
         NSString * commentString = [torrent comment];
         [fCommentView setString: commentString];
@@ -385,13 +361,27 @@ typedef enum
         [fPiecesControl setSelected: !piecesAvailableSegment forSegment: PIECES_CONTROL_PROGRESS];
         [fPiecesControl setEnabled: YES];
         [fPiecesView setTorrent: torrent];
+        
+        //set file table
+        [fFileOutline deselectAll: nil];
+        [fFiles release];
+        fFiles = [[torrent fileList] retain];
+        
+        int fileCount = [torrent fileCount];
+        if (fileCount != 1)
+            [fFileTableStatusField setStringValue: [NSString stringWithFormat: NSLocalizedString(@"%d files total",
+                                "Inspector -> Files tab -> bottom text (number of files)"), fileCount]];
+        else
+            [fFileTableStatusField setStringValue: NSLocalizedString(@"1 file total",
+                                "Inspector -> Files tab -> bottom text (number of files)")];
     }
     
     //update stats and settings
     [self updateInfoStats];
-    [self updateOptions];
     
     [fPeerTable reloadData];
+    [fFileOutline deselectAll: nil];
+    [fFileOutline reloadData];
 }
 
 - (void) updateInfoStats
@@ -410,134 +400,99 @@ typedef enum
         case TAB_FILES_TAG:
             [self updateInfoFiles];
             break;
+        case TAB_OPTIONS_TAG:
+            [self updateInfoOptions];
+            break;
     }
 }
 
-- (void) updateOptions
+- (BOOL) validateMenuItem: (NSMenuItem *) menuItem
 {
-    if ([fTorrents count] == 0)
-        return;
+    SEL action = [menuItem action];
     
-    //get bandwidth info
-    NSEnumerator * enumerator = [fTorrents objectEnumerator];
-    Torrent * torrent = [enumerator nextObject]; //first torrent
-    
-    int uploadSpeedMode = [torrent speedMode: YES],
-        uploadSpeedLimit = [torrent speedLimit: YES],
-        downloadSpeedMode = [torrent speedMode: NO],
-        downloadSpeedLimit = [torrent speedLimit: NO];
-    
-    while ((torrent = [enumerator nextObject])
-            && (uploadSpeedMode != INVALID || uploadSpeedLimit != INVALID
-                || downloadSpeedMode != INVALID || downloadSpeedLimit != INVALID))
+    if (action == @selector(revealFile:))
     {
-        if (uploadSpeedMode != INVALID && uploadSpeedMode != [torrent speedMode: YES])
-            uploadSpeedMode = INVALID;
+        if ([fTabMatrix selectedTag] != TAB_FILES_TAG)
+            return NO;
         
-        if (uploadSpeedLimit != INVALID && uploadSpeedLimit != [torrent speedLimit: YES])
-            uploadSpeedLimit = INVALID;
-        
-        if (downloadSpeedMode != INVALID && downloadSpeedMode != [torrent speedMode: NO])
-            downloadSpeedMode = INVALID;
-        
-        if (downloadSpeedLimit != INVALID && downloadSpeedLimit != [torrent speedLimit: NO])
-            downloadSpeedLimit = INVALID;
+        NSString * downloadFolder = [[fTorrents objectAtIndex: 0] downloadFolder];
+        NSIndexSet * indexSet = [fFileOutline selectedRowIndexes];
+        int i;
+        for (i = [indexSet firstIndex]; i != NSNotFound; i = [indexSet indexGreaterThanIndex: i])
+            if ([[NSFileManager defaultManager] fileExistsAtPath:
+                    [downloadFolder stringByAppendingPathComponent: [[fFiles objectAtIndex: i] objectForKey: @"Path"]]])
+                return YES;
+        return NO;
     }
     
-    //set upload view
-    int index;
-    if (uploadSpeedMode == TR_SPEEDLIMIT_SINGLE)
-        index = OPTION_POPUP_LIMIT;
-    else if (uploadSpeedMode == TR_SPEEDLIMIT_UNLIMITED)
-        index = OPTION_POPUP_NO_LIMIT;
-    else if (uploadSpeedMode == TR_SPEEDLIMIT_GLOBAL)
-        index = OPTION_POPUP_GLOBAL;
-    else
-        index = -1;
-    [fUploadLimitPopUp selectItemAtIndex: index];
-    [fUploadLimitPopUp setEnabled: YES];
-    
-    [fUploadLimitLabel setHidden: uploadSpeedMode != TR_SPEEDLIMIT_SINGLE];
-    [fUploadLimitField setHidden: uploadSpeedMode != TR_SPEEDLIMIT_SINGLE];
-    if (uploadSpeedLimit != INVALID)
-        [fUploadLimitField setIntValue: uploadSpeedLimit];
-    else
-        [fUploadLimitField setStringValue: @""];
-    
-    //set download view
-    if (downloadSpeedMode == TR_SPEEDLIMIT_SINGLE)
-        index = OPTION_POPUP_LIMIT;
-    else if (downloadSpeedMode == TR_SPEEDLIMIT_UNLIMITED)
-        index = OPTION_POPUP_NO_LIMIT;
-    else if (downloadSpeedMode == TR_SPEEDLIMIT_GLOBAL)
-        index = OPTION_POPUP_GLOBAL;
-    else
-        index = -1;
-    [fDownloadLimitPopUp selectItemAtIndex: index];
-    [fDownloadLimitPopUp setEnabled: YES];
-    
-    [fDownloadLimitLabel setHidden: downloadSpeedMode != TR_SPEEDLIMIT_SINGLE];
-    [fDownloadLimitField setHidden: downloadSpeedMode != TR_SPEEDLIMIT_SINGLE];
-    if (downloadSpeedLimit != INVALID)
-        [fDownloadLimitField setIntValue: downloadSpeedLimit];
-    else
-        [fDownloadLimitField setStringValue: @""];
-    
-    //get ratio info
-    enumerator = [fTorrents objectEnumerator];
-    torrent = [enumerator nextObject]; //first torrent
-    
-    int checkRatio = [torrent ratioSetting];
-    float ratioLimit = [torrent ratioLimit];
-    
-    while ((torrent = [enumerator nextObject]) && (checkRatio != INVALID || checkRatio != INVALID))
+    if (action == @selector(setCheck:))
     {
-        if (checkRatio != INVALID && checkRatio != [torrent ratioSetting])
-            checkRatio = INVALID;
+        if ([fFileOutline numberOfSelectedRows] <= 0)
+            return NO;
         
-        if (ratioLimit != INVALID && ratioLimit != [torrent ratioLimit])
-            ratioLimit = INVALID;
+        Torrent * torrent = [fTorrents objectAtIndex: 0];
+        NSIndexSet * indexSet = [fFileOutline selectedRowIndexes];
+        NSMutableIndexSet * itemIndexes = [NSMutableIndexSet indexSet];
+        int i, state = (menuItem == fFileCheckItem) ? NSOnState : NSOffState;
+        for (i = [indexSet firstIndex]; i != NSNotFound; i = [indexSet indexGreaterThanIndex: i])
+            [itemIndexes addIndexes: [[fFileOutline itemAtRow: i] objectForKey: @"Indexes"]];
+        
+        return [torrent checkForFiles: itemIndexes] != state && [torrent canChangeDownloadCheckForFiles: itemIndexes];
     }
     
-    //set ratio view
-    if (checkRatio == NSOnState)
-        index = OPTION_POPUP_LIMIT;
-    else if (checkRatio == NSOffState)
-        index = OPTION_POPUP_NO_LIMIT;
-    else if (checkRatio == NSMixedState)
-        index = OPTION_POPUP_GLOBAL;
-    else
-        index = -1;
-    [fRatioPopUp selectItemAtIndex: index];
-    [fRatioPopUp setEnabled: YES];
-    
-    [fRatioLimitField setHidden: checkRatio != NSOnState];
-    if (ratioLimit != INVALID)
-        [fRatioLimitField setFloatValue: ratioLimit];
-    else
-        [fRatioLimitField setStringValue: @""];
-    
-    //get peer info
-    enumerator = [fTorrents objectEnumerator];
-    torrent = [enumerator nextObject]; //first torrent
-    
-    int maxPeers = [torrent maxPeerConnect];
-    
-    while ((torrent = [enumerator nextObject]))
+    if (action == @selector(setOnlySelectedCheck:))
     {
-        if (maxPeers != [torrent maxPeerConnect])
+        if ([fFileOutline numberOfSelectedRows] <= 0)
+            return NO;
+        
+        Torrent * torrent = [fTorrents objectAtIndex: 0];
+        NSIndexSet * indexSet = [fFileOutline selectedRowIndexes];
+        NSMutableIndexSet * itemIndexes = [NSMutableIndexSet indexSet];
+        int i;
+        for (i = [indexSet firstIndex]; i != NSNotFound; i = [indexSet indexGreaterThanIndex: i])
+            [itemIndexes addIndexes: [[fFileOutline itemAtRow: i] objectForKey: @"Indexes"]];
+            
+        return [torrent canChangeDownloadCheckForFiles: itemIndexes];
+    }
+    
+    if (action == @selector(setPriority:))
+    {
+        if ([fFileOutline numberOfSelectedRows] <= 0)
         {
-            maxPeers = INVALID;
-            break;
+            [menuItem setState: NSOffState];
+            return NO;
         }
+        
+        //determine which priorities are checked
+        NSIndexSet * indexSet = [fFileOutline selectedRowIndexes];
+        BOOL current = NO, other = NO;
+        int i, priority;
+        Torrent * torrent = [fTorrents objectAtIndex: 0];
+        
+        if (menuItem == fFilePriorityHigh)
+            priority = TR_PRI_HIGH;
+        else if (menuItem == fFilePriorityLow)
+            priority = TR_PRI_LOW;
+        else
+            priority = TR_PRI_NORMAL;
+        
+        NSIndexSet * fileIndexSet;
+        for (i = [indexSet firstIndex]; i != NSNotFound && (!current || !other); i = [indexSet indexGreaterThanIndex: i])
+        {
+            fileIndexSet = [[fFileOutline itemAtRow: i] objectForKey: @"Indexes"];
+            if (![torrent canChangeDownloadCheckForFiles: fileIndexSet])
+                continue;
+            else if ([torrent hasFilePriority: priority forIndexes: fileIndexSet])
+                current = YES;
+            else
+                other = YES;
+        }
+        
+        [menuItem setState: current ? NSOnState : NSOffState];
+        return current || other;
     }
     
-    //set peer view
-    [fPeersConnectField setEnabled: YES];
-    if (maxPeers != INVALID)
-        [fPeersConnectField setIntValue: maxPeers];
-    else
-        [fPeersConnectField setStringValue: @""];
+    return YES;
 }
 
 - (NSRect) windowWillUseStandardFrame: (NSWindow *) window defaultFrame: (NSRect) defaultFrame
@@ -695,7 +650,16 @@ typedef enum
         NSDictionary * peer = [fPeers objectAtIndex: row];
         
         if ([ident isEqualToString: @"Encryption"])
-            return [[peer objectForKey: @"Encryption"] boolValue] ? [NSImage imageNamed: @"Lock.png"] : nil;
+        {
+            if ([[peer objectForKey: @"Encryption"] boolValue])
+            {
+                if (!fLockImage)
+                    fLockImage = [NSImage imageNamed: @"Lock.tiff"];
+                return fLockImage;
+            }
+            else
+                return nil;
+        }
         else if ([ident isEqualToString: @"Client"])
             return [peer objectForKey: @"Client"];
         else if  ([ident isEqualToString: @"Progress"])
@@ -741,7 +705,7 @@ typedef enum
     if (tableView == fPeerTable)
     {
         NSDictionary * peer = [fPeers objectAtIndex: row];
-        NSMutableArray * components = [NSMutableArray arrayWithCapacity: 5];
+        NSMutableArray * components = [NSMutableArray arrayWithCapacity: 4];
         
         [components addObject: [NSString stringWithFormat: NSLocalizedString(@"Progress: %.1f%%",
             "Inspector -> Peers tab -> table row tooltip"), [[peer objectForKey: @"Progress"] floatValue] * 100.0]];
@@ -772,40 +736,128 @@ typedef enum
                 break;
         }
         
-        //determing status strings from flags 
-        NSMutableArray * statusArray = [NSMutableArray arrayWithCapacity: 3];
-        NSString * flags = [peer objectForKey: @"Flags"];
-        
-        if ([flags rangeOfString: @"D"].location != NSNotFound)
-            [statusArray addObject: NSLocalizedString(@"Currently downloading (interested and not choked)",
-                "Inspector -> peer -> status")];
-        else if ([flags rangeOfString: @"d"].location != NSNotFound)
-            [statusArray addObject: NSLocalizedString(@"You want to download, but peer does not want to send (interested and choked)",
-                "Inspector -> peer -> status")];
-        else;
-        
-        if ([flags rangeOfString: @"U"].location != NSNotFound)
-            [statusArray addObject: NSLocalizedString(@"Currently uploading (interested and not choked)",
-                "Inspector -> peer -> status")];
-        else if ([flags rangeOfString: @"u"].location != NSNotFound)
-            [statusArray addObject: NSLocalizedString(@"Peer wants you to upload, but you do not want to (interested and choked)",
-                "Inspector -> peer -> status")];
-        else;
-        
-        if ([flags rangeOfString: @"K"].location != NSNotFound)
-            [statusArray addObject: NSLocalizedString(@"Peer is unchoking you, but you are not interested",
-                "Inspector -> peer -> status")];
-        
-        if ([flags rangeOfString: @"?"].location != NSNotFound)
-            [statusArray addObject: NSLocalizedString(@"You unchoked the peer, but the peer is not interested",
-                "Inspector -> peer -> status")];
-        
-        if ([statusArray count] > 0)
-            [components addObject: [@"\n" stringByAppendingString: [statusArray componentsJoinedByString: @"\n\n"]]];
-        
         return [components componentsJoinedByString: @"\n"];
     }
     return nil;
+}
+
+- (int) outlineView: (NSOutlineView *) outlineView numberOfChildrenOfItem: (id) item
+{
+    if (!item)
+        return [fFiles count];
+    return [[item objectForKey: @"IsFolder"] boolValue] ? [[item objectForKey: @"Children"] count] : 0;
+}
+
+- (BOOL) outlineView: (NSOutlineView *) outlineView isItemExpandable: (id) item 
+{
+    return [[item objectForKey: @"IsFolder"] boolValue];
+}
+
+- (id) outlineView: (NSOutlineView *) outlineView child: (int) index ofItem: (id) item
+{
+    return [(item ? [item objectForKey: @"Children"] : fFiles) objectAtIndex: index];
+}
+
+- (id) outlineView: (NSOutlineView *) outlineView objectValueForTableColumn: (NSTableColumn *) tableColumn byItem: (id) item
+{
+    if ([[tableColumn identifier] isEqualToString: @"Check"])
+        return [NSNumber numberWithInt: [[fTorrents objectAtIndex: 0] checkForFiles: [item objectForKey: @"Indexes"]]];
+    else
+        return item;
+}
+
+- (void) outlineView: (NSOutlineView *) outlineView willDisplayCell: (id) cell
+            forTableColumn: (NSTableColumn *) tableColumn item: (id) item
+{
+    NSString * identifier = [tableColumn identifier];
+    if ([identifier isEqualToString: @"Check"])
+        [cell setEnabled: [[fTorrents objectAtIndex: 0] canChangeDownloadCheckForFiles: [item objectForKey: @"Indexes"]]];
+    else if ([identifier isEqualToString: @"Priority"])
+        [cell setRepresentedObject: item];
+    else;
+}
+
+- (void) outlineView: (NSOutlineView *) outlineView setObjectValue: (id) object
+        forTableColumn: (NSTableColumn *) tableColumn byItem: (id) item
+{
+    NSString * identifier = [tableColumn identifier];
+    if ([identifier isEqualToString: @"Check"])
+    {
+        Torrent * torrent = [fTorrents objectAtIndex: 0];
+        NSIndexSet * indexSet;
+        if ([[NSApp currentEvent] modifierFlags] & NSAlternateKeyMask)
+            indexSet = [NSIndexSet indexSetWithIndexesInRange: NSMakeRange(0, [torrent fileCount])];
+        else
+            indexSet = [item objectForKey: @"Indexes"];
+        
+        [torrent setFileCheckState: [object intValue] != NSOffState ? NSOnState : NSOffState forIndexes: indexSet];
+        [fFileOutline reloadData];
+        
+        [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateUI" object: nil];
+    }
+}
+
+- (NSString *) outlineView: (NSOutlineView *) outlineView typeSelectStringForTableColumn: (NSTableColumn *) tableColumn item: (id) item
+{
+    return [item objectForKey: @"Name"];
+}
+
+- (NSString *) outlineView: (NSOutlineView *) outlineView toolTipForCell: (NSCell *) cell rect: (NSRectPointer) rect
+        tableColumn: (NSTableColumn *) tableColumn item: (id) item mouseLocation: (NSPoint) mouseLocation
+{
+    NSString * ident = [tableColumn identifier];
+    if ([ident isEqualToString: @"Name"])
+        return [[[fTorrents objectAtIndex: 0] downloadFolder] stringByAppendingPathComponent: [item objectForKey: @"Path"]];
+    else if ([ident isEqualToString: @"Check"])
+    {
+        switch ([cell state])
+        {
+            case NSOffState:
+                return NSLocalizedString(@"Don't Download", "Inspector -> files tab -> tooltip");
+            case NSOnState:
+                return NSLocalizedString(@"Download", "Inspector -> files tab -> tooltip");
+            case NSMixedState:
+                return NSLocalizedString(@"Download Some", "Inspector -> files tab -> tooltip");
+        }
+    }
+    else if ([ident isEqualToString: @"Priority"])
+    {
+        NSSet * priorities = [[fTorrents objectAtIndex: 0] filePrioritiesForIndexes: [item objectForKey: @"Indexes"]];
+        switch([priorities count])
+        {
+            case 0:
+                return NSLocalizedString(@"Priority Not Available", "Inspector -> files tab -> tooltip");
+            case 1:
+                switch ([[priorities anyObject] intValue])
+                {
+                    case TR_PRI_LOW:
+                        return NSLocalizedString(@"Low Priority", "Inspector -> files tab -> tooltip");
+                    case TR_PRI_HIGH:
+                        return NSLocalizedString(@"High Priority", "Inspector -> files tab -> tooltip");
+                    case TR_PRI_NORMAL:
+                        return NSLocalizedString(@"Normal Priority", "Inspector -> files tab -> tooltip");
+                }
+                break;
+            default:
+                return NSLocalizedString(@"Multiple Priorities", "Inspector -> files tab -> tooltip");
+        }
+    }
+    else;
+    
+    return nil;
+}
+
+- (float) outlineView: (NSOutlineView *) outlineView heightOfRowByItem: (id) item
+{
+    if ([[item objectForKey: @"IsFolder"] boolValue])
+        return FILE_ROW_SMALL_HEIGHT;
+    else
+        return [outlineView rowHeight];
+}
+
+- (void) mouseMoved: (NSEvent *) event
+{
+    [fFileOutline setHoverRowForEvent: fCurrentTabTag == TAB_FILES_TAG ? event : nil];
 }
 
 - (void) setPiecesView: (id) sender
@@ -832,6 +884,73 @@ typedef enum
 {
     if ([fTorrents count] > 0)
         [[fTorrents objectAtIndex: 0] revealData];
+}
+
+- (void) revealFile: (id) sender
+{
+    if (!fFiles)
+        return;
+    
+    NSString * folder = [[fTorrents objectAtIndex: 0] downloadFolder];
+    NSIndexSet * indexes = [fFileOutline selectedRowIndexes];
+    int i;
+    for (i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
+        [[NSWorkspace sharedWorkspace] selectFile: [folder stringByAppendingPathComponent:
+                [[fFileOutline itemAtRow: i] objectForKey: @"Path"]] inFileViewerRootedAtPath: nil];
+}
+
+- (void) setCheck: (id) sender
+{
+    int state = sender == fFileCheckItem ? NSOnState : NSOffState;
+    
+    Torrent * torrent = [fTorrents objectAtIndex: 0];
+    NSIndexSet * indexSet = [fFileOutline selectedRowIndexes];
+    NSMutableIndexSet * itemIndexes = [NSMutableIndexSet indexSet];
+    int i;
+    for (i = [indexSet firstIndex]; i != NSNotFound; i = [indexSet indexGreaterThanIndex: i])
+        [itemIndexes addIndexes: [[fFileOutline itemAtRow: i] objectForKey: @"Indexes"]];
+    
+    [torrent setFileCheckState: state forIndexes: itemIndexes];
+    [fFileOutline reloadData];
+}
+
+- (void) setOnlySelectedCheck: (id) sender
+{
+    Torrent * torrent = [fTorrents objectAtIndex: 0];
+    NSIndexSet * indexSet = [fFileOutline selectedRowIndexes];
+    NSMutableIndexSet * itemIndexes = [NSMutableIndexSet indexSet];
+    int i;
+    for (i = [indexSet firstIndex]; i != NSNotFound; i = [indexSet indexGreaterThanIndex: i])
+        [itemIndexes addIndexes: [[fFileOutline itemAtRow: i] objectForKey: @"Indexes"]];
+    
+    [torrent setFileCheckState: NSOnState forIndexes: itemIndexes];
+    
+    NSMutableIndexSet * remainingItemIndexes = [NSMutableIndexSet indexSetWithIndexesInRange: NSMakeRange(0, [torrent fileCount])];
+    [remainingItemIndexes removeIndexes: itemIndexes];
+    [torrent setFileCheckState: NSOffState forIndexes: remainingItemIndexes];
+    
+    [fFileOutline reloadData];
+}
+
+- (void) setPriority: (id) sender
+{
+    int priority;
+    if (sender == fFilePriorityHigh)
+        priority = TR_PRI_HIGH;
+    else if (sender == fFilePriorityLow)
+        priority = TR_PRI_LOW;
+    else
+        priority = TR_PRI_NORMAL;
+    
+    Torrent * torrent = [fTorrents objectAtIndex: 0];
+    NSIndexSet * indexSet = [fFileOutline selectedRowIndexes];
+    NSMutableIndexSet * itemIndexes = [NSMutableIndexSet indexSet];
+    int i;
+    for (i = [indexSet firstIndex]; i != NSNotFound; i = [indexSet indexGreaterThanIndex: i])
+        [itemIndexes addIndexes: [[fFileOutline itemAtRow: i] objectForKey: @"Indexes"]];
+    
+    [torrent setFilePriority: priority forIndexes: itemIndexes];
+    [fFileOutline reloadData];
 }
 
 - (void) setSpeedMode: (id) sender
@@ -875,13 +994,31 @@ typedef enum
 - (void) setSpeedLimit: (id) sender
 {
     BOOL upload = sender == fUploadLimitField;
-    int limit = [sender intValue];
     
     Torrent * torrent;
     NSEnumerator * enumerator = [fTorrents objectEnumerator];
-    
-    while ((torrent = [enumerator nextObject]))
-        [torrent setSpeedLimit: limit upload: upload];
+
+    int limit = [sender intValue];
+    if (![[sender stringValue] isEqualToString: [NSString stringWithFormat: @"%i", limit]] || limit < 0)
+    {
+        NSBeep();
+        
+        torrent = [enumerator nextObject]; //use first torrent
+        limit = [torrent speedLimit: upload];
+        while ((torrent = [enumerator nextObject]))
+            if (limit != [torrent speedLimit: upload])
+            {
+                [sender setStringValue: @""];
+                return;
+            }
+        
+        [sender setIntValue: limit];
+    }
+    else
+    {
+        while ((torrent = [enumerator nextObject]))
+            [torrent setSpeedLimit: limit upload: upload];
+    }
 }
 
 - (void) setRatioSetting: (id) sender
@@ -920,43 +1057,46 @@ typedef enum
 
 - (void) setRatioLimit: (id) sender
 {
-    float limit = [sender floatValue];
-    
     Torrent * torrent;
     NSEnumerator * enumerator = [fTorrents objectEnumerator];
-    while ((torrent = [enumerator nextObject]))
-        [torrent setRatioLimit: limit];
-}
 
-- (void) setPeersConnectLimit: (id) sender
-{
-    int limit = [sender intValue];
-    
-    Torrent * torrent;
-    NSEnumerator * enumerator = [fTorrents objectEnumerator];
-    while ((torrent = [enumerator nextObject]))
-        [torrent setMaxPeerConnect: limit];
-}
-
-
-- (BOOL) control: (NSControl *) control textShouldBeginEditing: (NSText *) fieldEditor
-{
-    [fInitialString release];
-    fInitialString = [[control stringValue] retain];
-    
-    return YES;
-}
-
-- (BOOL) control: (NSControl *) control didFailToFormatString: (NSString *) string errorDescription: (NSString *) error
-{
-    NSBeep();
-    if (fInitialString)
+    float ratioLimit = [sender floatValue];
+    if (![[sender stringValue] isEqualToString: [NSString stringWithFormat: @"%.2f", ratioLimit]] || ratioLimit < 0)
     {
-        [control setStringValue: fInitialString];
-        [fInitialString release];
-        fInitialString = nil;
+        NSBeep();
+        float ratioLimit = [[enumerator nextObject] ratioLimit]; //use first torrent
+        while ((torrent = [enumerator nextObject]))
+            if (ratioLimit != [torrent ratioLimit])
+            {
+                [sender setStringValue: @""];
+                return;
+            }
+        
+        [sender setFloatValue: ratioLimit];
     }
-    return NO;
+    else
+    {
+        while ((torrent = [enumerator nextObject]))
+            [torrent setRatioLimit: ratioLimit];
+    }
+    
+    [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateUI" object: nil];
+}
+
+- (void) setPex: (id) sender
+{
+	int state = [sender state];
+	if (state == NSMixedState)
+	{
+		state = NSOnState;
+		[sender setState: state];
+	}
+	
+	Torrent * torrent;
+    NSEnumerator * enumerator = [fTorrents objectEnumerator];
+	
+	while ((torrent = [enumerator nextObject]))
+		[torrent setPex: state == NSOnState];
 }
 
 @end
@@ -972,6 +1112,7 @@ typedef enum
     
     NSString * tracker = [[torrent trackerAddress] stringByAppendingString: [torrent trackerAddressAnnounce]];
     [fTrackerField setStringValue: tracker];
+    [fTrackerField setToolTip: tracker];
     
     NSString * location = [torrent dataLocation];
     [fDataLocationField setStringValue: [location stringByAbbreviatingWithTildeInPath]];
@@ -1095,7 +1236,136 @@ typedef enum
 - (void) updateInfoFiles
 {
     if ([fTorrents count] == 1)
-        [fFileController reloadData];
+    {
+        [[fTorrents objectAtIndex: 0] updateFileStat];
+        [fFileOutline reloadData];
+    }
+}
+
+- (void) updateInfoOptions
+{
+    if ([fTorrents count] == 0)
+        return;
+
+    //get bandwidth info
+    NSEnumerator * enumerator = [fTorrents objectEnumerator];
+    Torrent * torrent = [enumerator nextObject]; //first torrent
+    
+    int uploadSpeedMode = [torrent speedMode: YES],
+        uploadSpeedLimit = [torrent speedLimit: YES],
+        downloadSpeedMode = [torrent speedMode: NO],
+        downloadSpeedLimit = [torrent speedLimit: NO];
+    
+    while ((torrent = [enumerator nextObject])
+            && (uploadSpeedMode != INVALID || uploadSpeedLimit != INVALID
+                || downloadSpeedMode != INVALID || downloadSpeedLimit != INVALID))
+    {
+        if (uploadSpeedMode != INVALID && uploadSpeedMode != [torrent speedMode: YES])
+            uploadSpeedMode = INVALID;
+        
+        if (uploadSpeedLimit != INVALID && uploadSpeedLimit != [torrent speedLimit: YES])
+            uploadSpeedLimit = INVALID;
+        
+        if (downloadSpeedMode != INVALID && downloadSpeedMode != [torrent speedMode: NO])
+            downloadSpeedMode = INVALID;
+        
+        if (downloadSpeedLimit != INVALID && downloadSpeedLimit != [torrent speedLimit: NO])
+            downloadSpeedLimit = INVALID;
+    }
+    
+    //set upload view
+    int index;
+    if (uploadSpeedMode == TR_SPEEDLIMIT_SINGLE)
+        index = OPTION_POPUP_LIMIT;
+    else if (uploadSpeedMode == TR_SPEEDLIMIT_UNLIMITED)
+        index = OPTION_POPUP_NO_LIMIT;
+    else if (uploadSpeedMode == TR_SPEEDLIMIT_GLOBAL)
+        index = OPTION_POPUP_GLOBAL;
+    else
+        index = -1;
+    [fUploadLimitPopUp selectItemAtIndex: index];
+    [fUploadLimitPopUp setEnabled: YES];
+    
+    [fUploadLimitLabel setHidden: uploadSpeedMode != TR_SPEEDLIMIT_SINGLE];
+    [fUploadLimitField setHidden: uploadSpeedMode != TR_SPEEDLIMIT_SINGLE];
+    if (uploadSpeedLimit != INVALID)
+        [fUploadLimitField setIntValue: uploadSpeedLimit];
+    else
+        [fUploadLimitField setStringValue: @""];
+    
+    //set download view
+    if (downloadSpeedMode == TR_SPEEDLIMIT_SINGLE)
+        index = OPTION_POPUP_LIMIT;
+    else if (downloadSpeedMode == TR_SPEEDLIMIT_UNLIMITED)
+        index = OPTION_POPUP_NO_LIMIT;
+    else if (downloadSpeedMode == TR_SPEEDLIMIT_GLOBAL)
+        index = OPTION_POPUP_GLOBAL;
+    else
+        index = -1;
+    [fDownloadLimitPopUp selectItemAtIndex: index];
+    [fDownloadLimitPopUp setEnabled: YES];
+    
+    [fDownloadLimitLabel setHidden: downloadSpeedMode != TR_SPEEDLIMIT_SINGLE];
+    [fDownloadLimitField setHidden: downloadSpeedMode != TR_SPEEDLIMIT_SINGLE];
+    if (downloadSpeedLimit != INVALID)
+        [fDownloadLimitField setIntValue: downloadSpeedLimit];
+    else
+        [fDownloadLimitField setStringValue: @""];
+    
+    //get ratio info
+    enumerator = [fTorrents objectEnumerator];
+    torrent = [enumerator nextObject]; //first torrent
+    
+    int checkRatio = [torrent ratioSetting];
+    float ratioLimit = [torrent ratioLimit];
+    
+    while ((torrent = [enumerator nextObject]) && (checkRatio != INVALID || checkRatio != INVALID))
+    {
+        if (checkRatio != INVALID && checkRatio != [torrent ratioSetting])
+            checkRatio = INVALID;
+        
+        if (ratioLimit != INVALID && ratioLimit != [torrent ratioLimit])
+            ratioLimit = INVALID;
+    }
+    
+    //set ratio view
+    if (checkRatio == NSOnState)
+        index = OPTION_POPUP_LIMIT;
+    else if (checkRatio == NSOffState)
+        index = OPTION_POPUP_NO_LIMIT;
+    else if (checkRatio == NSMixedState)
+        index = OPTION_POPUP_GLOBAL;
+    else
+        index = -1;
+    [fRatioPopUp selectItemAtIndex: index];
+    [fRatioPopUp setEnabled: YES];
+    
+    [fRatioLimitField setHidden: checkRatio != NSOnState];
+    if (ratioLimit != INVALID)
+        [fRatioLimitField setFloatValue: ratioLimit];
+    else
+        [fRatioLimitField setStringValue: @""];
+    
+    //set pex check
+    enumerator = [fTorrents objectEnumerator];
+    torrent = [enumerator nextObject]; //first torrent
+    
+    BOOL pexEnabled = ![torrent privateTorrent] && ![torrent isActive];
+    int pexState = [torrent pex] ? NSOnState : NSOffState;
+    
+    while ((torrent = [enumerator nextObject]) && (pexEnabled || pexState != NSMixedState))
+    {
+        if (pexEnabled)
+            pexEnabled = ![torrent privateTorrent] && ![torrent isActive];
+        
+        if (pexState != NSMixedState && pexState != ([torrent pex] ? NSOnState : NSOffState))
+            pexState = NSMixedState;
+    }
+    
+    [fPexCheck setEnabled: pexEnabled];
+    [fPexCheck setState: pexState];
+    [fPexCheck setToolTip: !pexEnabled ? NSLocalizedString(@"PEX can only be toggled on paused public torrents.",
+                                "Inspector -> pex check") : nil];
 }
 
 - (NSView *) tabViewForTag: (int) tag

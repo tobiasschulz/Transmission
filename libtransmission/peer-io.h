@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -80,9 +80,7 @@ int   tr_peerIoReconnect( tr_peerIo * io );
 
 int   tr_peerIoIsIncoming( const tr_peerIo * io );
 
-void  tr_peerIoSetTimeoutSecs( tr_peerIo * io, int secs );
-
-int   tr_peerIoGetAge( const tr_peerIo * io );
+void tr_peerIoSetTimeoutSecs( tr_peerIo * io, int secs );
 
 
 /**
@@ -110,9 +108,11 @@ void  tr_peerIoSetIOFuncs( tr_peerIo        * io,
                            tr_net_error_cb    errcb,
                            void             * user_data );
 
-size_t tr_peerIoWriteBytesWaiting( const tr_peerIo * io );
+void  tr_peerIoSetIOMode ( tr_peerIo   * io,
+                           short         enable_mode,
+                           short         disable_mode );
 
-void tr_peerIoTryRead( tr_peerIo * io );
+size_t tr_peerIoWriteBytesWaiting( const tr_peerIo * io );
 
 void tr_peerIoWrite( tr_peerIo   * io,
                      const void  * writeme,
@@ -144,7 +144,7 @@ int  tr_peerIoIsEncrypted( const tr_peerIo * io );
 void tr_peerIoWriteBytes  ( tr_peerIo        * io,
                             struct evbuffer  * outbuf,
                             const void       * bytes,
-                            size_t             byteCount );
+                            int                byteCount );
 
 void tr_peerIoWriteUint8  ( tr_peerIo        * io,
                             struct evbuffer  * outbuf,
@@ -161,7 +161,7 @@ void tr_peerIoWriteUint32 ( tr_peerIo        * io,
 void tr_peerIoReadBytes   ( tr_peerIo        * io,
                             struct evbuffer  * inbuf,
                             void             * bytes,
-                            size_t             byteCount );
+                            int                byteCount );
 
 void tr_peerIoReadUint8   ( tr_peerIo        * io,
                             struct evbuffer  * inbuf,
@@ -177,7 +177,7 @@ void tr_peerIoReadUint32  ( tr_peerIo        * io,
 
 void tr_peerIoDrain       ( tr_peerIo        * io,
                             struct evbuffer  * inbuf,
-                            size_t             byteCount );
+                            int                byteCount );
 
 
 #endif

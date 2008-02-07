@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -34,9 +34,8 @@
 
 @interface MessageWindowController (Private)
 
-- (void) resizeColumn;
 - (NSString *) stringForMessage: (NSDictionary *) message;
-- (NSString *) fileForMessage: (NSDictionary *) message;
+- (void) setDebugWarningHidden: (BOOL) hide;
 
 @end
 
@@ -44,15 +43,23 @@
 
 - (id) init
 {
-    return [super initWithWindowNibName: @"MessageWindow"];
+    if ((self = [super initWithWindowNibName: @"MessageWindow"]))
+    {
+        fMessages = [[NSMutableArray alloc] init];
+        
+        fTimer = [NSTimer scheduledTimerWithTimeInterval: UPDATE_SECONDS target: self
+                    selector: @selector(updateLog:) userInfo: nil repeats: YES];
+        
+        tr_setMessageLevel([[NSUserDefaults standardUserDefaults] integerForKey: @"MessageLevel"]);
+        tr_setMessageQueuing(1);
+    }
+    return self;
 }
 
 - (void) dealloc
 {
     [fTimer invalidate];
     [fMessages release];
-    
-    [fAttributes release];
     
     [super dealloc];
 }
@@ -63,16 +70,16 @@
     [window setFrameAutosaveName: @"MessageWindowFrame"];
     [window setFrameUsingName: @"MessageWindowFrame"];
     
-    [[NSNotificationCenter defaultCenter] addObserver: self selector: @selector(resizeColumn)
-                    name: @"NSTableViewColumnDidResizeNotification" object: fMessageTable];
-    
     //initially sort peer table by IP
     if ([[fMessageTable sortDescriptors] count] == 0)
+    {
         [fMessageTable setSortDescriptors: [NSArray arrayWithObject: [[fMessageTable tableColumnWithIdentifier: @"Date"]
                                             sortDescriptorPrototype]]];
+        [self updateLog: nil];
+    }
     
-    fErrorImage = [NSImage imageNamed: @"RedDot.png"];
-    fInfoImage = [NSImage imageNamed: @"YellowDot.png"];
+    fErrorImage = [NSImage imageNamed: @"RedDot.tiff"];
+    fInfoImage = [NSImage imageNamed: @"YellowDot.tiff"];
     fDebugImage = [NSImage imageNamed: @"PurpleDot.png"];
     
     //set images to popup button items
@@ -81,7 +88,8 @@
     [[fLevelButton itemAtIndex: LEVEL_DEBUG] setImage: fDebugImage];
     
     //select proper level in popup button
-    switch (tr_getMessageLevel())
+    int level = tr_getMessageLevel();
+    switch (level)
     {
         case TR_MSG_ERR:
             [fLevelButton selectItemAtIndex: LEVEL_ERROR];
@@ -93,21 +101,7 @@
             [fLevelButton selectItemAtIndex: LEVEL_DEBUG];
     }
     
-    fMessages = [[NSMutableArray alloc] init];
-}
-
-- (void) windowDidBecomeKey: (NSNotification *) notification
-{
-    if (!fTimer)
-        fTimer = [NSTimer scheduledTimerWithTimeInterval: UPDATE_SECONDS target: self
-                    selector: @selector(updateLog:) userInfo: nil repeats: YES];
-    [self updateLog: nil];
-}
-
-- (void) windowWillClose: (id)sender
-{
-    [fTimer invalidate];
-    fTimer = nil;
+    [self setDebugWarningHidden: level != TR_MSG_DBG];
 }
 
 - (void) updateLog: (NSTimer *) timer
@@ -116,46 +110,29 @@
     if ((messages = tr_getQueuedMessages()) == NULL)
         return;
     
-    NSMutableDictionary * message;
     for (currentMessage = messages; currentMessage != NULL; currentMessage = currentMessage->next)
-    {
-        message  = [NSMutableDictionary dictionaryWithObjectsAndKeys:
-                    [NSString stringWithUTF8String: currentMessage->message], @"Message",
-                    [NSDate dateWithTimeIntervalSince1970: currentMessage->when], @"Date",
-                    [NSNumber numberWithInt: currentMessage->level], @"Level", nil];
-        
-        if (currentMessage->file != NULL)
-        {
-            [message setObject: [NSString stringWithUTF8String: currentMessage->file] forKey: @"File"];
-            [message setObject: [NSNumber numberWithInt: currentMessage->line] forKey: @"Line"];
-        }
-                                
-        [fMessages addObject: message];
-    }
+        [fMessages addObject: [NSDictionary dictionaryWithObjectsAndKeys:
+                                [NSString stringWithUTF8String: currentMessage->message], @"Message",
+                                [NSDate dateWithTimeIntervalSince1970: currentMessage->when], @"Date",
+                                [NSNumber numberWithInt: currentMessage->level], @"Level", nil]];
     
     tr_freeMessageList(messages);
-    
-    NSScroller * scroller = [[fMessageTable enclosingScrollView] verticalScroller];
-    BOOL shouldScroll = [scroller floatValue] == 1.0 || [scroller isHidden] || [scroller knobProportion] == 1.0;
     
     int total = [fMessages count];
     if (total > MAX_MESSAGES)
     {
         //remove the oldest
         NSSortDescriptor * descriptor = [[[NSSortDescriptor alloc] initWithKey: @"Date" ascending: YES] autorelease];
-        [fMessages sortUsingDescriptors: [NSArray arrayWithObject: descriptor]];
+        NSArray * descriptors = [[NSArray alloc] initWithObjects: descriptor, nil];
+        [fMessages sortUsingDescriptors: descriptors];
+        [descriptors release];
         
         [fMessages removeObjectsInRange: NSMakeRange(0, total-MAX_MESSAGES)];
-        
-        [fMessageTable noteHeightOfRowsWithIndexesChanged: [NSIndexSet indexSetWithIndexesInRange: NSMakeRange(0, MAX_MESSAGES)]];
-        total = MAX_MESSAGES;
     }
     
     [fMessages sortUsingDescriptors: [fMessageTable sortDescriptors]];
     
     [fMessageTable reloadData];
-    if (shouldScroll)
-        [fMessageTable scrollRowToVisible: total-1];
 }
 
 - (int) numberOfRowsInTableView: (NSTableView *) tableView
@@ -188,28 +165,16 @@
         return [message objectForKey: @"Message"];
 }
 
-#warning don't cut off end
-- (float) tableView: (NSTableView *) tableView heightOfRow: (int) row
+- (NSString *) tableView: (NSTableView *) tableView toolTipForCell: (NSCell *) cell rect: (NSRectPointer) rect
+                tableColumn: (NSTableColumn *) column row: (int) row mouseLocation: (NSPoint) mouseLocation
 {
-    NSTableColumn * column = [tableView tableColumnWithIdentifier: @"Message"];
-    
-    if (!fAttributes)
-        fAttributes = [[[[column dataCell] attributedStringValue] attributesAtIndex: 0 effectiveRange: NULL] retain];
-    
-    int count = [[[fMessages objectAtIndex: row] objectForKey: @"Message"] sizeWithAttributes: fAttributes].width / [column width];
-    return [tableView rowHeight] * (float)(count+1);
+    return [self stringForMessage: [fMessages objectAtIndex: row]];
 }
 
 - (void) tableView: (NSTableView *) tableView sortDescriptorsDidChange: (NSArray *) oldDescriptors
 {
     [fMessages sortUsingDescriptors: [fMessageTable sortDescriptors]];
     [fMessageTable reloadData];
-}
-
-- (NSString *) tableView: (NSTableView *) tableView toolTipForCell: (NSCell *) cell rect: (NSRectPointer) rect
-                tableColumn: (NSTableColumn *) column row: (int) row mouseLocation: (NSPoint) mouseLocation
-{
-    return [self fileForMessage: [fMessages objectAtIndex: row]];
 }
 
 - (void) copy: (id) sender
@@ -255,6 +220,8 @@
             level = TR_MSG_DBG;
             break;
     }
+    
+    [self setDebugWarningHidden: level != TR_MSG_DBG];
     
     tr_setMessageLevel(level);
     [[NSUserDefaults standardUserDefaults] setInteger: level forKey: @"MessageLevel"];
@@ -319,47 +286,31 @@
 
 @implementation MessageWindowController (Private)
 
-- (void) resizeColumn
-{
-    [fMessageTable noteHeightOfRowsWithIndexesChanged: [NSIndexSet indexSetWithIndexesInRange:
-                    NSMakeRange(0, [fMessageTable numberOfRows])]];
-}
-
 - (NSString *) stringForMessage: (NSDictionary *) message
 {
     NSString * level;
     switch ([[message objectForKey: @"Level"] intValue])
     {
         case TR_MSG_ERR:
-            level = @"[Error]";
+            level = @"Error";
             break;
         case TR_MSG_INF:
-            level = @"[Info]";
+            level = @"Info";
             break;
         case TR_MSG_DBG:
-            level = @"[Debug]";
+            level = @"Debug";
             break;
         default:
             level = @"";
     }
     
-    NSMutableArray * strings = [NSMutableArray arrayWithObjects: [message objectForKey: @"Date"], level,
-                                [message objectForKey: @"Message"], nil];
-    NSString * file;
-    if ((file = [self fileForMessage: message]))
-        [strings insertObject: file atIndex: 1];
-    
-    return [strings componentsJoinedByString: @" "];
+    return [NSString stringWithFormat: @"%@ [%@] %@", [message objectForKey: @"Date"], level, [message objectForKey: @"Message"]];
 }
 
-- (NSString *) fileForMessage: (NSDictionary *) message
+- (void) setDebugWarningHidden: (BOOL) hide
 {
-    NSString * file;
-    if ((file = [message objectForKey: @"File"]))
-        return [NSString stringWithFormat: @"%@:%@", [[message objectForKey: @"File"] lastPathComponent],
-                [message objectForKey: @"Line"]];
-    else
-        return nil;
+    [fDebugWarningField setHidden: hide];
+    [fDebugWarningIcon setHidden: hide];
 }
 
 @end

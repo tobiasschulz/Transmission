@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -26,12 +26,14 @@
 #define TR_ICON_H
 
 #include <gtk/gtk.h>
-#include "tr_core.h"
 
 #if GTK_CHECK_VERSION(2,10,0)
 #define STATUS_ICON_SUPPORTED
+#define status_icon_supported() (TRUE)
+#else
+#define status_icon_supported() (FALSE)
 #endif
 
-gpointer tr_icon_new( TrCore * core );
+gpointer tr_icon_new( void );
 
 #endif

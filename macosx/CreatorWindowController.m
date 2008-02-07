@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -43,19 +43,19 @@
     if (!(path = [CreatorWindowController chooseFile]))
         return;
     
-    CreatorWindowController * creator = [[self alloc] initWithHandle: handle path: path];
+    CreatorWindowController * creator = [[self alloc] initWithWindowNibName: @"Creator" handle: handle path: path];
     [creator showWindow: nil];
 }
 
 + (void) createTorrentFile: (tr_handle *) handle forFile: (NSString *) file
 {
-    CreatorWindowController * creator = [[self alloc] initWithHandle: handle path: file];
+    CreatorWindowController * creator = [[self alloc] initWithWindowNibName: @"Creator" handle: handle path: file];
     [creator showWindow: nil];
 }
 
-- (id) initWithHandle: (tr_handle *) handle path: (NSString *) path
+- (id) initWithWindowNibName: (NSString *) name handle: (tr_handle *) handle path: (NSString *) path
 {
-    if ((self = [super initWithWindowNibName: @"Creator"]))
+    if ((self = [super initWithWindowNibName: name]))
     {
         fStarted = NO;
         
@@ -174,16 +174,12 @@
 {
     NSSavePanel * panel = [NSSavePanel savePanel];
 
-    [panel setPrompt: NSLocalizedString(@"Select", "Create torrent -> location sheet -> button")];
-    [panel setMessage: NSLocalizedString(@"Select the name and location for the torrent file.",
-                                        "Create torrent -> location sheet -> message")]; 
-    
+    [panel setPrompt: @"Select"];
     [panel setRequiredFileType: @"torrent"];
     [panel setCanSelectHiddenExtension: YES];
-    
-    [panel beginSheetForDirectory: [fLocation stringByDeletingLastPathComponent] file: [fLocation lastPathComponent]
-            modalForWindow: [self window] modalDelegate: self didEndSelector: @selector(locationSheetClosed:returnCode:contextInfo:)
-            contextInfo: nil];
+
+    [panel beginSheetForDirectory: nil file: [fLocation lastPathComponent] modalForWindow: [self window] modalDelegate: self
+            didEndSelector: @selector(locationSheetClosed:returnCode:contextInfo:) contextInfo: nil];
 }
 
 - (void) create: (id) sender
@@ -367,8 +363,6 @@
             [window setContentView: fProgressView];
             [window setFrame: windowRect display: YES animate: YES];
             [fProgressView setHidden: NO];
-            
-            [[window standardWindowButton:NSWindowCloseButton] setEnabled: NO];
             
             fStarted = YES;
         }

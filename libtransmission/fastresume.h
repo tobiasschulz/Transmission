@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -38,7 +38,7 @@ enum
   TR_FR_SPEEDLIMIT   = (1<<6),
   TR_FR_RUN          = (1<<7),
   TR_FR_DESTINATION  = (1<<8),
-  TR_FR_MAX_PEERS    = (1<<9)
+  TR_FR_PEX          = (1<<9)
 };
 
 /**
@@ -46,6 +46,8 @@ enum
  */
 uint64_t tr_fastResumeLoad( tr_torrent          * tor,
                             uint64_t              fieldsToLoad,
-                            const tr_ctor       * ctor );
+                            struct tr_bitfield  * uncheckedPieces,
+                            const char          * destination,
+                            int                   destinationIsFallback );
 
 #endif

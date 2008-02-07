@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -28,18 +28,17 @@
 #include <signal.h>
 #include <stdarg.h>
 #include <string.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 #include <gtk/gtk.h>
 #include <glib/gi18n.h>
 
-#include <libevent/evhttp.h>
-
 #include "tr_prefs.h"
 #include "tr_torrent.h"
 #include "conf.h"
 #include "util.h"
+
+#define BESTDECIMAL(d) ( (d)<100 ? 1 : 0 )
 
 static void
 errcb(GtkWidget *wind, int resp, gpointer data);
@@ -53,111 +52,119 @@ tr_strcmp( const char * a, const char * b )
     return 0;
 }
 
-char*
-tr_strlratio( char * buf, double ratio, size_t buflen )
-{
-    if( (int)ratio == TR_RATIO_NA )
-        g_strlcpy( buf, _( "None" ), buflen );
-    else if( (int)ratio == TR_RATIO_INF )
-        g_strlcpy( buf, "\xE2\x88\x9E", buflen );
-    else if( ratio < 10.0 )
-        g_snprintf( buf, buflen, "%.2f", ratio );
-    else if( ratio < 100.0 )
-        g_snprintf( buf, buflen, "%.1f", ratio );
-    else
-        g_snprintf( buf, buflen, "%.0f", ratio );
-    return buf;
+static const char *sizestrs[] = {
+  N_("B"), N_("KiB"), N_("MiB"), N_("GiB"), N_("TiB"), N_("PiB"), N_("EiB"),
+};
+
+char *
+readablesize(guint64 size) {
+  int ii;
+  double small = size;
+
+  if( !size )
+    return g_strdup_printf( _("None") );
+
+  for(ii = 0; ii + 1 < ALEN(sizestrs) && 1024.0 <= small / 1024.0; ii++)
+    small /= 1024.0;
+
+  if(1024.0 <= small) {
+    small /= 1024.0;
+    ii++;
+  }
+
+  return g_strdup_printf("%.*f %s", BESTDECIMAL(small), small,
+                         gettext(sizestrs[ii]));
 }
 
-char*
-tr_strlsize( char * buf, guint64 size, size_t buflen )
+char *
+readablespeed (double KiBps)
 {
-    if( !size )
-        g_strlcpy( buf, _( "None" ), buflen );
-    else {
-        static const char *units[] = {
-            N_("B"), N_("KiB"), N_("MiB"), N_("GiB"), N_("TiB"),
-            N_("PiB"), N_("EiB"), N_("ZiB"), N_("YiB")
-        };
-        unsigned int i;
-        double small = size;
-        for( i=0; i<G_N_ELEMENTS(units) && (small>=1024.0); ++i )
-            small /= 1024.0;
-        if( i < 2 ) /* B & KiB */
-            g_snprintf( buf, buflen, "%d %s", (int)small, _(units[i]) );
-        else
-            g_snprintf( buf, buflen, "%.1f %s", small, _(units[i]) );
-    }
-    return buf;
+  const guint64 bps = KiBps * 1024;
+  char * str = readablesize (bps);
+  char * ret = bps ? g_strdup_printf ("%s/s", str) : g_strdup( str );
+  g_free (str);
+  return ret;
 }
-
-char*
-tr_strlspeed( char * buf, double KiBps, size_t buflen )
-{
-    const guint64 bps = KiBps * 1024;
-    if( !bps )
-        g_strlcpy( buf, _( "None" ), buflen );
-    else {
-        char bbuf[64];
-        tr_strlsize( bbuf, (guint64)(KiBps*1024), sizeof(bbuf) );
-        g_snprintf( buf, buflen, _("%s/s"), bbuf );
-    }
-    return buf;
-}
+ 
 
 #define SECONDS(s)              ((s) % 60)
 #define MINUTES(s)              ((s) / 60 % 60)
 #define HOURS(s)                ((s) / 60 / 60 % 24)
 #define DAYS(s)                 ((s) / 60 / 60 / 24 % 7)
 
-char*
-tr_strltime( char * buf, int secs, size_t buflen )
-{
-    if( secs < 60 )
-    {
-        g_snprintf( buf, buflen, _( "%i %s" ),
-                    SECONDS(secs), ngettext("sec", "secs", SECONDS(secs)));
-    }
-    else if( secs < 60*60 )
-    {
-        g_snprintf( buf, buflen, _("%i %s %i %s"),
-                    MINUTES(secs), ngettext("min", "mins", MINUTES(secs)),
-                    SECONDS(secs), ngettext("sec", "secs", SECONDS(secs)));
-    }
-    else if( secs < 60*60*24 )
-    {
-        g_snprintf( buf, buflen, _("%i %s %i %s"),
-                    HOURS(secs),   ngettext("hr", "hrs", HOURS(secs)),
-                    MINUTES(secs), ngettext("min", "mins", MINUTES(secs)));
-    }
-    else
-    {
-        g_snprintf( buf, buflen, _("%i %s %i %s"),
-                    DAYS(secs),  ngettext("day", "days", DAYS(secs)),
-                    HOURS(secs), ngettext("hr", "hrs", HOURS(secs)));
-    }
-
-    return buf;
+char *
+readabletime(int secs) {
+  if(60 > secs)
+    return g_strdup_printf(_("%i %s"),
+      SECONDS(secs), ngettext("sec", "secs", SECONDS(secs)));
+  else if(60 * 60 > secs)
+    return g_strdup_printf(_("%i %s %i %s"),
+      MINUTES(secs), ngettext("min", "mins", MINUTES(secs)),
+      SECONDS(secs), ngettext("sec", "secs", SECONDS(secs)));
+  else if(60 * 60 * 24 > secs)
+    return g_strdup_printf(_("%i %s %i %s"),
+      HOURS(secs),   ngettext("hr", "hrs", HOURS(secs)),
+      MINUTES(secs), ngettext("min", "mins", MINUTES(secs)));
+  else
+    return g_strdup_printf(_("%i %s %i %s"),
+      DAYS(secs),    ngettext("day", "days", DAYS(secs)),
+      HOURS(secs),   ngettext("hr", "hrs", HOURS(secs)));
 }
-
 
 char *
 rfc822date (guint64 epoch_msec)
 {
-    const time_t secs = epoch_msec / 1000;
-    const struct tm tm = *localtime (&secs);
-    char buf[128];
-    strftime( buf, sizeof(buf), "%a, %d %b %Y %T %Z", &tm );
-    return g_locale_to_utf8( buf, -1, NULL, NULL, NULL );
+  const time_t secs = epoch_msec / 1000;
+  const struct tm tm = *localtime (&secs);
+  char buf[128];
+  strftime (buf, sizeof(buf), "%a, %d %b %Y %T %Z", &tm);
+  return g_strdup (buf);
+}
+
+char *
+ratiostr(guint64 down, guint64 up) {
+  double ratio;
+
+  if(0 == up && 0 == down)
+    return g_strdup(_("N/A"));
+
+  if(0 == down)
+    /* this is a UTF-8 infinity symbol */
+    return g_strdup("\xE2\x88\x9E");
+
+  ratio = (double)up / (double)down;
+
+  return g_strdup_printf("%.*f", BESTDECIMAL(ratio), ratio);
 }
 
 gboolean
-mkdir_p( const char * path, mode_t mode )
+mkdir_p(const char *name, mode_t mode)
 {
-#if GLIB_CHECK_VERSION( 2, 8, 0)
-    return !g_mkdir_with_parents( path, mode );
+#if GLIB_CHECK_VERSION(2,8,0)
+    return !g_mkdir_with_parents( name, mode );
 #else
-    return !tr_mkdirp( path, mode );
+    struct stat sb;
+    char *parent;
+    gboolean ret;
+    int oerrno;
+
+    if(0 != stat(name, &sb)) {
+      if(ENOENT != errno)
+        return FALSE;
+      parent = g_path_get_dirname(name);
+      ret = mkdir_p(parent, mode);
+      oerrno = errno;
+      g_free(parent);
+      errno = oerrno;
+      return (ret ? (0 == mkdir(name, mode)) : FALSE);
+    }
+
+    if(!S_ISDIR(sb.st_mode)) {
+      errno = ENOTDIR;
+      return FALSE;
+    }
+
+    return TRUE;
 #endif
 }
 
@@ -191,12 +198,37 @@ freestrlist(GList *list)
 }
 
 char *
-decode_uri( const char * uri )
-{
-    char * filename = evhttp_decode_uri( uri );
-    char * ret = g_strdup( filename );
-    free( filename );
-    return ret;
+urldecode(const char *str, int len) {
+  int ii, jj;
+  char *ret;
+
+  if( len <= 0 )
+      len = strlen( str );
+
+  for(ii = jj = 0; ii < len; ii++, jj++)
+    if('%' == str[ii])
+      ii += 2;
+
+  ret = g_new(char, jj + 1);
+
+  for(ii = jj = 0; ii < len; ii++, jj++) {
+    switch(str[ii]) {
+      case '%':
+        if(ii + 2 < len) {
+          char buf[3] = { str[ii+1], str[ii+2], '\0' };
+          ret[jj] = g_ascii_strtoull(buf, NULL, 16);
+        }
+        ii += 2;
+        break;
+      case '+':
+        ret[jj] = ' ';
+      default:
+        ret[jj] = str[ii];
+    }
+  }
+  ret[jj] = '\0';
+
+  return ret;
 }
 
 GList *
@@ -359,7 +391,7 @@ verrmsg_full( GtkWindow * wind, callbackfunc_t func, void * data,
 }
 
 static void
-errcb(GtkWidget *widget, int resp UNUSED, gpointer data) {
+errcb(GtkWidget *widget, int resp SHUTUP, gpointer data) {
   GList *funcdata;
   callbackfunc_t func;
 
@@ -411,14 +443,3 @@ on_tree_view_button_pressed (GtkWidget       * view,
   return FALSE;
 }
 
-gpointer
-tr_object_ref_sink( gpointer object )
-{
-#if GLIB_CHECK_VERSION(2,10,0)
-    g_object_ref_sink( object );
-#else
-    g_object_ref( object );
-    gtk_object_sink( GTK_OBJECT( object ) );
-#endif
-    return object;
-}

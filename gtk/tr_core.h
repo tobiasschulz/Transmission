@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -55,24 +55,15 @@
 typedef struct _TrCore TrCore;
 typedef struct _TrCoreClass TrCoreClass;
 
-struct core_stats
-{
-    int downloadCount;
-    int seedingCount;
-    float clientDownloadSpeed;
-    float clientUploadSpeed;
-};
-
 /* treat the contents of this structure as private */
 struct _TrCore
 {
-    GObject            parent;
-    GtkTreeModel     * model;
-    tr_handle        * handle;
-    int                nextid;
-    gboolean           quitting;
-    gboolean           disposed;
-    struct core_stats  stats;
+    GObject           parent;
+    GtkTreeModel    * model;
+    tr_handle       * handle;
+    int               nextid;
+    gboolean          quitting;
+    gboolean          disposed;
 };
 
 struct _TrCoreClass
@@ -117,6 +108,14 @@ tr_core_model( TrCore * self );
 /* Returns the libtransmission handle */
 tr_handle *
 tr_core_handle( TrCore * self );
+
+/* Try to politely stop all torrents and nat traversal */
+void
+tr_core_shutdown( TrCore * self );
+
+/* Returns true if the shutdown has completed */
+gboolean
+tr_core_quiescent( TrCore * self );
 
 /* Load saved state, return number of torrents added. May trigger one
    or more "error" signals with TR_CORE_ERR_ADD_TORRENT */
@@ -181,18 +180,17 @@ tr_core_set_pref_bool( TrCore * self, const char * key, gboolean val );
 void
 tr_core_set_pref_int( TrCore * self, const char * key, int val );
 
+void
+tr_core_set_sort_column_from_prefs( TrCore * core );
+
 /* column names for the model used to store torrent information */
 /* keep this in sync with the type array in tr_core_init() in tr_core.c */
-enum
-{
-    MC_NAME,
-    MC_NAME_COLLATED,
-    MC_HASH,
-    MC_TORRENT,
-    MC_TORRENT_RAW,
-    MC_STATUS,
-    MC_ID,
-    MC_ROW_COUNT
+enum {
+  MC_NAME, MC_SIZE, MC_HASH, MC_STAT, MC_ERR, MC_TERR,
+  MC_PROG_C, MC_PROG_D, MC_DRATE, MC_URATE, MC_ETA, MC_PEERS,
+  MC_UPEERS, MC_DPEERS, MC_SEED, MC_LEECH, MC_DONE,
+  MC_DOWN, MC_UP, MC_LEFT, MC_TORRENT, MC_ID,
+  MC_ROW_COUNT
 };
 
 #endif

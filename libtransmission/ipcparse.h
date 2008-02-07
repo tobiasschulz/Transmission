@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2008 Joshua Elsasser
+ * Copyright (c) 2007 Joshua Elsasser
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,6 @@
 #define TR_DAEMON_IPC_H
 
 #include <inttypes.h>
-#include <unistd.h> /* for ssize_t */
 
 /* yay for typedefs, we can't forward declare benc_val_t or tr_info
    like with structs */
@@ -43,13 +42,11 @@ enum ipc_msg
     IPC_MSG_AUTOMAP,
     IPC_MSG_AUTOSTART,
     IPC_MSG_BAD,
-    IPC_MSG_CRYPTO,
     IPC_MSG_DIR,
     IPC_MSG_DOWNLIMIT,
     IPC_MSG_FAIL,
     IPC_MSG_GETAUTOMAP,
     IPC_MSG_GETAUTOSTART,
-    IPC_MSG_GETCRYPTO,
     IPC_MSG_GETDIR,
     IPC_MSG_GETDOWNLIMIT,
     IPC_MSG_GETINFO,

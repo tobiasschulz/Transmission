@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,7 @@
 
 @interface DragOverlayView : NSView
 {
-    NSImage * fBadge, * fBackBadge;
+    NSImage * fBadge, * fBackBadge, * fAppIcon;
     
     NSDictionary * fMainLineAttributes, * fSubLineAttributes;
 }

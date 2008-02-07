@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -27,7 +27,7 @@ hig_workarea_add_section_divider  (GtkWidget   * table,
                                    int         * row)
 {
 	GtkWidget * w = gtk_alignment_new (0.0f, 0.0f, 0.0f, 0.0f);
-	gtk_widget_set_size_request (w, 0u, 6u);
+	gtk_widget_set_usize (w, 0u, 6u);
 	gtk_table_attach (GTK_TABLE(table), w, 0, 4, *row, *row+1, 0, 0, 0, 0);
 	++*row;
 }
@@ -57,12 +57,12 @@ hig_workarea_add_section_spacer  (GtkWidget   * table,
 
 	/* spacer to move the fields a little to the right of the name header */
 	w = gtk_alignment_new (0.0f, 0.0f, 0.0f, 0.0f);
-	gtk_widget_set_size_request (w, 12u, 0u);
+	gtk_widget_set_usize (w, 18u, 0u);
 	gtk_table_attach (GTK_TABLE(table), w, 0, 1, row, row+items_in_section, 0, 0, 0, 0);
 
 	/* spacer between the controls and their labels */
 	w = gtk_alignment_new (0.0f, 0.0f, 0.0f, 0.0f);
-	gtk_widget_set_size_request (w, 12u, 0u);
+	gtk_widget_set_usize (w, 12u, 0u);
 	gtk_table_attach (GTK_TABLE(table), w, 2, 3, row, row+items_in_section, 0, 0, 0, 0);
 }
 
@@ -74,23 +74,6 @@ hig_workarea_add_wide_control (GtkWidget * table,
   gtk_table_attach (GTK_TABLE(table), w,
                     1, 4, *row, *row+1,
                     GTK_EXPAND|GTK_SHRINK|GTK_FILL, 0, 0, 0);
-  ++*row;
-}
-
-void
-hig_workarea_add_double_control (GtkWidget * table,
-                               int       * row,
-                               GtkWidget * wl,
-                               GtkWidget * wr)
-{
-  gtk_table_attach (GTK_TABLE(table), wl,
-                    1, 2, *row, *row+1,
-                    GTK_EXPAND|GTK_SHRINK|GTK_FILL, 0, 0, 0);
-
-  gtk_table_attach (GTK_TABLE(table), wr,
-                    3, 4, *row, *row+1,
-                    GTK_EXPAND|GTK_SHRINK|GTK_FILL, 0, 0, 0);
-
   ++*row;
 }
 

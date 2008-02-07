@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -35,6 +35,7 @@
 #include "conf.h"
 #include "dialogs.h"
 #include "hig.h"
+#include "tr_cell_renderer_progress.h"
 #include "tr_core.h"
 #include "tr_icon.h"
 #include "tr_prefs.h"
@@ -144,7 +145,7 @@ makeaddwind( GtkWindow * parent, TrCore * core )
 }
 
 void
-addwindnocore( gpointer gdata, GObject * core UNUSED )
+addwindnocore( gpointer gdata, GObject * core SHUTUP )
 {
     struct addcb * data = gdata;
 
@@ -279,7 +280,7 @@ promptfordir( GtkWindow * parent, TrCore * core, GList * files, uint8_t * data,
 }
 
 void
-promptdirnocore( gpointer gdata, GObject * core UNUSED )
+promptdirnocore( gpointer gdata, GObject * core SHUTUP )
 {
     struct dirdata * stuff = gdata;
 
@@ -356,19 +357,6 @@ quitresp( GtkWidget * widget, int response, gpointer data )
     gtk_widget_destroy( widget );
 }
 
-static gboolean
-countActiveTorrents( GtkTreeModel  * model,
-                     GtkTreePath   * path UNUSED,
-                     GtkTreeIter   * iter,
-                     gpointer        activeTorrentCount )
-{
-    int status = -1;
-    gtk_tree_model_get( model, iter, MC_STATUS, &status, -1 );
-    if( status != TR_STATUS_STOPPED )
-        *(int*)activeTorrentCount += 1;
-    return FALSE; /* keep iterating */
-}
-
 void
 askquit( TrCore          * core,
          GtkWindow       * parent,
@@ -378,20 +366,9 @@ askquit( TrCore          * core,
     struct quitdata * stuff;
     GtkWidget * wind;
     GtkWidget * dontask;
-    GtkTreeModel * model;
-    int activeTorrentCount;
 
-    /* if the user doesn't want to be asked, don't ask */
-    if( !pref_flag_get( PREF_KEY_ASKQUIT ) ) {
-        func( cbdata );
-        return;
-    }
-
-    /* if there aren't any active torrents, don't ask */
-    model = tr_core_model( core );
-    activeTorrentCount = 0;
-    gtk_tree_model_foreach( model, countActiveTorrents, &activeTorrentCount );
-    if( !activeTorrentCount ) {
+    if( !pref_flag_get( PREF_KEY_ASKQUIT ) )
+    {
         func( cbdata );
         return;
     }
