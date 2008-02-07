@@ -94,11 +94,7 @@ tr_getLogTimeStr( char * buf, int buflen )
     now = time( NULL );
     gettimeofday( &tv, NULL );
 
-#ifdef WIN32
-    now_tm = *localtime( &now );
-#else
     localtime_r( &now, &now_tm );
-#endif
     strftime( tmp, sizeof(tmp), "%H:%M:%S", &now_tm );
     milliseconds = (int)(tv.tv_usec / 1000);
     snprintf( buf, buflen, "%s.%03d", tmp, milliseconds );
@@ -438,12 +434,12 @@ tr_mkdirp( const char * path_in, int permissions )
         if( stat( path, &sb ) )
         {
             /* Folder doesn't exist yet */
-            if( tr_mkdir( path, permissions ) ) {
-                const int err = errno;
-                tr_err( "Couldn't create directory %s (%s)", path, strerror( err ) );
+            if( tr_mkdir( path, permissions ) )
+            {
+                tr_err( "Could not create directory %s (%s)", path,
+                        strerror( errno ) );
                 tr_free( path );
-                errno = err;
-                return -1;
+                return 1;
             }
         }
         else if( ( sb.st_mode & S_IFMT ) != S_IFDIR )
@@ -451,8 +447,7 @@ tr_mkdirp( const char * path_in, int permissions )
             /* Node exists but isn't a folder */
             tr_err( "Remove %s, it's in the way.", path );
             tr_free( path );
-            errno = ENOTDIR;
-            return -1;
+            return 1;
         }
 
         if( done )
@@ -488,12 +483,10 @@ tr_buildPath ( char *buf, size_t buflen, const char *first_element, ... )
 }
 
 int
-tr_ioErrorFromErrno( int err )
+tr_ioErrorFromErrno( void )
 {
-    switch( err )
+    switch( errno )
     {
-        case 0:
-            return TR_OK;
         case EACCES:
         case EROFS:
             return TR_ERROR_IO_PERMISSIONS;
@@ -509,37 +502,31 @@ tr_ioErrorFromErrno( int err )
     }
 }
 
-const char *
+char *
 tr_errorString( int code )
 {
     switch( code )
     {
         case TR_OK:
             return "No error";
-
         case TR_ERROR:
             return "Generic error";
         case TR_ERROR_ASSERT:
             return "Assert error";
-
-        case TR_ERROR_IO_PARENT:
-            return "Download folder does not exist";
         case TR_ERROR_IO_PERMISSIONS:
             return "Insufficient permissions";
         case TR_ERROR_IO_SPACE:
             return "Insufficient free space";
+        case TR_ERROR_IO_DUP_DOWNLOAD:
+            return "Already active transfer with same name and download folder";
         case TR_ERROR_IO_FILE_TOO_BIG:
             return "File too large";
         case TR_ERROR_IO_OPEN_FILES:
             return "Too many open files";
-        case TR_ERROR_IO_DUP_DOWNLOAD:
-            return "Already active transfer with same name and download folder";
         case TR_ERROR_IO_OTHER:
             return "Generic I/O error";
-
-        default:
-            return "Unknown error";
     }
+    return "Unknown error";
 }
 
 /****
@@ -647,7 +634,7 @@ tr_bitfieldClear( tr_bitfield * bitfield )
 int
 tr_bitfieldIsEmpty( const tr_bitfield * bitfield )
 {
-    size_t i;
+    unsigned int i;
 
     for( i=0; i<bitfield->len; ++i )
         if( bitfield->bits[i] )
@@ -677,7 +664,7 @@ tr_bitfieldAddRange( tr_bitfield  * bitfield,
                      size_t         end )
 {
     /* TODO: there are faster ways to do this */
-    size_t i;
+    unsigned int i;
     for( i=begin; i<end; ++i )
         tr_bitfieldAdd( bitfield, i );
 }
@@ -700,7 +687,7 @@ tr_bitfieldRemRange ( tr_bitfield  * b,
                       size_t         end )
 {
     /* TODO: there are faster ways to do this */
-    size_t i;
+    unsigned int i;
     for( i=begin; i<end; ++i )
         tr_bitfieldRem( b, i );
 }
@@ -855,22 +842,3 @@ strlcat(char *dst, const char *src, size_t siz)
 }
 
 #endif /* HAVE_STRLCAT */
-
-/***
-****
-***/
-
-double
-tr_getRatio( double numerator, double denominator )
-{
-    double ratio;
-
-    if( denominator )
-        ratio = numerator / denominator;
-    else if( numerator )
-        ratio = TR_RATIO_INF;
-    else
-        ratio = TR_RATIO_NA;
-
-    return ratio;
-}

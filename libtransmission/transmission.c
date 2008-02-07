@@ -189,7 +189,7 @@ tr_handle * tr_init( const char * tag )
                         -1, /* upload speed limit */
                         FALSE, /* use download speed limit? */
                         -1, /* download speed limit */
-                        200, /* globalPeerLimit */
+                        512, /* globalPeerLimit */
                         TR_MSG_INF, /* message level */
                         FALSE ); /* is message queueing enabled? */
 }
@@ -264,8 +264,7 @@ void tr_natTraversalEnable( tr_handle * h, int enable )
     tr_globalUnlock( h );
 }
 
-const tr_handle_status *
-tr_handleStatus( tr_handle * h )
+tr_handle_status * tr_handleStatus( tr_handle * h )
 {
     tr_handle_status * s;
 
@@ -354,7 +353,7 @@ tr_torrentRates( tr_handle * h, float * toClient, float * toPeer )
 }
 
 int
-tr_torrentCount( const tr_handle * h )
+tr_torrentCount( tr_handle * h )
 {
     return h->torrentCount;
 }
@@ -393,8 +392,6 @@ tr_close( tr_handle * h )
     const int maxwait_msec = SHUTDOWN_MAX_SECONDS * 1000;
     const uint64_t deadline = tr_date( ) + maxwait_msec;
 
-    tr_statsClose( h );
-
     tr_runInEventThread( h, tr_closeImpl, h );
     while( !h->isClosed && !deadlineReached( deadline ) )
         tr_wait( 100 );
@@ -404,6 +401,7 @@ tr_close( tr_handle * h )
         tr_wait( 100 );
 
     tr_fdClose( );
+    tr_statsClose( h );
     tr_lockFree( h->lock );
     free( h->tag );
     free( h );

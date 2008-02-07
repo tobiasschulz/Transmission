@@ -39,8 +39,8 @@
 #include "util.h"
 
 static void
-tr_core_marshal_err( GClosure * closure, GValue * ret UNUSED, guint count,
-                     const GValue * vals, gpointer hint UNUSED,
+tr_core_marshal_err( GClosure * closure, GValue * ret SHUTUP, guint count,
+                     const GValue * vals, gpointer hint SHUTUP,
                      gpointer marshal )
 {
     typedef void (*TRMarshalErr)
@@ -64,8 +64,8 @@ tr_core_marshal_err( GClosure * closure, GValue * ret UNUSED, guint count,
 }
 
 static void
-tr_core_marshal_prompt( GClosure * closure, GValue * ret UNUSED, guint count,
-                        const GValue * vals, gpointer hint UNUSED,
+tr_core_marshal_prompt( GClosure * closure, GValue * ret SHUTUP, guint count,
+                        const GValue * vals, gpointer hint SHUTUP,
                         gpointer marshal )
 {
     typedef void (*TRMarshalPrompt)
@@ -91,8 +91,8 @@ tr_core_marshal_prompt( GClosure * closure, GValue * ret UNUSED, guint count,
 }
 
 static void
-tr_core_marshal_data( GClosure * closure, GValue * ret UNUSED, guint count,
-                      const GValue * vals, gpointer hint UNUSED,
+tr_core_marshal_data( GClosure * closure, GValue * ret SHUTUP, guint count,
+                      const GValue * vals, gpointer hint SHUTUP,
                       gpointer marshal )
 {
     typedef void (*TRMarshalPrompt)
@@ -134,7 +134,7 @@ tr_core_dispose( GObject * obj )
 
 
 static void
-tr_core_class_init( gpointer g_class, gpointer g_class_data UNUSED )
+tr_core_class_init( gpointer g_class, gpointer g_class_data SHUTUP )
 {
     GObjectClass * gobject_class;
     TrCoreClass  * core_class;
@@ -174,7 +174,7 @@ static int
 compareDouble( double a, double b )
 {
     if( a < b ) return -1;
-    if( b < a ) return 1;
+    if( b > a ) return 1;
     return 0;
 }
 
@@ -244,7 +244,7 @@ compareByProgress( GtkTreeModel   * model,
     sb = tr_torrentStatCached( tb );
     ret = compareDouble( sa->percentDone, sb->percentDone );
     if( !ret )
-        ret = compareDouble( sa->ratio, sb->ratio );
+        ret = compareDouble( sa->ratio, sa->ratio );
     return ret;
 }
 
@@ -252,20 +252,12 @@ static int
 compareByState( GtkTreeModel   * model,
                 GtkTreeIter    * a,
                 GtkTreeIter    * b,
-                gpointer         user_data )
+                gpointer         user_data UNUSED )
 {
-    int sa, sb, ret;
-
-    /* first by state */
+    int sa, sb;
     gtk_tree_model_get( model, a, MC_STATUS, &sa, -1 );
     gtk_tree_model_get( model, b, MC_STATUS, &sb, -1 );
-    ret = sa - sb;
-
-    /* second by progress */
-    if( !ret )
-        ret = compareByProgress( model, a, b, user_data );
-
-    return ret;
+    return sa - sb;
 }
 
 static int
@@ -329,7 +321,7 @@ prefsChanged( TrCore * core, const char * key, gpointer data UNUSED )
 }
 
 static void
-tr_core_init( GTypeInstance * instance, gpointer g_class UNUSED )
+tr_core_init( GTypeInstance * instance, gpointer g_class SHUTUP )
 {
     tr_handle * h;
     TrCore * self = (TrCore *) instance;
@@ -646,35 +638,24 @@ tr_core_delete_torrent( TrCore * self, GtkTreeIter * iter )
     gtk_list_store_remove( GTK_LIST_STORE( self->model ), iter );
     tr_torrentRemoveSaved( tr_torrent_handle( tor ) );
 
-    g_object_unref( G_OBJECT( tor ) );
+    tr_torrent_sever( tor );
 }
 
 static gboolean
 update_foreach( GtkTreeModel * model,
                 GtkTreePath  * path UNUSED,
                 GtkTreeIter  * iter,
-                gpointer       data )
+                gpointer       data UNUSED)
 {
     TrTorrent * gtor;
     int oldStatus;
     const tr_stat * torStat;
-    struct core_stats * stats = data;
-
     gtk_tree_model_get( model, iter, MC_TORRENT, &gtor,
                                      MC_STATUS, &oldStatus,
                                      -1 );
 
     torStat = tr_torrent_stat( gtor );
 
-    /* sum the torrents' cumulative stats... */
-    if( torStat->status == TR_STATUS_DOWNLOAD )
-        ++stats->downloadCount;
-    else if( torStat->status == TR_STATUS_SEED )
-        ++stats->seedingCount;
-    stats->clientDownloadSpeed += torStat->rateDownload;
-    stats->clientUploadSpeed += torStat->rateUpload;
-
-    /* update the model's status if necessary */
     if( oldStatus != (int) torStat->status )
         gtk_list_store_set( GTK_LIST_STORE( model ), iter,
                             MC_STATUS, torStat->status,
@@ -699,8 +680,7 @@ tr_core_update( TrCore * self )
     gtk_tree_sortable_set_sort_column_id( sortable, GTK_TREE_SORTABLE_UNSORTED_SORT_COLUMN_ID, order );
 
     /* refresh the model */
-    memset( &self->stats, 0, sizeof( struct core_stats ) );
-    gtk_tree_model_foreach( self->model, update_foreach, &self->stats );
+    gtk_tree_model_foreach( self->model, update_foreach, NULL );
 
     /* resume sorting */
     gtk_tree_sortable_set_sort_column_id( sortable, column, order );

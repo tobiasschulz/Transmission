@@ -224,7 +224,6 @@ privateFree( gpointer vprivate )
 {
     PrivateData * p = ( PrivateData * ) vprivate;
     g_signal_handler_disconnect( p->core, p->pref_handler_id );
-    g_free( p->filter_text );
     g_free( p );
 }
 
@@ -460,6 +459,53 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
     w = p->toolbar = action_get_widget( "/main-window-toolbar" );
     gtk_box_pack_start( GTK_BOX(vbox), w, FALSE, FALSE, 0 ); 
 
+    /* status menu */
+    menu = p->status_menu = gtk_menu_new( );
+    status_stats_mode = 0;
+    l = NULL;
+    pch = pref_string_get( PREF_KEY_STATUS_BAR_STATS );
+    for( i=0, n=G_N_ELEMENTS(stats_modes); i<n; ++i )
+    {
+        const char * val = stats_modes[i].val;
+        w = gtk_radio_menu_item_new_with_label( l, _( stats_modes[i].i18n ) );
+        l = gtk_radio_menu_item_get_group( GTK_RADIO_MENU_ITEM(w) );
+        gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(w), !strcmp( val, pch ) );
+        g_object_set_data( G_OBJECT(w), STATS_MODE, (gpointer)stats_modes[i].val );
+        g_signal_connect( w, "toggled", G_CALLBACK(status_menu_toggled_cb), p );
+        gtk_menu_shell_append( GTK_MENU_SHELL(menu), w );
+        gtk_widget_show( w );
+    }
+    g_free( pch );
+
+    /* statusbar */
+    h = p->status = gtk_hbox_new( FALSE, GUI_PAD );
+    gtk_container_set_border_width( GTK_CONTAINER(h), GUI_PAD );
+     
+    w = p->ul_lb = gtk_label_new( NULL );
+    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
+    w = gtk_image_new_from_stock( "tr-arrow-up", (GtkIconSize)-1 );
+    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
+    w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
+    gtk_widget_set_usize( w, GUI_PAD, 0u );
+    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
+    w = p->dl_lb = gtk_label_new( NULL );
+    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
+    w = gtk_image_new_from_stock( "tr-arrow-down", (GtkIconSize)-1 );
+    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
+
+    w = gtk_image_new_from_stock( "tr-yin-yang", (GtkIconSize)-1 );
+    c = gtk_event_box_new( );
+    gtk_container_add( GTK_CONTAINER(c), w );
+    w = c;
+    g_signal_connect( w, "button-release-event", G_CALLBACK(onYinYangReleased), p );
+    gtk_box_pack_start( GTK_BOX(h), w, FALSE, FALSE, 0 );
+    w = p->stats_lb = gtk_label_new( NULL );
+    gtk_box_pack_start( GTK_BOX(h), w, FALSE, FALSE, 0 );
+    gtk_box_pack_start( GTK_BOX(vbox), h, FALSE, FALSE, 0 );
+
+    w = gtk_hseparator_new( );
+    gtk_box_pack_start( GTK_BOX(vbox), w, FALSE, FALSE, 0 ); 
+
     /* filter */
     toggles = NULL;
     h = p->filter = gtk_hbox_new( FALSE, 0 );
@@ -485,56 +531,6 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
     gtk_box_pack_start( GTK_BOX(vbox), h, FALSE, FALSE, 0 ); 
     g_signal_connect( s, "changed", G_CALLBACK( filter_entry_changed ), p );
 
-    w = gtk_hseparator_new( );
-    gtk_box_pack_start( GTK_BOX(vbox), w, FALSE, FALSE, 0 ); 
-
-    /* status menu */
-    menu = p->status_menu = gtk_menu_new( );
-    status_stats_mode = 0;
-    l = NULL;
-    pch = pref_string_get( PREF_KEY_STATUS_BAR_STATS );
-    for( i=0, n=G_N_ELEMENTS(stats_modes); i<n; ++i )
-    {
-        const char * val = stats_modes[i].val;
-        w = gtk_radio_menu_item_new_with_label( l, _( stats_modes[i].i18n ) );
-        l = gtk_radio_menu_item_get_group( GTK_RADIO_MENU_ITEM(w) );
-        gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM(w), !strcmp( val, pch ) );
-        g_object_set_data( G_OBJECT(w), STATS_MODE, (gpointer)stats_modes[i].val );
-        g_signal_connect( w, "toggled", G_CALLBACK(status_menu_toggled_cb), p );
-        gtk_menu_shell_append( GTK_MENU_SHELL(menu), w );
-        gtk_widget_show( w );
-    }
-    g_free( pch );
-
-    /* status */
-    h = p->status = gtk_hbox_new( FALSE, GUI_PAD );
-    gtk_container_set_border_width( GTK_CONTAINER( h ), GUI_PAD );
-    w = p->gutter_lb = gtk_label_new( "N transfers" );
-    gtk_box_pack_start( GTK_BOX(h), w, 0, 0, 0 );
-    w = p->ul_lb = gtk_label_new( NULL );
-    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
-    w = gtk_image_new_from_stock( GTK_STOCK_GO_UP, GTK_ICON_SIZE_MENU );
-    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
-    w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
-    gtk_widget_set_size_request( w, GUI_PAD, 0u );
-    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
-    w = p->dl_lb = gtk_label_new( NULL );
-    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
-    w = gtk_image_new_from_stock( GTK_STOCK_GO_DOWN, GTK_ICON_SIZE_MENU );
-    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
-    w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
-    gtk_widget_set_size_request( w, GUI_PAD, 0u );
-    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
-    w = p->stats_lb = gtk_label_new( NULL );
-    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
-    w = gtk_image_new_from_stock( GTK_STOCK_REFRESH, GTK_ICON_SIZE_MENU );
-    c = gtk_event_box_new( );
-    gtk_container_add( GTK_CONTAINER(c), w );
-    w = c;
-    gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
-    g_signal_connect( w, "button-release-event", G_CALLBACK(onYinYangReleased), p );
-    gtk_box_pack_start( GTK_BOX(vbox), h, FALSE, FALSE, 0 );
-
     menu = gtk_menu_new( );
     l = NULL;
     for( i=0; i<FILTER_TEXT_MODE_QTY; ++i )
@@ -549,12 +545,24 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
     }
     g_signal_connect( s, "icon-released", G_CALLBACK(entry_icon_released), menu );
 
+
     /* workarea */
     p->view = makeview( p, core );
     w = p->scroll = gtk_scrolled_window_new( NULL, NULL );
     gtk_container_add( GTK_CONTAINER(w), p->view );
     gtk_box_pack_start_defaults( GTK_BOX(vbox), w );
     gtk_container_set_focus_child( GTK_CONTAINER( vbox ), w );
+
+    /* spacer */
+    w = gtk_alignment_new (0.0f, 0.0f, 0.0f, 0.0f);
+    gtk_widget_set_usize (w, 0u, 6u);
+    gtk_box_pack_start( GTK_BOX(vbox), w, FALSE, FALSE, 0 ); 
+
+    /* status */
+    h = gtk_hbox_new( FALSE, GUI_PAD );
+    w = p->gutter_lb = gtk_label_new( "N transfers" );
+    gtk_box_pack_start_defaults( GTK_BOX(h), w );
+    gtk_box_pack_start( GTK_BOX(vbox), h, FALSE, FALSE, 0 ); 
 
     /* show all but the window */
     gtk_widget_show_all( vbox );
@@ -600,7 +608,7 @@ static void
 updateStats( PrivateData * p )
 {
     char * pch;
-    char up[32], down[32], ratio[32], buf[128];
+    char up[32], down[32], buf[128];
     struct tr_session_stats stats;
     tr_handle * handle = tr_core_handle( p->core );
 
@@ -608,8 +616,7 @@ updateStats( PrivateData * p )
     pch = pref_string_get( PREF_KEY_STATUS_BAR_STATS );
     if( !strcmp( pch, "session-ratio" ) ) {
         tr_getSessionStats( handle, &stats );
-        tr_strlratio( ratio, stats.ratio, sizeof( ratio ) );
-        g_snprintf( buf, sizeof(buf), _("Ratio: %s"), ratio );
+        g_snprintf( buf, sizeof(buf), _("Ratio: %.1f"), stats.ratio );
     } else if( !strcmp( pch, "session-transfer" ) ) {
         tr_getSessionStats( handle, &stats );
         tr_strlsize( up, stats.uploadedBytes, sizeof( up ) );
@@ -622,8 +629,7 @@ updateStats( PrivateData * p )
         g_snprintf( buf, sizeof( buf ), _( "Down: %s  Up: %s" ), down, up );
     } else { /* default is total-ratio */
         tr_getCumulativeSessionStats( handle, &stats );
-        tr_strlratio( ratio, stats.ratio, sizeof( ratio ) );
-        g_snprintf( buf, sizeof(buf), _("Ratio: %s"), ratio );
+        g_snprintf( buf, sizeof(buf), _("Ratio: %.1f"), stats.ratio );
     }
     g_free( pch );
     gtk_label_set_text( GTK_LABEL( p->stats_lb ), buf );

@@ -1,6 +1,5 @@
 AM_CPPFLAGS = \
     -I$(top_srcdir) \
-    -I$(top_srcdir)/third-party/ \
     $(LIBEVENT_CPPFLAGS) \
     -DTRANSMISSIONLOCALEDIR=\""$(transmissionlocaledir)"\"
 
@@ -21,6 +20,7 @@ noinst_HEADERS = \
     makemeta-ui.h \
     msgwin.h \
     stats.h \
+    status-bar-icons.h \
     sexy-icon-entry.h \
     torrent-cell-renderer.h \
     torrent-inspector.h \

@@ -22,10 +22,6 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#ifndef WIN32
-#define HAVE_GETRLIMIT
-#endif
-
 #include <assert.h>
 #include <errno.h>
 #include <inttypes.h>
@@ -35,10 +31,8 @@
 
 #include <sys/types.h>
 #include <sys/stat.h>
-#ifdef HAVE_GETRLIMIT
 #include <sys/time.h> /* getrlimit */
 #include <sys/resource.h> /* getrlimit */
-#endif
 #include <unistd.h>
 #include <libgen.h> /* basename, dirname */
 #include <fcntl.h> /* O_LARGEFILE */
@@ -127,29 +121,19 @@ static struct tr_fd_s * gFd = NULL;
 ****
 ***/
 
-static tr_errno
-TrOpenFile( int           i,
-            const char  * folder,
-            const char  * torrentFile,
-            int           write )
+static int
+TrOpenFile( int i, const char * filename, int write )
 {
     struct tr_openfile * file = &gFd->open[i];
     int flags;
-    char filename[MAX_PATH_LENGTH];
-    struct stat sb;
-
-    /* confirm the parent folder exists */
-    if( stat( folder, &sb ) || !S_ISDIR( sb.st_mode ) )
-        return TR_ERROR_IO_PARENT;
 
     /* create subfolders, if any */
-    tr_buildPath ( filename, sizeof(filename), folder, torrentFile, NULL );
     if( write ) {
         char * tmp = tr_strdup( filename );
-        const int err = tr_mkdirp( dirname(tmp), 0777 ) ? errno : 0;
+        const int val = tr_mkdirp( dirname(tmp), 0777 );
         tr_free( tmp );
-        if( err )
-            return tr_ioErrorFromErrno( err );
+        if( val )
+            return tr_ioErrorFromErrno( );
     }
 
     /* open the file */
@@ -160,11 +144,16 @@ TrOpenFile( int           i,
 #ifdef WIN32
     flags |= O_BINARY;
 #endif
+    errno = 0;
     file->fd = open( filename, flags, 0666 );
-    if( file->fd == -1 ) {
-        const int err = errno;
-        tr_err( "Couldn't open '%s': %s", filename, strerror(err) );
-        return tr_ioErrorFromErrno( err );
+    if( file->fd < 0 ) {
+        if( errno ) {
+            tr_err( "Couldn't open '%s': %s", filename, strerror(errno) );
+            return tr_ioErrorFromErrno();
+        } else {
+            tr_err( "Couldn't open '%s'", filename );
+            return TR_ERROR_IO_OTHER;
+        }
     }
 
     return TR_OK;
@@ -197,19 +186,14 @@ fileIsCheckedOut( const struct tr_openfile * o )
 }
 
 int
-tr_fdFileCheckout( const char * folder,
-                   const char * torrentFile, 
-                   int          write )
+tr_fdFileCheckout( const char * filename, int write )
 {
     int i, winner = -1;
     struct tr_openfile * o;
-    char filename[MAX_PATH_LENGTH];
 
-    assert( folder && *folder );
-    assert( torrentFile && *torrentFile );
+    assert( filename && *filename );
     assert( write==0 || write==1 );
 
-    tr_buildPath ( filename, sizeof(filename), folder, torrentFile, NULL );
     dbgmsg( "looking for file '%s', writable %c", filename, write?'y':'n' );
 
     tr_lockLock( gFd->lock );
@@ -284,10 +268,10 @@ tr_fdFileCheckout( const char * folder,
     o = &gFd->open[winner];
     if( !fileIsOpen( o ) )
     {
-        const tr_errno err = TrOpenFile( winner, folder, torrentFile, write );
-        if( err ) {
+        const int ret = TrOpenFile( winner, filename, write );
+        if( ret ) {
             tr_lockUnlock( gFd->lock );
-            return err;
+            return ret;
         }
 
         dbgmsg( "opened '%s' in slot %d, write %c", filename, winner, write?'y':'n' );
@@ -373,19 +357,13 @@ socketWasReserved( int fd )
     return tr_list_remove_data( &reservedSockets, TR_UINT_TO_PTR(fd) ) != NULL;
 }
 
-static int
-getSocketMax( struct tr_fd_s * gFd )
-{
-    return gFd->normalMax;
-}
-
 int
 tr_fdSocketCreate( int type, int isReserved )
 {
     int s = -1;
     tr_lockLock( gFd->lock );
 
-    if( isReserved || ( gFd->normal < getSocketMax( gFd ) ) )
+    if( isReserved || ( gFd->normal < gFd->normalMax ) )
         if( ( s = socket( AF_INET, type, 0 ) ) < 0 )
             tr_err( "Couldn't create socket (%s)", strerror( sockerrno ) );
 
@@ -417,7 +395,7 @@ tr_fdSocketAccept( int b, struct in_addr * addr, tr_port_t * port )
     assert( port != NULL );
 
     tr_lockLock( gFd->lock );
-    if( gFd->normal < getSocketMax( gFd ) )
+    if( gFd->normal < gFd->normalMax )
     {
         len = sizeof( sock );
         s = accept( b, (struct sockaddr *) &sock, &len );
@@ -473,24 +451,16 @@ void
 tr_fdInit( int globalPeerLimit )
 {
     int i;
+    struct rlimit rlim;
 
     assert( gFd == NULL );
     gFd = tr_new0( struct tr_fd_s, 1 );
     gFd->lock = tr_lockNew( );
 
-#ifdef HAVE_GETRLIMIT
-    {
-        struct rlimit rlim;
-        getrlimit( RLIMIT_NOFILE, &rlim );
-        rlim.rlim_cur = MIN( rlim.rlim_max,
-               (rlim_t)(globalPeerLimit + NOFILE_BUFFER) );
-        setrlimit( RLIMIT_NOFILE, &rlim );
-        gFd->normalMax = rlim.rlim_cur - NOFILE_BUFFER;
-        tr_dbg( "setrlimit( RLIMIT_NOFILE, %d )", rlim.rlim_cur );
-    }
-#else
-    gFd->normalMax = globalPeerLimit;
-#endif
+    getrlimit( RLIMIT_NOFILE, &rlim );
+    rlim.rlim_cur = MIN( rlim.rlim_max, (rlim_t)(globalPeerLimit + NOFILE_BUFFER) );
+    setrlimit( RLIMIT_NOFILE, &rlim );
+    gFd->normalMax = rlim.rlim_cur - NOFILE_BUFFER;
     tr_dbg( "%d usable file descriptors", globalPeerLimit );
 
     for( i=0; i<TR_MAX_OPEN_FILES; ++i ) 

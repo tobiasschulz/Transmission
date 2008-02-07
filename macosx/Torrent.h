@@ -56,8 +56,6 @@ typedef enum
 
     NSImage * fIcon;
     
-    NSString * fHashString;
-    
     tr_file_stat * fileStat;
     NSArray * fFileList;
     
@@ -68,7 +66,7 @@ typedef enum
     
     float fRatioLimit;
     int fRatioSetting;
-    BOOL fFinishedSeeding, fWaitToStart, fStalled;
+    BOOL fFinishedSeeding, fWaitToStart, fError, fChecking, fStalled;
     
     int fOrderValue, fGroupValue;
     
@@ -77,7 +75,6 @@ typedef enum
 
 - (id) initWithPath: (NSString *) path location: (NSString *) location deleteTorrentFile: (torrentFileState) torrentDelete
         lib: (tr_handle *) lib;
-- (id) initWithData: (NSData *) data location: (NSString *) location lib: (tr_handle *) lib;
 - (id) initWithHistory: (NSDictionary *) history lib: (tr_handle *) lib;
 
 - (NSDictionary *) history;
@@ -163,7 +160,6 @@ typedef enum
 - (float) progress;
 - (float) progressDone;
 - (float) progressLeft;
-- (float) checkingProgress;
 
 - (int) eta;
 - (int) etaRatio;

@@ -31,7 +31,7 @@ static int static_lastid = 0;
 
 @interface Torrent (Private)
 
-- (id) initWithHash: (NSString *) hashString path: (NSString *) path data: (NSData *) data lib: (tr_handle *) lib
+- (id) initWithHash: (NSString *) hashString path: (NSString *) path lib: (tr_handle *) lib
         publicTorrent: (NSNumber *) publicTorrent
         downloadFolder: (NSString *) downloadFolder
         useIncompleteFolder: (NSNumber *) useIncompleteFolder incompleteFolder: (NSString *) incompleteFolder
@@ -67,11 +67,10 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 
 @implementation Torrent
 
-
 - (id) initWithPath: (NSString *) path location: (NSString *) location deleteTorrentFile: (torrentFileState) torrentDelete
         lib: (tr_handle *) lib
 {
-    self = [self initWithHash: nil path: path data: nil lib: lib
+    self = [self initWithHash: nil path: path lib: lib
             publicTorrent: torrentDelete != TORRENT_FILE_DEFAULT
                             ? [NSNumber numberWithBool: torrentDelete == TORRENT_FILE_SAVE] : nil
             downloadFolder: location
@@ -89,24 +88,10 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
     return self;
 }
 
-- (id) initWithData: (NSData *) data location: (NSString *) location lib: (tr_handle *) lib
-{
-    self = [self initWithHash: nil path: nil data: data lib: lib
-            publicTorrent: nil
-            downloadFolder: location
-            useIncompleteFolder: nil incompleteFolder: nil
-            dateAdded: nil dateCompleted: nil
-            dateActivity: nil
-            ratioSetting: nil ratioLimit: nil
-            waitToStart: nil orderValue: nil groupValue: nil];
-    
-    return self;
-}
-
 - (id) initWithHistory: (NSDictionary *) history lib: (tr_handle *) lib
 {
     self = [self initWithHash: [history objectForKey: @"TorrentHash"]
-                path: [history objectForKey: @"TorrentPath"] data: nil lib: lib
+                path: [history objectForKey: @"TorrentPath"] lib: lib
                 publicTorrent: [history objectForKey: @"PublicCopy"]
                 downloadFolder: [history objectForKey: @"DownloadFolder"]
                 useIncompleteFolder: [history objectForKey: @"UseIncompleteFolder"]
@@ -174,8 +159,6 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
     if (fPreviousFinishedPieces != NULL)
         free(fPreviousFinishedPieces);
     [fFinishedPiecesDate release];
-    
-    [fHashString release];
     
     [fDownloadFolder release];
     [fIncompleteFolder release];
@@ -258,15 +241,6 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 
 - (void) update
 {
-    //get previous status values before update
-    BOOL wasChecking = NO, wasError = NO, wasStalled = NO;
-    if (fStat != NULL)
-    {
-        wasChecking = [self isChecking];
-        wasError = [self isError];
-        wasStalled = fStalled;
-    }
-    
     fStat = tr_torrentStat(fHandle);
     
     //check to stop for ratio
@@ -282,12 +256,21 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
         fFinishedSeeding = YES;
     }
     
-    //check if stalled (stored because based on time and needs to check if it was previously stalled)
+    //check if checking data
+    BOOL wasChecking = fChecking;
+    fChecking = fStat->status == TR_STATUS_CHECK || fStat->status == TR_STATUS_CHECK_WAIT;
+    
+    //check for error
+    BOOL wasError = fError;
+    fError = [self isError];
+    
+    //check if stalled
+    BOOL wasStalled = fStalled;
     fStalled = [self isActive] && [fDefaults boolForKey: @"CheckStalled"]
                 && [fDefaults integerForKey: @"StalledMinutes"] < [self stalledMinutes];
     
     //update queue for checking (from downloading to seeding), stalled, or error
-    if ((wasChecking && ![self isChecking]) || (wasStalled != fStalled) || (!wasError && [self isError] && [self isActive]))
+    if ((wasChecking && !fChecking) || (wasStalled != fStalled) || (!wasError && fError && [self isActive]))
         [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateQueue" object: self];
 }
 
@@ -451,13 +434,7 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 - (void) trashTorrent
 {
     if (fPublicTorrent)
-    {
-        [self trashFile: fPublicTorrentLocation];
-        [fPublicTorrentLocation release];
-        fPublicTorrentLocation = nil;
-        
-        fPublicTorrent = NO;
-    }
+        [self trashFile: [self publicTorrentLocation]];
 }
 
 - (void) moveTorrentDataFileTo: (NSString *) folder
@@ -554,6 +531,7 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
             [alert addButtonWithTitle: NSLocalizedString(@"OK", "Torrent file disk space alert -> button")];
             [alert addButtonWithTitle: NSLocalizedString(@"Download Anyway", "Torrent file disk space alert -> button")];
             
+            #warning factor in choice with suppression
             BOOL onLeopard = [NSApp isOnLeopardOrBetter];
             if (onLeopard)
                 [alert setShowsSuppressionButton: YES];
@@ -734,7 +712,7 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 
 - (NSString *) hashString
 {
-    return fHashString;
+    return [NSString stringWithUTF8String: fInfo->hashString];
 }
 
 - (BOOL) privateTorrent
@@ -776,11 +754,6 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 - (float) progressLeft
 {
     return (float)[self sizeLeft] / [self size];
-}
-
-- (float) checkingProgress
-{
-    return fStat->recheckProgress;
 }
 
 - (int) eta
@@ -890,16 +863,16 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
         
         dic = [NSMutableDictionary dictionaryWithObjectsAndKeys:
             [NSNumber numberWithInt: peer->from], @"From",
-            [NSString stringWithUTF8String: peer->addr], @"IP",
+            [NSString stringWithCString: (char *)peer->addr encoding: NSUTF8StringEncoding], @"IP",
             [NSNumber numberWithInt: peer->port], @"Port",
             [NSNumber numberWithFloat: peer->progress], @"Progress",
             [NSNumber numberWithBool: peer->isEncrypted], @"Encryption",
-            [NSString stringWithUTF8String: peer->client], @"Client",
-            [NSString stringWithUTF8String: peer->flagStr], @"Flags", nil];
+            [NSString stringWithCString: (char *)peer->client encoding: NSUTF8StringEncoding], @"Client",
+            [NSNumber numberWithInt: peer->status], @"Status", nil];
         
-        if (peer->isUploadingTo)
+        if (peer->isDownloading)
             [dic setObject: [NSNumber numberWithFloat: peer->uploadToRate] forKey: @"UL To Rate"];
-        if (peer->isDownloadingFrom)
+        if (peer->isUploading)
             [dic setObject: [NSNumber numberWithFloat: peer->downloadFromRate] forKey: @"DL From Rate"];
         
         [peerDics addObject: dic];
@@ -993,7 +966,7 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 
             case TR_STATUS_CHECK:
                 string = [NSString stringWithFormat: NSLocalizedString(@"Checking existing data (%.2f%%)",
-                                        "Torrent -> status string"), 100.0 * [self checkingProgress]];
+                                        "Torrent -> status string"), 100.0 * fStat->recheckProgress];
                 break;
 
             case TR_STATUS_DOWNLOAD:
@@ -1062,7 +1035,7 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 
         case TR_STATUS_CHECK:
             string = [NSString stringWithFormat: NSLocalizedString(@"Checking existing data (%.2f%%)",
-                                    "Torrent -> status string"), 100.0 * [self checkingProgress]];
+                                    "Torrent -> status string"), 100.0 * fStat->recheckProgress];
             break;
         
         case TR_STATUS_DOWNLOAD:
@@ -1109,7 +1082,7 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 
         case TR_STATUS_CHECK:
             return [NSString stringWithFormat: NSLocalizedString(@"Checking existing data (%.2f%%)",
-                                    "Torrent -> status string"), 100.0 * [self checkingProgress]];
+                                    "Torrent -> status string"), 100.0 * fStat->recheckProgress];
         
         case TR_STATUS_CHECK_WAIT:
             return [NSLocalizedString(@"Waiting to check existing data", "Torrent -> status string") stringByAppendingEllipsis];
@@ -1481,7 +1454,7 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 @implementation Torrent (Private)
 
 //if a hash is given, attempt to load that; otherwise, attempt to open file at path
-- (id) initWithHash: (NSString *) hashString path: (NSString *) path data: (NSData *) data lib: (tr_handle *) lib
+- (id) initWithHash: (NSString *) hashString path: (NSString *) path lib: (tr_handle *) lib
         publicTorrent: (NSNumber *) publicTorrent
         downloadFolder: (NSString *) downloadFolder
         useIncompleteFolder: (NSNumber *) useIncompleteFolder incompleteFolder: (NSString *) incompleteFolder
@@ -1548,20 +1521,6 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
         }
         tr_metainfoFree(&info);
     }
-    if (!fHandle && data)
-    {
-        tr_ctorSetMetainfo(ctor, [data bytes], [data length]);
-        if (tr_torrentParse(fLib, ctor, &info) == TR_OK)
-        {
-            NSString * currentDownloadFolder = [self shouldUseIncompleteFolderForName: [NSString stringWithUTF8String: info.name]]
-                                                ? fIncompleteFolder : fDownloadFolder;
-            tr_ctorSetDestination(ctor, TR_FORCE, [currentDownloadFolder UTF8String]);
-            
-            fHandle = tr_torrentNew(fLib, ctor, &error);
-        }
-        tr_metainfoFree(&info);
-    }
-    
     tr_ctorFree(ctor);
     
     if (!fHandle)
@@ -1573,9 +1532,7 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
     tr_torrentSetStatusCallback(fHandle, completenessChangeCallback, self);
     
     fInfo = tr_torrentInfo(fHandle);
-    
-    fHashString = [[NSString alloc] initWithUTF8String: fInfo->hashString];
-    
+
     fDateAdded = dateAdded ? [dateAdded retain] : [[NSDate alloc] init];
 	if (dateCompleted)
 		fDateCompleted = [dateCompleted retain];
@@ -1586,10 +1543,12 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
     fRatioLimit = ratioLimit ? [ratioLimit floatValue] : [fDefaults floatForKey: @"RatioLimit"];
     fFinishedSeeding = NO;
     
-    fWaitToStart = waitToStart && [waitToStart boolValue];
+    fWaitToStart = waitToStart ? [waitToStart boolValue] : [fDefaults boolForKey: @"AutoStartDownload"];
     
     fOrderValue = orderValue ? [orderValue intValue] : tr_torrentCount(fLib) - 1;
     fGroupValue = groupValue ? [groupValue intValue] : -1;
+    
+    fError = NO;
     
     [self createFileList];
     
@@ -1692,7 +1651,6 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 
 - (void) updateDownloadFolder
 {
-    //remove old Time Machine location
     [self setTimeMachineExclude: NO forPath: [[self downloadFolder] stringByAppendingPathComponent: [self name]]];
     
     NSString * folder = [self shouldUseIncompleteFolderForName: [self name]] ? fIncompleteFolder : fDownloadFolder;

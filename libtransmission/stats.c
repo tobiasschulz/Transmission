@@ -24,7 +24,7 @@
 struct tr_stats_handle
 {
     tr_session_stats single;
-    tr_session_stats old;
+    tr_session_stats cumulative;
     time_t startTime;
 };
 
@@ -115,64 +115,41 @@ void
 tr_statsInit( tr_handle * handle )
 {
     struct tr_stats_handle * stats = tr_new0( struct tr_stats_handle, 1 );
-    loadCumulativeStats( &stats->old );
-    stats->single.sessionCount = 1;
-    stats->startTime = time( NULL );
+    loadCumulativeStats( &stats->cumulative );
+    stats->cumulative.sessionCount++;
+    stats->startTime = time(NULL);
     handle->sessionStats = stats;
 }
 
 void
 tr_statsClose( tr_handle * handle )
 {
-    tr_session_stats cumulative;
-    tr_getCumulativeSessionStats( handle, &cumulative );
-    saveCumulativeStats( &cumulative );
+    tr_session_stats tmp;
+    tr_getCumulativeSessionStats( handle, &tmp );
+    saveCumulativeStats( &tmp );
 
     tr_free( handle->sessionStats );
     handle->sessionStats = NULL;
 }
 
-static struct tr_stats_handle *
-getStats( const tr_handle * handle )
-{
-    static struct tr_stats_handle nullObject;
-
-    return handle && handle->sessionStats
-        ? handle->sessionStats
-        : &nullObject;
-}
-
-/***
-****
-***/
-
 static void
 updateRatio( tr_session_stats * setme )
 {
-    setme->ratio = tr_getRatio( setme->uploadedBytes,
-                                setme->downloadedBytes );
-}
-
-static void
-addStats( tr_session_stats       * setme,
-          const tr_session_stats * a,
-          const tr_session_stats * b )
-{
-    setme->uploadedBytes   = a->uploadedBytes   + b->uploadedBytes;
-    setme->downloadedBytes = a->downloadedBytes + b->downloadedBytes;
-    setme->filesAdded      = a->filesAdded      + b->filesAdded;
-    setme->sessionCount    = a->sessionCount    + b->sessionCount;
-    setme->secondsActive   = a->secondsActive   + b->secondsActive;
-    updateRatio( setme );
+    if( setme->downloadedBytes )
+        setme->ratio = setme->uploadedBytes / (double)setme->downloadedBytes;
+    else if( setme->uploadedBytes )
+        setme->ratio = TR_RATIO_INF;
+    else
+        setme->ratio = TR_RATIO_NA;
 }
 
 void
 tr_getSessionStats( const tr_handle   * handle,
                     tr_session_stats  * setme )
 {
-    const struct tr_stats_handle * stats = getStats( handle );
+    const struct tr_stats_handle * stats = handle->sessionStats;
     *setme = stats->single;
-    setme->secondsActive = time( NULL ) - stats->startTime;
+    setme->secondsActive += ( time(NULL) - stats->startTime );
     updateRatio( setme );
 }
 
@@ -180,9 +157,10 @@ void
 tr_getCumulativeSessionStats( const tr_handle   * handle,
                               tr_session_stats  * setme )
 {
-    tr_session_stats current;
-    tr_getSessionStats( handle, &current );
-    addStats( setme, &getStats(handle)->old, &current );
+    const struct tr_stats_handle * stats = handle->sessionStats;
+    *setme = stats->cumulative;
+    setme->secondsActive += ( time(NULL) - stats->startTime );
+    updateRatio( setme );
 }
 
 /**
@@ -192,17 +170,23 @@ tr_getCumulativeSessionStats( const tr_handle   * handle,
 void
 tr_statsAddUploaded( tr_handle * handle, uint32_t bytes )
 {
-    getStats(handle)->single.uploadedBytes += bytes;
+    struct tr_stats_handle * stats = handle->sessionStats;
+    stats->single.uploadedBytes += bytes;
+    stats->cumulative.uploadedBytes += bytes;
 }
 
 void
 tr_statsAddDownloaded( tr_handle * handle, uint32_t bytes )
 {
-    getStats(handle)->single.downloadedBytes += bytes;
+    struct tr_stats_handle * stats = handle->sessionStats;
+    stats->single.downloadedBytes += bytes;
+    stats->cumulative.downloadedBytes += bytes;
 }
 
 void
 tr_statsFileCreated( tr_handle * handle )
 {
-    getStats(handle)->single.filesAdded++;
+    struct tr_stats_handle * stats = handle->sessionStats;
+    ++stats->cumulative.filesAdded;
+    ++stats->single.filesAdded;
 }

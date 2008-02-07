@@ -34,7 +34,7 @@
 #define ENABLE_LTEP */
 
 /* enable fast peers extension protocol */
-/* #define ENABLE_FASTPEER */
+#define ENABLE_FASTPEER
 
 /***
 ****
@@ -524,14 +524,7 @@ readCryptoSelect( tr_handshake * handshake, struct evbuffer * inbuf )
 
     tr_peerIoReadUint16( handshake->io, inbuf, &pad_d_len );
     dbgmsg( handshake, "pad_d_len is %d", (int)pad_d_len );
-
-    if( pad_d_len > 512 )
-    {
-        dbgmsg( handshake, "encryption handshake: pad_d_len is too long" );
-        tr_handshakeDone( handshake, FALSE );
-        return READ_DONE;
-    }
-
+    assert( pad_d_len <= 512 );
     handshake->pad_d_len = pad_d_len;
 
     setState( handshake, AWAITING_PAD_D );
@@ -1048,7 +1041,6 @@ tr_handshakeNew( tr_peerIo           * io,
     handshake->doneCB = doneCB;
     handshake->doneUserData = doneUserData;
     handshake->handle = tr_peerIoGetHandle( io );
-    tr_peerIoSetTimeoutSecs( io, 15 );
     
     tr_peerIoSetIOFuncs( handshake->io, canRead, NULL, gotError, handshake );
 
