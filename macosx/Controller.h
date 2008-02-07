@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,25 +27,15 @@
 #import "PrefsController.h"
 #import "InfoWindowController.h"
 #import "MessageWindowController.h"
-#import "AddWindowController.h"
 #import "DragOverlayWindow.h"
 #import "Badger.h"
-#import "StatusBarView.h"
-#import "FilterButton.h"
-#import "MenuLabel.h"
+#import "ImageBackgroundView.h"
+#import "FilterBarView.h"
 #import "IPCController.h"
 
 #import <Growl/Growl.h>
 
 @class TorrentTableView;
-
-typedef enum
-{
-    ADD_NORMAL,
-    ADD_SHOW_OPTIONS,
-    ADD_URL,
-    ADD_CREATED
-} addType;
 
 @interface Controller : NSObject <GrowlApplicationBridgeDelegate>
 {
@@ -54,32 +44,32 @@ typedef enum
     NSMutableArray                  * fTorrents, * fDisplayedTorrents;
     
     PrefsController                 * fPrefsController;
+    NSUserDefaults                  * fDefaults;
     InfoWindowController            * fInfoController;
     MessageWindowController         * fMessageController;
     IPCController                   * fIPCController;
-    
-    NSUserDefaults                  * fDefaults;
-    
+
     IBOutlet NSWindow               * fWindow;
     DragOverlayWindow               * fOverlayWindow;
+    IBOutlet NSScrollView           * fScrollView;
     IBOutlet TorrentTableView       * fTableView;
     
     IBOutlet NSMenuItem             * fOpenIgnoreDownloadFolder;
     
-    IBOutlet StatusBarView          * fBottomTigerBar;
-    IBOutlet NSBox                  * fBottomTigerLine;
+    IBOutlet ImageBackgroundView    * fBottomBar;
     IBOutlet NSButton               * fActionButton, * fSpeedLimitButton;
     NSTimer                         * fSpeedLimitTimer;
-    IBOutlet NSTextField            * fTotalTorrentsField;
     
-    IBOutlet StatusBarView          * fStatusBar;
-    IBOutlet NSButton               * fStatusButton;
-    IBOutlet MenuLabel              * fStatusTigerField;
-    IBOutlet NSImageView            * fStatusTigerImageView;
-    IBOutlet NSTextField            * fTotalDLField, * fTotalULField;
+    IBOutlet ImageBackgroundView    * fStatusBar;
+    IBOutlet NSTextField            * fTotalDLField, * fTotalULField, * fTotalTorrentsField;
     
-    IBOutlet StatusBarView          * fFilterBar;
-    IBOutlet FilterButton           * fNoFilterButton, * fActiveFilterButton, * fDownloadFilterButton,
+    IBOutlet NSMenuItem             * fNameSortItem, * fStateSortItem, * fProgressSortItem,
+                                    * fTrackerSortItem, * fDateSortItem, * fOrderSortItem,
+                                    * fNameSortActionItem, * fStateSortActionItem, * fProgressSortActionItem,
+                                    * fTrackerSortActionItem, * fDateSortActionItem, * fOrderSortActionItem;
+    
+    IBOutlet FilterBarView          * fFilterBar;
+    IBOutlet FilterBarButton        * fNoFilterButton, * fDownloadFilterButton,
                                     * fSeedFilterButton, * fPauseFilterButton;
     IBOutlet NSSearchField          * fSearchFilterField;
     IBOutlet NSMenuItem             * fNextFilterItem, * fPrevFilterItem;
@@ -89,12 +79,6 @@ typedef enum
     IBOutlet NSMenu                 * fUploadMenu, * fDownloadMenu;
     IBOutlet NSMenuItem             * fUploadLimitItem, * fUploadNoLimitItem,
                                     * fDownloadLimitItem, * fDownloadNoLimitItem;
-    
-    IBOutlet NSMenu                 * fRatioStopMenu;
-    IBOutlet NSMenuItem             * fCheckRatioItem, * fNoCheckRatioItem;
-    
-    IBOutlet NSMenu                 * fGroupsSetMenu, * fGroupsSetContextMenu, * fGroupFilterMenu;
-    IBOutlet NSPopUpButton          * fGroupsButton;
     
     IBOutlet NSWindow               * fURLSheetWindow;
     IBOutlet NSTextField            * fURLSheetTextField;
@@ -117,10 +101,13 @@ typedef enum
     BOOL                            fRemoteQuit;
 }
 
-- (void) openFiles:             (NSArray *) filenames addType: (addType) type forcePath: (NSString *) path;
-- (void) askOpenConfirmed:      (AddWindowController *) addController add: (BOOL) add;
+- (void) openFiles:             (NSArray *) filenames;
+- (void) openFiles:             (NSArray *) filenames forcePath: (NSString *) path ignoreDownloadFolder: (BOOL) ignore
+                                            deleteTorrentFile: (torrentFileState) deleteTorrent;
 - (void) openCreatedFile:       (NSNotification *) notification;
 - (void) openFilesWithDict:     (NSDictionary *) dictionary;
+- (void) openFilesAsk:          (NSMutableArray *) files deleteTorrentFile: (torrentFileState) deleteTorrent;
+- (void) openFilesAskWithDict:  (NSDictionary *) dictionary;
 - (void) openShowSheet:         (id) sender;
 
 - (void) duplicateOpenAlert: (NSString *) name;
@@ -177,11 +164,10 @@ typedef enum
 - (void) setInfoTab: (id) sender;
 
 - (void) showMessageWindow: (id) sender;
-- (void) showStatsWindow: (id) sender;
+
+- (void) updateControlTint: (NSNotification *) notification;
 
 - (void) updateUI;
-
-- (void) setBottomCountTextFiltering: (BOOL) filtering;
 
 - (void) updateTorrentsInQueue;
 - (int) numToStartFromQueue: (BOOL) downloadQueue;
@@ -191,26 +177,16 @@ typedef enum
 
 - (void) updateTorrentHistory;
 
-- (void) applyFilter: (id) sender;
-
 - (void) sortTorrents;
 - (void) sortTorrentsIgnoreSelected;
 - (void) setSort: (id) sender;
-- (void) setSortByGroup: (id) sender;
 - (void) setSortReverse: (id) sender;
-
+- (void) applyFilter: (id) sender;
 - (void) setFilter: (id) sender;
 - (void) setFilterSearchType: (id) sender;
 - (void) switchFilter: (id) sender;
 
-- (void) setStatusLabel: (id) sender;
-
-- (void) showGroups: (id) sender;
-- (void) setGroup: (id) sender; //used by delegate-generated menu items
-- (void) setGroupFilter: (id) sender;
-- (void) updateGroupsFilterButton;
-- (void) updateGroupsFilters: (NSNotification *) notification;
-
+- (void) applySpeedLimit: (id) sender;
 - (void) toggleSpeedLimit: (id) sender;
 - (void) autoSpeedLimitChange: (NSNotification *) notification;
 - (void) autoSpeedLimit;
@@ -218,7 +194,6 @@ typedef enum
 - (void) setLimitGlobalEnabled: (id) sender;
 - (void) setQuickLimitGlobal: (id) sender;
 
-- (void) setRatioGlobalEnabled: (id) sender;
 - (void) setQuickRatioGlobal: (id) sender;
 
 - (void) torrentStoppedForRatio: (NSNotification *) notification;
@@ -233,21 +208,20 @@ typedef enum
 - (void) torrentTableViewSelectionDidChange: (NSNotification *) notification;
 
 - (void) toggleSmallView: (id) sender;
-- (void) togglePiecesBar: (id) sender;
-- (void) toggleAvailabilityBar: (id) sender;
 
 - (void) toggleStatusBar: (id) sender;
 - (void) showStatusBar: (BOOL) show animate: (BOOL) animate;
 - (void) toggleFilterBar: (id) sender;
 - (void) showFilterBar: (BOOL) show animate: (BOOL) animate;
 
-- (void) allToolbarClicked: (id) sender;
-- (void) selectedToolbarClicked: (id) sender;
+//- (void) toggleAdvancedBar: (id) sender;
+
+- (void) doNothing: (id) sender; //needed for menu items that use bindings with no associated action
+
+- (void) updateDockBadge: (NSNotification *) notification;
 
 - (void) setWindowSizeToFit;
 - (NSRect) sizedWindowFrame;
-
-- (void) updateForExpandCollape;
 
 - (void) showMainWindow: (id) sender;
 

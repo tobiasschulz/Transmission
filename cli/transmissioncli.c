@@ -31,9 +31,19 @@
 
 #include <libtransmission/transmission.h>
 #include <libtransmission/makemeta.h>
-#include <libtransmission/metainfo.h> /* tr_metainfoFree */
-#include <libtransmission/utils.h> /* tr_wait */
 
+#ifdef __BEOS__
+    #include <kernel/OS.h>
+    #define wait_msecs(N)  snooze( (N) * 1000 )
+    #define wait_secs(N)   sleep( (N) )
+#elif defined(WIN32)
+    #include <windows.h>
+    #define wait_msecs(N)  Sleep( (N) )
+    #define wait_secs(N)   Sleep( (N) * 1000 )
+#else
+    #define wait_msecs(N)  usleep( (N) * 1000 )
+    #define wait_secs(N)   sleep( (N) )
+#endif
 
 /* macro to shut up "unused parameter" warnings */
 #ifdef __GNUC__
@@ -43,7 +53,7 @@
 #endif
 
 const char * USAGE =
-"Usage: %s [-car[-m]] [-dfinpsuv] [-h] file.torrent [output-dir]\n\n"
+"Usage: %s [options] file.torrent [options]\n\n"
 "Options:\n"
 "  -c, --create-from <file>  Create torrent from the specified source file.\n"
 "  -a, --announce <url> Used in conjunction with -c.\n"
@@ -55,27 +65,27 @@ const char * USAGE =
 "  -i, --info           Print metainfo and exit\n"
 "  -n  --nat-traversal  Attempt NAT traversal using NAT-PMP or UPnP IGD\n"
 "  -p, --port <int>     Port we should listen on (default = %d)\n"
+#if 0
 "  -s, --scrape         Print counts of seeders/leechers and exit\n"
+#endif
 "  -u, --upload <int>   Maximum upload rate (-1 = no limit, default = 20)\n"
-"  -v, --verbose <int>  Verbose level (0 to 2, default = 0)\n"
-"  -V, --version        Print the version number and exit\n"
-"  -y, --recheck        Force a recheck of the torrent data\n";
+"  -v, --verbose <int>  Verbose level (0 to 2, default = 0)\n";
 
 static int           showHelp      = 0;
 static int           showInfo      = 0;
+#if 0
 static int           showScrape    = 0;
-static int           showVersion   = 0;
+#endif
 static int           isPrivate     = 0;
 static int           verboseLevel  = 0;
 static int           bindPort      = TR_DEFAULT_PORT;
 static int           uploadLimit   = 20;
 static int           downloadLimit = -1;
-static char        * torrentPath   = NULL;
-static char        * savePath      = ".";
+static char          * torrentPath = NULL;
 static int           natTraversal  = 0;
-static int           recheckData   = 0;
 static sig_atomic_t  gotsig        = 0;
 static sig_atomic_t  manualUpdate  = 0;
+static tr_torrent    * tor;
 
 static char          * finishCall   = NULL;
 static char          * announce     = NULL;
@@ -85,8 +95,7 @@ static char          * comment      = NULL;
 static int  parseCommandLine ( int argc, char ** argv );
 static void sigHandler       ( int signal );
 
-static char *
-getStringRatio( float ratio )
+char * getStringRatio( float ratio )
 {
     static char string[20];
 
@@ -106,15 +115,14 @@ torrentStateChanged( tr_torrent   * torrent UNUSED,
     system( finishCall );
 }
 
-int
-main( int argc, char ** argv )
+int main( int argc, char ** argv )
 {
     int i, error;
     tr_handle  * h;
-    tr_ctor * ctor;
-    tr_torrent * tor = NULL;
+    const tr_stat    * s;
+    tr_handle_status * hstat;
 
-    printf( "Transmission %s - http://www.transmissionbt.com/\n",
+    printf( "Transmission %s - http://transmission.m0k.org/\n\n",
             LONG_VERSION_STRING );
 
     /* Get options */
@@ -124,13 +132,25 @@ main( int argc, char ** argv )
         return EXIT_FAILURE;
     }
 
-    if( showVersion )
-        return EXIT_SUCCESS;
-
     if( showHelp )
     {
         printf( USAGE, argv[0], TR_DEFAULT_PORT );
         return EXIT_SUCCESS;
+    }
+
+    if( verboseLevel < 0 )
+    {
+        verboseLevel = 0;
+    }
+    else if( verboseLevel > 9 )
+    {
+        verboseLevel = 9;
+    }
+    if( verboseLevel )
+    {
+        static char env[11];
+        snprintf( env, sizeof env, "TR_DEBUG=%d", verboseLevel );
+        putenv( env );
     }
 
     if( bindPort < 1 || bindPort > 65535 )
@@ -140,18 +160,7 @@ main( int argc, char ** argv )
     }
 
     /* Initialize libtransmission */
-    h = tr_initFull( "cli",
-                     1,                       /* pex enabled */
-                     natTraversal,            /* nat enabled */
-                     bindPort,                /* public port */
-                     TR_ENCRYPTION_PREFERRED, /* encryption mode */
-                     uploadLimit >= 0,        /* use upload speed limit? */
-                     uploadLimit,             /* upload speed limit */
-                     downloadLimit >= 0,      /* use download speed limit? */
-                     downloadLimit,           /* download speed limit */
-                     512,                     /* globalPeerLimit */
-                     verboseLevel + 1,        /* messageLevel */
-                     0 );                     /* is message queueing enabled? */
+    h = tr_init( "cli" );
 
     if( sourceFile && *sourceFile ) /* creating a torrent */
     {
@@ -159,7 +168,7 @@ main( int argc, char ** argv )
         tr_metainfo_builder * builder = tr_metaInfoBuilderCreate( h, sourceFile );
         tr_makeMetaInfo( builder, torrentPath, announce, comment, isPrivate );
         while( !builder->isDone ) {
-            tr_wait( 1000 );
+            wait_msecs( 1 );
             printf( "." );
         }
         ret = !builder->failed;
@@ -167,95 +176,86 @@ main( int argc, char ** argv )
         return ret;
     }
 
-    ctor = tr_ctorNew( h );
-    tr_ctorSetMetainfoFromFile( ctor, torrentPath );
-    tr_ctorSetPaused( ctor, TR_FORCE, 0 );
-    tr_ctorSetDestination( ctor, TR_FORCE, savePath );
-
-    if( showInfo )
-    {
-        tr_info info;
-
-        if( !tr_torrentParse( h, ctor, &info ) )
-        {
-            printf( "hash:\t" );
-            for( i=0; i<SHA_DIGEST_LENGTH; ++i )
-                printf( "%02x", info.hash[i] );
-            printf( "\n" );
-
-            printf( "name:\t%s\n", info.name );
-
-            for( i=0; i<info.trackerTiers; ++i ) {
-                int j;
-                printf( "tracker tier #%d:\n", ( i+1 ) );
-                for( j=0; j<info.trackerList[i].count; ++j ) {
-                    const tr_tracker_info * tracker = &info.trackerList[i].list[j];
-                    printf( "\taddress:\t%s:%d\n", tracker->address, tracker->port );
-                    printf( "\tannounce:\t%s\n", tracker->announce );
-                    printf( "\n" );
-                }
-            }
-
-            printf( "size:\t%"PRIu64" (%"PRIu64" * %d + %"PRIu64")\n",
-                    info.totalSize, info.totalSize / info.pieceSize,
-                    info.pieceSize, info.totalSize % info.pieceSize );
-
-            if( info.comment[0] )
-                printf( "comment:\t%s\n", info.comment );
-            if( info.creator[0] )
-                printf( "creator:\t%s\n", info.creator );
-            if( info.isPrivate )
-                printf( "private flag set\n" );
-
-            printf( "file(s):\n" );
-            for( i=0; i<info.fileCount; ++i )
-                printf( "\t%s (%"PRIu64")\n", info.files[i].name, info.files[i].length );
-
-            tr_metainfoFree( &info );
-        }
-
-        tr_ctorFree( ctor );
-        goto cleanup;
-    }
-
-
-    tor = tr_torrentNew( h, ctor, &error );
-    tr_ctorFree( ctor );
-    if( tor == NULL )
+    /* Open and parse torrent file */
+    if( !( tor = tr_torrentInit( h, torrentPath, ".", 0, &error ) ) )
     {
         printf( "Failed opening torrent file `%s'\n", torrentPath );
         tr_close( h );
         return EXIT_FAILURE;
     }
 
-    if( showScrape )
+    if( showInfo )
     {
-        printf( "Scraping, Please wait...\n" );
-        const tr_stat * stats;
-        
-        uint64_t start = tr_date();
-        
-        do
+        const tr_info * info = tr_torrentInfo( tor );
+
+        s = tr_torrentStat( tor );
+
+        /* Print torrent info (quite à la btshowmetainfo) */
+        printf( "hash:     " );
+        for( i = 0; i < SHA_DIGEST_LENGTH; i++ )
         {
-            stats = tr_torrentStat( tor );
-            if( stats == NULL || tr_date() - start > 20000 )
-            {
-                printf( "Scrape failed.\n" );
-                goto cleanup;
-            }
-            tr_wait( 2000 );
+            printf( "%02x", info->hash[i] );
         }
-        while( stats->completedFromTracker == -1 || stats->leechers == -1 || stats->seeders == -1 );
-        
-        printf( "%d seeder(s), %d leecher(s), %d download(s).\n",
-            stats->seeders, stats->leechers, stats->completedFromTracker );
+        printf( "\n" );
+        printf( "tracker:  %s:%d\n",
+                s->tracker->address, s->tracker->port );
+        printf( "announce: %s\n", s->tracker->announce );
+        printf( "size:     %"PRIu64" (%"PRIu64" * %d + %"PRIu64")\n",
+                info->totalSize, info->totalSize / info->pieceSize,
+                info->pieceSize, info->totalSize % info->pieceSize );
+        if( info->comment[0] )
+        {
+            printf( "comment:  %s\n", info->comment );
+        }
+        if( info->creator[0] )
+        {
+            printf( "creator:  %s\n", info->creator );
+        }
+        if( info->isPrivate )
+        {
+            printf( "private flag set\n" );
+        }
+        printf( "file(s):\n" );
+        for( i = 0; i < info->fileCount; i++ )
+        {
+            printf( " %s (%"PRIu64")\n", info->files[i].name,
+                    info->files[i].length );
+        }
 
         goto cleanup;
     }
 
+#if 0
+    if( showScrape )
+    {
+        int seeders, leechers, downloaded;
+
+        if( tr_torrentScrape( tor, &seeders, &leechers, &downloaded ) )
+        {
+            printf( "Scrape failed.\n" );
+        }
+        else
+        {
+            printf( "%d seeder(s), %d leecher(s), %d download(s).\n",
+                    seeders, leechers, downloaded );
+        }
+
+        goto cleanup;
+    }
+#endif
+
     signal( SIGINT, sigHandler );
     signal( SIGHUP, sigHandler );
 
+    tr_setBindPort( h, bindPort );
+  
+    tr_setGlobalSpeedLimit   ( h, TR_UP,   uploadLimit );
+    tr_setUseGlobalSpeedLimit( h, TR_UP,   uploadLimit > 0 );
+    tr_setGlobalSpeedLimit   ( h, TR_DOWN, downloadLimit );
+    tr_setUseGlobalSpeedLimit( h, TR_DOWN, downloadLimit > 0 );
+
+    tr_natTraversalEnable( h, natTraversal );
+    
     tr_torrentSetStatusCallback( tor, torrentStateChanged, NULL );
     tr_torrentStart( tor );
 
@@ -263,9 +263,8 @@ main( int argc, char ** argv )
     {
         char string[LINEWIDTH];
         int  chars = 0;
-        const tr_stat * s;
 
-        tr_wait( 1000 );
+        wait_secs( 1 );
 
         if( gotsig )
         {
@@ -284,24 +283,18 @@ main( int argc, char ** argv )
                 tr_manualUpdate( tor );
             }
         }
-        
-        if( recheckData )
-        {
-            recheckData = 0;
-            tr_torrentRecheck( tor );
-        }
 
         s = tr_torrentStat( tor );
 
         if( s->status & TR_STATUS_CHECK_WAIT )
         {
             chars = snprintf( string, sizeof string,
-                "Waiting to verify local files..." );
+                "Waiting to verify local files... %.2f %%", 100.0 * s->percentDone );
         }
         else if( s->status & TR_STATUS_CHECK )
         {
             chars = snprintf( string, sizeof string,
-                "Verifying local files... %.2f%%, found %.2f%% valid", 100 * s->recheckProgress, 100.0 * s->percentDone );
+                "Verifying local files... %.2f %%", 100.0 * s->percentDone );
         }
         else if( s->status & TR_STATUS_DOWNLOAD )
         {
@@ -346,13 +339,13 @@ main( int argc, char ** argv )
     tr_natTraversalEnable( h, 0 );
     for( i = 0; i < 10; i++ )
     {
-        const tr_handle_status * hstat = tr_handleStatus( h );
-        if( TR_NAT_TRAVERSAL_UNMAPPED == hstat->natTraversalStatus )
+        hstat = tr_handleStatus( h );
+        if( TR_NAT_TRAVERSAL_DISABLED == hstat->natTraversalStatus )
         {
             /* Port mappings were deleted */
             break;
         }
-        tr_wait( 500 );
+        wait_msecs( 500 );
     }
     
 cleanup:
@@ -362,32 +355,28 @@ cleanup:
     return EXIT_SUCCESS;
 }
 
-static int
-parseCommandLine( int argc, char ** argv )
+static int parseCommandLine( int argc, char ** argv )
 {
     for( ;; )
     {
         static struct option long_options[] =
-          { { "help",     no_argument,          NULL, 'h' },
-            { "info",     no_argument,          NULL, 'i' },
-            { "scrape",   no_argument,          NULL, 's' },
-            { "private",  no_argument,          NULL, 'r' },
-            { "version",  no_argument,          NULL, 'V' },
-            { "verbose",  required_argument,    NULL, 'v' },
-            { "port",     required_argument,    NULL, 'p' },
-            { "upload",   required_argument,    NULL, 'u' },
-            { "download", required_argument,    NULL, 'd' },
-            { "finish",   required_argument,    NULL, 'f' },
-            { "create",   required_argument,    NULL, 'c' },
-            { "comment",  required_argument,    NULL, 'm' },
-            { "announce", required_argument,    NULL, 'a' },
-            { "nat-traversal", no_argument,     NULL, 'n' },
-            { "recheck",  no_argument,          NULL, 'y' },
-            { "output-dir", required_argument,  NULL, 'o' },
+          { { "help",     no_argument,       NULL, 'h' },
+            { "info",     no_argument,       NULL, 'i' },
+            { "scrape",   no_argument,       NULL, 's' },
+            { "private",  no_argument,       NULL, 'r' },
+            { "verbose",  required_argument, NULL, 'v' },
+            { "port",     required_argument, NULL, 'p' },
+            { "upload",   required_argument, NULL, 'u' },
+            { "download", required_argument, NULL, 'd' },
+            { "finish",   required_argument, NULL, 'f' },
+            { "create",   required_argument, NULL, 'c' },
+            { "comment",  required_argument, NULL, 'm' },
+            { "announce", required_argument, NULL, 'a' },
+            { "nat-traversal", no_argument,  NULL, 'n' },
             { 0, 0, 0, 0} };
 
         int c, optind = 0;
-        c = getopt_long( argc, argv, "hisrVv:p:u:d:f:c:m:a:no:y",
+        c = getopt_long( argc, argv, "hisrv:p:u:d:f:c:m:a:n",
                          long_options, &optind );
         if( c < 0 )
         {
@@ -401,17 +390,16 @@ parseCommandLine( int argc, char ** argv )
             case 'i':
                 showInfo = 1;
                 break;
+#if 0
             case 's':
                 showScrape = 1;
                 break;
+#endif
             case 'r':
                 isPrivate = 1;
                 break;
             case 'v':
                 verboseLevel = atoi( optarg );
-                break;
-            case 'V':
-                showVersion = 1;
                 break;
             case 'p':
                 bindPort = atoi( optarg );
@@ -437,23 +425,18 @@ parseCommandLine( int argc, char ** argv )
             case 'n':
                 natTraversal = 1;
                 break;
-            case 'y':
-                recheckData = 1;
-                break;
-            case 'o':
-                savePath = optarg;
             default:
                 return 1;
         }
     }
 
-    if( showHelp || showVersion )
-        return 0;
-
-    if( optind >= argc )
-        return 1;
+    if( optind > argc - 1  )
+    {
+        return !showHelp;
+    }
 
     torrentPath = argv[optind];
+
     return 0;
 }
 

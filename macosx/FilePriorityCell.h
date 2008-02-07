@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,12 +27,7 @@
 
 @interface FilePriorityCell : NSSegmentedCell
 {
-    BOOL fHoverRow;
+    NSImage * fLowImage, * fHighImage, * fNormalImage, * fMixedImage, * fNoneImage;
 }
-
-- (void) addTrackingAreasForView: (NSView *) controlView inRect: (NSRect) cellFrame withUserInfo: (NSDictionary *) userInfo
-            mouseLocation: (NSPoint) mouseLocation;
-- (void) mouseEntered: (NSEvent *) event;
-- (void) mouseExited: (NSEvent *) event;
 
 @end

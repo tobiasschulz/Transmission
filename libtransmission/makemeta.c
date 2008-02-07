@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -385,7 +385,7 @@ static void tr_realMakeMetaInfo ( tr_metainfo_builder * builder )
     /* save the file */
     if ( !builder->abortFlag ) {
         size_t nmemb;
-        char * pch = tr_bencSave( &top, &n );
+        char * pch = tr_bencSaveMalloc( &top, &n );
         FILE * fp = fopen( builder->outputFile, "wb+" );
         nmemb = n;
         if( fp == NULL )

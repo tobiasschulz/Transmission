@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -26,46 +26,35 @@
 #import <transmission.h>
 #import <Controller.h>
 
-@class TorrentCell;
+//button layout (from end of bar) is: button, padding, button, padding
+#define BUTTON_WIDTH 14.0
+#define BUTTONS_TOTAL_WIDTH 36.0
 
-#define GROUP_SEPARATOR_HEIGHT 18.0
+#define ACTION_BUTTON_HEIGHT 12.0
+#define ACTION_BUTTON_WIDTH 28.0
 
-@interface TorrentTableView : NSOutlineView
+@interface TorrentTableView : NSTableView
 {
     IBOutlet Controller * fController;
+    NSArray * fTorrents;
     
-    TorrentCell * fTorrentCell;
+    NSPoint fClickPoint;
+    BOOL fClickIn;
     
     NSUserDefaults * fDefaults;
     
-    NSMutableIndexSet * fCollapsedGroups;
-    
     IBOutlet NSMenu * fContextRow, * fContextNoRow;
+    NSImage * fResumeOnIcon, * fResumeOffIcon, * fPauseOnIcon, * fPauseOffIcon,
+            * fResumeNoWaitOnIcon, * fResumeNoWaitOffIcon, * fRevealOnIcon, * fRevealOffIcon,
+            * fActionOnIcon, * fActionOffIcon;
     
-    int fMouseControlRow, fMouseRevealRow, fMouseActionRow, fActionPushedRow;
-    NSArray * fSelectedValues;
+    NSMutableArray * fKeyStrokes;
     
     IBOutlet NSMenu * fActionMenu, * fUploadMenu, * fDownloadMenu, * fRatioMenu;
     Torrent * fMenuTorrent;
-    
-    float fPiecesBarPercent;
-    NSTimer * fPiecesBarTimer;
 }
 
-- (BOOL) isGroupCollapsed: (int) value;
-- (void) removeCollapsedGroup: (int) value;
-- (void) removeAllCollapsedGroups;
-
-- (void) removeButtonTrackingAreas;
-- (void) setControlButtonHover: (int) row;
-- (void) setRevealButtonHover: (int) row;
-- (void) setActionButtonHover: (int) row;
-
-- (void) selectValues: (NSArray *) values;
-- (NSArray *) selectedValues;
-- (NSArray *) selectedTorrents;
-
-- (void) toggleControlForTorrent: (Torrent *) torrent;
+- (void) setTorrents: (NSArray *) torrents;
 
 - (void) displayTorrentMenuForEvent: (NSEvent *) event;
 
@@ -76,8 +65,5 @@
 - (void) setQuickRatio: (id) sender;
 
 - (void) checkFile: (id) sender;
-
-- (void) togglePiecesBar;
-- (float) piecesBarPercent;
 
 @end

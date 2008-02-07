@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -30,6 +30,7 @@ typedef struct tr_ratecontrol tr_ratecontrol;
 tr_ratecontrol * tr_rcInit( void );
 void             tr_rcSetLimit( tr_ratecontrol *, int );
 int              tr_rcGetLimit( const tr_ratecontrol * );
+int              tr_rcCanTransfer( const tr_ratecontrol * );
 size_t           tr_rcBytesLeft( const tr_ratecontrol * );
 void             tr_rcTransferred( tr_ratecontrol *, size_t byteCount );
 float            tr_rcRate( const tr_ratecontrol * );

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -51,7 +51,6 @@
                                 [NSDictionary dictionaryWithObjectsAndKeys: self, NSViewAnimationTargetKey,
                                 NSViewAnimationFadeInEffect, NSViewAnimationEffectKey, nil]]];
         [fFadeInAnimation setDuration: 0.15];
-        [fFadeInAnimation setAnimationBlockingMode: NSAnimationNonblockingThreaded];
         
         fFadeOutAnimation = [[NSViewAnimation alloc] initWithViewAnimations: [NSArray arrayWithObject:
                                 [NSDictionary dictionaryWithObjectsAndKeys: self, NSViewAnimationTargetKey,
@@ -83,36 +82,30 @@
     
     NSString * file;
     NSEnumerator * enumerator = [files objectEnumerator];
-    tr_ctor * ctor;
     tr_info info;
     while ((file = [enumerator nextObject]))
     {
-        if ([[file pathExtension] caseInsensitiveCompare: @"torrent"] == NSOrderedSame)
+        if (tr_torrentParse(fLib, [file UTF8String], NULL, &info) == TR_OK)
         {
-            ctor = tr_ctorNew(fLib);
-            tr_ctorSetMetainfoFromFile(ctor, [file UTF8String]);
-            if (tr_torrentParse(fLib, ctor, &info) == TR_OK)
+            count++;
+            size += info.totalSize;
+            fileCount += info.fileCount;
+            
+            //only useful when one torrent
+            if (count == 1)
             {
-                count++;
-                size += info.totalSize;
-                fileCount += info.fileCount;
-                
-                //only useful when one torrent
-                if (count == 1)
-                {
-                    name = [NSString stringWithUTF8String: info.name];
-                    folder = info.isMultifile;
-                }
+                name = [NSString stringWithUTF8String: info.name];
+                folder = info.isMultifile;
             }
-            tr_metainfoFree(&info);
-            tr_ctorFree(ctor);
         }
+        tr_metainfoFree(&info);
     }
     
     if (count <= 0)
         return;
     
     //set strings and icon
+    NSImage * icon = nil;
     NSString * secondString = [NSString stringForFileSize: size];
     if (count > 1 || folder)
     {
@@ -121,17 +114,15 @@
             fileString = NSLocalizedString(@"1 File, ", "Drag overlay -> torrents");
         else
             fileString= [NSString stringWithFormat: NSLocalizedString(@"%d Files, ", "Drag overlay -> torrents"), fileCount];
-        secondString = [fileString stringByAppendingString: secondString];
+         secondString = [fileString stringByAppendingString: secondString];
     }
     
-    NSImage * icon;
     if (count == 1)
         icon = [[NSWorkspace sharedWorkspace] iconForFileType: folder ? NSFileTypeForHFSTypeCode('fldr') : [name pathExtension]];
     else
     {
         name = [NSString stringWithFormat: NSLocalizedString(@"%d Torrent Files", "Drag overlay -> torrents"), count];
         secondString = [secondString stringByAppendingString: @" Total"];
-        icon = [NSImage imageNamed: @"TransmissionDocument.icns"];
     }
     
     [[self contentView] setOverlay: icon mainLine: name subLine: secondString];
@@ -144,6 +135,7 @@
         mainLine: NSLocalizedString(@"Create a Torrent File", "Drag overlay -> file") subLine: file];
     [self fadeIn];
 }
+
 
 - (void) setURL: (NSString *) url
 {

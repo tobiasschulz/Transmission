@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -30,5 +30,9 @@
     
     NSMutableDictionary * fTitleAttributes, * fStatusAttributes;
 }
+
+- (NSRect) imageRectForBounds: (NSRect) bounds;
+- (NSRect) titleRectForBounds: (NSRect) bounds;
+- (NSRect) statusRectForBounds: (NSRect) bounds;
 
 @end

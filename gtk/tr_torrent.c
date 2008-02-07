@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -45,6 +45,7 @@ tr_torrent_init(GTypeInstance *instance, gpointer g_class UNUSED )
 #endif
 
   self->handle = NULL;
+  self->lastStatTime = 0;
   self->delfile = NULL;
   self->severed = FALSE;
   self->disposed = FALSE;
@@ -126,10 +127,23 @@ tr_torrent_handle(TrTorrent *tor)
     return tor->severed ? NULL : tor->handle;
 }
 
+static tr_stat*
+refreshStat( TrTorrent * tor )
+{
+    tor->lastStatTime= time( NULL );
+    tor->stat = *tr_torrentStat( tor->handle );
+    return &tor->stat;
+}
+
 const tr_stat *
 tr_torrent_stat(TrTorrent *tor)
 {
-    return tor && !tor->severed ? tr_torrentStatCached( tor->handle ) : NULL;
+    g_assert( TR_IS_TORRENT(tor) );
+
+    if( !tor->severed && tor->lastStatTime!=time(NULL) )
+        refreshStat( tor );
+
+    return &tor->stat;
 }
 
 const tr_info *
@@ -164,6 +178,7 @@ static TrTorrent *
 maketorrent( tr_torrent * handle )
 {
     TrTorrent * tor = g_object_new( TR_TORRENT_TYPE, NULL );
+    tr_torrentDisablePex( handle, !pref_flag_get( PREF_KEY_PEX ) );
     tor->handle = handle;
     return tor;
 }
@@ -174,91 +189,78 @@ tr_torrent_new_preexisting( tr_torrent * tor )
     return maketorrent( tor );
 }
 
-TrTorrent *
-tr_torrent_new( tr_handle               * handle,
-                const char              * metainfo_filename,
-                const char              * destination,
-                enum tr_torrent_action    act,
-                gboolean                  paused,
-                char                   ** err )
-{
-  TrTorrent * ret;
-  tr_torrent * tor;
-  tr_ctor * ctor;
-  int errcode = -1;
 
-  g_assert( destination );
+TrTorrent *
+tr_torrent_new( tr_handle * back, const char *torrent, const char *dir,
+                enum tr_torrent_action act, gboolean paused, char **err )
+{
+  TrTorrent *ret;
+  tr_torrent *handle;
+  int errcode;
+
+  g_assert(NULL != dir);
 
   *err = NULL;
 
-  ctor = tr_ctorNew( handle );
-  tr_ctorSetMetainfoFromFile( ctor, metainfo_filename );
-  tr_ctorSetDestination( ctor, TR_FORCE, destination );
-  tr_ctorSetPaused( ctor, TR_FORCE, paused );
-  tr_ctorSetMaxConnectedPeers( ctor, TR_FORCE, pref_int_get( PREF_KEY_MAX_PEERS_PER_TORRENT ) );
-  tor = tr_torrentNew( handle, ctor, &errcode );
-  tr_ctorFree( ctor );
-  
-  if( tor == NULL ) {
-    switch( errcode ) {
+  errcode = -1;
+
+  handle = tr_torrentInit( back, torrent, dir, paused, &errcode );
+
+  if(NULL == handle) {
+    switch(errcode) {
       case TR_EINVALID:
-        *err = g_strdup_printf(_("%s: not a valid torrent file"), metainfo_filename );
+        *err = g_strdup_printf(_("%s: not a valid torrent file"), torrent);
         break;
       case TR_EDUPLICATE:
-        *err = g_strdup_printf(_("%s: torrent is already open"), metainfo_filename );
+        *err = g_strdup_printf(_("%s: torrent is already open"), torrent);
         break;
       default:
-        *err = g_strdup( metainfo_filename );
+        *err = g_strdup(torrent);
         break;
     }
     return NULL;
   }
 
-  ret = maketorrent( tor );
+  ret = maketorrent( handle );
+
   if( TR_TOR_MOVE == act )
-    ret->delfile = g_strdup( metainfo_filename );
+    ret->delfile = g_strdup(torrent);
+
   return ret;
 }
 
 TrTorrent *
-tr_torrent_new_with_data( tr_handle    * handle,
-                          uint8_t      * metainfo,
-                          size_t         size,
-                          const char   * destination,
-                          gboolean       paused,
-                          char        ** err )
+tr_torrent_new_with_data( tr_handle * back, uint8_t * data, size_t size,
+                          const char * dir, gboolean paused, char ** err )
 {
-  tr_torrent * tor;
-  tr_ctor * ctor;
-  int errcode = -1;  
+    tr_torrent * handle;
+    int          errcode;
 
-  g_assert( destination );
+    g_assert( NULL != dir );
 
-  *err = NULL;
+    *err = NULL;
 
-  ctor = tr_ctorNew( handle );
-  tr_ctorSetMetainfo( ctor, metainfo, size );
-  tr_ctorSetDestination( ctor, TR_FORCE, destination );
-  tr_ctorSetPaused( ctor, TR_FORCE, paused );
-  tr_ctorSetMaxConnectedPeers( ctor, TR_FORCE, pref_int_get( PREF_KEY_MAX_PEERS_PER_TORRENT ) );
-  tor = tr_torrentNew( handle, ctor, &errcode );
-  
-  if( tor == NULL ) {
-    switch( errcode ) {
-      case TR_EINVALID:
-        *err = g_strdup( _("not a valid torrent file") );
-        break;
-      case TR_EDUPLICATE:
-        *err = g_strdup( _("torrent is already open") );
-        break;
-      default:
-        *err = g_strdup( "" );
-        break;
+    errcode = -1;
+    handle  = tr_torrentInitData( back, data, size, dir, paused, &errcode );
+
+    if( NULL == handle )
+    {
+        switch( errcode )
+        {
+            case TR_EINVALID:
+                *err = g_strdup( _("not a valid torrent file") );
+                break;
+            case TR_EDUPLICATE:
+                *err = g_strdup( _("torrent is already open") );
+                break;
+            default:
+                *err = g_strdup( "" );
+                break;
+        }
+        return NULL;
     }
-    return NULL;
-  }
 
-  return maketorrent( tor );
+    return maketorrent( handle );
 }
 
 void
@@ -297,21 +299,21 @@ tr_torrent_status_str ( TrTorrent * gtor )
     {
         case TR_STATUS_CHECK_WAIT:
             prog = st->recheckProgress * 100.0; /* [0...100] */
-            top = g_strdup_printf( _("Waiting to verify local data (%.1f%% tested)"), prog );
+            top = g_strdup_printf( _("Waiting to verify local files (%.1f%% tested)"), prog );
             break;
 
         case TR_STATUS_CHECK:
             prog = st->recheckProgress * 100.0; /* [0...100] */
-            top = g_strdup_printf( _("Verifying local data (%.1f%% tested)"), prog );
+            top = g_strdup_printf( _("Verifying local files (%.1f%% tested)"), prog );
             break;
 
         case TR_STATUS_DOWNLOAD:
             if( eta < 0 )
                 top = g_strdup_printf( _("Stalled (%.1f%%)"), prog );
             else {
-                char timestr[128];
-                tr_strltime( timestr, eta, sizeof( timestr ) );
+                char * timestr = readabletime(eta);
                 top = g_strdup_printf( _("%s remaining (%.1f%%)"), timestr, prog );
+                g_free(timestr);
             }
             break;
 

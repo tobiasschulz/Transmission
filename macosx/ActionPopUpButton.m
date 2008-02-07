@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,46 +23,25 @@
  *****************************************************************************/
 
 #import "ActionPopUpButton.h"
-#import "NSApplicationAdditions.h"
 
 @implementation ActionPopUpButton
-
-//only needed on tiger
 
 - (id) initWithCoder: (NSCoder *) coder
 {
 	if ((self = [super initWithCoder: coder]))
     {
-        if (![NSApp isOnLeopardOrBetter])
-        {
-            fImage = [NSImage imageNamed: @"ActionGear.png"];
-            [fImage setFlipped: YES];
-        }
+        fImage = [NSImage imageNamed: @"ActionButton.png"];
+        [fImage setFlipped: YES];
+        fImagePressed = [NSImage imageNamed: @"ActionButtonPressed.png"];
+        [fImagePressed setFlipped: YES];
 	}
 	return self;
 }
 
-- (void) awakeFromNib
-{
-    if (![NSApp isOnLeopardOrBetter])
-    {
-        [(NSPopUpButtonCell *)[self cell] setArrowPosition: NSPopUpNoArrow];
-        [[[self menu] itemAtIndex: 0] setImage: nil];
-    }
-}
-
 - (void) drawRect: (NSRect) rect
 {
-    [super drawRect: rect];
-    
-    if ([NSApp isOnLeopardOrBetter])
-        return;
-    
-    NSSize imageSize = [fImage size];
-    NSRect imageRect = NSMakeRect(rect.origin.x + (rect.size.width - imageSize.width) * 0.5,
-                        rect.origin.y + (rect.size.height - imageSize.height) * 0.5, imageSize.width, imageSize.height);
-    
-	[fImage drawInRect: imageRect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
+    NSImage * image = [[self cell] isHighlighted] ? fImagePressed : fImage;
+	[image drawInRect: [self bounds] fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
 }
 
 @end
