@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2006 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -29,10 +29,9 @@
 
 #include <sys/types.h>
 
-#ifdef WIN32
-#include <winsock2.h> /* inet_addr */
-#else
 #include <arpa/inet.h> /* inet_addr */
+
+#ifndef WIN32
 #include <netdb.h>
 #include <fcntl.h>
 #endif
@@ -132,11 +131,9 @@ tr_netOpen( const struct in_addr * addr, tr_port_t port,
 #endif
         && ( sockerrno != EINPROGRESS ) )
     {
-        tr_err( "Couldn't connect socket %d to %s, port %d (errno %d - %s)",
-                s, inet_ntoa(*addr), port,
-                sockerrno, strerror(sockerrno) );
+        tr_err( "Couldn't connect socket (%s)", strerror( sockerrno ) );
         tr_netClose( s );
-        s = -1;
+        return -1;
     }
 
     return s;
@@ -148,8 +145,45 @@ tr_netOpenTCP( const struct in_addr * addr, tr_port_t port, int priority )
     return tr_netOpen( addr, port, SOCK_STREAM, priority );
 }
 
+int
+tr_netOpenUDP( const struct in_addr * addr, tr_port_t port, int priority )
+{
+    return tr_netOpen( addr, port, SOCK_DGRAM, priority );
+}
+
+#ifdef IP_ADD_MEMBERSHIP
+int tr_netMcastOpen( int port, const struct in_addr * addr )
+{
+    int fd;
+    struct ip_mreq req;
+
+    fd = tr_netBindUDP( port, addr );
+    if( 0 > fd )
+    {
+        return -1;
+    }
+
+    memset( &req, 0, sizeof( req ) );
+    req.imr_multiaddr.s_addr = addr->s_addr;
+    req.imr_interface.s_addr = htonl( INADDR_ANY );
+    if( setsockopt( fd, IPPROTO_IP, IP_ADD_MEMBERSHIP, (char*)&req, sizeof ( req ) ) )
+    {
+        tr_err( "Couldn't join multicast group (%s)", strerror( sockerrno ) );
+        tr_netClose( fd );
+        return -1;
+    }
+
+    return fd;
+}
+#else /* IP_ADD_MEMBERSHIP */
+int tr_netMcastOpen( int port UNUSED, const struct in_addr * addr UNUSED )
+{
+    return -1;
+}
+#endif /* IP_ADD_MEMBERSHIP */
+
 static int
-tr_netBind( int port, int type )
+tr_netBind( int port, int type, const struct in_addr * addr )
 {
     int s;
     struct sockaddr_in sock;
@@ -159,7 +193,6 @@ tr_netBind( int port, int type )
 
     if( ( s = createSocket( type, 1 ) ) < 0 )
     {
-        tr_err( "Couldn't create socket of type %d", type );
         return -1;
     }
 
@@ -168,10 +201,24 @@ tr_netBind( int port, int type )
     setsockopt( s, SOL_SOCKET, SO_REUSEADDR, (char*)&optval, sizeof( optval ) );
 #endif
 
+#ifdef SO_REUSEPORT
+    if( SOCK_DGRAM == type )
+    {
+        optval = 1;
+        setsockopt( s, SOL_SOCKET, SO_REUSEPORT, &optval, sizeof( optval ) );
+    }
+#endif
+
     memset( &sock, 0, sizeof( sock ) );
     sock.sin_family      = AF_INET;
-    sock.sin_addr.s_addr = INADDR_ANY;
-    sock.sin_port        = htons( port );
+    sock.sin_port = htons(port);
+    if( addr != NULL ) {
+        sock.sin_addr.s_addr = addr->s_addr;
+        tr_inf( "using the specified address\n" );
+    } else { 
+        sock.sin_addr.s_addr = INADDR_ANY;
+        tr_inf( "using INADDR_ANY\n" );
+    }
 
     if( bind( s, (struct sockaddr *) &sock,
                sizeof( struct sockaddr_in ) ) )
@@ -180,15 +227,20 @@ tr_netBind( int port, int type )
         tr_netClose( s );
         return -1;
     }
-     
-    tr_inf( "Bound socket %d to port %d", s, port );
+
     return s;
 }
 
 int
 tr_netBindTCP( int port )
 {
-    return tr_netBind( port, SOCK_STREAM );
+    return tr_netBind( port, SOCK_STREAM, NULL );
+}
+
+int
+tr_netBindUDP( int port, const struct in_addr * addr )
+{
+    return tr_netBind( port, SOCK_DGRAM, addr );
 }
 
 int

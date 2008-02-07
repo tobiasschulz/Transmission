@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -11,11 +11,13 @@
  */
 
 #include <assert.h>
+#include <ctype.h> /* isalnum */
 #include <stdio.h> /* snprintf */
 #include <stdlib.h>
 #include <string.h> /* strcmp, strchr */
 #include <libgen.h> /* basename */
 
+#include <sys/queue.h> /* evhttp.h needs this */
 #include <event.h>
 #include <evhttp.h>
 
@@ -26,8 +28,8 @@
 #include "net.h"
 #include "publish.h"
 #include "shared.h"
-#include "torrent.h"
 #include "tracker.h"
+#include "trcompat.h" /* for asprintf */
 #include "trevent.h"
 #include "utils.h"
 
@@ -39,11 +41,6 @@ enum
     /* maximum number of concurrent tracker socket connections */
     MAX_TRACKER_SOCKETS = 16,
 
-    /* maximum number of concurrent tracker socket connections during shutdown.
-     * all the peer connections should be gone by now, so we can hog more 
-     * connections to send `stop' messages to the trackers */
-    MAX_TRACKER_SOCKETS_DURING_SHUTDOWN = 64,
-
     /* unless the tracker says otherwise, rescrape this frequently */
     DEFAULT_SCRAPE_INTERVAL_SEC = (60 * 15),
 
@@ -54,7 +51,7 @@ enum
     DEFAULT_ANNOUNCE_MIN_INTERVAL_SEC = (60 * 2),
 
     /* this is how long we'll leave a request hanging before timeout */
-    TIMEOUT_INTERVAL_SEC = 30,
+    TIMEOUT_INTERVAL_SEC = 45,
 
     /* this is how long we'll leave a 'stop' request hanging before timeout.
        we wait less time for this so it doesn't slow down shutdowns */
@@ -103,7 +100,7 @@ struct tr_tracker
        closed and opened again without quitting Transmission ...
        change the peerid. It would help sometimes if a stopped event
        was missed to ensure that we didn't think someone was cheating. */
-    uint8_t * peer_id;
+    char peer_id[TR_ID_LEN + 1];
 
     /* these are set from the latest tracker response... -1 is 'unknown' */
     int timesDownloaded;
@@ -114,8 +111,6 @@ struct tr_tracker
     time_t manualAnnounceAllowedAt;
     time_t reannounceAt;
     time_t scrapeAt;
-
-    int randOffset;
 
     unsigned int isRunning     : 1;
 };
@@ -237,7 +232,8 @@ publishErrorClear( tr_tracker * t )
 static void
 publishErrorMessageAndStop( tr_tracker * t, const char * msg )
 {
-    t->isRunning = 0;
+    /* not in the 0.9x branch... */
+    /* t->isRunning = 0; */
     publishMessage( t, msg, TR_TRACKER_ERROR );
 }
 
@@ -256,21 +252,17 @@ publishNewPeers( tr_tracker * t, int count, uint8_t * peers )
     event.peerCount = count;
     event.peerCompact = peers;
     tr_inf( "Torrent \"%s\" got %d new peers", t->name, count );
-    if( count )
-        tr_publisherPublish( t->publisher, t, &event );
+    tr_publisherPublish( t->publisher, t, &event );
 }
 
 /***
 ****
 ***/
 
-static void onReqDone( tr_handle * handle );
-
 static void
-onStoppedResponse( struct evhttp_request * req UNUSED, void * handle )
+onStoppedResponse( struct evhttp_request * req UNUSED, void * handle UNUSED )
 {
     dbgmsg( NULL, "got a response to some `stop' message" );
-    onReqDone( handle );
 }
 
 static int
@@ -278,7 +270,14 @@ parseBencResponse( struct evhttp_request * req, benc_val_t * setme )
 {
     const unsigned char * body = EVBUFFER_DATA( req->input_buffer );
     const int bodylen = EVBUFFER_LENGTH( req->input_buffer );
-    return tr_bencLoad( body, bodylen, setme, NULL );
+    int ret = 1;
+    int i;
+
+    for( i=0; ret && i<bodylen; ++i )
+        if( !tr_bencLoad( body+i, bodylen-1, setme, NULL ) )
+            ret = 0;
+
+    return ret;
 }
 
 static const char*
@@ -381,6 +380,8 @@ parseOldPeers( benc_val_t * bePeers, int * setmePeerCount )
     *setmePeerCount = peerCount;
     return compact;
 }
+
+static void onReqDone( tr_handle * handle );
 
 static void
 onTrackerResponse( struct evhttp_request * req, void * vhash )
@@ -488,8 +489,8 @@ onTrackerResponse( struct evhttp_request * req, void * vhash )
     {
         dbgmsg( t, "request succeeded. reannouncing in %d seconds",
                    t->announceIntervalSec );
-        t->reannounceAt = time( NULL ) + t->randOffset + t->announceIntervalSec;
-        t->manualAnnounceAllowedAt = time( NULL ) + t->announceMinIntervalSec;
+        t->reannounceAt = time(NULL) + t->announceIntervalSec;
+        t->manualAnnounceAllowedAt = time(NULL) + t->announceMinIntervalSec;
     }
     else if( 300<=responseCode && responseCode<=399 )
     {
@@ -497,8 +498,8 @@ onTrackerResponse( struct evhttp_request * req, void * vhash )
 
         /* it's a redirect... updateAddresses() has already
          * parsed the redirect, all that's left is to retry */
-        t->reannounceAt = time( NULL );
-        t->manualAnnounceAllowedAt = time( NULL ) + t->announceMinIntervalSec;
+        t->reannounceAt = time(NULL);
+        t->manualAnnounceAllowedAt = time(NULL) + t->announceMinIntervalSec;
     }
     else if( 400<=responseCode && responseCode<=499 )
     {
@@ -516,7 +517,7 @@ onTrackerResponse( struct evhttp_request * req, void * vhash )
     }
     else if( 500<=responseCode && responseCode<=599 )
     {
-        dbgmsg( t, "Got a 5xx error... retrying in one minute." );
+        dbgmsg( t, "Got a 5xx error... retrying in 15 seconds." );
 
         /* Response status codes beginning with the digit "5" indicate
          * cases in which the server is aware that it has erred or is
@@ -525,17 +526,17 @@ onTrackerResponse( struct evhttp_request * req, void * vhash )
         if( req && req->response_code_line )
             publishWarning( t, req->response_code_line );
         t->manualAnnounceAllowedAt = ~(time_t)0;
-        t->reannounceAt = time( NULL ) + 60;
+        t->reannounceAt = time(NULL) + 15;
     }
     else
     {
-        dbgmsg( t, "Invalid response from tracker... retrying in two minutes." );
+        dbgmsg( t, "Invalid response from tracker... retrying in 60 seconds." );
 
         /* WTF did we get?? */
         if( req && req->response_code_line )
             publishWarning( t, req->response_code_line );
         t->manualAnnounceAllowedAt = ~(time_t)0;
-        t->reannounceAt = time( NULL ) + t->randOffset + 120;
+        t->reannounceAt = time(NULL) + 60;
     }
 }
 
@@ -611,7 +612,7 @@ onScrapeResponse( struct evhttp_request * req, void * vhash )
         publishWarning( t, warning );
     }
 
-    t->scrapeAt = time( NULL ) + t->randOffset + nextScrapeSec;
+    t->scrapeAt = time(NULL) + nextScrapeSec;
 }
 
 /***
@@ -656,6 +657,7 @@ addCommonHeaders( const tr_tracker * t,
     snprintf( buf, sizeof(buf), "%s:%d", address->address, address->port );
     evhttp_add_header( req->output_headers, "Host", buf );
     evhttp_add_header( req->output_headers, "Connection", "close" );
+    evhttp_add_header( req->output_headers, "Content-Length", "0" );
     evhttp_add_header( req->output_headers, "User-Agent",
                                          TR_NAME "/" LONG_VERSION_STRING );
 }
@@ -746,7 +748,7 @@ createScrape( tr_handle * handle, const tr_tracker * tracker )
     req->timeout = TIMEOUT_INTERVAL_SEC;
     req->req = evhttp_request_new( onScrapeResponse, torrentHashNew( handle, tracker ) );
     req->reqtype = TR_REQ_SCRAPE;
-    tr_asprintf( &req->uri, "%s%cinfo_hash=%s", a->scrape, strchr(a->scrape,'?')?'&':'?', tracker->escaped );
+    asprintf( &req->uri, "%s%cinfo_hash=%s", a->scrape, strchr(a->scrape,'?')?'&':'?', tracker->escaped );
     memcpy( req->torrent_hash, tracker->hash, SHA_DIGEST_LENGTH );
     addCommonHeaders( tracker, req->req );
 
@@ -756,7 +758,6 @@ createScrape( tr_handle * handle, const tr_tracker * tracker )
 struct tr_tracker_handle
 {
     int socketCount;
-    unsigned int isShuttingDown : 1;
     tr_timer * pulseTimer;
     tr_list * requestQueue;
     tr_list * scrapeQueue;
@@ -784,13 +785,9 @@ freeRequest2( void * req )
 void
 tr_trackerShuttingDown( tr_handle * handle )
 {
+    /* since we're shutting down, we don't need to scrape anymore... */
     if( handle->tracker )
-    {
-        /* since we're shutting down, we don't need to scrape anymore... */
         tr_list_free( &handle->tracker->scrapeQueue, freeRequest2 );
-
-        handle->tracker->isShuttingDown = 1;
-    }
 }
 
 static int
@@ -869,10 +866,7 @@ invokeNextInQueue( tr_handle * handle, tr_list ** list )
 static int
 socketIsAvailable( tr_handle * handle )
 {
-    const int max = handle->tracker->isShuttingDown
-                      ? MAX_TRACKER_SOCKETS_DURING_SHUTDOWN
-                      : MAX_TRACKER_SOCKETS;
-    return handle->tracker->socketCount < max;
+    return handle->tracker->socketCount < MAX_TRACKER_SOCKETS;
 }
 
 static void ensureGlobalsExist( tr_handle * );
@@ -895,13 +889,6 @@ enqueueRequest( tr_handle * handle, const tr_tracker * tracker, int reqtype )
     tr_list_append( &handle->tracker->requestQueue, req );
 }
 
-static void
-scrapeSoon( tr_tracker * t )
-{
-    if( trackerSupportsScrape( t ) )
-        t->scrapeAt = time( NULL ) + t->randOffset;
-}
-
 static int
 pulse( void * vhandle )
 {
@@ -909,9 +896,6 @@ pulse( void * vhandle )
     struct tr_tracker_handle * th = handle->tracker;
     tr_torrent * tor;
     const time_t now = time( NULL );
-
-    if( handle->tracker == NULL )
-        return FALSE;
 
     if( handle->tracker->socketCount || tr_list_size(th->requestQueue) || tr_list_size(th->scrapeQueue) )
         dbgmsg( NULL, "tracker pulse... %d sockets, %d reqs left, %d scrapes left", handle->tracker->socketCount, tr_list_size(th->requestQueue), tr_list_size(th->scrapeQueue) );
@@ -950,12 +934,9 @@ pulse( void * vhandle )
 static void
 onReqDone( tr_handle * handle )
 {
-    if( handle->tracker )
-    {
-        pulse( handle );
-        --handle->tracker->socketCount;
-        dbgmsg( NULL, "decrementing socket count to %d", handle->tracker->socketCount );
-    }
+    pulse( handle );
+    --handle->tracker->socketCount;
+    dbgmsg( NULL, "decrementing socket count to %d", handle->tracker->socketCount );
 }
 
 /***
@@ -973,20 +954,12 @@ generateKeyParam( char * msg, int len )
     *msg = '\0';
 }
 
-static int
-is_rfc2396_alnum( char ch )
-{
-    return ( (ch >= 'a' && ch <= 'z' )
-            || (ch >= 'A' && ch <= 'Z' )
-            || (ch >= '0' && ch <= '9' ) );
-}
-
 static void
 escape( char * out, const uint8_t * in, int in_len ) /* rfc2396 */
 {
     const uint8_t *end = in + in_len;
     while( in != end )
-        if( is_rfc2396_alnum(*in) )
+        if( isalnum(*in) )
             *out++ = (char) *in++;
         else 
             out += snprintf( out, 4, "%%%02X", (unsigned int)*in++ );
@@ -1001,6 +974,8 @@ tr_trackerNew( const tr_torrent * torrent )
     tr_tracker_info * nwalk;
     tr_tracker * t;
 
+    tr_dbg( "making a new tracker for \"%s\"", info->primaryAddress );
+
     t = tr_new0( tr_tracker, 1 );
     t->handle = torrent->handle;
     t->scrapeIntervalSec       = DEFAULT_SCRAPE_INTERVAL_SEC;
@@ -1014,7 +989,6 @@ tr_trackerNew( const tr_torrent * torrent )
     t->leecherCount = -1;
     t->manualAnnounceAllowedAt = ~(time_t)0;
     t->name = tr_strdup( info->name );
-    t->randOffset = tr_rand( 60 );
     memcpy( t->hash, info->hash, SHA_DIGEST_LENGTH );
     escape( t->escaped, info->hash, SHA_DIGEST_LENGTH );
 
@@ -1045,7 +1019,8 @@ tr_trackerNew( const tr_torrent * torrent )
     assert( nwalk - t->addresses == sum );
     assert( iwalk - t->tierFronts == sum );
 
-    scrapeSoon( t );
+    if( trackerSupportsScrape( t ) )
+        enqueueScrape( t->handle, t );
 
     return t;
 }
@@ -1059,7 +1034,6 @@ onTrackerFreeNow( void * vt )
     tr_publisherFree( &t->publisher );
     tr_free( t->name );
     tr_free( t->trackerID );
-    tr_free( t->peer_id );
 
     /* addresses... */
     for( i=0; i<t->addressCount; ++i )
@@ -1135,9 +1109,7 @@ tr_trackerGetCounts( const tr_tracker  * t,
 void
 tr_trackerStart( tr_tracker * t )
 {
-    tr_free( t->peer_id );
-    t->peer_id = tr_peerIdNew( );
-
+    tr_peerIdNew( t->peer_id, sizeof(t->peer_id) );
     if( t->isRunning == 0 ) {
         t->isRunning = 1;
         enqueueRequest( t->handle, t, TR_REQ_STARTED );

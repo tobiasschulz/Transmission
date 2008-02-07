@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -26,17 +26,17 @@
 
 @implementation NSMenu (NSMenuAdditions)
 
-- (void) appendItemsFromMenu: (NSMenu *) menu atIndexes: (NSIndexSet *) indexes atBottom: (BOOL) bottom
+- (void) appendItemsFromMenu: (NSMenu *) menu atIndexes: (NSIndexSet *) indexes
 {
-    int bottomIndex = bottom ? [self numberOfItems] : 0;
+    int bottom = [self numberOfItems];
     
     NSMenuItem * item;
     unsigned int i;
     for (i = [indexes lastIndex]; i != NSNotFound; i = [indexes indexLessThanIndex: i])
     {
-        item = [[menu itemAtIndex: i] retain];
+        item = [[menu itemAtIndex:i] retain];
         [menu removeItemAtIndex: i];
-        [self insertItem: item atIndex: bottomIndex];
+        [self insertItem: item atIndex: bottom];
         [item release];
     }
 }

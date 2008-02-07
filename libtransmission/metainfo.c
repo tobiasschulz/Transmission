@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -31,42 +31,25 @@
 #include <sys/stat.h>
 #include <unistd.h> /* unlink, stat */
 
-#include <miniupnp/miniwget.h> /* parseURL */
-
 #include "transmission.h"
 #include "bencode.h"
 #include "crypto.h" /* tr_sha1 */
+#include "http.h" /* tr_httpParseUrl */
 #include "metainfo.h"
 #include "platform.h"
 #include "utils.h"
 
-
-static int
-tr_httpParseUrl( const char * url_in, int len,
-                 char ** setme_host, int * setme_port, char ** setme_path )
-{
-    char * url = tr_strndup( url_in, len );
-    char * path;
-    char host[4096+1];
-    unsigned short port;
-    int success;
-
-    success = parseURL( url, host, &port, &path );
-
-    if( success ) {
-        *setme_host = tr_strdup( host );
-        *setme_port = port;
-        *setme_path = tr_strdup( path );
-    }
-
-    tr_free( url );
-
-    return !success;
-}
-
 /***********************************************************************
  * Local prototypes
  **********************************************************************/
+static int realparse( tr_info * inf, const uint8_t * buf, size_t len );
+static void savedname( char * name, size_t len, const char * hash,
+                       const char * tag );
+static uint8_t * readtorrent( const char * path, size_t * len );
+static int savetorrent( const char * hash, const char * tag,
+                        const uint8_t * buf, size_t buflen );
+static int getfile( char * buf, int size,
+                    const char * prefix, benc_val_t * name );
 static int getannounce( tr_info * inf, benc_val_t * meta );
 static char * announceToScrape( const char * announce );
 static int parseFiles( tr_info * inf, benc_val_t * name,
@@ -148,63 +131,159 @@ strlcat_utf8( void * dest, const void * src, size_t len, char skip )
     }
 }
 
-static void
-savedname( char * name, size_t len, const char * hash, const char * tag )
-{
-    const char * torDir = tr_getTorrentsDirectory ();
-
-    if( tag == NULL )
-    {
-        tr_buildPath( name, len, torDir, hash, NULL );
-    }
-    else
-    {
-        char base[1024];
-        snprintf( base, sizeof(base), "%s-%s", hash, tag );
-        tr_buildPath( name, len, torDir, base, NULL );
-    }
-}
-
-
+/***********************************************************************
+ * tr_metainfoParse
+ ***********************************************************************
+ *
+ **********************************************************************/
 int
-tr_metainfoParse( tr_info * inf, const benc_val_t * meta_in, const char * tag )
+tr_metainfoParseFile( tr_info * inf, const char * tag,
+                      const char * path, int save )
 {
-    int i;
-    benc_val_t * beInfo, * val, * val2;
-    benc_val_t * meta = (benc_val_t *) meta_in;
+    uint8_t * buf;
+    size_t    size;
 
-    /* info_hash: urlencoded 20-byte SHA1 hash of the value of the info key
-     * from the Metainfo file. Note that the value will be a bencoded 
-     * dictionary, given the definition of the info key above. */
-    if(( beInfo = tr_bencDictFindType( meta, "info", TYPE_DICT )))
+    /* read the torrent data */
+    buf = readtorrent( path, &size );
+    if( NULL == buf )
     {
-        int len;
-        char * str = tr_bencSave( beInfo, &len );
-        tr_sha1( inf->hash, str, len, NULL );
-        tr_free( str );
-    }
-    else
-    {
-        tr_err( "info dictionary not found!" );
         return TR_EINVALID;
     }
+
+    if( realparse( inf, buf, size ) )
+    {
+        free( buf );
+        return TR_EINVALID;
+    }
+
+    if( save )
+    {
+        if( savetorrent( inf->hashString, tag, buf, size ) )
+        {
+            free( buf );
+            return TR_EINVALID;
+        }
+        savedname( inf->torrent, sizeof inf->torrent, inf->hashString, tag );
+    }
+    else
+    {
+        snprintf( inf->torrent, sizeof inf->torrent, "%s", path );
+    }
+
+    free( buf );
+
+    return TR_OK;
+}
+
+int
+tr_metainfoParseData( tr_info * inf, const char * tag,
+                      const uint8_t * data, size_t size, int save )
+{
+    if( realparse( inf, data, size ) )
+    {
+        return TR_EINVALID;
+    }
+
+    if( save )
+    {
+        if( savetorrent( inf->hashString, tag, data, size ) )
+        {
+            return TR_EINVALID;
+        }
+        savedname( inf->torrent, sizeof inf->torrent, inf->hashString, tag );
+    }
+
+    return TR_OK;
+}
+
+int
+tr_metainfoParseHash( tr_info * inf, const char * tag, const char * hash )
+{
+    struct stat sb;
+    uint8_t   * buf;
+    size_t      size;
+    int         save;
+
+    /* check it we should use an old file without a tag */
+    /* XXX this should go away at some point */
+    save = 0;
+    savedname( inf->torrent, sizeof inf->torrent, hash, tag );
+    if( 0 > stat( inf->torrent, &sb ) && ENOENT == errno )
+    {
+        savedname( inf->torrent, sizeof inf->torrent, hash, NULL );
+        if( 0 == stat( inf->torrent, &sb ))
+        {
+            save = 1;
+        }
+    }
+
+    buf = readtorrent( inf->torrent, &size );
+    if( NULL == buf )
+    {
+        return TR_EINVALID;
+    }
+
+    if( realparse( inf, buf, size ) )
+    {
+        free( buf );
+        return TR_EINVALID;
+    }
+
+    /* save a new tagged copy of the old untagged torrent */
+    if( save )
+    {
+        if( savetorrent( hash, tag, buf, size ) )
+        {
+            free( buf );
+            return TR_EINVALID;
+        }
+        savedname( inf->torrent, sizeof inf->torrent, hash, tag );
+    }
+
+    free( buf );
+
+    return TR_OK;
+}
+
+static int
+realparse( tr_info * inf, const uint8_t * buf, size_t size )
+{
+    benc_val_t   meta, * beInfo, * val, * val2;
+    int          i;
+
+    /* Parse bencoded infos */
+    if( tr_bencLoad( buf, size, &meta, NULL ) )
+    {
+        tr_err( "Error while parsing bencoded data [%*.*s]", (int)size, (int)size, (char*)buf );
+        return TR_EINVALID;
+    }
+
+    /* Get info hash */
+    beInfo = tr_bencDictFind( &meta, "info" );
+    if( NULL == beInfo || TYPE_DICT != beInfo->type )
+    {
+        tr_err( "%s \"info\" dictionary", ( beInfo ? "Invalid" : "Missing" ) );
+        tr_bencFree( &meta );
+        return TR_EINVALID;
+    }
+
+    tr_sha1( inf->hash, beInfo->begin, beInfo->end - beInfo->begin, NULL );
 
     for( i = 0; i < SHA_DIGEST_LENGTH; i++ )
     {
         snprintf( inf->hashString + i * 2, sizeof( inf->hashString ) - i * 2,
                   "%02x", inf->hash[i] );
     }
-    savedname( inf->torrent, sizeof( inf->torrent ), inf->hashString, tag );
 
     /* Comment info */
-    val = tr_bencDictFindFirst( meta, "comment.utf-8", "comment", NULL );
+    val = tr_bencDictFindFirst( &meta, "comment.utf-8", "comment", NULL );
     if( NULL != val && TYPE_STR == val->type )
     {
         strlcat_utf8( inf->comment, val->val.s.s, sizeof( inf->comment ), 0 );
     }
     
     /* Creator info */
-    val = tr_bencDictFindFirst( meta, "created by.utf-8", "created by", NULL );
+    val = tr_bencDictFindFirst( &meta, "created by.utf-8", "created by", NULL );
     if( NULL != val && TYPE_STR == val->type )
     {
         strlcat_utf8( inf->creator, val->val.s.s, sizeof( inf->creator ), 0 );
@@ -212,7 +291,7 @@ tr_metainfoParse( tr_info * inf, const benc_val_t * meta_in, const char * tag )
     
     /* Date created */
     inf->dateCreated = 0;
-    val = tr_bencDictFind( meta, "creation date" );
+    val = tr_bencDictFind( &meta, "creation date" );
     if( NULL != val && TYPE_INT == val->type )
     {
         inf->dateCreated = val->val.i;
@@ -220,7 +299,7 @@ tr_metainfoParse( tr_info * inf, const benc_val_t * meta_in, const char * tag )
     
     /* Private torrent */
     val  = tr_bencDictFind( beInfo, "private" );
-    val2 = tr_bencDictFind( meta,  "private" );
+    val2 = tr_bencDictFind( &meta,  "private" );
     if( ( NULL != val  && ( TYPE_INT != val->type  || 0 != val->val.i ) ) ||
         ( NULL != val2 && ( TYPE_INT != val2->type || 0 != val2->val.i ) ) )
     {
@@ -289,15 +368,17 @@ tr_metainfoParse( tr_info * inf, const benc_val_t * meta_in, const char * tag )
     }
 
     /* get announce or announce-list */
-    if( getannounce( inf, meta ) )
+    if( getannounce( inf, &meta ) )
     {
         goto fail;
     }
 
+    tr_bencFree( &meta );
     return TR_OK;
 
   fail:
     tr_metainfoFree( inf );
+    tr_bencFree( &meta );
     return TR_EINVALID;
 }
 
@@ -575,18 +656,42 @@ tr_trackerInfoClear( tr_tracker_info * info )
     memset( info, '\0', sizeof(tr_tracker_info) );
 }
 
-void
-tr_metainfoRemoveSaved( const char * hashString, const char * tag )
+
+static void
+savedname( char * name, size_t len, const char * hash, const char * tag )
+{
+    const char * torDir = tr_getTorrentsDirectory ();
+
+    if( tag == NULL )
+    {
+        tr_buildPath( name, len, torDir, hash, NULL );
+    }
+    else
+    {
+        char base[1024];
+        snprintf( base, sizeof(base), "%s-%s", hash, tag );
+        tr_buildPath( name, len, torDir, base, NULL );
+    }
+}
+
+void tr_metainfoRemoveSaved( const char * hashString, const char * tag )
 {
     char file[MAX_PATH_LENGTH];
+
     savedname( file, sizeof file, hashString, tag );
     unlink( file );
 }
 
+static uint8_t *
+readtorrent( const char * path, size_t * size )
+{
+    return tr_loadFile( path, size );
+}
+
 /* Save a copy of the torrent file in the saved torrent directory */
-int
-tr_metainfoSave( const char * hash, const char * tag,
-                 const uint8_t * buf, size_t buflen )
+static int
+savetorrent( const char * hash, const char * tag,
+             const uint8_t * buf, size_t buflen )
 {
     char   path[MAX_PATH_LENGTH];
     FILE * file;

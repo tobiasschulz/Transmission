@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,12 +23,12 @@
  *****************************************************************************/
 
 #import "PrefsController.h"
-#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "UKKQueue.h"
 
 #define DOWNLOAD_FOLDER     0
 #define DOWNLOAD_TORRENT    2
+#define DOWNLOAD_ASK        3
 
 #define UPDATE_SECONDS 86400
 
@@ -56,26 +56,11 @@
         fDefaults = [NSUserDefaults standardUserDefaults];
         fHandle = handle;
         
-        //checks for old version speeds of -1
+        //checks for old version upload speed of -1
         if ([fDefaults integerForKey: @"UploadLimit"] < 0)
         {
             [fDefaults setInteger: 20 forKey: @"UploadLimit"];
             [fDefaults setBool: NO forKey: @"CheckUpload"];
-        }
-        if ([fDefaults integerForKey: @"DownloadLimit"] < 0)
-        {
-            [fDefaults setInteger: 20 forKey: @"DownloadLimit"];
-            [fDefaults setBool: NO forKey: @"CheckDownload"];
-        }
-        
-        //check for old version download location
-        NSString * choice;
-        if ((choice = [fDefaults stringForKey: @"DownloadChoice"]))
-        {
-            [fDefaults setBool: [choice isEqualToString: @"Constant"] forKey: @"DownloadLocationConstant"];
-            [fDefaults setBool: YES forKey: @"DownloadAsk"];
-            
-            [fDefaults removeObjectForKey: @"DownloadChoice"];
         }
         
         //set check for update to right value
@@ -86,8 +71,15 @@
         if ([fDefaults boolForKey: @"AutoImport"] && (autoPath = [fDefaults stringForKey: @"AutoImportDirectory"]))
             [[UKKQueue sharedFileWatcher] addPath: [autoPath stringByExpandingTildeInPath]];
         
+        //set bind port
+        int bindPort = [fDefaults integerForKey: @"BindPort"];
+        tr_setBindPort(fHandle, bindPort);
+        
+        //set NAT
+        tr_natTraversalEnable(fHandle, [fDefaults boolForKey: @"NatTraversal"]);
+        
         //set encryption
-        [self setEncryptionMode: nil];
+        tr_setEncryptionMode(fHandle, [fDefaults boolForKey: @"EncryptionRequire"] ? TR_ENCRYPTION_REQUIRED : TR_ENCRYPTION_PREFERRED);
         
         //actually set bandwidth limits
         [self applySpeedSettings: nil];
@@ -98,13 +90,8 @@
 
 - (void) dealloc
 {
-    if (fPortStatusTimer)
-        [fPortStatusTimer invalidate];
-    if (fPortChecker)
-    {
-        [fPortChecker cancelProbe];
-        [fPortChecker release];
-    }
+    if (fNatStatusTimer)
+        [fNatStatusTimer invalidate];
     
     [super dealloc];
 }
@@ -118,14 +105,19 @@
     [toolbar setAllowsUserCustomization: NO];
     [toolbar setDisplayMode: NSToolbarDisplayModeIconAndLabel];
     [toolbar setSizeMode: NSToolbarSizeModeRegular];
-    [toolbar setSelectedItemIdentifier: TOOLBAR_GENERAL];
     [[self window] setToolbar: toolbar];
-    [toolbar release];
-    
+
+    [toolbar setSelectedItemIdentifier: TOOLBAR_GENERAL];
     [self setPrefView: nil];
     
     //set download folder
-    [fFolderPopUp selectItemAtIndex: [fDefaults boolForKey: @"DownloadLocationConstant"] ? DOWNLOAD_FOLDER : DOWNLOAD_TORRENT];
+    NSString * downloadChoice = [fDefaults stringForKey: @"DownloadChoice"];
+    if ([downloadChoice isEqualToString: @"Constant"])
+        [fFolderPopUp selectItemAtIndex: DOWNLOAD_FOLDER];
+    else if ([downloadChoice isEqualToString: @"Torrent"])
+        [fFolderPopUp selectItemAtIndex: DOWNLOAD_TORRENT];
+    else
+        [fFolderPopUp selectItemAtIndex: DOWNLOAD_ASK];
     
     //set stop ratio
     [self updateRatioStopField];
@@ -142,16 +134,14 @@
     fNatStatus = -1;
     
     [self updatePortStatus];
-    fPortStatusTimer = [NSTimer scheduledTimerWithTimeInterval: 5.0 target: self
+    fNatStatusTimer = [NSTimer scheduledTimerWithTimeInterval: 5.0 target: self
                         selector: @selector(updatePortStatus) userInfo: nil repeats: YES];
-    
-    //set peer connections
-    [fPeersGlobalField setIntValue: [fDefaults integerForKey: @"PeersTotal"]];
-    [fPeersTorrentField setIntValue: [fDefaults integerForKey: @"PeersTorrent"]];
     
     //set queue values
     [fQueueDownloadField setIntValue: [fDefaults integerForKey: @"QueueDownloadNumber"]];
     [fQueueSeedField setIntValue: [fDefaults integerForKey: @"QueueSeedNumber"]];
+    
+    //set stalled value
     [fStalledField setIntValue: [fDefaults integerForKey: @"StalledMinutes"]];
 }
 
@@ -168,7 +158,7 @@
     if ([ident isEqualToString: TOOLBAR_GENERAL])
     {
         [item setLabel: NSLocalizedString(@"General", "Preferences -> General toolbar item title")];
-        [item setImage: [NSImage imageNamed: [NSApp isOnLeopardOrBetter] ? NSImageNamePreferencesGeneral : @"Preferences.png"]];
+        [item setImage: [NSImage imageNamed: @"Preferences.png"]];
         [item setTarget: self];
         [item setAction: @selector(setPrefView:)];
         [item setAutovalidates: NO];
@@ -192,7 +182,7 @@
     else if ([ident isEqualToString: TOOLBAR_ADVANCED])
     {
         [item setLabel: NSLocalizedString(@"Advanced", "Preferences -> Advanced toolbar item title")];
-        [item setImage: [NSImage imageNamed: [NSApp isOnLeopardOrBetter] ? NSImageNameAdvanced : @"Advanced.png"]];
+        [item setImage: [NSImage imageNamed: @"Advanced.png"]];
         [item setTarget: self];
         [item setAction: @selector(setPrefView:)];
         [item setAutovalidates: NO];
@@ -218,19 +208,22 @@
 
 - (NSArray *) toolbarAllowedItemIdentifiers: (NSToolbar *) toolbar
 {
-    return [NSArray arrayWithObjects: TOOLBAR_GENERAL, TOOLBAR_TRANSFERS, TOOLBAR_BANDWIDTH, TOOLBAR_ADVANCED, nil];
-}
-
-//used by ipc
-- (void) updatePortField
-{
-    [fPortField setIntValue: [fDefaults integerForKey: @"BindPort"]];
+    return [NSArray arrayWithObjects: TOOLBAR_GENERAL, TOOLBAR_TRANSFERS,
+                                        TOOLBAR_BANDWIDTH, TOOLBAR_ADVANCED, nil];
 }
 
 - (void) setPort: (id) sender
 {
     int port = [sender intValue];
+    if (![[sender stringValue] isEqualToString: [NSString stringWithFormat: @"%d", port]])
+    {
+        NSBeep();
+        [sender setIntValue: [fDefaults integerForKey: @"BindPort"]];
+        return;
+    }
+    
     [fDefaults setInteger: port forKey: @"BindPort"];
+    
     tr_setBindPort(fHandle, port);
     
     fPublicPort = -1;
@@ -240,17 +233,40 @@
 - (void) setNat: (id) sender
 {
     tr_natTraversalEnable(fHandle, [fDefaults boolForKey: @"NatTraversal"]);
-    
-    fNatStatus = -1;
     [self updatePortStatus];
 }
 
 - (void) updatePortStatus
 {
-    const tr_handle_status * stat = tr_handleStatus(fHandle);
-    if (fNatStatus != stat->natTraversalStatus || fPublicPort != stat->publicPort)
+    tr_handle_status * stat = tr_handleStatus(fHandle);
+    
+    BOOL change;
+    if (change = (fNatStatus != stat->natTraversalStatus))
     {
         fNatStatus = stat->natTraversalStatus;
+        switch (fNatStatus)
+        {
+            case TR_NAT_TRAVERSAL_MAPPED:
+                [fNatStatusField setStringValue: NSLocalizedString(@"Port successfully mapped",
+                                                    "Preferences -> Advanced -> port map status")];
+                [fNatStatusImage setImage: [NSImage imageNamed: @"GreenDot.tiff"]];
+                break;
+            
+            case TR_NAT_TRAVERSAL_NOTFOUND:
+            case TR_NAT_TRAVERSAL_ERROR:
+                [fNatStatusField setStringValue: NSLocalizedString(@"Error mapping port",
+                                                    "Preferences -> Advanced -> port map status")];
+                [fNatStatusImage setImage: [NSImage imageNamed: @"RedDot.tiff"]];
+                break;
+            
+            default:
+                [fNatStatusField setStringValue: @""];
+                [fNatStatusImage setImage: nil];
+        }
+    }
+    
+    if (change || fPublicPort != stat->publicPort)
+    {
         fPublicPort = stat->publicPort;
         
         [fPortStatusField setStringValue: [NSLocalizedString(@"Checking port status",
@@ -258,40 +274,35 @@
         [fPortStatusImage setImage: nil];
         [fPortStatusProgress startAnimation: self];
         
-        if (fPortChecker)
-        {
-            [fPortChecker cancelProbe];
-            [fPortChecker release];
-        }
-        fPortChecker = [[PortChecker alloc] initForPort: fPublicPort withDelegate: self];
+        PortChecker * portChecker = [[PortChecker alloc] initWithDelegate: self];
+        [portChecker probePort: fPublicPort];
     }
 }
 
 - (void) portCheckerDidFinishProbing: (PortChecker *) portChecker
 {
     [fPortStatusProgress stopAnimation: self];
-    switch ([fPortChecker status])
+    switch ([portChecker status])
     {
         case PORT_STATUS_OPEN:
             [fPortStatusField setStringValue: NSLocalizedString(@"Port is open", "Preferences -> Advanced -> port status")];
-            [fPortStatusImage setImage: [NSImage imageNamed: @"GreenDot.png"]];
-            break;
-        case PORT_STATUS_CLOSED:
-            [fPortStatusField setStringValue: NSLocalizedString(@"Port is closed", "Preferences -> Advanced -> port status")];
-            [fPortStatusImage setImage: [NSImage imageNamed: @"RedDot.png"]];
+            [fPortStatusImage setImage: [NSImage imageNamed: @"GreenDot.tiff"]];
             break;
         case PORT_STATUS_STEALTH:
             [fPortStatusField setStringValue: NSLocalizedString(@"Port is stealth", "Preferences -> Advanced -> port status")];
-            [fPortStatusImage setImage: [NSImage imageNamed: @"RedDot.png"]];
+            [fPortStatusImage setImage: [NSImage imageNamed: @"RedDot.tiff"]];
+            break;
+        case PORT_STATUS_CLOSED:
+            [fPortStatusField setStringValue: NSLocalizedString(@"Port is closed", "Preferences -> Advanced -> port status")];
+            [fPortStatusImage setImage: [NSImage imageNamed: @"RedDot.tiff"]];
             break;
         case PORT_STATUS_ERROR:
             [fPortStatusField setStringValue: NSLocalizedString(@"Unable to check port status",
                                                 "Preferences -> Advanced -> port status")];
-            [fPortStatusImage setImage: [NSImage imageNamed: @"YellowDot.png"]];
+            [fPortStatusImage setImage: [NSImage imageNamed: @"YellowDot.tiff"]];
             break;
     }
-    [fPortChecker release];
-    fPortChecker = nil;
+    [portChecker release];
 }
 
 - (NSArray *) sounds
@@ -330,28 +341,9 @@
         [sound play];
 }
 
-- (void) setPeersGlobal: (id) sender
+- (void) setEncryptionRequired: (id) sender
 {
-    int count = [sender intValue];
-    [fDefaults setInteger: count forKey: @"PeersTotal"];
-    tr_setGlobalPeerLimit(fHandle, count);
-}
-
-- (void) setPeersTorrent: (id) sender
-{
-    int count = [sender intValue];
-    [fDefaults setInteger: count forKey: @"PeersTorrent"];
-}
-
-- (void) setPEX: (id) sender
-{
-    tr_setPexEnabled(fHandle, [fDefaults boolForKey: @"PEXGlobal"]);
-}
-
-- (void) setEncryptionMode: (id) sender
-{
-    tr_setEncryptionMode(fHandle, [fDefaults boolForKey: @"EncryptionPrefer"] ? 
-        ([fDefaults boolForKey: @"EncryptionRequire"] ? TR_ENCRYPTION_REQUIRED : TR_ENCRYPTION_PREFERRED) : TR_PLAINTEXT_PREFERRED);
+    tr_setEncryptionMode(fHandle, [fDefaults boolForKey: @"EncryptionRequire"] ? TR_ENCRYPTION_REQUIRED : TR_ENCRYPTION_PREFERRED);
 }
 
 - (void) applySpeedSettings: (id) sender
@@ -391,7 +383,16 @@
 
 - (void) setRatioStop: (id) sender
 {
-    [fDefaults setFloat: [sender floatValue] forKey: @"RatioLimit"];
+    float ratio = [sender floatValue];
+    if (![[sender stringValue] isEqualToString: [NSString stringWithFormat: @"%.2f", ratio]] || ratio < 0)
+    {
+        NSBeep();
+        [sender setFloatValue: [fDefaults floatForKey: @"RatioLimit"]];
+        return;
+    }
+    
+    [fDefaults setFloat: ratio forKey: @"RatioLimit"];
+    
     [self applyRatioSetting: nil];
 }
 
@@ -406,40 +407,41 @@
 
 - (void) setGlobalLimit: (id) sender
 {
-    [fDefaults setInteger: [sender intValue] forKey: sender == fUploadField ? @"UploadLimit" : @"DownloadLimit"];
+    BOOL upload = sender == fUploadField;
+    
+    int limit = [sender intValue];
+    if (![[sender stringValue] isEqualToString: [NSString stringWithFormat: @"%d", limit]] || limit < 0)
+    {
+        NSBeep();
+        [sender setIntValue: [fDefaults integerForKey: upload ? @"UploadLimit" : @"DownloadLimit"]];
+        return;
+    }
+    
+    [fDefaults setInteger: limit forKey: upload ? @"UploadLimit" : @"DownloadLimit"];
+    
     [self applySpeedSettings: self];
 }
 
 - (void) setSpeedLimit: (id) sender
 {
-    [fDefaults setInteger: [sender intValue] forKey: sender == fSpeedLimitUploadField
-                                                        ? @"SpeedLimitUploadLimit" : @"SpeedLimitDownloadLimit"];
+    BOOL upload = sender == fSpeedLimitUploadField;
+    
+    int limit = [sender intValue];
+    if (![[sender stringValue] isEqualToString: [NSString stringWithFormat: @"%d", limit]])
+    {
+        NSBeep();
+        [sender setIntValue: [fDefaults integerForKey: upload ? @"SpeedLimitUploadLimit" : @"SpeedLimitDownloadLimit"]];
+        return;
+    }
+    
+    [fDefaults setInteger: limit forKey: upload ? @"SpeedLimitUploadLimit" : @"SpeedLimitDownloadLimit"];
+    
     [self applySpeedSettings: self];
 }
 
 - (void) setAutoSpeedLimit: (id) sender
 {
     [[NSNotificationCenter defaultCenter] postNotificationName: @"AutoSpeedLimitChange" object: self];
-}
-
-- (BOOL) control: (NSControl *) control textShouldBeginEditing: (NSText *) fieldEditor
-{
-    [fInitialString release];
-    fInitialString = [[control stringValue] retain];
-    
-    return YES;
-}
-
-- (BOOL) control: (NSControl *) control didFailToFormatString: (NSString *) string errorDescription: (NSString *) error
-{
-    NSBeep();
-    if (fInitialString)
-    {
-        [control setStringValue: fInitialString];
-        [fInitialString release];
-        fInitialString = nil;
-    }
-    return NO;
 }
 
 - (void) setBadge: (id) sender
@@ -449,9 +451,9 @@
 
 - (void) resetWarnings: (id) sender
 {
+    [fDefaults setBool: YES forKey: @"WarningDebug"];
     [fDefaults setBool: YES forKey: @"WarningDuplicate"];
     [fDefaults setBool: YES forKey: @"WarningRemainingSpace"];
-    [fDefaults setBool: YES forKey: @"WarningFolderDataSameName"];
 }
 
 - (void) setCheckForUpdate: (id) sender
@@ -469,31 +471,60 @@
 
 - (void) setQueueNumber: (id) sender
 {
-    [fDefaults setInteger: [sender intValue] forKey: sender == fQueueDownloadField ? @"QueueDownloadNumber" : @"QueueSeedNumber"];
+    BOOL download = sender == fQueueDownloadField;
+    
+    int limit = [sender intValue];
+    if (![[sender stringValue] isEqualToString: [NSString stringWithFormat: @"%d", limit]] || limit < 1)
+    {
+        NSBeep();
+        [sender setIntValue: [fDefaults integerForKey: download ? @"QueueDownloadNumber" : @"QueueSeedNumber"]];
+        return;
+    }
+    
+    [fDefaults setInteger: limit forKey: download ? @"QueueDownloadNumber" : @"QueueSeedNumber"];
     [self setQueue: nil];
 }
 
 - (void) setStalled: (id) sender
 {
-    [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateQueue" object: self];
+    [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateUI" object: self];
 }
 
 - (void) setStalledMinutes: (id) sender
 {
-    [fDefaults setInteger: [sender intValue] forKey: @"StalledMinutes"];
+    int minutes = [sender intValue];
+    if (![[sender stringValue] isEqualToString: [NSString stringWithFormat: @"%d", minutes]] || minutes < 1)
+    {
+        NSBeep();
+        [sender setIntValue: [fDefaults integerForKey: @"StalledMinutes"]];
+        return;
+    }
+    
+    [fDefaults setInteger: minutes forKey: @"StalledMinutes"];
     [self setStalled: nil];
 }
 
 - (void) setDownloadLocation: (id) sender
 {
-    [fDefaults setBool: [fFolderPopUp indexOfSelectedItem] ==  DOWNLOAD_FOLDER forKey: @"DownloadLocationConstant"];
+    switch ([fFolderPopUp indexOfSelectedItem])
+    {
+        case DOWNLOAD_FOLDER:
+            [fDefaults setObject: @"Constant" forKey: @"DownloadChoice"];
+            break;
+        case DOWNLOAD_TORRENT:
+            [fDefaults setObject: @"Torrent" forKey: @"DownloadChoice"];
+            break;
+        case DOWNLOAD_ASK:
+            [fDefaults setObject: @"Ask" forKey: @"DownloadChoice"];
+            break;
+    }
 }
 
 - (void) folderSheetShow: (id) sender
 {
     NSOpenPanel * panel = [NSOpenPanel openPanel];
 
-    [panel setPrompt: NSLocalizedString(@"Select", "Preferences -> Open panel prompt")];
+    [panel setPrompt: @"Select"];
     [panel setAllowsMultipleSelection: NO];
     [panel setCanChooseFiles: NO];
     [panel setCanChooseDirectories: YES];
@@ -508,7 +539,7 @@
 {
     NSOpenPanel * panel = [NSOpenPanel openPanel];
 
-    [panel setPrompt: NSLocalizedString(@"Select", "Preferences -> Open panel prompt")];
+    [panel setPrompt: @"Select"];
     [panel setAllowsMultipleSelection: NO];
     [panel setCanChooseFiles: NO];
     [panel setCanChooseDirectories: YES];
@@ -540,7 +571,7 @@
 {
     NSOpenPanel * panel = [NSOpenPanel openPanel];
 
-    [panel setPrompt: NSLocalizedString(@"Select", "Preferences -> Open panel prompt")];
+    [panel setPrompt: @"Select"];
     [panel setAllowsMultipleSelection: NO];
     [panel setCanChooseFiles: NO];
     [panel setCanChooseDirectories: YES];
@@ -628,7 +659,13 @@
     else
     {
         //reset if cancelled
-        [fFolderPopUp selectItemAtIndex: [fDefaults boolForKey: @"DownloadLocationConstant"] ? DOWNLOAD_FOLDER : DOWNLOAD_TORRENT];
+        NSString * downloadChoice = [fDefaults stringForKey: @"DownloadChoice"];
+        if ([downloadChoice isEqualToString: @"Constant"])
+            [fFolderPopUp selectItemAtIndex: DOWNLOAD_FOLDER];
+        else if ([downloadChoice isEqualToString: @"Torrent"])
+            [fFolderPopUp selectItemAtIndex: DOWNLOAD_TORRENT];
+        else
+            [fFolderPopUp selectItemAtIndex: DOWNLOAD_ASK];
     }
 }
 

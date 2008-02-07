@@ -1,24 +1,25 @@
 The Transmission Project
-http://www.transmissionbt.com/
+http://transmission.m0k.org/
 
 Lead Developers <transmission-dev@m0k.org>
-        Mitchell Livingston <livings124@gmail.com>  (Mac OS X interface)
+        Mitchell Livingston <livings124@gmail.com>  (Mac OS X interface, Backend)
         Charles Kerr <charles@rebelbase.com>  (Backend, GTK+ client)
         Eric Petit <titer@m0k.org>  (Creator)
         Josh Elsasser <josh@elsasser.org>  (Daemon, Backend, GTK+ interface)
         Bryan Varner <bryan@varnernet.com>  (BeOS interface)
 
 Project Contributors
-	Hugo van Heuven, madebysofa  (Main icon design)
-	Kendall Hopkins (IPC patches)
         Nick Pucius  (Mac OS X Help documentation)
-	John Clay
+        Hugo van Heuven, madebysofa  (Icon design, Mac toolbar icons)
+        Anthony Ryan  (Redesigned icon, Mac inspector icons)
 
 Translators
 Mac OS X, current release:
         Jorge Carrasco  (Spanish)
         Etienne Samson  (French)
         Marco Cavazzuti  (Italian)
+        Thermaikos  (Greek)
+        Jaewoo Chung  (Korean)
         Anton Sotkov  (Russian)
         Alexander Bykov  (Russian)
 	Maarten Van Coile  (Dutch)
@@ -43,8 +44,8 @@ GTK+:
 Special Thanks
 
 Image Contributors
-	Anthony Ryan  (Mac inspector icons)
-	Rick Patrick  (Toolbar icons)
+        FOOOD
+        Martin Stadtmueller  (Icon tweaking)
         Mike Matas <http://www.mikematas.com/>  (Previous toolbar icons)
         Jonas Rask  (Globe icon)
         George Tsotsos
@@ -53,6 +54,7 @@ Image Contributors
 Other Contributors
         Omar and Adrien  (Beta testing)
         BitTorrent Protocol Specification <http://wiki.theory.org/BitTorrentSpecification>
+        vi@nwr.jp  (Free SHA1 implementation)
         Ahmad M. Afuni  (NetBSD patch)
         Jeremy Messenger  (FreeBSD patch)
         John Blitch  (Mac OS X patch)
@@ -63,9 +65,7 @@ Other Contributors
 
 Third-Party Resources
 Thanks to:
-        Niels Provos for use of libevent <http://monkey.org/~provos/libevent/>
-	Thomas Bernard for use of MiniUPnP and libnatpmp. <http://miniupnp.tuxfamily.org/>
+        Niels Provos for libevent <http://monkey.org/~provos/libevent/>
         The Growl Development Team for use of Growl. <http://growl.info/>
         Andy Matuschak for use of Sparkle. <http://sparkle.andymatuschak.org/>
         M. Uli Kusterer for use of UKKQueue.
-        Christian Hammond for use of icon entry. <http://www.chipx86.com/wiki/Libsexy> 

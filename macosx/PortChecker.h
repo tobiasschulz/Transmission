@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,30 +24,18 @@
 
 #import <Cocoa/Cocoa.h>
 
-typedef enum
-{
-    PORT_STATUS_CHECKING,
-    PORT_STATUS_OPEN,
-    PORT_STATUS_CLOSED,
-    PORT_STATUS_STEALTH,
-    PORT_STATUS_ERROR
-} port_status_t;
+typedef enum { PORT_STATUS_OPEN, PORT_STATUS_STEALTH, PORT_STATUS_CLOSED, PORT_STATUS_ERROR } port_status_t;
 
 @interface PortChecker : NSObject
 {    
-    id fDelegate;
-    port_status_t fStatus;
-    int fPortNumber;
-    
-    NSURLConnection * fConnection;
-    NSMutableData * fPortProbeData;
-    
-    NSTimer * fTimer;
+    id              fDelegate;
+    port_status_t   fStatus;
+
+    NSMutableData   * fPortProbeData;
 }
 
-- (id) initForPort: (int) portNumber withDelegate: (id) delegate;
-- (void) cancelProbe;
-
+- (id) initWithDelegate: (id) delegate;
+- (void) probePort: (int) portNumber;
 - (void) callBackWithStatus: (port_status_t) status;
 - (port_status_t) status;
 

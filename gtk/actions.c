@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -14,10 +14,7 @@
 #include <glib/gi18n.h>
 #include <gtk/gtk.h>
 #include <libtransmission/transmission.h>
-#include "conf.h"
 #include "torrent-inspector.h"
-#include "tr_core.h"
-#include "tr_prefs.h"
 #include "lock.h"
 #include "logo.h"
 
@@ -25,12 +22,9 @@
 
 extern void doAction (const char * action_name, gpointer user_data );
 
-static TrCore * myCore = 0;
-
 static GtkActionGroup * myGroup = 0;
 
-static void
-action_cb ( GtkAction * a, gpointer user_data )
+static void action_cb ( GtkAction * a, gpointer user_data )
 {
   doAction ( gtk_action_get_name(a), user_data );
 }
@@ -43,85 +37,49 @@ action_cb ( GtkAction * a, gpointer user_data )
 #define GTK_STOCK_SELECT_ALL NULL
 #endif
 
-static GtkRadioActionEntry sort_radio_entries[] =
+static GtkRadioActionEntry priority_toggle_entries[] =
 {
-  { "sort-by-activity",   NULL, N_("Sort by _Activity"),   NULL, NULL, 0 },
-  { "sort-by-date-added", NULL, N_("Sort by _Date Added"), NULL, NULL, 1 },
-  { "sort-by-name",       NULL, N_("Sort by _Name"),       NULL, NULL, 2 },
-  { "sort-by-progress",   NULL, N_("Sort by _Progress"),   NULL, NULL, 3 },
-  { "sort-by-state",      NULL, N_("Sort by _State"),      NULL, NULL, 4 },
-  { "sort-by-tracker",    NULL, N_("Sort by _Tracker"),    NULL, NULL, 5 }
+  { "priority-high", NULL, N_("_High"), NULL, NULL, TR_PRI_HIGH },
+  { "priority-normal", NULL, N_("_Normal"), NULL, NULL, TR_PRI_NORMAL },
+  { "priority-low", NULL, N_("_Low"), NULL, NULL, TR_PRI_LOW }
 };
 
+extern void set_selected_file_priority ( tr_priority_t ); 
+
 static void
-sort_changed_cb( GtkAction            * action UNUSED,
-                 GtkRadioAction       * current,
-                 gpointer user_data     UNUSED )
+priority_changed_cb (GtkAction *action UNUSED, GtkRadioAction *current)
 {
-    const char * key = PREF_KEY_SORT_MODE;
-    const int i = gtk_radio_action_get_current_value( current );
-    const char * val = sort_radio_entries[i].name;
-    tr_core_set_pref( myCore, key, val );
+  const int priority = gtk_radio_action_get_current_value (current);
+  set_selected_file_priority ( priority );
 }
 
 static GtkToggleActionEntry show_toggle_entries[] = 
 {
   { "toggle-main-window", NULL, 
-    N_("_Main Window"), NULL, NULL, G_CALLBACK(action_cb), TRUE }, 
+    N_("Show _Main Window"), NULL, NULL, G_CALLBACK(action_cb), TRUE }, 
   { "toggle-message-log", NULL,
-    N_("Message _Log"), NULL, NULL, G_CALLBACK(action_cb), FALSE }
-};
-
-static void
-toggle_pref_cb ( GtkToggleAction * action, gpointer user_data UNUSED )
-{
-    const char * key = gtk_action_get_name( GTK_ACTION( action ) );
-    const gboolean val = gtk_toggle_action_get_active( action );
-    tr_core_set_pref_bool( myCore, key, val );
-}
-
-static GtkToggleActionEntry pref_toggle_entries[] =
-{
-  { "minimal-view", NULL,
-    N_("_Minimal View"), "<alt>M", NULL, G_CALLBACK(toggle_pref_cb), FALSE },
-  { "sort-reversed", NULL,
-    N_("_Reverse Sort Order"), NULL, NULL, G_CALLBACK(toggle_pref_cb), FALSE },
-  { "show-filter-bar", NULL,
-    N_("_Filter Bar"), NULL, NULL, G_CALLBACK(toggle_pref_cb), FALSE },
-  { "show-status-bar", NULL,
-    N_("_Status Bar"), NULL, NULL, G_CALLBACK(toggle_pref_cb), FALSE },
-  { "show-toolbar", NULL,
-    N_("_Toolbar"), NULL, NULL, G_CALLBACK(toggle_pref_cb), FALSE }
+    N_("Show Message _Log"), NULL, NULL, G_CALLBACK(action_cb), FALSE }
 };
 
 static GtkActionEntry entries[] =
 {
   { "torrent-menu", NULL, N_("_Torrent"), NULL, NULL, NULL },
-  { "view-menu", NULL, N_("_View"), NULL, NULL, NULL },
-  { "sort-menu", NULL, N_("_Sort Torrents By"), NULL, NULL, NULL },
   { "edit-menu", NULL, N_("_Edit"), NULL, NULL, NULL },
   { "help-menu", NULL, N_("_Help"), NULL, NULL, NULL },
-  { "open-torrent-toolbar", GTK_STOCK_OPEN, N_("_Open"), NULL,
-    N_("Open an existing torrent"),
-    G_CALLBACK(action_cb) },
-  { "open-torrent-menu", GTK_STOCK_OPEN, N_("_Open..."), "<control>O",
-    N_("Open an existing torrent"),
-    G_CALLBACK(action_cb) },
+  { "priority-menu", NULL, N_("_Priority"), NULL, NULL, NULL },
+  { "add-torrent", GTK_STOCK_OPEN, NULL, NULL, N_("Open Torrent"), G_CALLBACK(action_cb) },
   { "start-torrent", GTK_STOCK_MEDIA_PLAY,
     N_("_Start"), "<control>S", NULL, G_CALLBACK(action_cb) },
-  { "show-stats", NULL, N_("_Statistics"), NULL, NULL, G_CALLBACK(action_cb) },
   { "verify-torrent", NULL,
     N_("_Verify Local Data"), NULL, NULL, G_CALLBACK(action_cb) },
   { "pause-torrent", GTK_STOCK_MEDIA_PAUSE,
     N_("_Pause"), "<control>P", NULL, G_CALLBACK(action_cb) },
   { "remove-torrent", GTK_STOCK_REMOVE,
-    N_("_Remove"), "<control>Delete", NULL, G_CALLBACK(action_cb) },
-  { "new-torrent", GTK_STOCK_NEW, N_("_New..."), NULL,
-    N_("Create a new torrent"),
-    G_CALLBACK(action_cb) },
-  { "close", GTK_STOCK_CLOSE, N_("_Close"), "<control>W",
-    N_("Close main window"),
-    G_CALLBACK(action_cb) },
+    N_("_Remove"), "<control>R", NULL, G_CALLBACK(action_cb) },
+  { "create-torrent", GTK_STOCK_NEW,
+    N_("Create _New Torrent"), NULL, NULL, G_CALLBACK(action_cb) },
+  { "close", GTK_STOCK_CLOSE,
+    N_("_Close"), "<control>W", NULL, G_CALLBACK(action_cb) },
   { "quit", GTK_STOCK_QUIT,
     N_("_Quit"), "<control>Q", NULL, G_CALLBACK(action_cb) },
   { "select-all", GTK_STOCK_SELECT_ALL,
@@ -160,6 +118,7 @@ typedef struct
 }
 BuiltinIconInfo;
 
+/* only one icon now... but room to grow ;) */
 const BuiltinIconInfo my_builtin_icons [] =
 {
     { tr_icon_logo, "transmission-logo" },
@@ -198,17 +157,9 @@ register_my_icons ( void )
 static GtkUIManager * myUIManager = NULL;
 
 void
-actions_set_core( TrCore * core )
-{
-    myCore = core;
-}
-
-void
 actions_init( GtkUIManager * ui_manager, gpointer callback_user_data )
 {
-  int i, n;
-  int active;
-  char * match;
+  int i;
   const int n_entries = G_N_ELEMENTS( entries );
   GtkActionGroup * action_group;
 
@@ -222,32 +173,16 @@ actions_init( GtkUIManager * ui_manager, gpointer callback_user_data )
   action_group = myGroup = gtk_action_group_new( "Actions" );
   gtk_action_group_set_translation_domain( action_group, NULL );
 
-
-  match = pref_string_get( PREF_KEY_SORT_MODE );
-  for( i=0, n=G_N_ELEMENTS(sort_radio_entries), active=-1; active==-1 && i<n; ++i )
-      if( !strcmp( sort_radio_entries[i].name, match ) )
-          active = i;
-
   gtk_action_group_add_radio_actions( action_group,
-                                      sort_radio_entries,
-                                      G_N_ELEMENTS(sort_radio_entries),
-                                      active,
-                                      G_CALLBACK(sort_changed_cb),
-                                      NULL );
+                                      priority_toggle_entries,
+                                      G_N_ELEMENTS(priority_toggle_entries),
+                                      TR_PRI_NORMAL,
+                                      G_CALLBACK(priority_changed_cb), NULL);
 
-  gtk_action_group_add_toggle_actions( action_group, 
-                                       show_toggle_entries, 
-                                       G_N_ELEMENTS(show_toggle_entries), 
-                                       callback_user_data );
-
-  for( i=0, n=G_N_ELEMENTS(pref_toggle_entries); i<n; ++i )
-    pref_toggle_entries[i].is_active =
-      pref_flag_get( pref_toggle_entries[i].name );
-
-  gtk_action_group_add_toggle_actions( action_group, 
-                                       pref_toggle_entries, 
-                                       G_N_ELEMENTS(pref_toggle_entries), 
-                                       callback_user_data );
+  gtk_action_group_add_toggle_actions ( action_group, 
+					show_toggle_entries, 
+					G_N_ELEMENTS(show_toggle_entries), 
+					callback_user_data );
 
   gtk_action_group_add_actions( action_group,
                                 entries, n_entries,
@@ -255,7 +190,6 @@ actions_init( GtkUIManager * ui_manager, gpointer callback_user_data )
 
   gtk_ui_manager_insert_action_group( ui_manager, action_group, 0 );
   g_object_unref (G_OBJECT(action_group));
-  g_free( match );
 }
 
 /****

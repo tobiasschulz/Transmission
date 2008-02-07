@@ -1,6 +1,5 @@
 AM_CPPFLAGS = \
     -I$(top_srcdir) \
-    -I$(top_srcdir)/third-party/ \
     $(LIBEVENT_CPPFLAGS) \
     -DTRANSMISSIONLOCALEDIR=\""$(transmissionlocaledir)"\"
 
@@ -20,10 +19,8 @@ noinst_HEADERS = \
     logo.h \
     makemeta-ui.h \
     msgwin.h \
-    stats.h \
-    sexy-icon-entry.h \
-    torrent-cell-renderer.h \
     torrent-inspector.h \
+    tr_cell_renderer_progress.h \
     tr_core.h \
     tr_icon.h \
     tr_prefs.h \
@@ -44,10 +41,8 @@ transmission_SOURCES = \
     main.c \
     makemeta-ui.c \
     msgwin.c \
-    sexy-icon-entry.c \
-    stats.c \
-    torrent-cell-renderer.c \
     torrent-inspector.c \
+    tr_cell_renderer_progress.c \
     tr_core.c \
     tr_icon.c \
     tr_prefs.c \
@@ -60,8 +55,6 @@ dist_man_MANS = transmission.1
 transmission_LDADD = \
     $(top_builddir)/libtransmission/libtransmission.a \
     $(top_builddir)/third-party/libevent/libevent.la \
-    $(top_builddir)/third-party/miniupnp/libminiupnp.a \
-    $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
     $(GTK_LIBS) \
     $(OPENSSL_LIBS) \
     $(PTHREAD_LIBS) -lm

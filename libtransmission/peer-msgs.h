@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -63,9 +63,9 @@ typedef enum
 {
     TR_PEERMSG_CLIENT_HAVE,
     TR_PEERMSG_CLIENT_BLOCK,
-    TR_PEERMSG_PIECE_DATA,
     TR_PEERMSG_PEER_PROGRESS,
-    TR_PEERMSG_ERROR,
+    TR_PEERMSG_GOT_ERROR,
+    TR_PEERMSG_GOT_ASSERT_ERROR,
     TR_PEERMSG_CANCEL,
     TR_PEERMSG_NEED_REQ
 }
@@ -78,7 +78,6 @@ typedef struct
     uint32_t offset;     /* for TR_PEERMSG_GOT_BLOCK */
     uint32_t length;     /* for TR_PEERMSG_GOT_BLOCK */
     float progress;      /* for TR_PEERMSG_PEER_PROGRESS */
-    tr_errno err;        /* for TR_PEERMSG_GOT_ERROR */
 }
 tr_peermsgs_event;
 

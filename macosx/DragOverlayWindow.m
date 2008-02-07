@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -51,7 +51,6 @@
                                 [NSDictionary dictionaryWithObjectsAndKeys: self, NSViewAnimationTargetKey,
                                 NSViewAnimationFadeInEffect, NSViewAnimationEffectKey, nil]]];
         [fFadeInAnimation setDuration: 0.15];
-        [fFadeInAnimation setAnimationBlockingMode: NSAnimationNonblockingThreaded];
         
         fFadeOutAnimation = [[NSViewAnimation alloc] initWithViewAnimations: [NSArray arrayWithObject:
                                 [NSDictionary dictionaryWithObjectsAndKeys: self, NSViewAnimationTargetKey,
@@ -83,30 +82,24 @@
     
     NSString * file;
     NSEnumerator * enumerator = [files objectEnumerator];
-    tr_ctor * ctor;
     tr_info info;
     while ((file = [enumerator nextObject]))
     {
-        if ([[file pathExtension] caseInsensitiveCompare: @"torrent"] == NSOrderedSame)
+        if ([[file pathExtension] caseInsensitiveCompare: @"torrent"] == NSOrderedSame
+            && tr_torrentParse(fLib, [file UTF8String], NULL, &info) == TR_OK)
         {
-            ctor = tr_ctorNew(fLib);
-            tr_ctorSetMetainfoFromFile(ctor, [file UTF8String]);
-            if (tr_torrentParse(fLib, ctor, &info) == TR_OK)
+            count++;
+            size += info.totalSize;
+            fileCount += info.fileCount;
+            
+            //only useful when one torrent
+            if (count == 1)
             {
-                count++;
-                size += info.totalSize;
-                fileCount += info.fileCount;
-                
-                //only useful when one torrent
-                if (count == 1)
-                {
-                    name = [NSString stringWithUTF8String: info.name];
-                    folder = info.isMultifile;
-                }
+                name = [NSString stringWithUTF8String: info.name];
+                folder = info.isMultifile;
             }
-            tr_metainfoFree(&info);
-            tr_ctorFree(ctor);
         }
+        tr_metainfoFree(&info);
     }
     
     if (count <= 0)
@@ -145,6 +138,7 @@
     [self fadeIn];
 }
 
+
 - (void) setURL: (NSString *) url
 {
     [[self contentView] setOverlay: [NSImage imageNamed: @"Globe.png"]
@@ -166,6 +160,9 @@
 
 - (void) fadeOut
 {
+    if ([self alphaValue] <= 0.0)
+        return;
+    
     //stop other animation and set to same progress
     if ([fFadeInAnimation isAnimating])
     {
