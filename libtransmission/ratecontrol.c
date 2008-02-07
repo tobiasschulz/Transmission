@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,30 +22,32 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#include <string.h> /* memset */
+#include <string.h>
 
 #include "transmission.h"
 #include "platform.h"
 #include "ratecontrol.h"
+#include "shared.h"
 #include "utils.h"
 
 #define GRANULARITY_MSEC 250
-#define SHORT_INTERVAL_MSEC 4000
-#define LONG_INTERVAL_MSEC 8000
+#define SHORT_INTERVAL_MSEC 3000
+#define LONG_INTERVAL_MSEC 20000
 #define HISTORY_SIZE (LONG_INTERVAL_MSEC / GRANULARITY_MSEC)
 
-struct tr_transfer
+typedef struct
 {
     uint64_t date;
     uint64_t size;
-};
+}
+tr_transfer_t;
 
 struct tr_ratecontrol
 {
     tr_lock * lock;
     int limit;
     int newest;
-    struct tr_transfer transfers[HISTORY_SIZE];
+    tr_transfer_t transfers[HISTORY_SIZE];
 };
 
 /* return the xfer rate over the last `interval' seconds in KiB/sec */
@@ -94,26 +96,20 @@ tr_rcClose( tr_ratecontrol * r )
 ****
 ***/
 
-size_t
-tr_rcBytesLeft( const tr_ratecontrol * r )
+int
+tr_rcCanTransfer( const tr_ratecontrol * r )
 {
-    size_t bytes = 0;
+    int ret;
 
-    if( r != NULL )
-    {
-        float cur, max, kb;
- 
+    if( r == NULL )
+        ret = 0;
+    else {
         tr_lockLock( (tr_lock*)r->lock );
-
-        cur = rateForInterval( r, SHORT_INTERVAL_MSEC );
-        max = r->limit;
-        kb = max>cur ? max-cur : 0;
-        bytes = (size_t)(kb * 1024);
-
+        ret = rateForInterval( r, SHORT_INTERVAL_MSEC ) < r->limit;
         tr_lockUnlock( (tr_lock*)r->lock );
     }
 
-    return bytes;
+    return ret;
 }
 
 float
@@ -141,6 +137,9 @@ tr_rcTransferred( tr_ratecontrol * r, size_t size )
 {
     uint64_t now;
 
+    if( size < 100 ) /* don't count small messages */
+        return;
+    
     tr_lockLock( (tr_lock*)r->lock );
 
     now = tr_date ();
@@ -160,7 +159,7 @@ tr_rcReset( tr_ratecontrol * r )
 {
     tr_lockLock( (tr_lock*)r->lock );
     r->newest = 0;
-    memset( r->transfers, 0, sizeof(struct tr_transfer) * HISTORY_SIZE );
+    memset( r->transfers, 0, sizeof(tr_transfer_t) * HISTORY_SIZE );
     tr_lockUnlock( (tr_lock*)r->lock );
 }
 

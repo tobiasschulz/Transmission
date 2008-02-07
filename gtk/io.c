@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -216,7 +216,7 @@ freeoutbuf(struct iooutbuf *buf) {
 }
 
 static gboolean
-io_prepare(GSource *source UNUSED, gint *timeout_) {
+io_prepare(GSource *source SHUTUP, gint *timeout_) {
   *timeout_ = -1;
   return FALSE;
 }
@@ -234,8 +234,8 @@ io_check(GSource *source) {
 }
 
 static gboolean
-io_dispatch(GSource *source, GSourceFunc callback UNUSED,
-            gpointer gdata UNUSED) {
+io_dispatch(GSource *source, GSourceFunc callback SHUTUP,
+            gpointer gdata SHUTUP) {
   struct iosource *io = (struct iosource*)source;
 
   if(io->infd.revents & (G_IO_ERR | G_IO_HUP) ||
@@ -253,7 +253,7 @@ io_dispatch(GSource *source, GSourceFunc callback UNUSED,
 
 
 static void
-io_finalize(GSource *source UNUSED) {
+io_finalize(GSource *source SHUTUP) {
   struct iosource *io = (struct iosource*)source;
 
   if(NULL != io->outbufs) {

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -28,11 +28,28 @@
 #include <stddef.h> /* for size_t */
 
 #ifndef HAVE_STRLCPY
-size_t strlcpy(char *dst, const char *src, size_t siz);
+size_t
+strlcpy(char *dst, const char *src, size_t siz);
 #endif
 
 #ifndef HAVE_STRLCAT
-size_t strlcat(char *dst, const char *src, size_t siz);
+size_t
+strlcat(char *dst, const char *src, size_t siz);
+#endif
+
+#ifndef HAVE_ASPRINTF
+int asprintf( char **, const char *, ... );
+int vasprintf( char **, const char *, va_list );
+#endif
+
+#if defined(HAVE_DIRNAME) || defined(HAVE_BASENAME)
+    #include <libgen.h>
+#endif
+#ifndef HAVE_DIRNAME
+    char* dirname(const char *path);
+#endif
+#ifndef HAVE_BASENAME
+    char* basename(const char *path);
 #endif
 
 #endif /* TRCOMPAT_H */

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -28,8 +28,6 @@
 
 - (void) awakeFromNib
 {
-    [(NSMatrix *)[self controlView] setToolTip: [self title] forCell: self];
-    
     NSNotificationCenter * nc = [NSNotificationCenter defaultCenter];
     [nc addObserver: self selector: @selector(updateControlTint:)
             name: NSControlTintDidChangeNotification object: nil];
@@ -51,7 +49,7 @@
 - (void) setIcon: (NSImage *) image
 {
     [fIcon release];
-    fIcon = [image retain];
+    fIcon = image ? [image retain] : nil;
     
     if (fRegularImage)
     {
@@ -77,8 +75,8 @@
     {
         if (!fSelectedImage)
         {
-            fSelectedImage = [NSColor currentControlTint] == NSGraphiteControlTint
-                ? [[NSImage imageNamed: @"InfoTabBackGraphite.png"] copy] : [[NSImage imageNamed: @"InfoTabBackBlue.png"] copy];
+            fSelectedImage = [NSColor currentControlTint] == NSGraphiteControlTint ? [[NSImage imageNamed: @"InfoTabBackBlue.tif"] copy]
+                                : [[NSImage imageNamed: @"InfoTabBackBlue.tif"] copy];
             createImage = YES;
         }
         tabImage = fSelectedImage;
@@ -87,7 +85,7 @@
     {
         if (!fRegularImage)
         {
-            fRegularImage = [[NSImage imageNamed: @"InfoTabBack.png"] copy];
+            fRegularImage = [[NSImage imageNamed: @"InfoTabBack.tif"] copy];
             createImage = YES;
         }
         tabImage = fRegularImage;
@@ -97,12 +95,13 @@
     {
         if (fIcon)
         {
-            NSSize iconSize = [fIcon size], tabSize = [tabImage size];
-            NSPoint point = NSMakePoint(floorf((tabSize.width - iconSize.width) * 0.5),
-                                        floorf((tabSize.height - iconSize.height) * 0.5));
-            
+            NSSize iconSize = [fIcon size];
+            NSRect imageRect = NSMakeRect(0, 0, [tabImage size].width, [tabImage size].height);
+            NSRect rect = NSMakeRect(imageRect.origin.x + (imageRect.size.width - iconSize.width) * 0.5,
+                            imageRect.origin.y + (imageRect.size.height - iconSize.height) * 0.5, iconSize.width, iconSize.height);
+
             [tabImage lockFocus];
-            [fIcon compositeToPoint: point operation: NSCompositeSourceOver];
+            [fIcon drawInRect: rect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
             [tabImage unlockFocus];
         }
     }
@@ -112,8 +111,11 @@
 
 - (void) updateControlTint: (NSNotification *) notification
 {
-    [fSelectedImage release];
-    fSelectedImage = nil;
+    if (fSelectedImage)
+    {
+        [fSelectedImage release];
+        fSelectedImage = nil;
+    }
     
     if (fSelected)
         [self setSelectedTab: YES];

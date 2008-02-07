@@ -57,6 +57,8 @@ struct tor
     int             id;
     uint8_t         hash[SHA_DIGEST_LENGTH];
     tr_torrent    * tor;
+    int             pexset;
+    int             pex;
     RB_ENTRY( tor ) idlinks;
     RB_ENTRY( tor ) hashlinks;
 };
@@ -95,7 +97,6 @@ static int                 gl_mapping   = 0;
 static int                 gl_uplimit   = -1;
 static int                 gl_downlimit = -1;
 static char                gl_dir[MAXPATHLEN];
-static tr_encryption_mode  gl_crypto    = TR_ENCRYPTION_PREFERRED;
 
 RB_GENERATE_STATIC( tortree, tor, idlinks, toridcmp )
 RB_GENERATE_STATIC( hashtree, tor, hashlinks, torhashcmp )
@@ -371,15 +372,27 @@ torrent_get_port( void )
 void
 torrent_set_pex( int pex )
 {
+    struct tor * tor;
+
     assert( NULL != gl_handle );
     assert( !gl_exiting );
 
-    if( pex != gl_pex )
+    if( pex == gl_pex )
     {
-        tr_setPexEnabled( gl_handle, gl_pex );
-
-        savestate( );
+        return;
     }
+    gl_pex = pex;
+
+    for( tor = iterate( NULL ); NULL != tor; tor = iterate( tor ) )
+    {
+        if( tor->pexset )
+        {
+            continue;
+        }
+        tr_torrentDisablePex( tor->tor, !gl_pex );
+    }
+
+    savestate();
 }
 
 int
@@ -454,20 +467,6 @@ torrent_get_directory( void )
     return gl_dir;
 }
 
-void
-torrent_set_encryption(tr_encryption_mode mode)
-{
-    tr_setEncryptionMode(gl_handle, mode);
-    gl_crypto = mode;
-    savestate();
-}
-
-tr_encryption_mode
-torrent_get_encryption(void)
-{
-    return tr_getEncryptionMode(gl_handle);
-}
-
 struct tor *
 opentor( const char * path, const char * hash, uint8_t * data, size_t size,
          const char * dir )
@@ -475,7 +474,6 @@ opentor( const char * path, const char * hash, uint8_t * data, size_t size,
     struct tor * tor, * found;
     int          errcode;
     const tr_info  * inf;
-    tr_ctor        * ctor;
 
     assert( ( NULL != path && NULL == hash && NULL == data ) ||
             ( NULL == path && NULL != hash && NULL == data ) ||
@@ -499,17 +497,18 @@ opentor( const char * path, const char * hash, uint8_t * data, size_t size,
     if( dir == NULL )
         dir = gl_dir;
 
-    ctor = tr_ctorNew( gl_handle );
-    tr_ctorSetPaused( ctor, TR_FORCE, 1 );
-    tr_ctorSetDestination( ctor, TR_FORCE, dir );
-    if( path != NULL )
-        tr_ctorSetMetainfoFromFile( ctor, path );
-    else if( hash != NULL )
-        tr_ctorSetMetainfoFromHash( ctor, hash );
+    if( NULL != path )
+    {
+        tor->tor = tr_torrentInit( gl_handle, path, dir, 1, &errcode );
+    }
+    else if( NULL != hash )
+    {
+        tor->tor = tr_torrentInitSaved( gl_handle, hash, dir, 1, &errcode );
+    }
     else
-        tr_ctorSetMetainfo( ctor, data, size );
-    tor->tor = tr_torrentNew( gl_handle, ctor, &errcode );
-    tr_ctorFree( ctor );
+    {
+        tor->tor = tr_torrentInitData( gl_handle, data, size, dir, 1, &errcode );
+    }
 
     if( NULL == tor->tor )
     {
@@ -565,6 +564,16 @@ opentor( const char * path, const char * hash, uint8_t * data, size_t size,
     inf = tr_torrentInfo( tor->tor );
     memcpy( tor->hash, inf->hash, sizeof tor->hash );
 
+    if( inf->isPrivate )
+    {
+        tor->pexset = 1;
+        tor->pex    = 0;
+    }
+    else
+    {
+        tr_torrentDisablePex( tor->tor, !gl_pex );
+    }
+
     found = RB_INSERT( tortree, &gl_tree, tor );
     assert( NULL == found );
     found = RB_INSERT( hashtree, &gl_hashes, tor );
@@ -599,7 +608,7 @@ starttimer( int callnow )
     if( !evtimer_initialized( &gl_event ) )
     {
         evtimer_set( &gl_event, timerfunc, NULL );
-        event_base_set( gl_base, &gl_event );
+        /* XXX event_base_set( gl_base, &gl_event ); */
     }
 
     if( callnow )
@@ -611,10 +620,10 @@ starttimer( int callnow )
 static void
 timerfunc( int fd UNUSED, short event UNUSED, void * arg UNUSED )
 {
-    struct tor             * tor, * next;
-    const tr_handle_status * hs;
-    int                      stillmore;
-    struct timeval           tv;
+    struct tor       * tor, * next;
+    tr_handle_status * hs;
+    int                stillmore;
+    struct timeval     tv;
 
     /* true if we've still got live torrents... */
     stillmore = tr_torrentCount( gl_handle ) != 0;
@@ -624,7 +633,7 @@ timerfunc( int fd UNUSED, short event UNUSED, void * arg UNUSED )
         if( !stillmore )
         {
             hs = tr_handleStatus( gl_handle );
-            if( TR_NAT_TRAVERSAL_UNMAPPED != hs->natTraversalStatus )
+            if( TR_NAT_TRAVERSAL_DISABLED != hs->natTraversalStatus )
             {
                 stillmore = 1;
             }
@@ -728,17 +737,6 @@ loadstate( void )
         strlcpy( gl_dir, str->val.s.s, sizeof gl_dir );
     }
 
-    str = tr_bencDictFind( &top, "encryption-mode" );
-    if( NULL != str && TYPE_STR == str->type )
-    {
-        if(!strcasecmp(str->val.s.s, "preferred"))
-            gl_crypto = TR_ENCRYPTION_PREFERRED;
-        else if(!strcasecmp(str->val.s.s, "required"))
-            gl_crypto = TR_ENCRYPTION_REQUIRED;
-    }
-
-    tr_setEncryptionMode(gl_handle, gl_crypto);
-
     list = tr_bencDictFind( &top, "torrents" );
     if( NULL == list || TYPE_LIST != list->type )
     {
@@ -772,8 +770,10 @@ loadstate( void )
         num = tr_bencDictFind( dict, "pex" );
         if( NULL != num && TYPE_INT == num->type )
         {
-            fprintf( stderr, "warning: obsolete command 'pex'\n" );
+            tor->pexset = 1;
+            tor->pex = ( num->val.i ? 1 : 0 );
         }
+        tr_torrentDisablePex( tor->tor, !( tor->pexset ? tor->pex : gl_pex ) );
 
         num = tr_bencDictFind( dict, "paused" );
         if( NULL != num && TYPE_INT == num->type && !num->val.i )
@@ -791,10 +791,10 @@ savestate( void )
     benc_val_t   top, * list, * tor;
     struct tor * ii;
     uint8_t    * buf;
-    int          len;
+    int          len, pexset;
 
     tr_bencInit( &top, TYPE_DICT );
-    if( tr_bencDictReserve( &top, 9 ) )
+    if( tr_bencDictReserve( &top, 8 ) )
     {
       nomem:
         tr_bencFree( &top );
@@ -809,10 +809,6 @@ savestate( void )
     tr_bencInitInt( tr_bencDictAdd( &top, "download-limit" ), gl_downlimit );
     tr_bencInitStr( tr_bencDictAdd( &top, "default-directory" ),
                     gl_dir, -1, 1 );
-    if(TR_ENCRYPTION_REQUIRED == gl_crypto)
-        tr_bencInitStr(tr_bencDictAdd(&top, "encryption-mode"), "required", -1, 1);
-    else
-        tr_bencInitStr(tr_bencDictAdd(&top, "encryption-mode"), "preferred", -1, 1);
     list = tr_bencDictAdd( &top, "torrents" );
     tr_bencInit( list, TYPE_LIST );
 
@@ -835,7 +831,8 @@ savestate( void )
         tr_bencInit( tor, TYPE_DICT );
         inf    = tr_torrentInfo( ii->tor );
         st     = tr_torrentStat( ii->tor );
-        if( tr_bencDictReserve( tor, 3 ) )
+        pexset = ( ii->pexset && !inf->isPrivate );
+        if( tr_bencDictReserve( tor, ( pexset ? 4 : 3 ) ) )
         {
             goto nomem;
         }
@@ -845,9 +842,13 @@ savestate( void )
                         !TR_STATUS_IS_ACTIVE( st->status ) );
         tr_bencInitStr( tr_bencDictAdd( tor, "directory" ),
                         tr_torrentGetFolder( ii->tor ), -1, 1 );
+        if( pexset )
+        {
+            tr_bencInitInt( tr_bencDictAdd( tor, "pex" ), ii->pex );
+        }
     }
 
-    buf = ( uint8_t * )tr_bencSave( &top, &len );
+    buf = ( uint8_t * )tr_bencSaveMalloc( &top, &len );
     SAFEBENCFREE( &top );
     if( NULL == buf )
     {

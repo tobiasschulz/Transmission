@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -40,14 +40,8 @@
         for (i = 0; i < [self segmentCount]; i++)
         {
             [self setLabel: @"" forSegment: i];
-            [self setWidth: 9.0 forSegment: i]; //9 is minimum size to get proper look
+            [self setWidth: 7.0 forSegment: i];
         }
-        
-        [self setImage: [NSImage imageNamed: @"PriorityControlLow.png"] forSegment: 0];
-        [self setImage: [NSImage imageNamed: @"PriorityControlNormal.png"] forSegment: 1];
-        [self setImage: [NSImage imageNamed: @"PriorityControlHigh.png"] forSegment: 2];
-        
-        fHoverRow = NO;
     }
     return self;
 }
@@ -77,34 +71,6 @@
     [controlView reloadData];
 }
 
-- (void) addTrackingAreasForView: (NSView *) controlView inRect: (NSRect) cellFrame withUserInfo: (NSDictionary *) userInfo
-            mouseLocation: (NSPoint) mouseLocation
-{
-    NSTrackingAreaOptions options = NSTrackingEnabledDuringMouseDrag | NSTrackingMouseEnteredAndExited | NSTrackingActiveAlways;
-    
-    if (NSMouseInRect(mouseLocation, cellFrame, [controlView isFlipped]))
-    {
-        options |= NSTrackingAssumeInside;
-        [controlView setNeedsDisplayInRect: cellFrame];
-    }
-    
-    NSTrackingArea * area = [[NSTrackingArea alloc] initWithRect: cellFrame options: options owner: controlView userInfo: userInfo];
-    [controlView addTrackingArea: area];
-    [area release];
-}
-
-- (void) mouseEntered: (NSEvent *) event
-{
-    fHoverRow = YES;
-    [(NSControl *)[self controlView] updateCell: self];
-}
-
-- (void) mouseExited: (NSEvent *) event
-{
-    fHoverRow = NO;
-    [(NSControl *)[self controlView] updateCell: self];
-}
-
 - (void) drawWithFrame: (NSRect) cellFrame inView: (NSView *) controlView
 {
     Torrent * torrent = [(FileOutlineView *)controlView torrent];
@@ -112,7 +78,9 @@
     NSSet * priorities = [torrent filePrioritiesForIndexes: [dict objectForKey: @"Indexes"]];
     
     int count = [priorities count];
-    if (fHoverRow && count > 0)
+    
+    int hoverRow = [(FileOutlineView *)controlView hoverRow];
+    if (count > 0 && hoverRow != -1 && [(FileOutlineView *)controlView itemAtRow: hoverRow] == dict)
     {
         [super setSelected: [priorities containsObject: [NSNumber numberWithInt: TR_PRI_LOW]] forSegment: 0];
         [super setSelected: [priorities containsObject: [NSNumber numberWithInt: TR_PRI_NORMAL]] forSegment: 1];
@@ -124,21 +92,35 @@
     {
         NSImage * image;
         if (count == 0)
-            image = [NSImage imageNamed: @"PriorityNone.png"];
+        {
+            if (!fNoneImage)
+                fNoneImage = [NSImage imageNamed: @"PriorityNone.png"];
+            image = fNoneImage;
+        }
         else if (count > 1)
-            image = [NSImage imageNamed: @"PriorityMixed.png"];
+        {
+            if (!fMixedImage)
+                fMixedImage = [NSImage imageNamed: @"PriorityMixed.png"];
+            image = fMixedImage;
+        }
         else
         {
             switch ([[priorities anyObject] intValue])
             {
                 case TR_PRI_NORMAL:
-                    image = [NSImage imageNamed: @"PriorityNormal.png"];
+                    if (!fNormalImage)
+                        fNormalImage = [NSImage imageNamed: @"PriorityNormal.png"];
+                    image = fNormalImage;
                     break;
                 case TR_PRI_LOW:
-                    image = [NSImage imageNamed: @"PriorityLow.png"];
+                    if (!fLowImage)
+                        fLowImage = [NSImage imageNamed: @"PriorityLow.png"];
+                    image = fLowImage;
                     break;
                 case TR_PRI_HIGH:
-                    image = [NSImage imageNamed: @"PriorityHigh.png"];
+                    if (!fHighImage)
+                        fHighImage = [NSImage imageNamed: @"PriorityHigh.png"];
+                    image = fHighImage;
                     break;
             }
         }

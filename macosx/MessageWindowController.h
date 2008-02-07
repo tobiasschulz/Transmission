@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -32,11 +32,12 @@
     
     NSMutableArray * fMessages;
     
-    NSDictionary * fAttributes;
-    
     NSTimer * fTimer;
     
     NSImage * fErrorImage, * fInfoImage, * fDebugImage;
+    
+    IBOutlet NSTextField * fDebugWarningField;
+    IBOutlet NSImageView * fDebugWarningIcon;
 }
 
 - (void) updateLog: (NSTimer *) timer;

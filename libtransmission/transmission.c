@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -41,9 +41,6 @@
 #include "platform.h"
 #include "ratecontrol.h"
 #include "shared.h"
-#include "stats.h"
-#include "torrent.h"
-#include "tracker.h"
 #include "trevent.h"
 #include "utils.h"
 
@@ -51,39 +48,30 @@
    characters, where x is the major version number, y is the
    minor version number, z is the maintenance number, and b
    designates beta (Azureus-style) */
-uint8_t*
-tr_peerIdNew( void )
+void
+tr_peerIdNew ( char * buf, int buflen )
 {
     int i;
-    int val;
-    int total = 0;
-    uint8_t * buf = tr_new( uint8_t, 21 );
-    const char * pool = "0123456789abcdefghijklmnopqrstuvwxyz";
-    const int base = 36;
+    assert( buflen == TR_ID_LEN + 1 );
 
-    memcpy( buf, PEERID_PREFIX, 8 );
-
-    for( i=8; i<19; ++i ) {
-        val = tr_rand( base );
-        total += val;
-        buf[i] = pool[val];
+    snprintf( buf, TR_ID_LEN, "%s", PEERID_PREFIX );
+    assert( strlen(buf) == 8 );
+    for( i=8; i<TR_ID_LEN; ++i ) {
+        const int r = tr_rand( 36 );
+        buf[i] = ( r < 26 ) ? ( 'a' + r ) : ( '0' + r - 26 ) ;
     }
-
-    val = total % base ? base - (total % base) : 0;
-    total += val;
-    buf[19] = pool[val];
-    buf[20] = '\0';
-
-    return buf;
+    buf[TR_ID_LEN] = '\0';
 }
 
-const uint8_t*
-tr_getPeerId( void )
+const char*
+getPeerId( void )
 {
-    static uint8_t * id = NULL;
-    if( id == NULL )
-        id = tr_peerIdNew( );
-    return id;
+    static char * peerId = NULL;
+    if( !peerId ) {
+        peerId = tr_new0( char, TR_ID_LEN + 1 );
+        tr_peerIdNew( peerId, TR_ID_LEN + 1 );
+    }
+    return peerId;
 }
 
 /***
@@ -102,9 +90,7 @@ void
 tr_setEncryptionMode( tr_handle * handle, tr_encryption_mode mode )
 {
     assert( handle != NULL );
-    assert( mode==TR_ENCRYPTION_PREFERRED
-         || mode==TR_ENCRYPTION_REQUIRED
-         || mode==TR_PLAINTEXT_PREFERRED );
+    assert( mode==TR_ENCRYPTION_PREFERRED || mode==TR_ENCRYPTION_REQUIRED );
 
     handle->encryptionMode = mode;
 }
@@ -113,35 +99,31 @@ tr_setEncryptionMode( tr_handle * handle, tr_encryption_mode mode )
 ****
 ***/
 
-tr_handle *
-tr_initFull( const char * tag,
-             int          isPexEnabled,
-             int          isNatEnabled,
-             int          publicPort,
-             int          encryptionMode,
-             int          isUploadLimitEnabled,
-             int          uploadLimit,
-             int          isDownloadLimitEnabled,
-             int          downloadLimit,
-             int          globalPeerLimit,
-             int          messageLevel,
-             int          isMessageQueueingEnabled )
+
+/***********************************************************************
+ * tr_init
+ ***********************************************************************
+ * Allocates a tr_handle structure and initializes a few things
+ **********************************************************************/
+tr_handle * tr_init( const char * tag )
 {
     tr_handle * h;
+    int         i;
 
 #ifndef WIN32
     /* Don't exit when writing on a broken socket */
     signal( SIGPIPE, SIG_IGN );
 #endif
 
-    tr_msgInit( );
-    tr_setMessageLevel( messageLevel );
-    tr_setMessageQueuing( isMessageQueueingEnabled );
+    tr_msgInit();
 
     h = tr_new0( tr_handle, 1 );
+    if( !h )
+        return NULL;
+
     h->lock = tr_lockNew( );
-    h->isPexEnabled = isPexEnabled ? 1 : 0;
-    h->encryptionMode = encryptionMode;
+
+    h->encryptionMode = TR_ENCRYPTION_PREFERRED;
 
     tr_netInit(); /* must go before tr_eventInit */
 
@@ -157,41 +139,20 @@ tr_initFull( const char * tag,
 
     h->peerMgr = tr_peerMgrNew( h );
 
+    /* Azureus identity */
+    for( i=0; i < TR_AZ_ID_LEN; ++i )
+        h->azId[i] = tr_rand( 0xff );
+
     /* Initialize rate and file descripts controls */
-
-    h->upload = tr_rcInit();
-    tr_rcSetLimit( h->upload, uploadLimit );
-    h->useUploadLimit = isUploadLimitEnabled;
-
+    h->upload   = tr_rcInit();
     h->download = tr_rcInit();
-    tr_rcSetLimit( h->download, downloadLimit );
-    h->useDownloadLimit = isDownloadLimitEnabled;
 
-    tr_fdInit( globalPeerLimit );
-    h->shared = tr_sharedInit( h, isNatEnabled, publicPort );
-    h->isPortSet = publicPort >= 0;
+    tr_fdInit();
+    h->shared = tr_sharedInit( h );
 
     tr_inf( TR_NAME " " LONG_VERSION_STRING " started" );
 
-    tr_statsInit( h );
-
     return h;
-}
-
-tr_handle * tr_init( const char * tag )
-{
-    return tr_initFull( tag,
-                        TRUE, /* pex enabled */
-                        FALSE, /* nat enabled */
-                        -1, /* public port */
-                        TR_ENCRYPTION_PREFERRED, /* encryption mode */
-                        FALSE, /* use upload speed limit? */ 
-                        -1, /* upload speed limit */
-                        FALSE, /* use download speed limit? */
-                        -1, /* download speed limit */
-                        200, /* globalPeerLimit */
-                        TR_MSG_INF, /* message level */
-                        FALSE ); /* is message queueing enabled? */
 }
 
 /***
@@ -221,33 +182,10 @@ tr_globalIsLocked( const struct tr_handle * handle )
  ***********************************************************************
  * 
  **********************************************************************/
-
-struct bind_port_data
+void tr_setBindPort( tr_handle * h, int port )
 {
-    tr_handle * handle;
-    int port;
-};
-
-static void
-tr_setBindPortImpl( void * vdata )
-{
-    struct bind_port_data * data = vdata;
-    tr_handle * handle = data->handle;
-    const int port = data->port;
-
-    handle->isPortSet = 1;
-    tr_sharedSetPort( handle->shared, port );
-
-    tr_free( data );
-}
-
-void
-tr_setBindPort( tr_handle * handle, int port )
-{
-    struct bind_port_data * data = tr_new( struct bind_port_data, 1 );
-    data->handle = handle;
-    data->port = port;
-    tr_runInEventThread( handle, tr_setBindPortImpl, data );
+    h->isPortSet = 1;
+    tr_sharedSetPort( h->shared, port );
 }
 
 int
@@ -264,8 +202,7 @@ void tr_natTraversalEnable( tr_handle * h, int enable )
     tr_globalUnlock( h );
 }
 
-const tr_handle_status *
-tr_handleStatus( tr_handle * h )
+tr_handle_status * tr_handleStatus( tr_handle * h )
 {
     tr_handle_status * s;
 
@@ -321,20 +258,6 @@ tr_getGlobalSpeedLimit( tr_handle  * h,
                                                         : h->download );
 }
 
-
-void
-tr_setGlobalPeerLimit( tr_handle * handle UNUSED,
-                       uint16_t    maxGlobalPeers )
-{
-    tr_fdSetPeerLimit( maxGlobalPeers );
-}
-
-uint16_t
-tr_getGlobalPeerLimit( const tr_handle * handle UNUSED )
-{
-    return tr_fdGetPeerLimit( );
-}
-
 void
 tr_torrentRates( tr_handle * h, float * toClient, float * toPeer )
 {
@@ -354,78 +277,70 @@ tr_torrentRates( tr_handle * h, float * toClient, float * toPeer )
 }
 
 int
-tr_torrentCount( const tr_handle * h )
+tr_torrentCount( tr_handle * h )
 {
     return h->torrentCount;
+}
+
+void
+tr_torrentIterate( tr_handle * h, tr_callback_t func, void * d )
+{
+    tr_torrent * tor, * next;
+
+    for( tor = h->torrentList; tor; tor = next )
+    {
+        next = tor->next;
+        func( tor, d );
+    }
 }
 
 static void
 tr_closeImpl( void * vh )
 {
     tr_handle * h = vh;
-    tr_torrent * t;
-
-    tr_sharedShuttingDown( h->shared );
-    tr_trackerShuttingDown( h );
-
-    for( t=h->torrentList; t!=NULL; t=t->next )
-        tr_torrentClose( t );
-
     tr_peerMgrFree( h->peerMgr );
 
     tr_rcClose( h->upload );
     tr_rcClose( h->download );
-    
+
+    tr_sharedClose( h->shared );
+    tr_fdClose();
+
     h->isClosed = TRUE;
 }
-
-static int
-deadlineReached( const uint64_t deadline )
-{
-    return tr_date( ) >= deadline;
-}
-
-#define SHUTDOWN_MAX_SECONDS 30
-
 void
 tr_close( tr_handle * h )
 {
-    const int maxwait_msec = SHUTDOWN_MAX_SECONDS * 1000;
-    const uint64_t deadline = tr_date( ) + maxwait_msec;
-
-    tr_statsClose( h );
-
     tr_runInEventThread( h, tr_closeImpl, h );
-    while( !h->isClosed && !deadlineReached( deadline ) )
+    while( !h->isClosed )
         tr_wait( 100 );
 
     tr_eventClose( h );
-    while( h->events && !deadlineReached( deadline ) )
+    while( h->events != NULL )
         tr_wait( 100 );
 
-    tr_fdClose( );
     tr_lockFree( h->lock );
     free( h->tag );
     free( h );
+    fprintf( stderr, "libtransmission closed cleanly.\n" );
 }
 
 tr_torrent **
 tr_loadTorrents ( tr_handle   * h,
-                  tr_ctor     * ctor,
+                  const char  * destination,
+                  int           isPaused,
                   int         * setmeCount )
 {
     int i, n = 0;
     struct stat sb;
     DIR * odir = NULL;
-    const char * dirname = tr_getTorrentsDirectory( );
+    const char * torrentDir = tr_getTorrentsDirectory( );
     tr_torrent ** torrents;
     tr_list *l=NULL, *list=NULL;
 
-    tr_ctorSetSave( ctor, FALSE ); /* since we already have them */
-
-    if( !stat( dirname, &sb )
+    if( !stat( torrentDir, &sb )
         && S_ISDIR( sb.st_mode )
-        && (( odir = opendir ( dirname ) )) )
+        && (( odir = opendir ( torrentDir ) )) )
     {
         struct dirent *d;
         for (d = readdir( odir ); d!=NULL; d=readdir( odir ) )
@@ -433,10 +348,9 @@ tr_loadTorrents ( tr_handle   * h,
             if( d->d_name && d->d_name[0]!='.' ) /* skip dotfiles, ., and .. */
             {
                 tr_torrent * tor;
-                char filename[MAX_PATH_LENGTH];
-                tr_buildPath( filename, sizeof(filename), dirname, d->d_name, NULL );
-                tr_ctorSetMetainfoFromFile( ctor, filename );
-                tor = tr_torrentNew( h, ctor, NULL );
+                char path[MAX_PATH_LENGTH];
+                tr_buildPath( path, sizeof(path), torrentDir, d->d_name, NULL );
+                tor = tr_torrentInit( h, path, destination, isPaused, NULL );
                 if( tor != NULL ) {
                     tr_list_append( &list, tor );
                     n++;
@@ -456,20 +370,4 @@ tr_loadTorrents ( tr_handle   * h,
     *setmeCount = n;
     tr_inf( "Loaded %d torrents from disk", *setmeCount );
     return torrents;
-}
-
-/***
-****
-***/
-
-void
-tr_setPexEnabled( tr_handle * handle, int isPexEnabled )
-{
-    handle->isPexEnabled = isPexEnabled ? 1 : 0;
-}
-
-int
-tr_isPexEnabled( const tr_handle * handle )
-{
-    return handle->isPexEnabled;
 }

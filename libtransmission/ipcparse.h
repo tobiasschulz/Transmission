@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2008 Joshua Elsasser
+ * Copyright (c) 2007 Joshua Elsasser
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -26,7 +26,6 @@
 #define TR_DAEMON_IPC_H
 
 #include <inttypes.h>
-#include <unistd.h> /* for ssize_t */
 
 /* yay for typedefs, we can't forward declare benc_val_t or tr_info
    like with structs */
@@ -43,13 +42,11 @@ enum ipc_msg
     IPC_MSG_AUTOMAP,
     IPC_MSG_AUTOSTART,
     IPC_MSG_BAD,
-    IPC_MSG_CRYPTO,
     IPC_MSG_DIR,
     IPC_MSG_DOWNLIMIT,
     IPC_MSG_FAIL,
     IPC_MSG_GETAUTOMAP,
     IPC_MSG_GETAUTOSTART,
-    IPC_MSG_GETCRYPTO,
     IPC_MSG_GETDIR,
     IPC_MSG_GETDOWNLIMIT,
     IPC_MSG_GETINFO,
@@ -82,9 +79,6 @@ enum ipc_msg
     IPC__MSG_UNKNOWN
 };
 
-/* If you add or delete a constant here then you need to renumber the
-   ones after it. They need to be in ascending order starting at zero,
-   with no gaps. */
 #define IPC_INF_COMMENT         ( 1 << 0 )
 #define IPC_INF_CREATOR         ( 1 << 1 )
 #define IPC_INF_DATE            ( 1 << 2 )
@@ -94,11 +88,10 @@ enum ipc_msg
 #define IPC_INF_NAME            ( 1 << 6 )
 #define IPC_INF_PATH            ( 1 << 7 )
 #define IPC_INF_PRIVATE         ( 1 << 8 )
-#define IPC_INF_SIZE            ( 1 << 9 )
-#define IPC_INF_TRACKERS        ( 1 << 10 )
-#define IPC_INF__MAX            ( 1 << 11 )
+#define IPC_INF_SIZE            ( 1 << 10 )
+#define IPC_INF_TRACKERS        ( 1 << 11 )
+#define IPC_INF__MAX            ( 1 << 12 )
 
-/* Ditto for these */
 #define IPC_ST_COMPLETED        ( 1 << 0 )
 #define IPC_ST_DOWNSPEED        ( 1 << 1 )
 #define IPC_ST_DOWNTOTAL        ( 1 << 2 )

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2006 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -29,54 +29,35 @@
  ***********************************************************************
  * Detect the maximum number of open files and initializes things.
  **********************************************************************/
-void tr_fdInit( int globalPeerLimit );
+void tr_fdInit( void );
 
-void tr_fdClose( void );
+/***********************************************************************
+ * tr_fdFileOpen
+ ***********************************************************************
+ * If it isn't open already, tries to open the file 'name' in the
+ * directory 'folder'. If 'name' itself contains '/'s, required
+ * subfolders are created. The file is open read-write if 'write' is 1
+ * (created if necessary), read-only if 0.
+ * Returns the file descriptor if successful, otherwise returns
+ * one of the TR_ERROR_IO_*.
+ **********************************************************************/
+int tr_fdFileOpen( const char * folder, const char * name, int write );
 
-/**
- * Returns an fd to the specified filename.
- *
- * A small pool of open files is kept to avoid the overhead of
- * continually opening and closing the same files when downloading
- * piece data.    It's also used to ensure only one caller can
- * write to the file at a time.  Callers check out a file, use it,
- * and then check it back in via tr_fdFileReturn() when done.
- *
- * - if `folder' doesn't exist, TR_ERROR_IO_PARENT is returned.
- * - if doWrite is true, subfolders in torrentFile are created if necessary.
- * - if doWrite is true, the target file is created if necessary.
- *
- * on success, a file descriptor >= 0 is returned.
- * on failure, a negative number corresponding to tr_errno is returned.
- *
- * @see tr_fdFileReturn
- * @see tr_fdFileClose
- * @see tr_errno
- */
-int tr_fdFileCheckout( const char * folder,
-                       const char * torrentFile,
-                       int          doWrite );
+/***********************************************************************
+ * tr_fdFileRelease
+ ***********************************************************************
+ * Indicates that the file whose descriptor is 'file' is unused at the
+ * moment and can safely be closed.
+ **********************************************************************/
+void tr_fdFileRelease( int file );
 
-/**
- * Returns an fd from tr_fdFileCheckout() so that other clients may borrow it.
- *
- * @see tr_fdFileCheckout
- * @see tr_fdFileClose
- */
-void tr_fdFileReturn( int file );
-
-/**
- * Closes a file that's being held by our file repository.
- *
- * If the file isn't checked out, it's closed immediately.
- * If the file is currently checked out, it will be closed upon its return.
- *
- * @see tr_fdFileCheckout
- * @see tr_fdFileReturn
- */
-void tr_fdFileClose( const char * filename );
-
-
+/***********************************************************************
+ * tr_fdFileClose
+ ***********************************************************************
+ * If the file 'name' in directory 'folder' was open, closes it,
+ * flushing data on disk.
+ **********************************************************************/
+void tr_fdFileClose( const char * folder, const char * name );
 
 /***********************************************************************
  * Sockets
@@ -91,9 +72,4 @@ void tr_fdSocketClose( int s );
  * Frees resources allocated by tr_fdInit.
  **********************************************************************/
 void tr_fdClose( void );
-
-
-void tr_fdSetPeerLimit( uint16_t n );
-
-uint16_t tr_fdGetPeerLimit( void );
 

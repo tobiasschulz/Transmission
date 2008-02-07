@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -40,12 +40,6 @@ void
 hig_workarea_add_wide_control (GtkWidget   * table,
                                int         * row,
                                GtkWidget   * w);
-
-void
-hig_workarea_add_double_control (GtkWidget * table,
-                               int       * row,
-                               GtkWidget * wl,
-                               GtkWidget * wr);
 
 GtkWidget*
 hig_workarea_add_wide_checkbutton (GtkWidget   * table,

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2006 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -55,6 +55,10 @@
     #define sockerrno errno
 #endif
 
+#ifndef INADDR_NONE
+#define INADDR_NONE 0xffffffff
+#endif
+
 struct in_addr;
 struct sockaddr_in;
 
@@ -69,6 +73,7 @@ int tr_netResolve( const char *, struct in_addr * );
  **********************************************************************/
 int  tr_netOpenTCP  ( const struct in_addr * addr, tr_port_t port, int priority );
 int  tr_netOpenUDP  ( const struct in_addr * addr, tr_port_t port, int priority );
+int  tr_netMcastOpen( int port, const struct in_addr * addr );
 int  tr_netBindTCP  ( int port );
 int  tr_netBindUDP  ( int port );
 int  tr_netAccept   ( int s, struct in_addr *, tr_port_t * );

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2008 Transmission authors and contributors
+ * Copyright (c) 2006-2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -32,7 +32,6 @@
 #include <libtransmission/transmission.h>
 
 #include "conf.h"
-#include "hig.h"
 #include "msgwin.h"
 #include "tr_prefs.h"
 #include "util.h"
@@ -188,7 +187,7 @@ static void
 save_cb( GtkWidget * w, GtkTextBuffer * textbuf )
 {
   GtkWindow * window = GTK_WINDOW( gtk_widget_get_toplevel( w ) );
-  GtkWidget * d = gtk_file_chooser_dialog_new( _("Save Log"), window,
+  GtkWidget * d = gtk_file_chooser_dialog_new( _("Save Debug Log"), window,
                                                GTK_FILE_CHOOSER_ACTION_SAVE,
                                                GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                                GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT,
@@ -226,14 +225,13 @@ msgwin_create( TrCore * core )
   GtkWidget * win, * vbox, * scroll, * text;
   GtkWidget * levels;
   GtkWidget * toolbar;
-  GtkWidget * w;
   GtkCellRenderer * renderer;
   int ii, curlevel;
 
   win = gtk_window_new( GTK_WINDOW_TOPLEVEL );
-  gtk_window_set_title( GTK_WINDOW( win ), _( "Message Log" ) );
+  gtk_window_set_title( GTK_WINDOW( win ), _( "Debug Window" ) );
   gtk_window_set_default_size( GTK_WINDOW( win ), 600, 400 );
-  gtk_window_set_role( GTK_WINDOW( win ), "message-log" );
+  gtk_window_set_role( GTK_WINDOW( win ), "debug-window" );
   vbox = gtk_vbox_new( FALSE, 0 );
 
   /**
@@ -258,12 +256,6 @@ msgwin_create( TrCore * core )
                              GTK_TOOLBAR_CHILD_WIDGET, gtk_label_new(_("Level ")),
                              NULL, _("Select the debug filter level."),
                              NULL, NULL, NULL, NULL);
-
-  w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
-  gtk_widget_set_size_request( w, GUI_PAD_SMALL, GUI_PAD_SMALL );
-  gtk_toolbar_append_element( GTK_TOOLBAR(toolbar),
-                              GTK_TOOLBAR_CHILD_WIDGET, w,
-                              NULL, NULL, NULL, NULL, NULL, NULL);
 
   store = gtk_list_store_new (2, G_TYPE_STRING, G_TYPE_INT);
 
@@ -317,4 +309,6 @@ void
 msgwin_loadpref( void )
 {
     textbuf = debug_window_text_buffer_new ( );
+    tr_setMessageLevel( pref_int_get( PREF_KEY_MSGLEVEL ) );
+    tr_setMessageQueuing( TRUE );
 }

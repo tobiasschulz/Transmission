@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -14,12 +14,7 @@
 #define TR_PEER_MGR_H
 
 #include <inttypes.h> /* uint16_t */
-
-#ifdef WIN32
-#include <winsock2.h> /* struct in_addr */
-#else
-#include <netinet/in.h> /* struct in_addr */
-#endif
+#include <arpa/inet.h> /* struct in_addr */
 
 struct in_addr;
 struct tr_handle;
@@ -55,7 +50,8 @@ void tr_peerMgrAddPeers( tr_peerMgr     * manager,
 void tr_peerMgrAddPex( tr_peerMgr     * manager,
                        const uint8_t  * torrentHash,
                        uint8_t          from,
-                       const tr_pex   * pex );
+                       const tr_pex   * pex,
+                       int              pexCount );
 
 void tr_peerMgrSetBlame( tr_peerMgr     * manager,
                          const uint8_t  * torrentHash,

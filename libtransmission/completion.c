@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,6 @@
 
 #include "transmission.h"
 #include "completion.h"
-#include "torrent.h"
 #include "utils.h"
 
 struct tr_completion
@@ -48,21 +47,6 @@ struct tr_completion
     uint64_t doneTotal;
     uint64_t completeHave;
 };
-
-static void
-tr_cpReset( tr_completion * cp )
-{
-    tr_torrent * tor = cp->tor;
-
-    tr_bitfieldClear( cp->pieceBitfield );
-    tr_bitfieldClear( cp->blockBitfield );
-    memset( cp->completeBlocks, 0, sizeof(uint16_t) * tor->info.pieceCount );
-
-    cp->doneDirty = TRUE;
-    cp->doneHave = 0;
-    cp->doneTotal = 0;
-    cp->completeHave = 0;
-}
 
 tr_completion * tr_cpInit( tr_torrent * tor )
 {
@@ -85,6 +69,20 @@ void tr_cpClose( tr_completion * cp )
     tr_bitfieldFree( cp->pieceBitfield );
     tr_bitfieldFree( cp->blockBitfield );
     tr_free(         cp );
+}
+
+void tr_cpReset( tr_completion * cp )
+{
+    tr_torrent * tor = cp->tor;
+
+    tr_bitfieldClear( cp->pieceBitfield );
+    tr_bitfieldClear( cp->blockBitfield );
+    memset( cp->completeBlocks, 0, sizeof(uint16_t) * tor->info.pieceCount );
+
+    cp->doneDirty = TRUE;
+    cp->doneHave = 0;
+    cp->doneTotal = 0;
+    cp->completeHave = 0;
 }
 
 /**
@@ -139,11 +137,7 @@ tr_cpInvalidateDND ( tr_completion * cp )
 int
 tr_cpPieceIsComplete( const tr_completion * cp, int piece )
 {
-    assert( piece >= 0 );
-    assert( piece < cp->tor->info.pieceCount );
-    assert( cp->completeBlocks[piece] <= tr_torPieceCountBlocks(cp->tor,piece) );
-
-    return cp->completeBlocks[piece] == tr_torPieceCountBlocks(cp->tor,piece);
+    return cp->completeBlocks[piece] >= tr_torPieceCountBlocks(cp->tor,piece);
 }
 
 const tr_bitfield * tr_cpPieceBitfield( const tr_completion * cp )
@@ -151,8 +145,7 @@ const tr_bitfield * tr_cpPieceBitfield( const tr_completion * cp )
     return cp->pieceBitfield;
 }
 
-void
-tr_cpPieceAdd( tr_completion * cp, int piece )
+void tr_cpPieceAdd( tr_completion * cp, int piece )
 {
     const tr_torrent * tor = cp->tor;
     const int start = tr_torPieceFirstBlock(tor,piece);
@@ -163,8 +156,7 @@ tr_cpPieceAdd( tr_completion * cp, int piece )
         tr_cpBlockAdd( cp, i );
 }
 
-void
-tr_cpPieceRem( tr_completion * cp, int piece )
+void tr_cpPieceRem( tr_completion * cp, int piece )
 {
     const tr_torrent * tor = cp->tor;
     const int start = tr_torPieceFirstBlock(tor,piece);
@@ -191,10 +183,6 @@ tr_cpPieceRem( tr_completion * cp, int piece )
     cp->completeBlocks[piece] = 0;
     tr_bitfieldRemRange ( cp->blockBitfield, start, end );
     tr_bitfieldRem( cp->pieceBitfield, piece );
-
-    assert( cp->completeHave <= tor->info.totalSize );
-    assert( cp->doneHave <= tor->info.totalSize );
-    assert( cp->doneHave <= cp->completeHave );
 }
 
 int tr_cpBlockIsComplete( const tr_completion * cp, int block )
@@ -224,10 +212,6 @@ tr_cpBlockAdd( tr_completion * cp, int block )
         if( !tor->info.pieces[piece].dnd )
             cp->doneHave += blockSize;
     }
-
-    assert( cp->completeHave <= tor->info.totalSize );
-    assert( cp->doneHave <= tor->info.totalSize );
-    assert( cp->doneHave <= cp->completeHave );
 }
 
 const tr_bitfield * tr_cpBlockBitfield( const tr_completion * cp )
@@ -272,8 +256,6 @@ tr_cpPercentComplete ( const tr_completion * cp )
 uint64_t
 tr_cpLeftUntilComplete ( const tr_completion * cp )
 {
-    assert( cp->tor->info.totalSize >= cp->completeHave );
-
     return cp->tor->info.totalSize - cp->completeHave;
 }
 
@@ -296,9 +278,7 @@ tr_cpLeftUntilDone ( const tr_completion * cp )
 cp_status_t
 tr_cpGetStatus ( const tr_completion * cp )
 {
-    assert( cp->tor->info.totalSize >= cp->completeHave );
-
-    if( cp->completeHave == cp->tor->info.totalSize )
+    if( cp->completeHave >= cp->tor->info.totalSize )
         return TR_CP_COMPLETE;
 
     tr_cpEnsureDoneValid( cp );
@@ -326,11 +306,11 @@ tr_cpHaveValid( const tr_completion * cp )
     if( tr_cpPieceIsComplete( cp, info->pieceCount-1 ) )
         b -= (info->pieceSize - (info->totalSize % info->pieceSize));
 
-    return b;
+   return b;
 }
 
 uint64_t
 tr_cpHaveTotal( const tr_completion * cp )
 {
-    return cp->completeHave;
+   return cp->completeHave;
 }

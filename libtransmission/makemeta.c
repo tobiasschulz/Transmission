@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -19,7 +19,6 @@
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <unistd.h>
-#include <libgen.h> /* dirname, basename */
 #include <dirent.h>
 
 #include "crypto.h" /* tr_sha1 */
@@ -168,7 +167,7 @@ tr_metaInfoBuilderFree( tr_metainfo_builder * builder )
 {
     if( builder != NULL )
     {
-        uint32_t i;
+        int i;
         for( i=0; i<builder->fileCount; ++i )
             tr_free( builder->files[i].filename );
         tr_free( builder->files );
@@ -187,7 +186,7 @@ tr_metaInfoBuilderFree( tr_metainfo_builder * builder )
 static uint8_t*
 getHashInfo ( tr_metainfo_builder * b )
 {
-    uint32_t fileIndex = 0;
+    int fileIndex = 0;
     uint8_t *ret = tr_new0( uint8_t, SHA_DIGEST_LENGTH * b->pieceCount );
     uint8_t *walk = ret;
     uint8_t *buf;
@@ -297,7 +296,7 @@ static void
 makeFilesList( benc_val_t                 * list,
                const tr_metainfo_builder  * builder )
 {
-    uint32_t i = 0;
+    int i = 0;
 
     tr_bencListReserve( list, builder->fileCount );
 
@@ -385,7 +384,7 @@ static void tr_realMakeMetaInfo ( tr_metainfo_builder * builder )
     /* save the file */
     if ( !builder->abortFlag ) {
         size_t nmemb;
-        char * pch = tr_bencSave( &top, &n );
+        char * pch = tr_bencSaveMalloc( &top, &n );
         FILE * fp = fopen( builder->outputFile, "wb+" );
         nmemb = n;
         if( fp == NULL )

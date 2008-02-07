@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -30,9 +30,9 @@ typedef struct tr_metainfo_builder
     char * top;
     tr_metainfo_builder_file * files;
     uint64_t totalSize;
-    uint32_t fileCount;
-    uint32_t pieceSize;
-    uint32_t pieceCount;
+    int fileCount;
+    int pieceSize;
+    int pieceCount;
     int isSingleFile;
     tr_handle * handle;
 
@@ -54,7 +54,7 @@ typedef struct tr_metainfo_builder
     ***  tell tr_makeMetaInfo() to abort and clean up after itself.
     **/
 
-    uint32_t pieceIndex;
+    int pieceIndex;
     int abortFlag;
     int isDone;
     int failed; /* only meaningful if isDone is set */

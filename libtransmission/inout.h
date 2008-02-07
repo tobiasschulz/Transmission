@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2008 Transmission authors and contributors
+ * Copyright (c) 2005-2006 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,22 +27,24 @@
 
 struct tr_torrent;
 
-/**
- * Reads the block specified by the piece index, offset, and length.
- * @return 0 on success, TR_ERROR_ASSERT if the arguments are incorrect,
- * or TR_ERROR_IO_* otherwise.
- */
-int tr_ioRead  ( struct tr_torrent*, int index, int begin, int len, uint8_t * );
+typedef struct tr_io tr_io;
 
-/**
- * Writes the block specified by the piece index, offset, and length.
- * @return 0 on success, TR_ERROR_ASSERT if the arguments are incorrect,
- * or TR_ERROR_IO_* otherwise.
- */
-tr_errno tr_ioWrite ( struct tr_torrent *, int index, int begin, int len, const uint8_t * );
+/***********************************************************************
+ * tr_ioRead, tr_ioWrite
+ ***********************************************************************
+ * Reads or writes the block specified by the piece index, the offset in
+ * that piece and the size of the block. Returns 0 if successful, 
+ * TR_ERROR_ASSERT if the parameters are incorrect, one of the
+ * TR_ERROR_IO_* otherwise.
+ **********************************************************************/
+int tr_ioRead  ( struct tr_torrent*, int index, int begin, int len, uint8_t * );
+int tr_ioWrite ( struct tr_torrent *, int index, int begin, int len, uint8_t * );
 
 /* hashes the specified piece and updates the completion accordingly. */
 int tr_ioHash ( tr_torrent*, int piece );
+
+/* close all the files associated with this torrent*/
+void tr_ioClose( const tr_torrent * );
 
 /**
 ***

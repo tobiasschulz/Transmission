@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -25,7 +25,6 @@
 #import "FileNameCell.h"
 #import "FileOutlineView.h"
 #import "Torrent.h"
-#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 
 #define PADDING_HORIZONAL 2.0
@@ -46,48 +45,6 @@
 @end
 
 @implementation FileNameCell
-
-- (id) init
-{
-    if ((self = [super init]))
-    {
-        NSMutableParagraphStyle * paragraphStyle = [[NSParagraphStyle defaultParagraphStyle] mutableCopy];
-        [paragraphStyle setLineBreakMode: NSLineBreakByTruncatingTail];
-        
-        fTitleAttributes = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
-                            [NSFont messageFontOfSize: 12.0], NSFontAttributeName,
-                            paragraphStyle, NSParagraphStyleAttributeName, nil];
-        
-        fStatusAttributes = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
-                                [NSFont messageFontOfSize: 9.0], NSFontAttributeName,
-                                paragraphStyle, NSParagraphStyleAttributeName, nil];
-        
-        [paragraphStyle release];
-    }
-    return self;
-}
-
-- (void) dealloc
-{
-    [fTitleAttributes release];
-    [fStatusAttributes release];
-    
-    [fFolderImage release];
-    
-    [super dealloc];
-}
-
-- (id) copyWithZone: (NSZone *) zone
-{
-    FileNameCell * copy = [super copyWithZone: zone];
-    
-    copy->fTitleAttributes = [fTitleAttributes retain];
-    copy->fStatusAttributes = [fStatusAttributes retain];
-    
-    copy->fFolderImage = [fFolderImage retain];
-    
-    return copy;
-}
 
 - (NSImage *) image
 {
@@ -130,11 +87,12 @@
 - (void) drawWithFrame: (NSRect) cellFrame inView: (NSView *) controlView
 {
     //icon
-    [[self image] drawInRect: [self imageRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
+    [[self image] drawInRect: [self imageRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver
+                    fraction: 1.0];
     
     //title
     NSColor * specialColor = nil;
-    if ([NSApp isOnLeopardOrBetter] ? [self backgroundStyle] == NSBackgroundStyleDark : [self isHighlighted]
+    if ([self isHighlighted]
             && [[self highlightColorWithFrame: cellFrame inView: controlView] isEqual: [NSColor alternateSelectedControlColor]])
         specialColor = [NSColor whiteColor];
     else if ([[(FileOutlineView *)[self controlView] torrent] checkForFiles:
@@ -201,6 +159,18 @@
 
 - (NSAttributedString *) attributedTitleWithColor: (NSColor *) color
 {
+    if (!fTitleAttributes)
+    {
+        NSMutableParagraphStyle * paragraphStyle = [[NSParagraphStyle defaultParagraphStyle] mutableCopy];
+        [paragraphStyle setLineBreakMode: NSLineBreakByTruncatingTail];
+        
+        fTitleAttributes = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
+                            [NSFont messageFontOfSize: 12.0], NSFontAttributeName,
+                            paragraphStyle, NSParagraphStyleAttributeName, nil];
+        
+        [paragraphStyle release];
+    }
+    
     if (color)
         [fTitleAttributes setObject: color forKey: NSForegroundColorAttributeName];
         
@@ -210,6 +180,18 @@
 
 - (NSAttributedString *) attributedStatusWithColor: (NSColor *) color
 {
+    if (!fStatusAttributes)
+    {
+        NSMutableParagraphStyle * paragraphStyle = [[NSParagraphStyle defaultParagraphStyle] mutableCopy];
+        [paragraphStyle setLineBreakMode: NSLineBreakByTruncatingTail];
+        
+        fStatusAttributes = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
+                                [NSFont messageFontOfSize: 9.0], NSFontAttributeName,
+                                paragraphStyle, NSParagraphStyleAttributeName, nil];
+        
+        [paragraphStyle release];
+    }
+    
     if (color)
         [fStatusAttributes setObject: color forKey: NSForegroundColorAttributeName];
     
