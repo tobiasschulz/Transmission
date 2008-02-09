@@ -1,29 +1,22 @@
 ACLOCAL_AMFLAGS = -I m4
 
-if BUILD_BEOS
+if HAVE_BEOS
   BEOS_DIR = beos
 endif
-if BUILD_CLI
-  CLI_DIR = cli
-endif
-if BUILD_DAEMON
-  DAEMON_DIR = daemon
-endif
-if BUILD_DARWIN
+if HAVE_DARWIN
   MAC_DIR = macosx
 endif
-if BUILD_GTK
+if WITH_GTK
   GTK_DIR = gtk po
 endif
-if BUILD_WX
+if HAVE_WX
   WX_DIR = wx
 endif
 
 SUBDIRS = \
   third-party \
   libtransmission \
-  $(DAEMON_DIR) \
-  $(CLI_DIR) \
+  daemon cli \
   $(BEOS_DIR) \
   $(GTK_DIR) \
   $(MAC_DIR) \

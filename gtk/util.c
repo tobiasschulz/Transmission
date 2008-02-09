@@ -28,13 +28,10 @@
 #include <signal.h>
 #include <stdarg.h>
 #include <string.h>
-#include <stdlib.h>
 #include <unistd.h>
 
 #include <gtk/gtk.h>
 #include <glib/gi18n.h>
-
-#include <libevent/evhttp.h>
 
 #include "tr_prefs.h"
 #include "tr_torrent.h"
@@ -54,26 +51,10 @@ tr_strcmp( const char * a, const char * b )
 }
 
 char*
-tr_strlratio( char * buf, double ratio, size_t buflen )
-{
-    if( (int)ratio == TR_RATIO_NA )
-        g_strlcpy( buf, _( "None" ), buflen );
-    else if( (int)ratio == TR_RATIO_INF )
-        g_strlcpy( buf, "\xE2\x88\x9E", buflen );
-    else if( ratio < 10.0 )
-        g_snprintf( buf, buflen, "%.2f", ratio );
-    else if( ratio < 100.0 )
-        g_snprintf( buf, buflen, "%.1f", ratio );
-    else
-        g_snprintf( buf, buflen, "%.0f", ratio );
-    return buf;
-}
-
-char*
 tr_strlsize( char * buf, guint64 size, size_t buflen )
 {
     if( !size )
-        g_strlcpy( buf, _( "None" ), buflen );
+        g_strlcpy( buf, _("None"), buflen );
     else {
         static const char *units[] = {
             N_("B"), N_("KiB"), N_("MiB"), N_("GiB"), N_("TiB"),
@@ -96,7 +77,7 @@ tr_strlspeed( char * buf, double KiBps, size_t buflen )
 {
     const guint64 bps = KiBps * 1024;
     if( !bps )
-        g_strlcpy( buf, _( "None" ), buflen );
+        g_strlcpy( buf, _("None"), buflen );
     else {
         char bbuf[64];
         tr_strlsize( bbuf, (guint64)(KiBps*1024), sizeof(bbuf) );
@@ -140,7 +121,6 @@ tr_strltime( char * buf, int secs, size_t buflen )
     return buf;
 }
 
-
 char *
 rfc822date (guint64 epoch_msec)
 {
@@ -152,12 +132,33 @@ rfc822date (guint64 epoch_msec)
 }
 
 gboolean
-mkdir_p( const char * path, mode_t mode )
+mkdir_p(const char *name, mode_t mode)
 {
-#if GLIB_CHECK_VERSION( 2, 8, 0)
-    return !g_mkdir_with_parents( path, mode );
+#if GLIB_CHECK_VERSION(2,8,0)
+    return !g_mkdir_with_parents( name, mode );
 #else
-    return !tr_mkdirp( path, mode );
+    struct stat sb;
+    char *parent;
+    gboolean ret;
+    int oerrno;
+
+    if(0 != stat(name, &sb)) {
+      if(ENOENT != errno)
+        return FALSE;
+      parent = g_path_get_dirname(name);
+      ret = mkdir_p(parent, mode);
+      oerrno = errno;
+      g_free(parent);
+      errno = oerrno;
+      return (ret ? (0 == mkdir(name, mode)) : FALSE);
+    }
+
+    if(!S_ISDIR(sb.st_mode)) {
+      errno = ENOTDIR;
+      return FALSE;
+    }
+
+    return TRUE;
 #endif
 }
 
@@ -191,12 +192,37 @@ freestrlist(GList *list)
 }
 
 char *
-decode_uri( const char * uri )
-{
-    char * filename = evhttp_decode_uri( uri );
-    char * ret = g_strdup( filename );
-    free( filename );
-    return ret;
+urldecode(const char *str, int len) {
+  int ii, jj;
+  char *ret;
+
+  if( len <= 0 )
+      len = strlen( str );
+
+  for(ii = jj = 0; ii < len; ii++, jj++)
+    if('%' == str[ii])
+      ii += 2;
+
+  ret = g_new(char, jj + 1);
+
+  for(ii = jj = 0; ii < len; ii++, jj++) {
+    switch(str[ii]) {
+      case '%':
+        if(ii + 2 < len) {
+          char buf[3] = { str[ii+1], str[ii+2], '\0' };
+          ret[jj] = g_ascii_strtoull(buf, NULL, 16);
+        }
+        ii += 2;
+        break;
+      case '+':
+        ret[jj] = ' ';
+      default:
+        ret[jj] = str[ii];
+    }
+  }
+  ret[jj] = '\0';
+
+  return ret;
 }
 
 GList *
@@ -359,7 +385,7 @@ verrmsg_full( GtkWindow * wind, callbackfunc_t func, void * data,
 }
 
 static void
-errcb(GtkWidget *widget, int resp UNUSED, gpointer data) {
+errcb(GtkWidget *widget, int resp SHUTUP, gpointer data) {
   GList *funcdata;
   callbackfunc_t func;
 

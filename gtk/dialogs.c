@@ -144,7 +144,7 @@ makeaddwind( GtkWindow * parent, TrCore * core )
 }
 
 void
-addwindnocore( gpointer gdata, GObject * core UNUSED )
+addwindnocore( gpointer gdata, GObject * core SHUTUP )
 {
     struct addcb * data = gdata;
 
@@ -279,7 +279,7 @@ promptfordir( GtkWindow * parent, TrCore * core, GList * files, uint8_t * data,
 }
 
 void
-promptdirnocore( gpointer gdata, GObject * core UNUSED )
+promptdirnocore( gpointer gdata, GObject * core SHUTUP )
 {
     struct dirdata * stuff = gdata;
 

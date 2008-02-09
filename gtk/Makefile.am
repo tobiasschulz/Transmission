@@ -2,7 +2,6 @@ SUBDIRS = icons
 
 AM_CPPFLAGS = \
     -I$(top_srcdir) \
-    -I$(top_srcdir)/third-party/ \
     $(LIBEVENT_CPPFLAGS) \
     -DTRANSMISSIONLOCALEDIR=\""$(transmissionlocaledir)"\"
 

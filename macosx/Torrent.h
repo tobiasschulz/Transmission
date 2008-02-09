@@ -56,8 +56,6 @@ typedef enum
 
     NSImage * fIcon;
     
-    NSString * fHashString;
-    
     tr_file_stat * fileStat;
     NSArray * fFileList;
     
@@ -68,7 +66,7 @@ typedef enum
     
     float fRatioLimit;
     int fRatioSetting;
-    BOOL fFinishedSeeding, fWaitToStart, fStalled;
+    BOOL fFinishedSeeding, fWaitToStart, fError, fChecking, fStalled;
     
     int fOrderValue, fGroupValue;
     
@@ -163,7 +161,6 @@ typedef enum
 - (float) progress;
 - (float) progressDone;
 - (float) progressLeft;
-- (float) checkingProgress;
 
 - (int) eta;
 - (int) etaRatio;

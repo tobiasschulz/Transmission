@@ -514,7 +514,7 @@ static void
 makeicon( struct cbdata * cbdata )
 {
     if( cbdata->icon == NULL )
-        cbdata->icon = tr_icon_new( cbdata->core );
+        cbdata->icon = tr_icon_new( );
 }
 
 static gpointer
@@ -655,7 +655,7 @@ gotdrag( GtkWidget         * widget UNUSED,
                 continue;
 
             /* decode the filename */
-            filename = decode_uri( files[i] );
+            filename = urldecode( files[i], -1 );
             freeme = g_list_prepend( freeme, filename );
             if( !g_utf8_validate( filename, -1, NULL ) )
                 continue;
@@ -1011,7 +1011,7 @@ doAction ( const char * action_name, gpointer user_data )
     struct cbdata * data = user_data;
     gboolean changed = FALSE;
 
-    if ( !strcmp (action_name, "open-torrent-menu") || !strcmp( action_name, "open-torrent-toolbar" ))
+    if (!strcmp (action_name, "add-torrent"))
     {
         makeaddwind( data->wind, data->core );
     }
@@ -1049,7 +1049,7 @@ doAction ( const char * action_name, gpointer user_data )
         GtkTreeSelection * s = tr_window_get_selection(data->wind);
         gtk_tree_selection_selected_foreach( s, updateTrackerForeach, data->wind );
     }
-    else if (!strcmp (action_name, "new-torrent"))
+    else if (!strcmp (action_name, "create-torrent"))
     {
         GtkWidget * w = make_meta_ui( GTK_WINDOW( data->wind ),
                                       tr_core_handle( data->core ) );

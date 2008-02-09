@@ -161,7 +161,10 @@ GroupsWindowController * fGroupsWindowInstance = nil;
 - (NSImage *) imageForIndex: (int) index isSmall: (BOOL) small
 {
     int orderIndex = [self orderValueForIndex: index];
-    return orderIndex != -1 ? [self imageForGroup: [fGroups objectAtIndex: orderIndex] isSmall: small] : nil;
+    if (orderIndex == -1)
+        return nil;
+    
+    return [self imageForGroup: [fGroups objectAtIndex: orderIndex] isSmall: small];
 }
 
 - (NSInteger) numberOfRowsInTableView: (NSTableView *) tableview
@@ -259,13 +262,14 @@ GroupsWindowController * fGroupsWindowInstance = nil;
         
         if ([selectedGroups count] > 0)
         {
-            NSMutableIndexSet * indexSet = [NSMutableIndexSet indexSet];
             NSEnumerator * enumerator = [selectedGroups objectEnumerator];
+            NSMutableIndexSet * indexSet = [[NSMutableIndexSet alloc] init];
             NSDictionary * dict;
             while ((dict = [enumerator nextObject]))
                 [indexSet addIndex: [fGroups indexOfObject: dict]];
             
             [fTableView selectRowIndexes: indexSet byExtendingSelection: NO];
+            [indexSet release];
         }
         
         [fTableView reloadData];
@@ -366,6 +370,7 @@ GroupsWindowController * fGroupsWindowInstance = nil;
         [item release];
     }
     
+
     return [menu autorelease];
 }
 

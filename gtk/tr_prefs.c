@@ -301,14 +301,14 @@ tr_prefs_dialog_new( GObject * core, GtkWindow * parent )
     hig_workarea_add_section_title (t, &row, _("Speed Limits"));
     hig_workarea_add_section_spacer (t, row, 2);
 
-        s = _("_Limit upload speed (KiB/s)");
+        s = _("_Limit Upload Speed (KiB/s)");
         w = new_check_button( s, PREF_KEY_UL_LIMIT_ENABLED, core );
         w2 = new_spin_button( PREF_KEY_UL_LIMIT, core, 0, INT_MAX, 5 );
         gtk_widget_set_sensitive( GTK_WIDGET(w2), pref_flag_get( PREF_KEY_UL_LIMIT_ENABLED ) );
         g_signal_connect( w, "toggled", G_CALLBACK(target_cb), w2 );
         hig_workarea_add_double_control( t, &row, w, w2 );
 
-        s = _("Li_mit download speed (KiB/s)");
+        s = _("Li_mit Download Speed (KiB/s)");
         w = new_check_button( s, PREF_KEY_DL_LIMIT_ENABLED, core );
         w2 = new_spin_button( PREF_KEY_DL_LIMIT, core, 0, INT_MAX, 5 );
         gtk_widget_set_sensitive( GTK_WIDGET(w2), pref_flag_get( PREF_KEY_DL_LIMIT_ENABLED ) );
@@ -334,6 +334,7 @@ tr_prefs_dialog_new( GObject * core, GtkWindow * parent )
         s = _("For torrents added from _command-line:");
         l = hig_workarea_add_row( t, &row, s, w, NULL );
 
+#if 0
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title( t, &row, _( "Peer Connections" ) );
     hig_workarea_add_section_spacer(t , row, 2 );
@@ -342,6 +343,7 @@ tr_prefs_dialog_new( GObject * core, GtkWindow * parent )
         hig_workarea_add_row( t, &row, _( "Global maximum connected peers:" ), w, NULL );
         w = new_spin_button( PREF_KEY_MAX_PEERS_PER_TORRENT, core, 1, 300, 5 );
         hig_workarea_add_row( t, &row, _( "Maximum connected peers for new torrents:" ), w, NULL );
+#endif
 
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title (t, &row, _("Network"));
@@ -371,15 +373,15 @@ tr_prefs_dialog_new( GObject * core, GtkWindow * parent )
     hig_workarea_add_section_title (t, &row, _("Options"));
     hig_workarea_add_section_spacer (t, row, 3);
         
-        s = _("Use peer _exchange if possible");
+        s = _("Use Peer _Exchange if Possible");
         w = new_check_button( s, PREF_KEY_PEX, core );
         hig_workarea_add_wide_control( t, &row, w );
         
-        s = _("_Ignore unencrypted peers");
+        s = _("_Ignore Unencrypted Peers");
         w = new_check_button( s, PREF_KEY_ENCRYPTED_ONLY, core );
         hig_workarea_add_wide_control( t, &row, w );
         
-        s = _("Show an icon in the system _tray");
+        s = _("Show an Icon in the System _Tray");
         w = new_check_button( s, PREF_KEY_SYSTRAY, core );
         hig_workarea_add_wide_control( t, &row, w );
         

@@ -39,7 +39,7 @@ int tr_ioRead  ( struct tr_torrent*, int index, int begin, int len, uint8_t * );
  * @return 0 on success, TR_ERROR_ASSERT if the arguments are incorrect,
  * or TR_ERROR_IO_* otherwise.
  */
-tr_errno tr_ioWrite ( struct tr_torrent *, int index, int begin, int len, const uint8_t * );
+int tr_ioWrite ( struct tr_torrent *, int index, int begin, int len, const uint8_t * );
 
 /* hashes the specified piece and updates the completion accordingly. */
 int tr_ioHash ( tr_torrent*, int piece );

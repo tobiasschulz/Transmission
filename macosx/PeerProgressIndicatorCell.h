@@ -28,6 +28,7 @@
 {
     BOOL fIsHidden;
     NSDictionary * fAttributes;
+    NSImage * fCheckImage;
 }
 
 @end
