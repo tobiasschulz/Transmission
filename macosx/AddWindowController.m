@@ -207,19 +207,17 @@
 - (void) updateStatusField: (NSNotification *) notification
 {
     NSString * statusString = [NSString stringForFileSize: [fTorrent size]];
-    if ([fTorrent isFolder])
+    if ([fTorrent folder])
     {
         NSString * fileString;
         int count = [fTorrent fileCount];
         if (count != 1)
-            fileString = [NSString stringWithFormat: NSLocalizedString(@"%d files", "Add torrent -> info"), count];
+            fileString = [NSString stringWithFormat: NSLocalizedString(@"%d Files", "Add torrent -> info"), count];
         else
-            fileString = NSLocalizedString(@"1 file", "Add torrent -> info");
+            fileString = NSLocalizedString(@"1 File", "Add torrent -> info");
         
-        NSString * selectedString = [NSString stringWithFormat: NSLocalizedString(@"%@ selected", "Add torrent -> info"),
-                                        [NSString stringForFileSize: [fTorrent totalSizeSelected]]];
-        
-        statusString = [NSString stringWithFormat: @"%@, %@ (%@)", fileString, statusString, selectedString];
+        statusString = [NSString stringWithFormat: NSLocalizedString(@"%@, %@ (%@ selected)", "Add torrent -> info"), fileString,
+                        statusString, [NSString stringForFileSize: [fTorrent totalSizeSelected]]];
     }
     
     [fStatusField setStringValue: statusString];

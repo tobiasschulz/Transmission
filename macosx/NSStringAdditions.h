@@ -36,9 +36,8 @@
 + (NSString *) stringForRatio: (float) ratio;
 
 + (NSString *) timeString: (uint64_t) seconds showSeconds: (BOOL) showSeconds;
-+ (NSString *) timeString: (NSUInteger) seconds showSeconds: (BOOL) showSeconds maxFields: (NSUInteger) max;
++ (NSString *) timeString: (NSUInteger) seconds showSeconds: (BOOL) showSeconds maxDigits: (NSUInteger) max;
 
-- (NSComparisonResult) compareFinder: (NSString *) string; //how the Finder compares strings
-- (NSComparisonResult) compareNumeric: (NSString *) string; //simple compare method for strings with numbers (works for IP addresses)
+- (NSComparisonResult) compareIP: (NSString *) string;
 
 @end

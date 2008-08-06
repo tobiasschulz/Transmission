@@ -29,7 +29,7 @@
 
 @interface BadgeView (Private)
 
-- (void) badge: (NSImage *) badge string: (NSString *) string atHeight: (float) height adjustForQuit: (BOOL) quit;
+- (void) badge: (NSImage *) badge string: (NSString *) string atHeight: (float) height;
 
 @end
 
@@ -40,36 +40,20 @@
     if ((self = [super initWithFrame: frame]))
     {
         fLib = lib;
-        
-        fDownloadRate = 0.0;
-        fUploadRate = 0.0;
         fQuitting = NO;
     }
     return self;
+}
+
+- (void) setQuitting
+{
+    fQuitting = YES;
 }
 
 - (void) dealloc
 {
     [fAttributes release];
     [super dealloc];
-}
-
-- (BOOL) setRatesWithDownload: (float) downloadRate upload: (float) uploadRate
-{
-    //only needs update if the badges were displayed or are displayed now
-    BOOL needsUpdate = fDownloadRate != downloadRate || fUploadRate != uploadRate;
-    if (needsUpdate)
-    {
-        fDownloadRate = downloadRate;
-        fUploadRate = uploadRate;
-    }
-    
-    return needsUpdate;
-}
-
-- (void) setQuitting
-{
-    fQuitting = YES;
 }
 
 - (void) drawRect: (NSRect) rect
@@ -80,23 +64,31 @@
     {
         NSImage * quitBadge = [NSImage imageNamed: @"QuitBadge.png"];
         [self badge: quitBadge string: NSLocalizedString(@"Quitting", "Dock Badger -> quit")
-                atHeight: (rect.size.height - [quitBadge size].height) * 0.5 adjustForQuit: YES];
+                atHeight: (rect.size.height - [quitBadge size].height) * 0.5];
         return;
     }
     
-    BOOL upload = fUploadRate >= 0.1,
-        download = fDownloadRate >= 0.1;
-    float bottom = 0.0;
-    if (upload)
+    BOOL checkDownload = [[NSUserDefaults standardUserDefaults] boolForKey: @"BadgeDownloadRate"],
+        checkUpload = [[NSUserDefaults standardUserDefaults] boolForKey: @"BadgeUploadRate"];
+    if (checkDownload || checkUpload)
     {
-        NSImage * uploadBadge = [NSImage imageNamed: @"UploadBadge.png"];
-        [self badge: uploadBadge string: [NSString stringForSpeedAbbrev: fUploadRate] atHeight: bottom adjustForQuit: NO];
+        float downloadRate, uploadRate;
+        tr_torrentRates(fLib, &downloadRate, &uploadRate);
+        
+        BOOL upload = checkUpload && uploadRate >= 0.1,
+            download = checkDownload && downloadRate >= 0.1;
+        float bottom = 0.0;
+        if (upload)
+        {
+            NSImage * uploadBadge = [NSImage imageNamed: @"UploadBadge.png"];
+            [self badge: uploadBadge string: [NSString stringForSpeedAbbrev: uploadRate] atHeight: bottom];
+            if (download)
+                bottom += [uploadBadge size].height + BETWEEN_PADDING; //download rate above upload rate
+        }
         if (download)
-            bottom += [uploadBadge size].height + BETWEEN_PADDING; //download rate above upload rate
+            [self badge: [NSImage imageNamed: @"DownloadBadge.png"] string: [NSString stringForSpeedAbbrev: downloadRate]
+                    atHeight: bottom];
     }
-    if (download)
-        [self badge: [NSImage imageNamed: @"DownloadBadge.png"] string: [NSString stringForSpeedAbbrev: fDownloadRate]
-                atHeight: bottom adjustForQuit: NO];
 }
 
 @end
@@ -104,7 +96,7 @@
 @implementation BadgeView (Private)
 
 //dock icon must have locked focus
-- (void) badge: (NSImage *) badge string: (NSString *) string atHeight: (float) height adjustForQuit: (BOOL) quit
+- (void) badge: (NSImage *) badge string: (NSString *) string atHeight: (float) height
 {
     if (!fAttributes)
     {
@@ -130,7 +122,7 @@
     
     NSRect stringRect = badgeRect;
     stringRect.origin.x += (badgeRect.size.width - stringSize.width) * 0.5;
-    stringRect.origin.y += (badgeRect.size.height - stringSize.height) * 0.5 + (quit ? 2.0 : 1.0); //adjust for shadow, extra for quit
+    stringRect.origin.y += (badgeRect.size.height - stringSize.height) * 0.5 + 1.0; //adjust for shadow
     stringRect.size = stringSize;
     
     [string drawInRect: stringRect withAttributes: fAttributes];

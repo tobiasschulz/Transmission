@@ -118,9 +118,9 @@
     {
         NSString * fileString;
         if (fileCount == 1)
-            fileString = NSLocalizedString(@"1 file", "Drag overlay -> torrents");
+            fileString = NSLocalizedString(@"1 File", "Drag overlay -> torrents");
         else
-            fileString= [NSString stringWithFormat: NSLocalizedString(@"%d files", "Drag overlay -> torrents"), fileCount];
+            fileString= [NSString stringWithFormat: NSLocalizedString(@"%d Files", "Drag overlay -> torrents"), fileCount];
         secondString = [NSString stringWithFormat: @"%@, %@", fileString, secondString];
     }
     
@@ -130,7 +130,7 @@
     else
     {
         name = [NSString stringWithFormat: NSLocalizedString(@"%d Torrent Files", "Drag overlay -> torrents"), count];
-        secondString = [secondString stringByAppendingString: @" total"];
+        secondString = [secondString stringByAppendingString: @" Total"];
         icon = [NSImage imageNamed: @"TransmissionDocument.icns"];
     }
     

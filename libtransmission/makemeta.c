@@ -12,7 +12,7 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <stdio.h> /* FILE, stderr */
+#include <stdio.h> /* FILE, snprintf, stderr */
 #include <stdlib.h> /* qsort */
 
 #include <sys/types.h>
@@ -22,10 +22,12 @@
 #include <dirent.h>
 
 #include "crypto.h" /* tr_sha1 */
+#include "trcompat.h" /* strlcpy */
 #include "transmission.h"
 #include "bencode.h"
 #include "makemeta.h"
 #include "platform.h" /* threads, locks */
+#include "shared.h" /* shared lock */
 #include "utils.h" /* buildpath */
 #include "version.h"
 
@@ -113,7 +115,7 @@ tr_metaInfoBuilderCreate( tr_handle * handle, const char * topFile )
     tr_metainfo_builder * ret = tr_new0( tr_metainfo_builder, 1 );
     ret->top = tr_strdup( topFile );
     ret->handle = handle; 
-    {
+    if (1) {
         struct stat sb;
         stat( topFile, &sb );
         ret->isSingleFile = !S_ISDIR( sb.st_mode );
@@ -121,12 +123,12 @@ tr_metaInfoBuilderCreate( tr_handle * handle, const char * topFile )
 
     /* build a list of files containing topFile and,
        if it's a directory, all of its children */
-    {
+    if (1) {
         char *dir, *base;
         char dirbuf[MAX_PATH_LENGTH];
         char basebuf[MAX_PATH_LENGTH];
-        tr_strlcpy( dirbuf, topFile, sizeof( dirbuf ) );
-        tr_strlcpy( basebuf, topFile, sizeof( basebuf ) );
+        strlcpy( dirbuf, topFile, sizeof( dirbuf ) );
+        strlcpy( basebuf, topFile, sizeof( basebuf ) );
         dir = dirname( dirbuf );
         base = basename( basebuf );
         files = getFiles( dir, base, NULL );
@@ -166,18 +168,15 @@ tr_metaInfoBuilderCreate( tr_handle * handle, const char * topFile )
 void
 tr_metaInfoBuilderFree( tr_metainfo_builder * builder )
 {
-    if( builder )
+    if( builder != NULL )
     {
-        tr_file_index_t t;
-        int i;
-        for( t=0; t<builder->fileCount; ++t )
-            tr_free( builder->files[t].filename );
+        uint32_t i;
+        for( i=0; i<builder->fileCount; ++i )
+            tr_free( builder->files[i].filename );
         tr_free( builder->files );
         tr_free( builder->top );
         tr_free( builder->comment );
-        for( i=0; i<builder->trackerCount; ++i )
-            tr_free( builder->trackers[i].announce );
-        tr_free( builder->trackers );
+        tr_free( builder->announce );
         tr_free( builder->outputFile );
         tr_free( builder );
     }
@@ -207,7 +206,7 @@ getHashInfo ( tr_metainfo_builder * b )
     fp = fopen( b->files[fileIndex].filename, "rb" );
     if( !fp ) {
         b->my_errno = errno;
-        tr_snprintf( b->errfile, sizeof( b->errfile ), b->files[fileIndex].filename );
+        snprintf( b->errfile, sizeof( b->errfile ), b->files[fileIndex].filename );
         b->result = TR_MAKEMETA_IO_READ;
         tr_free( ret );
         return NULL;
@@ -237,7 +236,7 @@ getHashInfo ( tr_metainfo_builder * b )
                     fp = fopen( b->files[fileIndex].filename, "rb" );
                     if( !fp ) {
                         b->my_errno = errno;
-                        tr_snprintf( b->errfile, sizeof( b->errfile ), b->files[fileIndex].filename );
+                        snprintf( b->errfile, sizeof( b->errfile ), b->files[fileIndex].filename );
                         b->result = TR_MAKEMETA_IO_READ;
                         tr_free( ret );
                         return NULL;
@@ -261,8 +260,9 @@ getHashInfo ( tr_metainfo_builder * b )
     }
     assert( b->abortFlag || (walk-ret == (int)(SHA_DIGEST_LENGTH*b->pieceCount)) );
     assert( b->abortFlag || !totalRemain );
+    assert( b->abortFlag || fp == NULL );
 
-    if( fp )
+    if( fp != NULL )
         fclose( fp );
 
     tr_free( buf );
@@ -275,6 +275,7 @@ getFileInfo( const char                      * topFile,
              tr_benc                         * uninitialized_length,
              tr_benc                         * uninitialized_path )
 {
+    tr_benc *sub;
     const char *pch, *prev;
     const size_t topLen = strlen(topFile) + 1; /* +1 for '/' */
     int n;
@@ -298,7 +299,8 @@ getFileInfo( const char                      * topFile,
         memcpy( buf, prev, pch-prev );
         buf[pch-prev] = '\0';
 
-        tr_bencListAddStr( uninitialized_path, buf );
+        sub = tr_bencListAdd( uninitialized_path );
+        tr_bencInitStrDup( sub, buf );
 
         prev = pch + 1;
         if (!*pch)
@@ -307,92 +309,117 @@ getFileInfo( const char                      * topFile,
 }
 
 static void
+makeFilesList( tr_benc                    * list,
+               const tr_metainfo_builder  * builder )
+{
+    uint32_t i = 0;
+
+    tr_bencListReserve( list, builder->fileCount );
+
+    for( i=0; i<builder->fileCount; ++i )
+    {
+        tr_benc * dict = tr_bencListAdd( list );
+        tr_benc *length, *pathVal;
+
+        tr_bencInitDict( dict, 2 );
+        length = tr_bencDictAdd( dict, "length" );
+        pathVal = tr_bencDictAdd( dict, "path" );
+        getFileInfo( builder->top, &builder->files[i], length, pathVal );
+    }
+}
+
+static void
 makeInfoDict ( tr_benc              * dict,
                tr_metainfo_builder  * builder )
 {
     uint8_t * pch;
+    tr_benc * val;
     char base[MAX_PATH_LENGTH];
 
     tr_bencDictReserve( dict, 5 );
     
     if ( builder->isSingleFile )
-        tr_bencDictAddInt( dict, "length", builder->files[0].size );
-    else {
-        uint32_t i;
-        tr_benc * list = tr_bencDictAddList( dict, "files", builder->fileCount );
-        for( i=0; i<builder->fileCount; ++i ) {
-            tr_benc * dict = tr_bencListAddDict( list, 2 );
-            tr_benc * length = tr_bencDictAdd( dict, "length" );
-            tr_benc * pathVal = tr_bencDictAdd( dict, "path" );
-            getFileInfo( builder->top, &builder->files[i], length, pathVal );
-        }
+    {
+        val = tr_bencDictAdd( dict, "length" );
+        tr_bencInitInt( val, builder->files[0].size );
+    }
+    else
+    {
+        val = tr_bencDictAdd( dict, "files" );
+        tr_bencInit( val, TYPE_LIST );
+        makeFilesList( val, builder );
     }
 
-    tr_strlcpy( base, builder->top, sizeof( base ) );
-    tr_bencDictAddStr( dict, "name", basename( base ) );
+    val = tr_bencDictAdd( dict, "name" );
+    strlcpy( base, builder->top, sizeof( base ) );
+    tr_bencInitStrDup ( val, basename( base ) );
 
-    tr_bencDictAddInt( dict, "piece length", builder->pieceSize );
+    val = tr_bencDictAdd( dict, "piece length" );
+    tr_bencInitInt( val, builder->pieceSize );
 
-    if(( pch = getHashInfo( builder ))) {
-        tr_bencDictAddRaw( dict, "pieces", pch, SHA_DIGEST_LENGTH * builder->pieceCount );
-        tr_free( pch );
+    if( ( pch = getHashInfo( builder ) ) ) {
+        val = tr_bencDictAdd( dict, "pieces" );
+        tr_bencInitStr( val, pch, SHA_DIGEST_LENGTH * builder->pieceCount, 0 );
     }
 
-    tr_bencDictAddInt( dict, "private", builder->isPrivate ? 1 : 0 );
+    val = tr_bencDictAdd( dict, "private" );
+    tr_bencInitInt( val, builder->isPrivate ? 1 : 0 );
 }
 
 static void
 tr_realMakeMetaInfo ( tr_metainfo_builder * builder )
 {
-    int i;
-    tr_benc top;
+    int n = 5;
+    tr_benc top, *val;
 
-    /* allow an empty set, but if URLs *are* listed, verify them. #814, #971 */
-    for( i=0; i<builder->trackerCount && !builder->result; ++i )
-        if( !tr_httpIsValidURL( builder->trackers[i].announce ) )
-            builder->result = TR_MAKEMETA_URL;
+    if ( builder->comment && *builder->comment ) ++n;
+    tr_bencInitDict( &top, n );
 
-    tr_bencInitDict( &top, 6 );
-
-    if( !builder->result && builder->trackerCount )
+    val = tr_bencDictAdd( &top, "announce" );
+    tr_bencInitStrDup( val, builder->announce );
+    if( tr_httpParseURL( builder->announce, -1, NULL, NULL, NULL ) )
     {
-        int prevTier = -1;
-        tr_benc * tier = NULL;
-        tr_benc * announceList;
-
-        announceList = tr_bencDictAddList( &top, "announce-list", 0 );
-        for( i=0; i<builder->trackerCount; ++i ) {
-            if( prevTier != builder->trackers[i].tier ) {
-                prevTier = builder->trackers[i].tier;
-                tier = tr_bencListAddList( announceList, 0 );
-            }
-            tr_bencListAddStr( tier, builder->trackers[i].announce );
-        }
-
-        tr_bencDictAddStr( &top, "announce", builder->trackers[0].announce );
+        builder->result = TR_MAKEMETA_URL;
     }
     
     if( !builder->result && !builder->abortFlag )
     {
-        if( builder->comment && *builder->comment )
-            tr_bencDictAddStr( &top, "comment", builder->comment );
-        tr_bencDictAddStr( &top, "created by", TR_NAME "/" LONG_VERSION_STRING );
-        tr_bencDictAddInt( &top, "creation date", time(0) );
-        tr_bencDictAddStr( &top, "encoding", "UTF-8" );
-        makeInfoDict( tr_bencDictAddDict( &top, "info", 666 ), builder );
+        if( builder->comment && *builder->comment ) {
+            val = tr_bencDictAdd( &top, "comment" );
+            tr_bencInitStrDup( val, builder->comment );
+        }
+
+        val = tr_bencDictAdd( &top, "created by" );
+        tr_bencInitStrDup( val, TR_NAME "/" LONG_VERSION_STRING );
+
+        val = tr_bencDictAdd( &top, "creation date" );
+        tr_bencInitInt( val, time(0) );
+
+        val = tr_bencDictAdd( &top, "encoding" );
+        tr_bencInitStrDup( val, "UTF-8" );
+
+        val = tr_bencDictAdd( &top, "info" );
+        tr_bencInitDict( val, 666 );
+        makeInfoDict( val, builder );
     }
 
     /* save the file */
     if ( !builder->result && !builder->abortFlag ) {
-        if( tr_bencSaveFile( builder->outputFile, &top ) ) {
+        char * pch = tr_bencSave( &top, &n );
+        FILE * fp = fopen( builder->outputFile, "wb+" );
+        size_t nmemb = n;
+        if( !fp || ( fwrite( pch, 1, nmemb, fp ) != nmemb ) ) {
             builder->my_errno = errno;
-            tr_strlcpy( builder->errfile, builder->outputFile, sizeof( builder->errfile ) );
+            strlcpy( builder->errfile, builder->outputFile, sizeof( builder->errfile ) );
             builder->result = TR_MAKEMETA_IO_WRITE;
         }
+        if( fp )
+            fclose( fp );
+        tr_free( pch );
     }
 
     /* cleanup */
-    tr_bencFree( &top );
+    tr_bencFree( & top );
     if( builder->abortFlag )
         builder->result = TR_MAKEMETA_CANCELLED;
     builder->isDone = 1;
@@ -431,7 +458,7 @@ static void workerFunc( void * user_data )
         /* find the next builder to process */
         tr_lock * lock = getQueueLock ( handle );
         tr_lockLock( lock );
-        if( queue ) {
+        if( queue != NULL ) {
             builder = queue;
             queue = queue->nextBuilder;
         }
@@ -448,39 +475,24 @@ static void workerFunc( void * user_data )
 }
 
 void
-tr_makeMetaInfo( tr_metainfo_builder    * builder,
-                 const char             * outputFile,
-                 const tr_tracker_info  * trackers,
-                 int                      trackerCount,
-                 const char             * comment,
-                 int                      isPrivate )
+tr_makeMetaInfo( tr_metainfo_builder  * builder,
+                 const char           * outputFile,
+                 const char           * announce,
+                 const char           * comment,
+                 int                    isPrivate )
 {
-    int i;
     tr_lock * lock;
 
-    /* free any variables from a previous run */
-    for( i=0; i<builder->trackerCount; ++i )
-        tr_free( builder->trackers[i].announce );
-    tr_free( builder->trackers );
-    tr_free( builder->comment );
-    tr_free( builder->outputFile );
-
-    /* initialize the builder variables */
     builder->abortFlag = 0;
     builder->isDone = 0;
-    builder->trackerCount = trackerCount;
-    builder->trackers = tr_new0( tr_tracker_info, builder->trackerCount );
-    for( i=0; i<builder->trackerCount; ++i ) {
-        builder->trackers[i].tier = trackers[i].tier;
-        builder->trackers[i].announce = tr_strdup( trackers[i].announce );
-    }
+    builder->announce = tr_strdup( announce );
     builder->comment = tr_strdup( comment );
     builder->isPrivate = isPrivate;
     if( outputFile && *outputFile )
         builder->outputFile = tr_strdup( outputFile );
     else {
         char out[MAX_PATH_LENGTH];
-        tr_snprintf( out, sizeof(out), "%s.torrent", builder->top);
+        snprintf( out, sizeof(out), "%s.torrent", builder->top);
         builder->outputFile = tr_strdup( out );
     }
 

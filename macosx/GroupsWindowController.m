@@ -28,8 +28,11 @@
 
 #define GROUP_TABLE_VIEW_DATA_TYPE @"GroupTableViewDataType"
 
-#define ADD_TAG 0
-#define REMOVE_TAG 1
+typedef enum
+{
+    ADD_TAG = 0,
+    REMOVE_TAG = 1
+} controlTag;
 
 @interface GroupsWindowController (Private)
 
@@ -58,9 +61,8 @@ GroupsWindowController * fGroupsWindowInstance = nil;
         [[self window] setContentBorderThickness: [[fTableView enclosingScrollView] frame].origin.y forEdge: NSMinYEdge];
     else
     {
-        [fAddRemoveControl sizeToFit];
-        [fAddRemoveControl setLabel: @"+" forSegment: ADD_TAG];
-        [fAddRemoveControl setLabel: @"-" forSegment: REMOVE_TAG];
+        [fAddRemoveControl setLabel: @"+" forSegment: 0];
+        [fAddRemoveControl setLabel: @"-" forSegment: 1];
     }
     
     [fAddRemoveControl setEnabled: NO forSegment: REMOVE_TAG];
@@ -86,7 +88,7 @@ GroupsWindowController * fGroupsWindowInstance = nil;
     
     NSString * identifier = [tableColumn identifier];
     if ([identifier isEqualToString: @"Color"])
-        return [groupsController imageForIndex: groupsIndex];
+        return [groupsController imageForIndex: groupsIndex isSmall: NO];
     else
         return [groupsController nameForIndex: groupsIndex];
 }
@@ -138,7 +140,7 @@ GroupsWindowController * fGroupsWindowInstance = nil;
     return NSDragOperationNone;
 }
 
-- (BOOL) tableView: (NSTableView *) tableView acceptDrop: (id <NSDraggingInfo>) info row: (int) newRow
+- (BOOL) tableView: (NSTableView *) t acceptDrop: (id <NSDraggingInfo>) info row: (int) newRow
     dropOperation: (NSTableViewDropOperation) operation
 {
     NSPasteboard * pasteboard = [info draggingPasteboard];

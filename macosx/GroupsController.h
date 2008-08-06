@@ -24,6 +24,8 @@
 
 #import <Cocoa/Cocoa.h>
 
+@class CTGradient;
+
 @interface GroupsController : NSObject
 {
     NSMutableArray * fGroups;
@@ -36,13 +38,15 @@
 - (int) rowValueForIndex: (int) index;
 - (int) indexForRow: (int) row;
 
+- (CTGradient *) gradientForIndex: (int) index;
+
 - (NSString *) nameForIndex: (int) index;
 - (void) setName: (NSString *) name forIndex: (int) index;
 
-- (NSImage *) imageForIndex: (int) index;
+- (NSImage *) imageForIndex: (int) index isSmall: (BOOL) small;
 
 - (NSColor *) colorForIndex: (int) index;
-- (void) setColor: (NSColor *) color forIndex: (int) index;
+- (NSColor *) setColor: (NSColor *) color forIndex: (int) index;
 
 - (void) addNewGroup;
 - (void) removeGroupWithRowIndexes: (NSIndexSet *) rowIndexes;

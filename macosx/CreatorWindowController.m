@@ -23,21 +23,13 @@
  *****************************************************************************/
 
 #import "CreatorWindowController.h"
-#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
-#include "utils.h" //tr_httpIsValidURL
-
-#define TRACKER_ADD_TAG 0
-#define TRACKER_REMOVE_TAG 1
+#include "utils.h" //tr_httpParseURL
 
 @interface CreatorWindowController (Private)
 
 + (NSString *) chooseFile;
-- (void) updateEnableOpenCheckForTrackers;
 - (void) locationSheetClosed: (NSSavePanel *) openPanel returnCode: (int) code contextInfo: (void *) info;
-
-- (void) createBlankAddressAlertDidEnd: (NSAlert *) alert returnCode: (int) returnCode contextInfo: (void *) contextInfo;
-- (void) createReal;
 - (void) checkProgress;
 - (void) failureSheetClosed: (NSAlert *) alert returnCode: (int) code contextInfo: (void *) info;
 
@@ -105,21 +97,6 @@
         }
         
         fDefaults = [NSUserDefaults standardUserDefaults];
-        
-        //get list of trackers
-        if (!(fTrackers = [[fDefaults arrayForKey: @"CreatorTrackers"] mutableCopy]))
-        {
-            fTrackers = [[NSMutableArray alloc] initWithCapacity: 1];
-            
-            //check for tracker from versions before 1.3
-            NSString * tracker;
-            if ((tracker = [fDefaults stringForKey: @"CreatorTracker"]))
-            {
-                [fTrackers addObject: tracker];
-                [fDefaults removeObjectForKey: @"CreatorTracker"];
-                [fDefaults setObject: fTrackers forKey: @"CreatorTrackers"];
-            }
-        }
     }
     return self;
 }
@@ -146,9 +123,9 @@
         NSString * fileString;
         int count = fInfo->fileCount;
         if (count != 1)
-            fileString = [NSString stringWithFormat: NSLocalizedString(@"%d files", "Create torrent -> info"), count];
+            fileString = [NSString stringWithFormat: NSLocalizedString(@"%d Files", "Create torrent -> info"), count];
         else
-            fileString = NSLocalizedString(@"1 file", "Create torrent -> info");
+            fileString = NSLocalizedString(@"1 File", "Create torrent -> info");
         statusString = [NSString stringWithFormat: @"%@, %@", fileString, statusString];
     }
     [fStatusField setStringValue: statusString];
@@ -169,18 +146,15 @@
     [fLocationField setToolTip: fLocation];
     
     //set previously saved values
+    NSString * tracker;
+    if ((tracker = [fDefaults stringForKey: @"CreatorTracker"]))
+        [fTrackerField setStringValue: tracker];
+    
     if ([fDefaults objectForKey: @"CreatorPrivate"])
         [fPrivateCheck setState: [fDefaults boolForKey: @"CreatorPrivate"] ? NSOnState : NSOffState];
     
-    fOpenTorrent = [fDefaults boolForKey: @"CreatorOpen"];
-    [self updateEnableOpenCheckForTrackers];
-    
-    if (![NSApp isOnLeopardOrBetter])
-    {
-        [fTrackerAddRemoveControl sizeToFit];
-        [fTrackerAddRemoveControl setLabel: @"+" forSegment: TRACKER_ADD_TAG];
-        [fTrackerAddRemoveControl setLabel: @"-" forSegment: TRACKER_REMOVE_TAG];
-    }
+    if ([fDefaults objectForKey: @"CreatorOpen"])
+        [fOpenCheck setState: [fDefaults boolForKey: @"CreatorOpen"] ? NSOnState : NSOffState];
 }
 
 - (void) dealloc
@@ -188,19 +162,13 @@
     [fPath release];
     [fLocation release];
     
-    [fTrackers release];
-    
     if (fInfo)
         tr_metaInfoBuilderFree(fInfo);
     
-    [fTimer invalidate];
+    if (fTimer)
+        [fTimer invalidate];
     
     [super dealloc];
-}
-
-- (void) toggleOpenCheck: (id) sender
-{
-    fOpenTorrent = [fOpenCheck state] == NSOnState;
 }
 
 - (void) setLocation: (id) sender
@@ -221,26 +189,68 @@
 
 - (void) create: (id) sender
 {
-    if ([fTrackers count] == 0 && [fDefaults boolForKey: @"WarningCreatorBlankAddress"])
+    NSString * trackerString = [fTrackerField stringValue];
+    if ([trackerString rangeOfString: @"://"].location == NSNotFound)
+        trackerString = [@"http://" stringByAppendingString: trackerString];
+    
+    //parse tracker string
+    if (tr_httpParseURL([trackerString UTF8String], -1, NULL, NULL, NULL))
     {
-        NSAlert * alert = [[NSAlert alloc] init];
-        [alert setMessageText: NSLocalizedString(@"There is no tracker address.", "Create torrent -> blank address -> title")];
-        [alert setInformativeText: NSLocalizedString(@"The torrent file will not be able to be opened."
-            " A torrent file with no tracker address is only useful when you plan to upload the file to a tracker website"
-            " that will add the address for you.", "Create torrent -> blank address -> message")];
-        [alert addButtonWithTitle: NSLocalizedString(@"Create", "Create torrent -> blank address -> button")];
-        [alert addButtonWithTitle: NSLocalizedString(@"Cancel", "Create torrent -> blank address -> button")];
+        NSAlert * alert = [[[NSAlert alloc] init] autorelease];
+        [alert addButtonWithTitle: NSLocalizedString(@"OK", "Create torrent -> warning -> button")];
+        [alert setMessageText: NSLocalizedString(@"The tracker address cannot be blank.", "Create torrent -> warning -> title")];
+        [alert setInformativeText: NSLocalizedString(@"Change the tracker address to create the torrent.",
+                                                    "Create torrent -> warning -> info")];
+        [alert setAlertStyle: NSWarningAlertStyle];
         
-        if ([NSApp isOnLeopardOrBetter])
-            [alert setShowsSuppressionButton: YES];
+        //check common reasons for failure
+        if (![trackerString hasPrefix: @"http://"])
+            [alert setMessageText: NSLocalizedString(@"The tracker address must begin with \"http://\".",
+                                                    "Create torrent -> warning -> message")];
+        else if ([trackerString length] == 7) //don't allow blank addresses
+            [alert setMessageText: NSLocalizedString(@"The tracker address cannot be blank.", "Create torrent -> warning -> message")];
         else
-            [alert addButtonWithTitle: NSLocalizedString(@"Don't Alert Again", "Create torrent -> blank address -> button")];
-
-        [alert beginSheetModalForWindow: [self window] modalDelegate: self
-            didEndSelector: @selector(createBlankAddressAlertDidEnd:returnCode:contextInfo:) contextInfo: nil];
+            [alert setMessageText: NSLocalizedString(@"The tracker address is invalid.", "Create torrent -> warning -> message")];
+        
+        [alert beginSheetModalForWindow: [self window] modalDelegate: self didEndSelector: nil contextInfo: nil];
+        return;
     }
-    else
-        [self createReal];
+    
+    //check if a file with the same name and location already exists
+    if ([[NSFileManager defaultManager] fileExistsAtPath: fLocation])
+    {
+        NSArray * pathComponents = [fLocation pathComponents];
+        int count = [pathComponents count];
+        
+        NSAlert * alert = [[[NSAlert alloc] init] autorelease];
+        [alert addButtonWithTitle: NSLocalizedString(@"OK", "Create torrent -> file already exists warning -> button")];
+        [alert setMessageText: NSLocalizedString(@"A torrent file with this name and directory cannot be created.",
+                                                "Create torrent -> file already exists warning -> title")];
+        [alert setInformativeText: [NSString stringWithFormat:
+                NSLocalizedString(@"A file with the name \"%@\" already exists in the directory \"%@\". "
+                    "Choose a new name or directory to create the torrent.",
+                    "Create torrent -> file already exists warning -> warning"),
+                    [pathComponents objectAtIndex: count-1], [pathComponents objectAtIndex: count-2]]];
+        [alert setAlertStyle: NSWarningAlertStyle];
+        
+        [alert beginSheetModalForWindow: [self window] modalDelegate: self didEndSelector: nil contextInfo: nil];
+        return;
+    }
+    
+    fOpenTorrent = [fOpenCheck state] == NSOnState;
+    
+    //store values
+    [fDefaults setObject: trackerString forKey: @"CreatorTracker"];
+    [fDefaults setBool: [fPrivateCheck state] == NSOnState forKey: @"CreatorPrivate"];
+    [fDefaults setBool: fOpenTorrent forKey: @"CreatorOpen"];
+    [fDefaults setObject: [fLocation stringByDeletingLastPathComponent] forKey: @"CreatorLocation"];
+    
+    [[NSNotificationCenter defaultCenter] postNotificationName: @"BeginCreateTorrentFile" object: fLocation userInfo: nil];
+    tr_makeMetaInfo(fInfo, [fLocation UTF8String], [trackerString UTF8String], [[fCommentView string] UTF8String],
+                    [fPrivateCheck state] == NSOnState);
+    
+    fTimer = [NSTimer scheduledTimerWithTimeInterval: 0.1 target: self selector: @selector(checkProgress)
+                        userInfo: nil repeats: YES];
 }
 
 - (void) cancelCreateWindow: (id) sender
@@ -257,70 +267,6 @@
 {
     fInfo->abortFlag = 1;
     [fTimer fire];
-}
-
-- (NSInteger) numberOfRowsInTableView: (NSTableView *) tableView
-{
-    return [fTrackers count];
-}
-
-- (id) tableView: (NSTableView *) tableView objectValueForTableColumn: (NSTableColumn *) tableColumn row: (NSInteger) row
-{
-    return [fTrackers objectAtIndex: row];
-}
-
-- (void) addRemoveTracker: (id) sender
-{
-    //don't allow add/remove when currently adding - it leads to weird results
-    if ([fTrackerTable editedRow] != -1)
-        return;
-    
-    if ([[sender cell] tagForSegment: [sender selectedSegment]] == TRACKER_REMOVE_TAG)
-    {
-        [fTrackers removeObjectsAtIndexes: [fTrackerTable selectedRowIndexes]];
-        
-        [fTrackerTable deselectAll: self];
-        [fTrackerTable reloadData];
-        
-        [self updateEnableOpenCheckForTrackers];
-    }
-    else
-    {
-        [fTrackers addObject: @""];
-        [fTrackerTable reloadData];
-        
-        int row = [fTrackers count] - 1;
-        [fTrackerTable selectRow: row byExtendingSelection: NO];
-        [fTrackerTable editColumn: 0 row: row withEvent: nil select: YES];
-    }
-}
-
-- (void) tableView: (NSTableView *) tableView setObjectValue: (id) object forTableColumn: (NSTableColumn *) tableColumn
-    row: (NSInteger) row
-{
-    NSString * tracker = (NSString *)object;
-    
-    if ([tracker rangeOfString: @"://"].location == NSNotFound)
-        tracker = [@"http://" stringByAppendingString: tracker];
-    
-    if (!tr_httpIsValidURL([tracker UTF8String]))
-    {
-        NSBeep();
-        [fTrackers removeObjectAtIndex: row];
-    }
-    else
-    {
-        [fTrackers replaceObjectAtIndex: row withObject: tracker];
-        [self updateEnableOpenCheckForTrackers];
-    }
-    
-    [fTrackerTable deselectAll: self];
-    [fTrackerTable reloadData];
-}
-
-- (void) tableViewSelectionDidChange: (NSNotification *) notification
-{
-    [fTrackerAddRemoveControl setEnabled: [fTrackerTable numberOfSelectedRows] > 0 forSegment: TRACKER_REMOVE_TAG];
 }
 
 @end
@@ -344,13 +290,6 @@
     return success ? [[panel filenames] objectAtIndex: 0] : nil;
 }
 
-- (void) updateEnableOpenCheckForTrackers
-{
-    BOOL hasTracker = [fTrackers count] > 0;
-    [fOpenCheck setEnabled: hasTracker];
-    [fOpenCheck setState: (fOpenTorrent && hasTracker) ? NSOnState : NSOffState];
-}
-
 - (void) locationSheetClosed: (NSSavePanel *) panel returnCode: (int) code contextInfo: (void *) info
 {
     if (code == NSOKButton)
@@ -361,62 +300,6 @@
         [fLocationField setStringValue: [fLocation stringByAbbreviatingWithTildeInPath]];
         [fLocationField setToolTip: fLocation];
     }
-}
-
-- (void) createBlankAddressAlertDidEnd: (NSAlert *) alert returnCode: (int) returnCode contextInfo: (void *) contextInfo
-{
-    if (([NSApp isOnLeopardOrBetter] ? [[alert suppressionButton] state] == NSOnState : returnCode == NSAlertThirdButtonReturn))
-        [[NSUserDefaults standardUserDefaults] setBool: NO forKey: @"WarningCreatorBlankAddress"];
-    
-    [alert release];
-    
-    if (returnCode == NSAlertFirstButtonReturn)
-        [self performSelectorOnMainThread: @selector(createReal) withObject: nil waitUntilDone: NO];
-}
-
-- (void) createReal
-{
-    //check if a file with the same name and location already exists
-    if ([[NSFileManager defaultManager] fileExistsAtPath: fLocation])
-    {
-        NSArray * pathComponents = [fLocation pathComponents];
-        int count = [pathComponents count];
-        
-        NSAlert * alert = [[[NSAlert alloc] init] autorelease];
-        [alert addButtonWithTitle: NSLocalizedString(@"OK", "Create torrent -> file already exists warning -> button")];
-        [alert setMessageText: NSLocalizedString(@"A torrent file with this name and directory cannot be created.",
-                                                "Create torrent -> file already exists warning -> title")];
-        [alert setInformativeText: [NSString stringWithFormat:
-                NSLocalizedString(@"A file with the name \"%@\" already exists in the directory \"%@\". "
-                    "Choose a new name or directory to create the torrent file.",
-                    "Create torrent -> file already exists warning -> warning"),
-                    [pathComponents objectAtIndex: count-1], [pathComponents objectAtIndex: count-2]]];
-        [alert setAlertStyle: NSWarningAlertStyle];
-        
-        [alert beginSheetModalForWindow: [self window] modalDelegate: self didEndSelector: nil contextInfo: nil];
-        return;
-    }
-    
-    //parse non-empty tracker strings
-    tr_tracker_info * trackerInfo = tr_new0(tr_tracker_info, [fTrackers count]);
-    
-    NSUInteger i;
-    for (i = 0; i < [fTrackers count]; i++)
-        trackerInfo[i].announce = (char *)[[fTrackers objectAtIndex: i] UTF8String];
-    
-    //store values
-    [fDefaults setObject: fTrackers forKey: @"CreatorTrackers"];
-    [fDefaults setBool: [fPrivateCheck state] == NSOnState forKey: @"CreatorPrivate"];
-    [fDefaults setBool: fOpenTorrent forKey: @"CreatorOpen"];
-    [fDefaults setObject: [fLocation stringByDeletingLastPathComponent] forKey: @"CreatorLocation"];
-    
-    [[NSNotificationCenter defaultCenter] postNotificationName: @"BeginCreateTorrentFile" object: fLocation userInfo: nil];
-    tr_makeMetaInfo(fInfo, [fLocation UTF8String], trackerInfo, [fTrackers count], [[fCommentView string] UTF8String],
-                    [fPrivateCheck state] == NSOnState);
-    tr_free(trackerInfo);
-    
-    fTimer = [NSTimer scheduledTimerWithTimeInterval: 0.1 target: self selector: @selector(checkProgress)
-                userInfo: nil repeats: YES];
 }
 
 - (void) checkProgress
@@ -430,7 +313,7 @@
         switch (fInfo->result)
         {
             case TR_MAKEMETA_OK:
-                if (fOpenTorrent && [fTrackers count] > 0)
+                if (fOpenTorrent)
                 {
                     NSDictionary * dict = [[NSDictionary alloc] initWithObjectsAndKeys: fLocation, @"File",
                                             [fPath stringByDeletingLastPathComponent], @"Path", nil];
@@ -487,7 +370,7 @@
             [window setFrame: windowRect display: YES animate: YES];
             [fProgressView setHidden: NO];
             
-            [[window standardWindowButton: NSWindowCloseButton] setEnabled: NO];
+            [[window standardWindowButton:NSWindowCloseButton] setEnabled: NO];
         }
     }
 }

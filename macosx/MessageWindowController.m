@@ -70,7 +70,7 @@
     if ([NSApp isOnLeopardOrBetter])
         [window setContentBorderThickness: [[fMessageTable enclosingScrollView] frame].origin.y forEdge: NSMinYEdge];
     
-    //initially sort peer table by date
+    //initially sort peer table by IP
     if ([[fMessageTable sortDescriptors] count] == 0)
         [fMessageTable setSortDescriptors: [NSArray arrayWithObject: [[fMessageTable tableColumnWithIdentifier: @"Date"]
                                             sortDescriptorPrototype]]];
@@ -129,7 +129,6 @@
     }
     
     fMessages = [[NSMutableArray alloc] init];
-    fIndex = 0;
 }
 
 - (void) windowDidBecomeKey: (NSNotification *) notification
@@ -160,14 +159,12 @@
         NSDictionary * message  = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSString stringWithUTF8String: currentMessage->message], @"Message",
                                     [NSDate dateWithTimeIntervalSince1970: currentMessage->when], @"Date",
-                                    [NSNumber numberWithUnsignedInt: fIndex], @"Index", //more accurate when sorting by date
                                     [NSNumber numberWithInt: currentMessage->level], @"Level",
                                     name, @"Name",
                                     [NSString stringWithUTF8String: currentMessage->file], @"File",
                                     [NSNumber numberWithInt: currentMessage->line], @"Line", nil];
                                 
         [fMessages addObject: message];
-        fIndex++;
     }
     
     tr_freeMessageList(messages);
@@ -179,7 +176,7 @@
     if (total > MAX_MESSAGES)
     {
         //remove the oldest
-        NSSortDescriptor * descriptor = [[[NSSortDescriptor alloc] initWithKey: @"Index" ascending: YES] autorelease];
+        NSSortDescriptor * descriptor = [[[NSSortDescriptor alloc] initWithKey: @"Date" ascending: YES] autorelease];
         [fMessages sortUsingDescriptors: [NSArray arrayWithObject: descriptor]];
         
         [fMessages removeObjectsInRange: NSMakeRange(0, total-MAX_MESSAGES)];
@@ -309,7 +306,7 @@
 - (void) writeToFile: (id) sender
 {
     //make the array sorted by date
-    NSSortDescriptor * descriptor = [[[NSSortDescriptor alloc] initWithKey: @"Index" ascending: YES] autorelease];
+    NSSortDescriptor * descriptor = [[[NSSortDescriptor alloc] initWithKey: @"Date" ascending: YES] autorelease];
     NSArray * descriptors = [[NSArray alloc] initWithObjects: descriptor, nil];
     NSArray * sortedMessages = [fMessages sortedArrayUsingDescriptors: descriptors];
     [descriptors release];
