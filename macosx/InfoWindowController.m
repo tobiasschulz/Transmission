@@ -71,10 +71,8 @@ typedef enum
 - (void) updateInfoFiles;
 
 - (NSView *) tabViewForTag: (int) tag;
-- (void) setWebSeedTableHidden: (BOOL) hide animate: (BOOL) animate;
 - (NSArray *) peerSortDescriptors;
-
-- (BOOL) canQuickLookFile: (FileListNode *) item;
+- (void) setWebSeedTableHidden: (BOOL) hide animate: (BOOL) animate;
 
 - (void) addTrackers;
 - (void) removeTrackers;
@@ -300,7 +298,6 @@ typedef enum
             
             [fPeersConnectField setEnabled: NO];
             [fPeersConnectField setStringValue: @""];
-            [fPeersConnectLabel setEnabled: NO];
         }
         
         [fFileController setTorrent: nil];
@@ -436,17 +433,15 @@ typedef enum
         [fCreatorField setStringValue: creatorString];
         [fDateCreatedField setObjectValue: [torrent dateCreated]];
         
-        if ([torrent publicTorrent])
-        {
-            NSString * location = [torrent publicTorrentLocation];
-            [fTorrentLocationField setStringValue: [location stringByAbbreviatingWithTildeInPath]];
-            [fTorrentLocationField setToolTip: [location stringByAppendingFormat: @"\n\n%@", [torrent torrentLocation]]];
-        }
+        BOOL publicTorrent = [torrent publicTorrent];
+        [fTorrentLocationField setStringValue: publicTorrent
+                    ? [[torrent publicTorrentLocation] stringByAbbreviatingWithTildeInPath]
+                    : NSLocalizedString(@"Transmission Support Folder", "Torrent -> location when deleting original")];
+        if (publicTorrent)
+            [fTorrentLocationField setToolTip: [[torrent publicTorrentLocation] stringByAppendingFormat: @"\n\n%@",
+                                                [torrent torrentLocation]]];
         else
-        {
-            [fTorrentLocationField setStringValue: NSLocalizedString(@"Transmission Support Folder", "Inspector -> torrent location")];
             [fTorrentLocationField setToolTip: [torrent torrentLocation]];
-        }
         
         [fDateAddedField setObjectValue: [torrent dateAdded]];
         
@@ -641,7 +636,6 @@ typedef enum
     
     //set peer view
     [fPeersConnectField setEnabled: YES];
-    [fPeersConnectLabel setEnabled: YES];
     if (maxPeers != INVALID)
         [fPeersConnectField setIntValue: maxPeers];
     else
@@ -1092,7 +1086,7 @@ typedef enum
     for (i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
     {
         FileListNode * item = [fileOutlineView itemAtRow: i];
-        if ([self canQuickLookFile: item])
+        if ([item isFolder] || [torrent fileProgress: [[item indexes] firstIndex]] == 1.0)
             [urlArray addObject: [NSURL fileURLWithPath: [folder stringByAppendingPathComponent: [item fullPath]]]];
     }
     
@@ -1102,12 +1096,16 @@ typedef enum
 - (BOOL) canQuickLook
 {
     FileOutlineView * fileOutlineView = [fFileController outlineView];
+    Torrent * torrent = [fTorrents objectAtIndex: 0];
     NSIndexSet * indexes = [fileOutlineView selectedRowIndexes];
-    
+
     int i;
     for (i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
-        if ([self canQuickLookFile: [fileOutlineView itemAtRow: i]])
+    {
+        FileListNode * item = [fileOutlineView itemAtRow: i];
+        if ([item isFolder] || [torrent fileProgress: [[item indexes] firstIndex]] == 1.0)
             return YES;
+    }
     
     return NO;
 }
@@ -1395,19 +1393,7 @@ typedef enum
     [fAnnounceResponseField setSelectable: ![announceResponse isEqualToString: @""]];
     
     int announceNext = [torrent nextAnnounceTime];
-    NSString * announceNextString;
-    switch (announceNext)
-    {
-        case STAT_TIME_NOW:
-            announceNextString = [NSLocalizedString(@"In progress", "Inspector -> tracker tab") stringByAppendingEllipsis];
-            break;
-        case STAT_TIME_NONE:
-            announceNextString = @"";
-            break;
-        default:
-            announceNextString = [NSString timeString: announceNext showSeconds: YES];
-    }
-    [fAnnounceNextField setStringValue: announceNextString];
+    [fAnnounceNextField setStringValue: announceNext > 0 ? [NSString timeString: announceNext showSeconds: YES] : @""];
     
     //scrape fields
     NSString * scrapeAddress;
@@ -1430,19 +1416,7 @@ typedef enum
     [fScrapeResponseField setSelectable: ![scrapeResponse isEqualToString: @""]];
     
     int scrapeNext = [torrent nextScrapeTime];
-    NSString * scrapeNextString;
-    switch (scrapeNext)
-    {
-        case STAT_TIME_NOW:
-            scrapeNextString = [NSLocalizedString(@"In progress", "Inspector -> tracker tab") stringByAppendingEllipsis];
-            break;
-        case STAT_TIME_NONE:
-            scrapeNextString = @"";
-            break;
-        default:
-            scrapeNextString = [NSString timeString: scrapeNext showSeconds: YES];
-    }
-    [fScrapeNextField setStringValue: scrapeNextString];
+    [fScrapeNextField setStringValue: scrapeNext > 0 ? [NSString timeString: scrapeNext showSeconds: YES] : @""];
 }
 
 - (void) updateInfoPeers
@@ -1616,22 +1590,12 @@ typedef enum
     if (useSecond)
     {
         NSSortDescriptor * secondDescriptor = [[NSSortDescriptor alloc] initWithKey: @"IP" ascending: asc
-                                                                        selector: @selector(compareNumeric:)];
+                                                                        selector: @selector(compareIP:)];
         [descriptors addObject: secondDescriptor];
         [secondDescriptor release];
     }
     
     return descriptors;
-}
-
-- (BOOL) canQuickLookFile: (FileListNode *) item
-{
-    Torrent * torrent = [fTorrents objectAtIndex: 0];
-    
-    if (![[NSFileManager defaultManager] fileExistsAtPath: [[torrent downloadFolder] stringByAppendingPathComponent: [item fullPath]]])
-        return NO;
-    
-    return [item isFolder] || [torrent fileProgress: [[item indexes] firstIndex]] == 1.0;
 }
 
 - (void) addTrackers

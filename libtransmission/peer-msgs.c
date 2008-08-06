@@ -67,7 +67,7 @@ enum
     KEEPALIVE_INTERVAL_SECS = 100,
 
     PEX_INTERVAL            = (90 * 1000), /* msec between sendPex() calls */
-    PEER_PULSE_INTERVAL     = (50),        /* msec between peerPulse() calls */
+    PEER_PULSE_INTERVAL     = (50),        /* msec between pulse() calls */
     RATE_PULSE_INTERVAL     = (250),       /* msec between ratePulse() calls */
 
     MAX_QUEUE_SIZE          = (100),
@@ -88,8 +88,8 @@ enum
 
     /* used in lowering the outMessages queue period */
     IMMEDIATE_PRIORITY_INTERVAL_SECS = 0,
-    HIGH_PRIORITY_INTERVAL_SECS = 2,
-    LOW_PRIORITY_INTERVAL_SECS = 20
+    HIGH_PRIORITY_INTERVAL_SECS = 5,
+    LOW_PRIORITY_INTERVAL_SECS = 30
 };
 
 /**
@@ -288,11 +288,6 @@ struct tr_peermsgs
     uint16_t minActiveRequests;
     uint16_t maxActiveRequests;
 
-    /* how long the outMessages batch should be allowed to grow before
-     * it's flushed -- some messages (like requests >:) should be sent
-     * very quickly; others aren't as urgent. */
-    int outMessagesBatchPeriod;
-
     tr_peer * info;
 
     tr_handle * handle;
@@ -318,6 +313,11 @@ struct tr_peermsgs
 
     /* when we started batching the outMessages */
     time_t outMessagesBatchedAt;
+
+    /* how long the outMessages batch should be allowed to grow before
+     * it's flushed -- some messages (like requests >:) should be sent
+     * very quickly; others aren't as urgent. */
+    int outMessagesBatchPeriod;
     
     tr_bitfield * peerAllowedPieces;
 
@@ -336,7 +336,7 @@ myDebug( const char * file, int line,
          const char * fmt, ... )
 {
     FILE * fp = tr_getLog( );
-    if( fp )
+    if( fp != NULL )
     {
         va_list args;
         char timestr[64];
@@ -551,7 +551,7 @@ isPeerInteresting( const tr_peermsgs * msgs )
 static void
 sendInterest( tr_peermsgs * msgs, int weAreInterested )
 {
-    assert( msgs );
+    assert( msgs != NULL );
     assert( weAreInterested==0 || weAreInterested==1 );
 
     msgs->info->clientIsInterested = weAreInterested;
@@ -585,8 +585,8 @@ tr_peerMsgsSetChoke( tr_peermsgs * msgs, int choke )
 {
     const time_t fibrillationTime = time(NULL) - MIN_CHOKE_PERIOD_SEC;
 
-    assert( msgs );
-    assert( msgs->info );
+    assert( msgs != NULL );
+    assert( msgs->info != NULL );
     assert( choke==0 || choke==1 );
 
     if( msgs->info->chokeChangedAt > fibrillationTime )
@@ -621,7 +621,7 @@ static void
 sendFastSuggest( tr_peermsgs * msgs,
                  uint32_t      pieceIndex )
 {
-    assert( msgs );
+    assert( msgs != NULL );
     
     if( tr_peerIoSupportsFEXT( msgs->io ) )
     {
@@ -633,7 +633,7 @@ sendFastSuggest( tr_peermsgs * msgs,
 static void
 sendFastHave( tr_peermsgs * msgs, int all )
 {
-    assert( msgs );
+    assert( msgs != NULL );
     
     if( tr_peerIoSupportsFEXT( msgs->io ) )
     {
@@ -651,7 +651,7 @@ sendFastReject( tr_peermsgs * msgs,
                 uint32_t      offset,
                 uint32_t      length )
 {
-    assert( msgs );
+    assert( msgs != NULL );
 
     if( tr_peerIoSupportsFEXT( msgs->io ) )
     {
@@ -684,7 +684,7 @@ static void
 sendFastAllowed( tr_peermsgs * msgs,
                  uint32_t      pieceIndex)
 {
-    assert( msgs );
+    assert( msgs != NULL );
     
     if( tr_peerIoSupportsFEXT( msgs->io ) )
     {
@@ -835,7 +835,7 @@ pumpRequestQueue( tr_peermsgs * msgs )
 }
 
 static int
-peerPulse( void * vmsgs );
+pulse( void * vmsgs );
 
 static int
 requestQueueIsFull( const tr_peermsgs * msgs )
@@ -850,8 +850,8 @@ tr_peerMsgsAddRequest( tr_peermsgs       * msgs,
 {
     struct peer_request req;
 
-    assert( msgs );
-    assert( msgs->torrent );
+    assert( msgs != NULL );
+    assert( msgs->torrent != NULL );
     assert( piece < msgs->torrent->info.pieceCount );
 
     /**
@@ -1325,6 +1325,7 @@ readBtMessage( tr_peermsgs * msgs, struct evbuffer * inbuf, size_t inlen )
         case BT_INTERESTED:
             dbgmsg( msgs, "got Interested" );
             msgs->info->peerIsInterested = 1;
+            tr_peerMsgsSetChoke( msgs, 0 );
             break;
 
         case BT_NOT_INTERESTED:
@@ -1492,8 +1493,8 @@ clientGotBlock( tr_peermsgs                * msgs,
     tr_torrent * tor = msgs->torrent;
     const tr_block_index_t block = _tr_block( tor, req->index, req->offset );
 
-    assert( msgs );
-    assert( req );
+    assert( msgs != NULL );
+    assert( req != NULL );
 
     if( req->length != tr_torBlockCountBytes( msgs->torrent, block ) )
     {
@@ -1545,7 +1546,7 @@ clientGotBlock( tr_peermsgs                * msgs,
 static void
 didWrite( struct bufferevent * evin UNUSED, void * vmsgs )
 {
-    peerPulse( vmsgs );
+    pulse( vmsgs );
 }
 
 static ReadState
@@ -1645,7 +1646,7 @@ popNextRequest( tr_peermsgs * msgs, struct peer_request * setme )
 }
 
 static int
-peerPulse( void * vmsgs )
+pulse( void * vmsgs )
 {
     const time_t now = time( NULL );
     tr_peermsgs * msgs = vmsgs;
@@ -1670,7 +1671,7 @@ peerPulse( void * vmsgs )
 
             len -= outlen;
             msgs->clientSentAnythingAt = now;
-            msgs->sendingBlock = len != 0;
+            msgs->sendingBlock = len!=0;
 
             dbgmsg( msgs, "wrote %d bytes; %d left in block", (int)outlen, (int)len );
         }
@@ -1733,7 +1734,7 @@ static void
 gotError( struct bufferevent * evbuf UNUSED, short what, void * vmsgs )
 {
     if( what & EVBUFFER_TIMEOUT )
-        dbgmsg( vmsgs, "libevent got a timeout, what=%hd, secs=%d", what, evbuf->timeout_read );
+        dbgmsg( vmsgs, "libevent got a timeout, what=%hd", what );
     if( what & ( EVBUFFER_EOF | EVBUFFER_ERROR ) )
         dbgmsg( vmsgs, "libevent got an error! what=%hd, errno=%d (%s)",
                 what, errno, tr_strerror(errno) );
@@ -1856,7 +1857,6 @@ sendPex( tr_peermsgs * msgs )
             *walk++ = diffs.added[i].flags;
         assert( ( walk - tmp ) == diffs.addedCount );
         tr_bencDictAddRaw( &val, "added.f", tmp, walk-tmp );
-        tr_free( tmp );
 
         /* "dropped" */
         dropped = tr_bencDictAdd( &val, "dropped" );
@@ -1907,8 +1907,8 @@ tr_peerMsgsNew( struct tr_torrent * torrent,
 {
     tr_peermsgs * m;
 
-    assert( info );
-    assert( info->io );
+    assert( info != NULL );
+    assert( info->io != NULL );
 
     m = tr_new0( tr_peermsgs, 1 );
     m->publisher = tr_publisherNew( );
@@ -1922,7 +1922,7 @@ tr_peerMsgsNew( struct tr_torrent * torrent,
     m->info->peerIsInterested = 0;
     m->info->have = tr_bitfieldNew( torrent->info.pieceCount );
     m->state = AWAITING_BT_LENGTH;
-    m->pulseTimer = tr_timerNew( m->handle, peerPulse, m, PEER_PULSE_INTERVAL );
+    m->pulseTimer = tr_timerNew( m->handle, pulse, m, PEER_PULSE_INTERVAL );
     m->rateTimer = tr_timerNew( m->handle, ratePulse, m, RATE_PULSE_INTERVAL );
     m->pexTimer = tr_timerNew( m->handle, pexPulse, m, PEX_INTERVAL );
     m->outMessages = evbuffer_new( );
@@ -1952,7 +1952,7 @@ tr_peerMsgsNew( struct tr_torrent * torrent,
 void
 tr_peerMsgsFree( tr_peermsgs* msgs )
 {
-    if( msgs )
+    if( msgs != NULL )
     {
         tr_timerFree( &msgs->pulseTimer );
         tr_timerFree( &msgs->rateTimer );

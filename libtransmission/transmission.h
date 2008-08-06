@@ -111,13 +111,9 @@ tr_proxy_type;
 /** @see tr_sessionInitFull */
 #define TR_DEFAULT_PORT                     51413
 /** @see tr_sessionInitFull */
-#define TR_DEFAULT_PORT_STR                 "51413"
-/** @see tr_sessionInitFull */
 #define TR_DEFAULT_GLOBAL_PEER_LIMIT        200
 /** @see tr_sessionInitFull */
 #define TR_DEFAULT_PEER_SOCKET_TOS          8
-/** @see tr_sessionInitFull */
-#define TR_DEFAULT_PEER_SOCKET_TOS_STR      "8"
 /** @see tr_sessionInitFull */
 #define TR_DEFAULT_BLOCKLIST_ENABLED        0
 /** @see tr_sessionInitFull */
@@ -132,8 +128,6 @@ tr_proxy_type;
 #define TR_DEFAULT_PROXY_ENABLED            0
 /** @see tr_sessionInitFull */
 #define TR_DEFAULT_PROXY                    NULL
-/** @see tr_sessionInitFull */
-#define TR_DEFAULT_PROXY_PORT               80
 /** @see tr_sessionInitFull */
 #define TR_DEFAULT_PROXY_TYPE               TR_PROXY_HTTP
 /** @see tr_sessionInitFull */
@@ -263,7 +257,6 @@ tr_handle * tr_sessionInitFull( const char    * configDir,
                                 const char    * rpcPassword, 
                                 int             proxyIsEnabled,
                                 const char    * proxy,
-                                int             proxyPort,
                                 tr_proxy_type   proxyType,
                                 int             proxyAuthIsEnabled,
                                 const char    * proxyUsername,
@@ -430,13 +423,11 @@ void tr_sessionSetRPCCallback( tr_session   * handle,
 int           tr_sessionIsProxyEnabled       ( const tr_session * );
 int           tr_sessionIsProxyAuthEnabled   ( const tr_session * );
 const char*   tr_sessionGetProxy             ( const tr_session * );
-int           tr_sessionGetProxyPort         ( const tr_session * );
 tr_proxy_type tr_sessionGetProxyType         ( const tr_session * );
 const char*   tr_sessionGetProxyPassword     ( const tr_session * );
 void          tr_sessionSetProxyEnabled      ( tr_session *, int isEnabled );
 void          tr_sessionSetProxyAuthEnabled  ( tr_session *, int isEnabled );
 void          tr_sessionSetProxy             ( tr_session *, const char * proxy );
-void          tr_sessionSetProxyPort         ( tr_session *, int port );
 void          tr_sessionSetProxyType         ( tr_session *, tr_proxy_type );
 void          tr_sessionSetProxyUsername     ( tr_session *, const char * username );
 void          tr_sessionSetProxyPassword     ( tr_session *, const char * password );
@@ -1256,7 +1247,7 @@ typedef struct tr_stat
     int leechers;
 
     /** Number of finished downloads that the tracker says torrent has */
-    int timesCompleted;
+    int completedFromTracker;
 
     /** Byte count of all the piece data we'll have downloaded when we're done,
         whether or not we have it yet. [0...tr_info.totalSize] */
@@ -1306,10 +1297,8 @@ typedef struct tr_stat
         or zero if one hasn't been sent yet. */
     time_t lastScrapeTime;
 
-    /** Time when the next scrape request will be sent,
-        or 0 if an error has occured that stops scraping,
-        or 1 if a scrape is currently in progress s.t.
-        we haven't set a timer for the next one yet. */
+    /** Time when the next scrape request will be sent.
+        This value is always a valid time. */
     time_t nextScrapeTime;
 
     /** Time the most recent announce request was sent,
@@ -1317,17 +1306,12 @@ typedef struct tr_stat
     time_t lastAnnounceTime;
 
     /** Time when the next reannounce request will be sent,
-        or 0 if the torrent is stopped,
-        or 1 if an announce is currently in progress s.t.
-        we haven't set a timer for the next one yet */
+        or zero if the torrent is stopped. */
     time_t nextAnnounceTime;
 
     /** If the torrent is running, this is the time at which
         the client can manually ask the torrent's tracker
-        for more peers,
-        or 0 if the torrent is stopped or doesn't allow manual,
-        or 1 if an announce is currently in progress s.t.
-        we haven't set a timer for the next one yet */
+        for more peers.  otherwise, the value is zero. */
     time_t manualAnnounceTime;
 
     /** A very rough estimate in KiB/s of how quickly data is being

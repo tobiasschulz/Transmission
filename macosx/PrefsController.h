@@ -57,7 +57,7 @@
     NSTimer * fPortStatusTimer;
     int fPeerPort, fNatStatus;
     
-    IBOutlet NSTextField * fProxyAddressField, * fProxyPortField, * fProxyPasswordField;
+    IBOutlet NSTextField * fProxyAddressField, * fProxyPasswordField;
     IBOutlet NSPopUpButton * fProxyTypePopUp;
     
     IBOutlet NSTextField * fRPCPortField, * fRPCPasswordField;
@@ -123,7 +123,6 @@
 
 - (void) setProxyEnabled: (id) sender;
 - (void) setProxyAddress: (id) sender;
-- (void) setProxyPort: (id) sender;
 - (void) setProxyType: (id) sender;
 - (void) updateProxyType;
 - (void) setProxyAuthorize: (id) sender;
@@ -132,7 +131,6 @@
 - (void) updateProxyPassword;
 
 - (void) setRPCEnabled: (id) sender;
-- (void) linkWebUI: (id) sender;
 - (void) setRPCAuthorize: (id) sender;
 - (void) setRPCUsername: (id) sender;
 - (void) setRPCPassword: (id) sender;

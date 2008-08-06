@@ -30,7 +30,7 @@ testInt( void )
     const uint8_t * end;
 
     /* good int string */
-    tr_snprintf( (char*)buf, sizeof( buf ), "i64e" );
+    snprintf( (char*)buf, sizeof( buf ), "i64e" );
     err = tr_bencParseInt( buf, buf+4, &end, &val );
     check( err == 0 );
     check( val == 64 );
@@ -51,21 +51,21 @@ testInt( void )
     check( end == NULL );
 
     /* bad number */
-    tr_snprintf( (char*)buf, sizeof( buf ), "i6z4e" );
+    snprintf( (char*)buf, sizeof( buf ), "i6z4e" );
     err = tr_bencParseInt( buf, buf+5, &end, &val );
     check( err == TR_ERROR );
     check( val == 888 );
     check( end == NULL );
 
     /* negative number */
-    tr_snprintf( (char*)buf, sizeof( buf ), "i-3e" );
+    snprintf( (char*)buf, sizeof( buf ), "i-3e" );
     err = tr_bencParseInt( buf, buf+4, &end, &val );
     check( err == TR_OK );
     check( val == -3 );
     check( end == buf + 4 );
 
     /* zero */
-    tr_snprintf( (char*)buf, sizeof( buf ), "i0e" );
+    snprintf( (char*)buf, sizeof( buf ), "i0e" );
     err = tr_bencParseInt( buf, buf+4, &end, &val );
     check( err == TR_OK );
     check( val == 0 );
@@ -74,7 +74,7 @@ testInt( void )
     /* no leading zeroes allowed */
     val = 0;
     end = NULL;
-    tr_snprintf( (char*)buf, sizeof( buf ), "i04e" );
+    snprintf( (char*)buf, sizeof( buf ), "i04e" );
     err = tr_bencParseInt( buf, buf+4, &end, &val );
     check( err == TR_ERROR );
     check( val == 0 );
@@ -93,7 +93,7 @@ testStr( void )
     size_t len;
 
     /* good string */
-    tr_snprintf( (char*)buf, sizeof( buf ), "4:boat" );
+    snprintf( (char*)buf, sizeof( buf ), "4:boat" );
     err = tr_bencParseStr( buf, buf+6, &end, &str, &len );
     check( err == TR_OK );
     check( !strcmp( (char*)str, "boat" ) );
@@ -112,7 +112,7 @@ testStr( void )
     check( !len );
 
     /* empty string */
-    tr_snprintf( (char*)buf, sizeof( buf ), "0:" );
+    snprintf( (char*)buf, sizeof( buf ), "0:" );
     err = tr_bencParseStr( buf, buf+2, &end, &str, &len );
     check( err == TR_OK );
     check( !*str );
@@ -124,7 +124,7 @@ testStr( void )
     len = 0;
 
     /* short string */
-    tr_snprintf( (char*)buf, sizeof( buf ), "3:boat" );
+    snprintf( (char*)buf, sizeof( buf ), "3:boat" );
     err = tr_bencParseStr( buf, buf+6, &end, &str, &len );
     check( err == TR_OK );
     check( !strcmp( (char*)str, "boa" ) );
@@ -178,7 +178,7 @@ testParse( void )
     int64_t i;
     char * saved;
 
-    tr_snprintf( (char*)buf, sizeof( buf ), "i64e" );
+    snprintf( (char*)buf, sizeof( buf ), "i64e" );
     err = tr_bencParse( buf, buf + sizeof( buf ), &val, &end );
     check( !err );
     check( tr_bencGetInt( &val, &i ) );
@@ -186,7 +186,7 @@ testParse( void )
     check( end == buf + 4 );
     tr_bencFree( &val );
 
-    tr_snprintf( (char*)buf, sizeof( buf ), "li64ei32ei16ee" );
+    snprintf( (char*)buf, sizeof( buf ), "li64ei32ei16ee" );
     err = tr_bencParse( buf, buf + sizeof( buf ), &val, &end );
     check( !err );
     check( end == buf + strlen( (char*)buf ) );
@@ -203,13 +203,13 @@ testParse( void )
     tr_bencFree( &val );
 
     end = NULL;
-    tr_snprintf( (char*)buf, sizeof( buf ), "lllee" );
+    snprintf( (char*)buf, sizeof( buf ), "lllee" );
     err = tr_bencParse( buf, buf + strlen( (char*)buf ), &val , &end );
     check( err );
     check( end == NULL );
 
     end = NULL;
-    tr_snprintf( (char*)buf, sizeof( buf ), "le" );
+    snprintf( (char*)buf, sizeof( buf ), "le" );
     err = tr_bencParse( buf, buf + sizeof( buf ), &val , &end );
     check( !err );
     check( end == buf + 2 );
@@ -241,7 +241,7 @@ testParse( void )
      * parse an unsorted dict
      * save as a sorted dict */
     end = NULL;
-    tr_snprintf( (char*)buf, sizeof( buf ), "lld1:bi32e1:ai64eeee" );
+    snprintf( (char*)buf, sizeof( buf ), "lld1:bi32e1:ai64eeee" );
     err = tr_bencParse( buf, buf + sizeof( buf ), &val, &end );
     check( !err );
     check( end == buf + strlen( (const char*)buf ) );
@@ -254,7 +254,7 @@ testParse( void )
 
     /* too many endings */
     end = NULL;
-    tr_snprintf( (char*)buf, sizeof( buf ), "leee" );
+    snprintf( (char*)buf, sizeof( buf ), "leee" );
     err = tr_bencParse( buf, buf + sizeof( buf ), &val, &end );
     check( !err );
     check( end == buf + 2 );
@@ -265,13 +265,13 @@ testParse( void )
 
     /* no ending */
     end = NULL;
-    tr_snprintf( (char*)buf, sizeof( buf ), "l1:a1:b1:c" );
+    snprintf( (char*)buf, sizeof( buf ), "l1:a1:b1:c" );
     err = tr_bencParse( buf, buf + strlen( (char*)buf ), &val, &end );
     check( err );
 
     /* incomplete string */
     end = NULL;
-    tr_snprintf( (char*)buf, sizeof( buf ), "1:" );
+    snprintf( (char*)buf, sizeof( buf ), "1:" );
     err = tr_bencParse( buf, buf + strlen( (char*)buf ), &val, &end );
     check( err );
 

@@ -119,7 +119,7 @@
                 [fDefaults removeObjectForKey: @"CreatorTracker"];
                 [fDefaults setObject: fTrackers forKey: @"CreatorTrackers"];
             }
-        }
+        }NSLog([fTrackers description]);
     }
     return self;
 }
@@ -193,7 +193,8 @@
     if (fInfo)
         tr_metaInfoBuilderFree(fInfo);
     
-    [fTimer invalidate];
+    if (fTimer)
+        [fTimer invalidate];
     
     [super dealloc];
 }

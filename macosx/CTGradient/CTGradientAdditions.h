@@ -25,9 +25,6 @@
 #import "CTGradient.h"
 
 @interface CTGradient (ProgressBar)
-
-+ (CTGradient *) progressGradientForRed: (float) redComponent green: (float) greenComponent blue: (float) blueComponent;
-
 + (CTGradient *)progressWhiteGradient;
 + (CTGradient *)progressGrayGradient;
 + (CTGradient *)progressLightGrayGradient;
@@ -38,5 +35,4 @@
 + (CTGradient *)progressDarkGreenGradient;
 + (CTGradient *)progressRedGradient;
 + (CTGradient *)progressYellowGradient;
-
 @end

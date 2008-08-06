@@ -257,6 +257,7 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
     fPreviousFinishedIndexesDate = indexes != nil ? [[NSDate alloc] init] : nil;
 }
 
+#warning when queue and seeding options are folded into libt, no need to call this on all torrents - use tr_torrentGetStatus
 - (void) update
 {
     //get previous status values before update
@@ -414,9 +415,8 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 
 - (void) setMaxPeerConnect: (uint16_t) count
 {
-    NSAssert(count > 0, @"max peer count must be greater than 0");
-    
-    tr_torrentSetPeerLimit(fHandle, count);
+    if (count > 0)
+        tr_torrentSetPeerLimit(fHandle, count);
 }
 
 - (uint16_t) maxPeerConnect
@@ -733,17 +733,11 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 - (int) nextAnnounceTime
 {
     int date = fStat->nextAnnounceTime;
-    NSTimeInterval difference;
-    switch (date)
-    {
-        case 0:
-            return STAT_TIME_NONE;
-        case 1:
-            return STAT_TIME_NOW;
-        default:
-            difference = [[NSDate dateWithTimeIntervalSince1970: date] timeIntervalSinceNow];
-            return difference > 0 ? (int)difference : STAT_TIME_NONE;
-    }
+    if (date <= 0)
+        return -1;
+    
+    NSTimeInterval difference = [[NSDate dateWithTimeIntervalSince1970: date] timeIntervalSinceNow];
+    return difference > 0 ? (int)difference : -1;
 }
 
 - (NSString *) announceResponse
@@ -765,17 +759,11 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 - (int) nextScrapeTime
 {
     int date = fStat->nextScrapeTime;
-    NSTimeInterval difference;
-    switch (date)
-    {
-        case 0:
-            return STAT_TIME_NONE;
-        case 1:
-            return STAT_TIME_NOW;
-        default:
-            difference = [[NSDate dateWithTimeIntervalSince1970: date] timeIntervalSinceNow];
-            return difference > 0 ? (int)difference : STAT_TIME_NONE;
-    }
+    if (date <= 0)
+        return -1;
+    
+    NSTimeInterval difference = [[NSDate dateWithTimeIntervalSince1970: date] timeIntervalSinceNow];
+    return difference > 0 ? (int)difference : -1;
 }
 
 - (NSString *) scrapeResponse
@@ -1289,7 +1277,7 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 
 - (int) completedFromTracker
 {
-    return fStat->timesCompleted;
+    return fStat->completedFromTracker;
 }
 
 - (int) totalPeersConnected
@@ -1599,14 +1587,14 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
     return fStalled;
 }
 
-- (NSInteger) stateSortKey
+- (NSNumber *) stateSortKey
 {
-    if (![self isActive]) //paused
-        return 0;
-    else if ([self isSeeding]) //seeding
-        return 1;
-    else //downloading
-        return 2;
+    if (![self isActive])
+        return [NSNumber numberWithInt: 0];
+    else if ([self isSeeding])
+        return [NSNumber numberWithInt: 1];
+    else
+        return [NSNumber numberWithInt: 2];
 }
 
 - (tr_torrent *) torrentStruct
@@ -1842,7 +1830,7 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
 //status has been retained
 - (void) completenessChange: (NSNumber *) status
 {
-    fStat = tr_torrentStat(fHandle); //don't call update yet to avoid auto-stop
+    [self update];
     
     BOOL canMove;
     switch ([status intValue])
@@ -1878,6 +1866,7 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
             //allow to be backed up by Time Machine
             [self setTimeMachineExclude: NO forPath: [[self downloadFolder] stringByAppendingPathComponent: [self name]]];
             
+            fStat = tr_torrentStat(fHandle);
             [[NSNotificationCenter defaultCenter] postNotificationName: @"TorrentFinishedDownloading" object: self];
             break;
         
@@ -1889,8 +1878,6 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
             break;
     }
     [status release];
-    
-    [self update];
 } 
 
 - (void) quickPause
@@ -1934,7 +1921,7 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
             return NSLocalizedString(@"remaining time unknown", "Torrent -> eta string");
         default:
             return [NSString stringWithFormat: NSLocalizedString(@"%@ remaining", "Torrent -> eta string"),
-                        [NSString timeString: eta showSeconds: YES maxFields: 2]];
+                        [NSString timeString: eta showSeconds: YES maxDigits: 2]];
     }
 }
 

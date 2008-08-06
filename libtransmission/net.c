@@ -115,19 +115,7 @@ makeSocketNonBlocking( int fd )
 static int
 createSocket( int type, int priority )
 {
-    int fd;
-
-    fd = tr_fdSocketCreate( type, priority );
-
-    if( fd >= 0 )
-        fd = makeSocketNonBlocking( fd );
-
-    if( fd >= 0 ) {
-        const int buffsize = 1500*2; /* 2x MTU for most ethernet/wireless */
-        setsockopt( fd, SOL_SOCKET, SO_SNDBUF, &buffsize, sizeof( buffsize ) );
-    }
-
-    return fd;
+    return makeSocketNonBlocking( tr_fdSocketCreate( type, priority ) );
 }
 
 int
@@ -217,6 +205,6 @@ tr_netNtop( const struct in_addr * addr, char * buf, int len )
     const uint8_t * cast;
 
     cast = (const uint8_t *)addr;
-    tr_snprintf( buf, len, "%hhu.%hhu.%hhu.%hhu",
-                cast[0], cast[1], cast[2], cast[3] );
+    snprintf( buf, len, "%hhu.%hhu.%hhu.%hhu",
+              cast[0], cast[1], cast[2], cast[3] );
 }

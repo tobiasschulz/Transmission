@@ -1,14 +1,26 @@
-/*
- * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
- *
- * This file is licensed by the GPL version 2.  Works owned by the
- * Transmission project are granted a special exemption to clause 2(b)
- * so that the bulk of its code can remain under the MIT license. 
- * This exemption does not extend to derived works not owned by
- * the Transmission project.
- *
+/******************************************************************************
  * $Id$
- */
+ *
+ * Copyright (c) 2005-2008 Transmission authors and contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *****************************************************************************/
 
 #include <assert.h>
 #include <ctype.h> /* isdigit, isprint, isspace */
@@ -26,6 +38,8 @@
 #include "ptrarray.h"
 #include "utils.h" /* tr_new(), tr_free() */
 
+const tr_benc BENC_NULL = { 0, { 0 } };
+
 /**
 ***
 **/
@@ -33,7 +47,7 @@
 int
 tr_bencIsType( const tr_benc * val, int type )
 {
-    return ( ( val ) && ( val->type == type ) );
+    return ( ( val != NULL ) && ( val->type == type ) );
 }
 
 static int
@@ -46,14 +60,6 @@ isSomething( const tr_benc * val )
 {
     return isContainer(val) || tr_bencIsInt(val) || tr_bencIsString(val);
 }
-
-static void
-tr_bencInit( tr_benc * val, int type )
-{
-    memset( val, 0, sizeof( *val ) );
-    val->type = type;
-}
-
 
 /***
 ****  tr_bencParse()
@@ -176,14 +182,14 @@ getNode( tr_benc * top, tr_ptrArray * parentStack, int type )
 {
     tr_benc * parent;
 
-    assert( top );
-    assert( parentStack );
+    assert( top != NULL );
+    assert( parentStack != NULL );
 
     if( tr_ptrArrayEmpty( parentStack ) )
         return top;
 
     parent = tr_ptrArrayBack( parentStack );
-    assert( parent );
+    assert( parent != NULL );
 
     /* dictionary keys must be strings */
     if( ( parent->type == TYPE_DICT )
@@ -300,7 +306,7 @@ tr_bencParse( const void     * buf_in,
 
     err = !isSomething( top ) || !tr_ptrArrayEmpty( parentStack );
 
-    if( !err && setme_end )
+    if( !err && ( setme_end != NULL ) )
         *setme_end = buf;
 
     tr_ptrArrayFree( parentStack, NULL );
@@ -624,7 +630,7 @@ tr_benc*
 tr_bencDictAddDouble( tr_benc * dict, const char * key, double d )
 {
     char buf[128];
-    tr_snprintf( buf, sizeof( buf ), "%f", d );
+    snprintf( buf, sizeof( buf ), "%f", d );
     return tr_bencDictAddStr( dict, key, buf );
 }
 tr_benc*
@@ -903,7 +909,7 @@ tr_bencSave( const tr_benc * top, int * len )
     walkFuncs.containerEndFunc = saveContainerEndFunc;
     bencWalk( top, &walkFuncs, out );
     
-    if( len )
+    if( len != NULL )
         *len = EVBUFFER_LENGTH( out );
     ret = tr_strndup( (char*) EVBUFFER_DATA( out ), EVBUFFER_LENGTH( out ) );
     evbuffer_free( out );
@@ -1205,7 +1211,7 @@ tr_bencSaveAsJSON( const tr_benc * top, int * len )
     
     if( EVBUFFER_LENGTH( data.out ) )
         evbuffer_add_printf( data.out, "\n" );
-    if( len )
+    if( len != NULL )
         *len = EVBUFFER_LENGTH( data.out );
     ret = tr_strndup( (char*) EVBUFFER_DATA( data.out ), EVBUFFER_LENGTH( data.out ) );
     evbuffer_free( data.out );

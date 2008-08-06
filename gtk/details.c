@@ -491,6 +491,7 @@ refresh_peers (GtkWidget * top)
   peers = tr_torrentPeers (tor, &n_peers);
   qsort (peers, n_peers, sizeof(tr_peer_stat), compare_peers);
 
+  i = 0;
   if (gtk_tree_model_get_iter_first (model, &iter)) do
   {
     char * addr = NULL;
@@ -524,9 +525,9 @@ refresh_peers (GtkWidget * top)
     refresh_pieces (p->completeness, NULL, p->gtor);
 #endif
 
-  fmtpeercount (p->seeders_lb, stat->seeders );
-  fmtpeercount (p->leechers_lb, stat->leechers );
-  fmtpeercount (p->completed_lb, stat->timesCompleted );
+  fmtpeercount (p->seeders_lb, stat->seeders);
+  fmtpeercount (p->leechers_lb, stat->leechers);
+  fmtpeercount (p->completed_lb, stat->completedFromTracker );
 
   free( peers );
 }
@@ -556,12 +557,12 @@ onPeerViewQueryTooltip( GtkWidget  * widget,
             const char * txt = NULL;
             switch( *pch ) {
                 case 'O': txt = _( "Optimistic unchoke" ); break;
-                case 'D': txt = _( "Downloading from this peer" ); break;
-                case 'd': txt = _( "We would download from this peer if they would let us" ); break;
+                case 'D': txt = _( "Downloading from peer" ); break;
+                case 'd': txt = _( "We'd download from peer if they'd let us" ); break;
                 case 'U': txt = _( "Uploading to peer" ); break;
-                case 'u': txt = _( "We would upload to this peer if they asked" ); break;
+                case 'u': txt = _( "We'd upload to peer if they'd ask us" ); break;
                 case 'K': txt = _( "Peer has unchoked us, but we're not interested" ); break;
-                case '?': txt = _( "We unchoked this peer, but they're not interested" ); break;
+                case '?': txt = _( "We unchoked the peer, but they're not interested" ); break;
                 case 'E': txt = _( "Encrypted connection" ); break;
                 case 'X': txt = _( "Peer was discovered through Peer Exchange (PEX)" ); break;
                 case 'I': txt = _( "Peer is an incoming connection" ); break;
@@ -764,7 +765,7 @@ peer_page_new ( TrTorrent * gtor )
     gtk_box_pack_start_defaults (GTK_BOX(hbox),
                                  gtk_alignment_new (0.0f, 0.0f, 0.0f, 0.0f));
         l = gtk_label_new (NULL);
-        gtk_label_set_markup (GTK_LABEL(l), _( "<b>Times Completed:</b>" ) );
+        gtk_label_set_markup (GTK_LABEL(l), _( "<b>Completed:</b>" ) );
         gtk_box_pack_start (GTK_BOX(hbox), l, FALSE, FALSE, 0);
         l = p->completed_lb = gtk_label_new (NULL);
         gtk_box_pack_start (GTK_BOX(hbox), l, FALSE, FALSE, 0);
@@ -789,7 +790,7 @@ refresh_time_lb( GtkWidget * l, time_t t )
     if( !t )
         gtk_label_set_text( GTK_LABEL( l ), never );
     else {
-        char * str = gtr_localtime( t );
+        char * str = rfc822date( t );
         gtk_label_set_text( GTK_LABEL( l ), str );
         g_free( str );
     }
@@ -811,7 +812,7 @@ info_page_new (tr_torrent * tor)
   hig_workarea_add_section_title (t, &row, _("Details"));
 
     g_snprintf( countStr, sizeof( countStr ),
-                ngettext( "%'d Piece", "%'d Pieces", info->pieceCount ),
+                ngettext( "%d Piece", "%d Pieces", info->pieceCount ),
                 info->pieceCount );
     tr_strlsize( sizeStr, info->pieceSize, sizeof(sizeStr) );
     g_snprintf( buf, sizeof( buf ),
@@ -1237,21 +1238,17 @@ tracker_page_new( TrTorrent * gtor )
 }
 
 static void
-refresh_countdown_lb( GtkWidget * w, time_t t,
-                      const char * countdown_done )
+refresh_countdown_lb( GtkWidget * l, time_t t )
 {
     const time_t now = time( NULL );
-    GtkLabel * l = GTK_LABEL( w );
 
-    if( t == 1 )
-        gtk_label_set_text( l, _( "In progress" ) );
-    else if( t < now )
-        gtk_label_set_text( l, countdown_done );
+    if( !t || ( t < now ) )
+        gtk_label_set_text( GTK_LABEL( l ), _( "Never" ) );
     else {
         char buf[1024];
         const int seconds = t - now;
         tr_strltime( buf, seconds, sizeof( buf ) );
-        gtk_label_set_text( l, buf );
+        gtk_label_set_text( GTK_LABEL( l ), buf );
     }
 }
 
@@ -1272,7 +1269,7 @@ refresh_tracker( GtkWidget * w )
 
     l = page->next_scrape_countdown_lb;
     t = torStat->nextScrapeTime;
-    refresh_countdown_lb( l, t, _( "Never" ) );
+    refresh_countdown_lb( l, t );
 
     l = page->last_announce_time_lb;
     t = torStat->lastAnnounceTime;
@@ -1283,11 +1280,11 @@ refresh_tracker( GtkWidget * w )
 
     l = page->next_announce_countdown_lb;
     t = torStat->nextAnnounceTime;
-    refresh_countdown_lb( l, t, _( "Never" ) );
+    refresh_countdown_lb( l, t );
 
     l = page->manual_announce_countdown_lb;
     t = torStat->manualAnnounceTime;
-    refresh_countdown_lb( l, t, _( "Now" ) );
+    refresh_countdown_lb( l, t );
 }
 
 /****

@@ -32,9 +32,7 @@ SOFTWARE.
     For the added features the license above applies also.
     
     Changelog:
-        2008/07/19 
-            - Removed some duplicate code & debugging variable (Charles.Kerr@noaa.gov)
-        
+    
         2008/05/28 
             - Made JSON_value structure ansi C compliant. This bug was report by 
               trisk@acm.jhu.edu
@@ -59,7 +57,7 @@ SOFTWARE.
 #include "ConvertUTF.h"
 
 #if _MSC_VER >= 1400 /* Visual Studio 2005 and up */
-#	pragma warning(disable:4996) // unsecure sscanf
+#	pragma warning(disable:4996) /* unsecure sscanf */
 #endif
 
 
@@ -295,14 +293,12 @@ push(JSON_parser jc, int mode)
     jc->top += 1;
     if (jc->depth < 0) {
         if (jc->top >= jc->stack_capacity) {
-            size_t bytes_to_allocate;
             jc->stack_capacity *= 2;
-            bytes_to_allocate = jc->stack_capacity * sizeof(jc->static_stack[0]);
             if (jc->stack == &jc->static_stack[0]) {
-                jc->stack = (signed char*)malloc(bytes_to_allocate);
+                jc->stack = (signed char*)malloc(jc->stack_capacity * sizeof(jc->static_stack[0]));
                 memcpy(jc->stack, jc->static_stack, sizeof(jc->static_stack));
             } else {
-                jc->stack = (signed char*)realloc(jc->stack, bytes_to_allocate);
+                jc->stack = (signed char*)realloc(jc->stack, jc->stack_capacity * sizeof(jc->static_stack[0]));
             }
         }
     } else {
@@ -430,14 +426,12 @@ new_JSON_parser(JSON_config* config)
 
 static void grow_parse_buffer(JSON_parser jc)
 {
-    size_t bytes_to_allocate;
     jc->parse_buffer_capacity *= 2;
-    bytes_to_allocate = jc->parse_buffer_capacity * sizeof(jc->parse_buffer[0]);
     if (jc->parse_buffer == &jc->static_parse_buffer[0]) {
-        jc->parse_buffer = (char*)malloc(bytes_to_allocate);
+        jc->parse_buffer = (char*)malloc(jc->parse_buffer_capacity * sizeof(jc->parse_buffer[0]));
         memcpy(jc->parse_buffer, jc->static_parse_buffer, jc->parse_buffer_count);
     } else {
-        jc->parse_buffer = (char*)realloc(jc->parse_buffer, bytes_to_allocate);
+        jc->parse_buffer = (char*)realloc(jc->parse_buffer, jc->parse_buffer_capacity * sizeof(jc->parse_buffer[0]));
     }
 }
 
@@ -445,13 +439,14 @@ static void grow_parse_buffer(JSON_parser jc)
     do {\
         if (jc->parse_buffer_count + 1 >= jc->parse_buffer_capacity) grow_parse_buffer(jc);\
         jc->parse_buffer[jc->parse_buffer_count++] = c;\
-        jc->parse_buffer[jc->parse_buffer_count]   = 0;\
+        jc->parse_buffer[jc->parse_buffer_count] = 0;\
     } while (0)
 
 
 static int parse_parse_buffer(JSON_parser jc)
 {
     if (jc->callback) {
+        int result = 1;
         JSON_value value, *arg = NULL;
         
         if (jc->type != JSON_T_NONE) {
@@ -462,6 +457,7 @@ static int parse_parse_buffer(JSON_parser jc)
                 jc->type == JSON_T_FLOAT ||
                 jc->type == JSON_T_INTEGER ||
                 jc->type == JSON_T_STRING);
+                
         
             switch(jc->type) {
                 case JSON_T_FLOAT:
@@ -470,12 +466,12 @@ static int parse_parse_buffer(JSON_parser jc)
                         value.vu.str.value = jc->parse_buffer;
                         value.vu.str.length = jc->parse_buffer_count;
                     } else { 
-                        sscanf(jc->parse_buffer, "%Lf", &value.vu.float_value);
+                        result = sscanf(jc->parse_buffer, "%Lf", &value.vu.float_value);
                     }
                     break;
                 case JSON_T_INTEGER:
                     arg = &value;
-                    sscanf(jc->parse_buffer, JSON_PARSER_INTEGER_SSCANF_TOKEN, &value.vu.integer_value);
+                    result = sscanf(jc->parse_buffer, JSON_PARSER_INTEGER_SSCANF_TOKEN, &value.vu.integer_value);
                     break;
                 case JSON_T_STRING:
                     arg = &value;

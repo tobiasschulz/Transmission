@@ -104,6 +104,38 @@
 	return self;
 }
 
+- (id) copyWithZone: (NSZone *) zone
+{
+    TorrentCell * copy = [super copyWithZone: zone];
+    
+    copy->fGrayGradient = [fGrayGradient retain];
+    copy->fLightGrayGradient = [fLightGrayGradient retain];
+    copy->fBlueGradient = [fBlueGradient retain];
+    copy->fDarkBlueGradient = [fDarkBlueGradient retain];
+    copy->fGreenGradient = [fGreenGradient retain];
+    copy->fLightGreenGradient = [fLightGreenGradient retain];
+    copy->fDarkGreenGradient = [fDarkGreenGradient retain];
+    copy->fYellowGradient = [fYellowGradient retain];
+    copy->fRedGradient = [fRedGradient retain];
+    
+    return copy;
+}
+
+- (void) dealloc
+{
+    [fGrayGradient release];
+    [fLightGrayGradient release];
+    [fBlueGradient release];
+    [fDarkBlueGradient release];
+    [fGreenGradient release];
+    [fLightGreenGradient release];
+    [fDarkGreenGradient release];
+    [fYellowGradient release];
+    [fRedGradient release];
+    
+    [super dealloc];
+}
+
 - (NSRect) iconRectForBounds: (NSRect) bounds
 {
     float imageSize = [fDefaults boolForKey: @"SmallView"] ? IMAGE_SIZE_MIN : IMAGE_SIZE_REG;
@@ -588,7 +620,9 @@
             noIncludeRect.origin.x += barRect.size.width - rightNoIncludeWidth;
             noIncludeRect.size.width = rightNoIncludeWidth;
             
-            [[CTGradient progressLightGrayGradient] fillRect: noIncludeRect angle: 90];
+            if (!fLightGrayGradient)
+                fLightGrayGradient = [[CTGradient progressLightGrayGradient] retain];
+            [fLightGrayGradient fillRect: noIncludeRect angle: -90];
         }
         
         if (rightWidth > 0)
@@ -605,7 +639,9 @@
                     notAvailableRect.origin.x += leftWidth + rightWidth;
                     notAvailableRect.size.width = notAvailableWidth;
                     
-                    [[CTGradient progressRedGradient] fillRect: notAvailableRect angle: 90];
+                    if (!fRedGradient)
+                        fRedGradient = [[CTGradient progressRedGradient] retain];
+                    [fRedGradient fillRect: notAvailableRect angle: -90];
                 }
             }
             
@@ -615,7 +651,9 @@
                 includeRect.origin.x += leftWidth;
                 includeRect.size.width = rightWidth;
                 
-                [[CTGradient progressWhiteGradient] fillRect: includeRect angle: 90];
+                if (!fWhiteGradient)
+                    fWhiteGradient = [[CTGradient progressWhiteGradient] retain];
+                [fWhiteGradient fillRect: includeRect angle: -90];
             }
         }
     }
@@ -628,7 +666,11 @@
         if ([torrent isActive])
         {
             if ([torrent isChecking])
-                [[CTGradient progressYellowGradient] fillRect: completeRect angle: 90];
+            {
+                if (!fYellowGradient)
+                    fYellowGradient = [[CTGradient progressYellowGradient] retain];
+                [fYellowGradient fillRect: completeRect angle: -90];
+            }
             else if ([torrent isSeeding])
             {
                 int ratioLeftWidth = leftWidth * (1.0 - [torrent progressStopRatio]);
@@ -640,30 +682,50 @@
                     ratioLeftRect.origin.x += leftWidth;
                     ratioLeftRect.size.width = ratioLeftWidth;
                     
-                    [[CTGradient progressLightGreenGradient] fillRect: ratioLeftRect angle: 90];
+                    if (!fLightGreenGradient)
+                        fLightGreenGradient = [[CTGradient progressLightGreenGradient] retain];
+                    [fLightGreenGradient fillRect: ratioLeftRect angle: -90];
                 }
                 
                 if (leftWidth > 0)
                 {
                     completeRect.size.width = leftWidth;
                     
-                    [[CTGradient progressGreenGradient] fillRect: completeRect angle: 90];
+                    if (!fGreenGradient)
+                        fGreenGradient = [[CTGradient progressGreenGradient] retain];
+                    [fGreenGradient fillRect: completeRect angle: -90];
                 }
             }
             else
-                [[CTGradient progressBlueGradient] fillRect: completeRect angle: 90];
+            {
+                if (!fBlueGradient)
+                    fBlueGradient = [[CTGradient progressBlueGradient] retain];
+                [fBlueGradient fillRect: completeRect angle: -90];
+            }
         }
         else
         {
             if ([torrent waitingToStart])
             {
                 if ([torrent progressLeft] <= 0.0)
-                    [[CTGradient progressDarkGreenGradient] fillRect: completeRect angle: 90];
+                {
+                    if (!fDarkGreenGradient)
+                        fDarkGreenGradient = [[CTGradient progressDarkGreenGradient] retain];
+                    [fDarkGreenGradient fillRect: completeRect angle: -90];
+                }
                 else
-                    [[CTGradient progressDarkBlueGradient] fillRect: completeRect angle: 90];
+                {
+                    if (!fDarkBlueGradient)
+                        fDarkBlueGradient = [[CTGradient progressDarkBlueGradient] retain];
+                    [fDarkBlueGradient fillRect: completeRect angle: -90];
+                }
             }
             else
-                [[CTGradient progressGrayGradient] fillRect: completeRect angle: 90];
+            {
+                if (!fGrayGradient)
+                    fGrayGradient = [[CTGradient progressGrayGradient] retain];
+                [fGrayGradient fillRect: completeRect angle: -90];
+            }
         }
     }
 }

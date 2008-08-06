@@ -45,7 +45,7 @@
 #include "tr-torrent.h"
 #include "util.h"
 
-static void maybeInhibitHibernation( TrCore * core );
+static void tr_core_set_hibernation_allowed( TrCore * core, gboolean allowed );
 
 static gboolean our_instance_adds_remote_torrents = FALSE;
 
@@ -60,7 +60,6 @@ struct TrCorePrivate
 #endif
     gboolean           inhibit_allowed;
     gboolean           have_inhibit_cookie;
-    gboolean           dbus_error;
     guint              inhibit_cookie;
     GtkTreeModel     * model;
     tr_handle        * handle;
@@ -502,7 +501,7 @@ prefsChanged( TrCore * core, const char * key, gpointer data UNUSED )
     }
     else if( !strcmp( key, PREF_KEY_ALLOW_HIBERNATION ) )
     {
-        maybeInhibitHibernation( core );
+        tr_core_set_hibernation_allowed( core, pref_flag_get( key ) );
     }
 #ifdef HAVE_GIO
     else if( !strcmp( key, PREF_KEY_DIR_WATCH ) ||
@@ -740,6 +739,25 @@ tr_core_errsig( TrCore * core, enum tr_core_err type, const char * msg )
     g_signal_emit( core, TR_CORE_GET_CLASS(core)->errsig, 0, type, msg );
 }
 
+void
+tr_core_add_ctor( TrCore * self, tr_ctor * ctor )
+{
+    TrTorrent * tor;
+    char      * errstr = NULL;
+
+    tr_core_apply_defaults( ctor );
+
+    if(( tor = tr_torrent_new_ctor( tr_core_handle( self ), ctor, &errstr )))
+        tr_core_add_torrent( self, tor );
+    else{ 
+        tr_core_errsig( self, TR_CORE_ERR_ADD_TORRENT, errstr );
+        g_free( errstr );
+    }
+
+    /* cleanup */
+    tr_ctorFree( ctor );
+}
+
 static void
 add_filename( TrCore       * core,
               const char   * filename,
@@ -750,25 +768,17 @@ add_filename( TrCore       * core,
 
     if( filename && handle )
     {
-        int err;
         tr_ctor * ctor = tr_ctorNew( handle );
         tr_core_apply_defaults( ctor );
         tr_ctorSetPaused( ctor, TR_FORCE, !doStart );
-        if( tr_ctorSetMetainfoFromFile( ctor, filename ) ) {
-            tr_core_errsig( core, TR_EINVALID, filename );
+        if( tr_ctorSetMetainfoFromFile( ctor, filename ) )
             tr_ctorFree( ctor );
-        } else if(( err = tr_torrentParse( handle, ctor, NULL ))) {
-            tr_core_errsig( core, err, filename );
+        else if( tr_torrentParse( handle, ctor, NULL ) )
             tr_ctorFree( ctor );
-        } else if( doPrompt )
+        else if( doPrompt )
             g_signal_emit( core, TR_CORE_GET_CLASS(core)->promptsig, 0, ctor );
-        else {
-            tr_torrent * tor = tr_torrentNew( handle, ctor, &err );
-            if( err )
-                tr_core_errsig( core, err, filename );
-            else
-                tr_core_add_torrent( core, tr_torrent_new_preexisting( tor ) );
-        }
+        else
+            tr_core_add_ctor( core, ctor );
     }
 }
 
@@ -807,7 +817,7 @@ tr_core_torrents_added( TrCore * self )
 }
 
 static gboolean
-findTorrentInModel( TrCore * core, int id, GtkTreeIter * setme )
+findTorrentInModel( TrCore * core, const TrTorrent * gtor, GtkTreeIter * setme )
 {
     int match = 0;
     GtkTreeIter iter;
@@ -815,9 +825,10 @@ findTorrentInModel( TrCore * core, int id, GtkTreeIter * setme )
 
     if( gtk_tree_model_iter_children( model, &iter, NULL ) ) do
     {
-        tr_torrent * tor;
-        gtk_tree_model_get( model, &iter, MC_TORRENT_RAW, &tor, -1 );
-        match = tr_torrentId(tor) == id;
+        TrTorrent * tmp;
+        gtk_tree_model_get( model, &iter, MC_TORRENT, &tmp, -1 );
+        match = tmp == gtor;
+        g_object_unref( G_OBJECT( tmp ) );
     }
     while( !match && gtk_tree_model_iter_next( model, &iter ) );
 
@@ -828,46 +839,24 @@ findTorrentInModel( TrCore * core, int id, GtkTreeIter * setme )
 }
 
 void
-tr_core_torrent_destroyed( TrCore   * core,
-                           int        id )
+tr_core_remove_torrent( TrCore * self, TrTorrent * gtor, int deleteFiles )
 {
     GtkTreeIter iter;
-    if( findTorrentInModel( core, id, &iter ) )
-    {
-        TrTorrent * gtor;
-        GtkTreeModel * model = tr_core_model( core );
-        gtk_tree_model_get( model, &iter, MC_TORRENT, &gtor, -1 );
-        tr_torrent_clear( gtor );
+    GtkTreeModel * model = tr_core_model( self );
+
+    /* remove from the gui */
+    if( findTorrentInModel( self, gtor, &iter ) )
         gtk_list_store_remove( GTK_LIST_STORE( model ), &iter );
-        g_object_unref( G_OBJECT( gtor ) );
-    }
+
+    /* maybe delete the downloaded files */
+    if( deleteFiles )
+        tr_torrent_delete_files( gtor );
+
+    /* remove the torrent */
+    tr_torrent_set_remove_flag( gtor, TRUE );
+    g_object_unref( G_OBJECT( gtor ) );
 }
 
-void
-tr_core_remove_torrent( TrCore * core, TrTorrent * gtor, int deleteFiles )
-{
-    const tr_torrent * tor = tr_torrent_handle( gtor );
-    if( tor )
-    {
-        int id = tr_torrentId( tor );
-        GtkTreeIter iter;
-        if( findTorrentInModel( core, id, &iter ) )
-        {
-            GtkTreeModel * model = tr_core_model( core );
-
-            /* remove from the gui */
-            gtk_list_store_remove( GTK_LIST_STORE( model ), &iter );
-
-            /* maybe delete the downloaded files */
-            if( deleteFiles )
-                tr_torrent_delete_files( gtor );
-
-            /* remove the torrent */
-            tr_torrent_set_remove_flag( gtor, TRUE );
-            g_object_unref( G_OBJECT( gtor ) );
-        }
-    }
-}
 
 /***
 ****
@@ -917,9 +906,6 @@ tr_core_update( TrCore * self )
 
     /* resume sorting */
     gtk_tree_sortable_set_sort_column_id( sortable, column, order );
-
-    /* maybe inhibit hibernation */
-    maybeInhibitHibernation( self );
 }
 
 void
@@ -1007,7 +993,8 @@ gtr_uninhibit_hibernation( guint inhibit_cookie )
 
 #endif
 
-static void
+
+void
 tr_core_set_hibernation_allowed( TrCore * core, gboolean allowed )
 {
 #ifdef HAVE_DBUS_GLIB
@@ -1022,40 +1009,11 @@ tr_core_set_hibernation_allowed( TrCore * core, gboolean allowed )
         core->priv->have_inhibit_cookie = FALSE;
     }
 
-    if( !allowed &&
-        !core->priv->have_inhibit_cookie &&
-        !core->priv->dbus_error )
+    if( !allowed && !core->priv->have_inhibit_cookie )
     {
-        if( gtr_inhibit_hibernation( &core->priv->inhibit_cookie ) )
-            core->priv->have_inhibit_cookie = TRUE;
-        else
-            core->priv->dbus_error = TRUE;
+        core->priv->have_inhibit_cookie = gtr_inhibit_hibernation( &core->priv->inhibit_cookie );
     }
 #endif
-}
-
-static void
-maybeInhibitHibernation( TrCore * core )
-{
-    gboolean allowHibernation;
-    tr_handle * session = tr_core_handle( core );
-
-    /* allow hibernation unless we have active torrents */
-    allowHibernation = TRUE;
-    tr_torrent * tor = NULL;
-    while(( tor = tr_torrentNext( session, tor ))) {
-        if( tr_torrentGetStatus( tor ) != TR_STATUS_STOPPED ) {
-            allowHibernation = FALSE;
-            break;
-        }
-    }
-
-    /* even if we do have active torrents,
-     * maybe allow hibernation anyway... */
-    if( !allowHibernation )
-        allowHibernation = pref_flag_get( PREF_KEY_ALLOW_HIBERNATION );
-
-    tr_core_set_hibernation_allowed( core, allowHibernation );
 }
 
 /**

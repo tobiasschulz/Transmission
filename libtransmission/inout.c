@@ -232,6 +232,7 @@ recalculateHash( const tr_torrent  * tor,
 
     int n;
     tr_errno err;
+    const tr_info * info;
 
     /* only check one block at a time to prevent disk thrashing.
      * this also lets us reuse the same buffer each time. */
@@ -240,10 +241,11 @@ recalculateHash( const tr_torrent  * tor,
 
     tr_lockLock( lock );
 
-    assert( tor );
-    assert( setme );
+    assert( tor != NULL );
+    assert( setme != NULL );
     assert( pieceIndex < tor->info.pieceCount );
 
+    info = &tor->info;
     n = tr_torPieceCountBytes( tor, pieceIndex );
 
     if( buflen < n ) {

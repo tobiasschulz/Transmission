@@ -104,8 +104,6 @@
 	<false/>
 	<key>ProxyAddress</key>
 	<string></string>
-	<key>ProxyPort</key>
-	<integer>80</integer>
 	<key>ProxyAuthorize</key>
 	<false/>
 	<key>ProxyType</key>
@@ -173,8 +171,6 @@
 	<key>WarningCreatorBlankAddress</key>
 	<true/>
 	<key>WarningFolderDataSameName</key>
-	<true/>
-	<key>WarningInvalidOpen</key>
 	<true/>
 	<key>WarningRemainingSpace</key>
 	<true/>

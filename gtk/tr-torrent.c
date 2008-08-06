@@ -88,15 +88,6 @@ tr_torrent_dispose( GObject * o )
     parent->dispose( o );
 }
 
-void
-tr_torrent_clear( TrTorrent * tor )
-{
-    g_return_if_fail( tor );
-    g_return_if_fail( tor->priv );
-
-    tor->priv->handle = NULL;
-}
-
 static void
 tr_torrent_class_init( gpointer g_class, gpointer g_class_data UNUSED )
 {
@@ -185,19 +176,20 @@ tr_torrent_new_ctor( tr_handle  * handle,
 {
     tr_torrent * tor;
     int errcode;
-    uint8_t doTrash = FALSE;
 
     errcode = -1;
     *err = NULL;
 
-    /* let the gtk client handle the removal, since libT
-     * doesn't have any concept of the glib trash API */
-    tr_ctorGetDeleteSource( ctor, &doTrash );
     tr_ctorSetDeleteSource( ctor, FALSE );
     tor = tr_torrentNew( handle, ctor, &errcode );
 
-    if( tor && doTrash )
-        tr_file_trash_or_unlink( tr_ctorGetSourceFile( ctor ) );
+    if( tor )
+    {
+        uint8_t doTrash = FALSE;
+        tr_ctorGetDeleteSource( ctor, &doTrash );
+        if( doTrash )
+            tr_file_trash_or_unlink( tr_ctorGetSourceFile( ctor ) );
+    }
   
     if( !tor )
     {

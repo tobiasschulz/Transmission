@@ -25,7 +25,6 @@
 #import "TorrentTableView.h"
 #import "TorrentCell.h"
 #import "Torrent.h"
-#import "TorrentGroup.h"
 #import "FileListNode.h"
 #import "QuickLookController.h"
 #import "NSApplicationAdditions.h"
@@ -38,8 +37,6 @@
 
 #define GROUP_SPEED_IMAGE_COLUMN_WIDTH 8.0
 #define GROUP_RATIO_IMAGE_COLUMN_WIDTH 10.0
-
-#define TOGGLE_PROGRESS_SECONDS 0.175
 
 @interface TorrentTableView (Private)
 
@@ -235,7 +232,7 @@
                 : NSLocalizedString(@"Upload speed", "Torrent table -> group row -> tooltip");
     else if (ident)
     {
-        int count = [[item torrents] count];
+        int count = [[item objectForKey: @"Torrents"] count];
         if (count == 1)
             return NSLocalizedString(@"1 transfer", "Torrent table -> group row -> tooltip");
         else
@@ -264,7 +261,8 @@
         
         NSDictionary * userInfo = [NSDictionary dictionaryWithObject: [NSNumber numberWithInt: row] forKey: @"Row"];
         TorrentCell * cell = (TorrentCell *)[self preparedCellAtColumn: -1 row: row];
-        [cell addTrackingAreasForView: self inRect: [self rectOfRow: row] withUserInfo: userInfo mouseLocation: mouseLocation];
+        [cell addTrackingAreasForView: self inRect: [self rectOfRow: row] withUserInfo: userInfo
+                mouseLocation: mouseLocation];
     }
 }
 
@@ -355,7 +353,7 @@
 
 - (void) outlineViewItemDidExpand: (NSNotification *) notification
 {
-    int value = [[[notification userInfo] objectForKey: @"NSObject"] groupIndex];
+    int value = [[[[notification userInfo] objectForKey: @"NSObject"] objectForKey: @"Group"] intValue];
     if (value < 0)
         value = MAX_GROUP;
     
@@ -368,7 +366,7 @@
 
 - (void) outlineViewItemDidCollapse: (NSNotification *) notification
 {
-    int value = [[[notification userInfo] objectForKey: @"NSObject"] groupIndex];
+    int value = [[[[notification userInfo] objectForKey: @"NSObject"] objectForKey: @"Group"] intValue];
     if (value < 0)
         value = MAX_GROUP;
     
@@ -443,20 +441,21 @@
     {
         if ([item isKindOfClass: [Torrent class]])
         {
-            NSInteger index = [self rowForItem: item];
+            NSUInteger index = [self rowForItem: item];
             if (index != -1)
                 [indexSet addIndex: index];
         }
         else
         {
-            int i, group = [item groupIndex];
+            NSNumber * group = [item objectForKey: @"Group"];
+            int i;
             for (i = 0; i < [self numberOfRows]; i++)
             {
                 if ([indexSet containsIndex: i])
                     continue;
                 
                 id tableItem = [self itemAtRow: i];
-                if (![tableItem isKindOfClass: [Torrent class]] && group == [tableItem groupIndex])
+                if (![tableItem isKindOfClass: [Torrent class]] && [group isEqualToNumber: [tableItem objectForKey: @"Group"]])
                 {
                     [indexSet addIndex: i];
                     break;
@@ -493,7 +492,7 @@
             [torrents addObject: item];
         else
         {
-            NSArray * groupTorrents = [item torrents];
+            NSArray * groupTorrents = [item objectForKey: @"Torrents"];
             [torrents addObjectsFromArray: groupTorrents];
             i += [groupTorrents count];
         }
@@ -530,7 +529,8 @@
 {
     unichar firstChar = [[event charactersIgnoringModifiers] characterAtIndex: 0];
     
-    if (firstChar == 'f' && [event modifierFlags] & NSAlternateKeyMask && [event modifierFlags] & NSCommandKeyMask)
+    if (firstChar == 'f' && [event modifierFlags] & NSAlternateKeyMask
+        && [event modifierFlags] & NSCommandKeyMask)
         [fController focusFilterField];
     else
     {
@@ -851,7 +851,7 @@
     for (i = 0.0625; i <= 1.0; i += 0.0625)
         [progressMarks addObject: [NSNumber numberWithFloat: i]];
     
-    fPiecesBarAnimation = [[NSAnimation alloc] initWithDuration: TOGGLE_PROGRESS_SECONDS animationCurve: NSAnimationEaseIn];
+    fPiecesBarAnimation = [[NSAnimation alloc] initWithDuration: 0.25 animationCurve: NSAnimationEaseIn];
     [fPiecesBarAnimation setAnimationBlockingMode: NSAnimationNonblocking];
     [fPiecesBarAnimation setProgressMarks: progressMarks];
     [fPiecesBarAnimation setDelegate: self];

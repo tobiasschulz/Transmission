@@ -33,6 +33,9 @@
 #define UNUSED G_GNUC_UNUSED
 #endif
 
+/* NULL-safe version of strcmp */
+int tr_strcmp( const char*, const char * );
+
 /* return number of items in array */
 #define ALEN(a) ((signed)G_N_ELEMENTS(a))
 
@@ -51,7 +54,7 @@ char* tr_strlratio( char * buf, double ratio, size_t buflen );
 /* return a human-readable string for the time given in seconds. */
 char* tr_strltime( char * buf, int secs, size_t buflen );
 
-char* gtr_localtime( time_t time );
+char* rfc822date( time_t epoch_sec );
 
 /* create a directory and any missing parent directories */
 gboolean
@@ -87,10 +90,6 @@ char* gtr_get_help_url( void );
 
 GtkWidget * tr_button_new_from_stock( const char * stock,
                                       const char * mnemonic );
-
-void addTorrentErrorDialog( GtkWidget  * window_or_child,
-                            int          err,
-                            const char * filename );
 
 /* create an error dialog, if wind is NULL or mapped then show dialog now,
    otherwise show it when wind becomes mapped */

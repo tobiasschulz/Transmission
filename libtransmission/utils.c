@@ -23,7 +23,7 @@
  *****************************************************************************/
 
 #include <assert.h>
-#include <ctype.h> /* isalpha, tolower */
+#include <ctype.h> /* isalpha */
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -167,7 +167,7 @@ tr_getLogTimeStr( char * buf, int buflen )
 #endif
     strftime( tmp, sizeof(tmp), "%H:%M:%S", &now_tm );
     milliseconds = (int)(tv.tv_usec / 1000);
-    tr_snprintf( buf, buflen, "%s.%03d", tmp, milliseconds );
+    snprintf( buf, buflen, "%s.%03d", tmp, milliseconds );
 
     return buf;
 }
@@ -176,7 +176,7 @@ void
 tr_deepLog( const char * file, int line, const char * name, const char * fmt, ... )
 {
     FILE * fp = tr_getLog( );
-    if( fp )
+    if( fp != NULL )
     {
         va_list args;
         char timestr[64];
@@ -362,47 +362,6 @@ tr_compareUint64( uint64_t a, uint64_t b )
     return 0;
 }
 
-int
-tr_compareDouble( double a, double b )
-{
-    if( a < b ) return -1;
-    if( a > b ) return 1;
-    return 0;
-}
-
-int
-tr_compareTime( time_t a, time_t b )
-{
-    if( a < b ) return -1;
-    if( a > b ) return 1;
-    return 0;
-}
-
-int
-tr_strcmp( const void * a, const void * b )
-{
-    if( a && b ) return strcmp( a, b );
-    if( a ) return 1;
-    if( b ) return -1;
-    return 0;
-}
-
-int
-tr_strcasecmp( const char * a, const char * b )
-{
-    if( !a && !b ) return 0;
-    if( !a ) return -1;
-    if( !b ) return 1;
-#ifdef HAVE_STRCASECMP
-    return strcasecmp( a, b );
-#else
-    while( *a && ( tolower( *(uint8_t*)a ) == tolower( *(uint8_t*)b ) ) )
-        ++a, ++b;
-    return tolower( *(uint8_t*)a) - tolower(*(uint8_t*)b );
-#endif
-}
-
-
 /**
 ***
 **/
@@ -521,7 +480,7 @@ tr_mkdirp( const char * path_in, int permissions )
         {
             /* Node exists but isn't a folder */
             char buf[MAX_PATH_LENGTH];
-            tr_snprintf( buf, sizeof( buf ), _( "File \"%s\" is in the way" ), path );
+            snprintf( buf, sizeof( buf ), _( "File \"%s\" is in the way" ), path );
             tr_err( _( "Couldn't create \"%1$s\": %2$s" ), path_in, buf );
             tr_free( path );
             errno = ENOTDIR;
@@ -577,7 +536,7 @@ tr_ioErrorFromErrno( int err )
         case EFBIG:
             return TR_ERROR_IO_FILE_TOO_BIG;
         default:
-            tr_err( "generic i/o errno from errno: %s", tr_strerror( errno ) );
+            tr_dbg( "generic i/o errno from errno: %s", tr_strerror( errno ) );
             return TR_ERROR_IO_OTHER;
     }
 }
@@ -652,7 +611,7 @@ tr_strndup( const void * in, int len )
     {
         out = tr_strdup( in );
     }
-    else if( in )
+    else if( in != NULL )
     {
         out = tr_malloc( len+1 );
         memcpy( out, in, len );
@@ -823,8 +782,8 @@ tr_bitfieldFindTrue( const tr_bitfield  * bitfield,
 int
 tr_bitfieldAdd( tr_bitfield  * bitfield, size_t nth )
 {
-    assert( bitfield );
-    assert( bitfield->bits );
+    assert( bitfield != NULL );
+    assert( bitfield->bits != NULL );
 
     if( nth >= bitfield->bitCount )
         return -1;
@@ -850,8 +809,8 @@ int
 tr_bitfieldRem( tr_bitfield   * bitfield,
                 size_t          nth )
 {
-    assert( bitfield );
-    assert( bitfield->bits );
+    assert( bitfield != NULL );
+    assert( bitfield->bits != NULL );
 
     if( nth >= bitfield->bitCount )
         return -1;
@@ -970,18 +929,6 @@ tr_stringEndsWith( const char * str, const char * end )
     return slen>=elen && !memcmp( &str[slen-elen], end, elen );
 }
 
-int
-tr_snprintf( char * buf, size_t buflen, const char * fmt, ... )
-{
-    int len;
-    va_list args;
-    va_start( args, fmt );
-    len = evutil_vsnprintf( buf, buflen, fmt, args );
-    va_end( args );
-    return len;
-}
-
-
 /*
  * Copy src to string dst of size siz.  At most siz-1 characters
  * will be copied.  Always NUL terminates (unless siz == 0).
@@ -997,8 +944,8 @@ tr_strlcpy(char *dst, const char *src, size_t siz)
     const char *s = src;
     size_t n = siz;
 
-    assert( s );
-    assert( d );
+    assert( s != NULL );
+    assert( d != NULL );
 
     /* Copy as many bytes as will fit */
     if (n != 0) {

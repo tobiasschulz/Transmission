@@ -385,8 +385,8 @@ tr_fdSocketAccept( int b, struct in_addr * addr, tr_port_t * port )
     unsigned int len;
     struct sockaddr_in sock;
 
-    assert( addr );
-    assert( port );
+    assert( addr != NULL );
+    assert( port != NULL );
 
     tr_lockLock( gFd->lock );
     if( gFd->normal < getSocketMax( gFd ) )

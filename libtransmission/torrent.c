@@ -232,7 +232,7 @@ onTrackerResponse( void * tracker UNUSED, void * vevent, void * user_data )
 static int
 getBytePiece( const tr_info * info, uint64_t byteOffset )
 {
-    assert( info );
+    assert( info != NULL );
     assert( info->pieceSize != 0 );
 
     return byteOffset / info->pieceSize;
@@ -241,10 +241,10 @@ getBytePiece( const tr_info * info, uint64_t byteOffset )
 static void
 initFilePieces ( tr_info * info, tr_file_index_t fileIndex )
 {
-    tr_file * file;
+    tr_file * file = &info->files[fileIndex];
     uint64_t firstByte, lastByte;
 
-    assert( info );
+    assert( info != NULL );
     assert( fileIndex < info->fileCount );
 
     file = &info->files[fileIndex];
@@ -309,7 +309,7 @@ tr_torrentInitFilePieces( tr_torrent * tor )
     uint64_t offset = 0;
     tr_info * inf = &tor->info;
 
-    assert( inf );
+    assert( inf != NULL );
 
     for( ff=0; ff<inf->fileCount; ++ff ) {
       inf->files[ff].offset = offset;
@@ -327,7 +327,7 @@ tr_torrentPromoteTracker( tr_torrent * tor, int pos )
     int i;
     int tier;
 
-    assert( tor );
+    assert( tor != NULL );
     assert( ( 0 <= pos ) && ( pos < tor->info.trackerCount ) );
 
     /* the tier of the tracker we're promoting */
@@ -389,22 +389,6 @@ randomizeTiers( tr_info * info )
 
 static void torrentStart( tr_torrent * tor, int reloadProgress );
 
-/**
- * Decide on a block size.  constraints:
- * (1) most clients decline requests over 16 KiB
- * (2) pieceSize must be a multiple of block size
- */
-static uint32_t
-getBlockSize( uint32_t pieceSize )
-{
-    uint32_t b = pieceSize;
-    while( b > MAX_BLOCK_SIZE )
-        b /= 2u;
-    if( !b || ( pieceSize % b ) ) /* not cleanly divisible */
-        return 0;
-    return b;
-}
-
 static void
 torrentRealInit( tr_handle     * h,
                  tr_torrent    * tor,
@@ -423,7 +407,14 @@ torrentRealInit( tr_handle     * h,
 
     randomizeTiers( info );
 
-    tor->blockSize = getBlockSize( info->pieceSize );
+    /**
+     * Decide on a block size.  constraints:
+     * (1) most clients decline requests over 16 KiB
+     * (2) pieceSize must be a multiple of block size
+     */
+    tor->blockSize = info->pieceSize;
+    while( tor->blockSize > MAX_BLOCK_SIZE )
+        tor->blockSize /= 2;
 
     tor->lastPieceSize = info->totalSize % info->pieceSize;
 
@@ -553,9 +544,6 @@ tr_torrentParse( const tr_handle  * handle,
     err = tr_metainfoParse( handle, setmeInfo, metainfo );
     doFree = !err && ( setmeInfo == &tmp );
 
-    if( !err && !getBlockSize( setmeInfo->pieceSize ) )
-        err = TR_EINVALID;
-
     if( !err && tr_torrentExists( handle, setmeInfo->hash ) )
         err = TR_EDUPLICATE;
 
@@ -644,7 +632,7 @@ tr_torrentManualUpdate( tr_torrent * tor )
 int
 tr_torrentCanManualUpdate( const tr_torrent * tor )
 {
-    return ( tor )
+    return ( tor != NULL )
         && ( tor->isRunning )
         && ( tr_trackerCanManualAnnounce( tor->tracker ) );
 }
@@ -724,7 +712,7 @@ tr_torrentStat( tr_torrent * tor )
     s->announceURL = ti ? ti->announce : NULL;
     s->scrapeURL   = ti ? ti->scrape   : NULL;
     tr_trackerStat( tc, s );
-    tr_trackerGetCounts( tc, &s->timesCompleted,
+    tr_trackerGetCounts( tc, &s->completedFromTracker,
                              &s->leechers, 
                              &s->seeders );
     tr_peerMgrTorrentStats( tor->handle->peerMgr,
@@ -745,9 +733,8 @@ tr_torrentStat( tr_torrent * tor )
     s->leftUntilDone = tr_cpLeftUntilDone( tor->completion );
     s->sizeWhenDone = tr_cpSizeWhenDone( tor->completion );
 
-    s->recheckProgress = s->status == TR_STATUS_CHECK
-        ? 1.0 - (tr_torrentCountUncheckedPieces( tor ) / (double) tor->info.pieceCount)
-        : 0.0;
+    s->recheckProgress =
+        1.0 - (tr_torrentCountUncheckedPieces( tor ) / (double) tor->info.pieceCount);
 
     tr_torrentGetRates( tor, &s->rateDownload, &s->rateUpload );
 
@@ -816,7 +803,7 @@ fileBytesCompleted ( const tr_torrent * tor, tr_file_index_t fileIndex )
     const uint64_t lastBlockOffset  = (file->offset + lastOffset) % tor->blockSize;
     uint64_t haveBytes = 0;
 
-    assert( tor );
+    assert( tor != NULL );
     assert( fileIndex < tor->info.fileCount );
     assert( file->offset + file->length <= tor->info.totalSize );
     assert( ( firstBlock < tor->blockCount ) || (!file->length && file->offset==tor->info.totalSize) );
@@ -891,7 +878,7 @@ tr_torrentPeers( const tr_torrent * tor, int * peerCount )
 {
     tr_peer_stat * ret = NULL;
 
-    if( tor )
+    if( tor != NULL )
         ret = tr_peerMgrPeerStats( tor->handle->peerMgr,
                                    tor->info.hash, peerCount );
 
@@ -941,7 +928,7 @@ tr_torrentSetHasPiece( tr_torrent * tor, tr_piece_index_t pieceIndex, int has )
 {
     tr_torrentLock( tor );
 
-    assert( tor );
+    assert( tor != NULL );
     assert( pieceIndex < tor->info.pieceCount );
 
     if( has )
@@ -963,7 +950,7 @@ freeTorrent( tr_torrent * tor )
     tr_handle * h = tor->handle;
     tr_info * inf = &tor->info;
 
-    assert( tor );
+    assert( tor != NULL );
     assert( !tor->isRunning );
 
     tr_globalLock( h );
@@ -1172,11 +1159,11 @@ getCompletionString( int type )
 static void
 fireStatusChange( tr_torrent * tor, cp_status_t status )
 {
-    assert( tor );
+    assert( tor != NULL );
     assert( status==TR_CP_INCOMPLETE || status==TR_CP_DONE || status==TR_CP_COMPLETE );
 
-    if( tor->status_func )
-        tor->status_func( tor, status, tor->status_func_user_data );
+    if( tor->status_func != NULL )
+        (tor->status_func)( tor, status, tor->status_func_user_data );
 }
 
 void
@@ -1184,7 +1171,7 @@ tr_torrentSetStatusCallback( tr_torrent             * tor,
                              tr_torrent_status_func   func,
                              void                   * user_data )
 {
-    assert( tor );
+    assert( tor != NULL );
     tor->status_func = func;
     tor->status_func_user_data = user_data;
 }
@@ -1249,7 +1236,7 @@ tr_torrentInitFilePriority( tr_torrent      * tor,
     tr_piece_index_t i;
     tr_file * file;
 
-    assert( tor );
+    assert( tor != NULL );
     assert( fileIndex < tor->info.fileCount );
     assert( priority==TR_PRI_LOW || priority==TR_PRI_NORMAL || priority==TR_PRI_HIGH );
 
@@ -1281,7 +1268,7 @@ tr_torrentGetFilePriority( const tr_torrent *  tor, tr_file_index_t file )
     tr_priority_t ret;
 
     tr_torrentLock( tor );
-    assert( tor );
+    assert( tor != NULL );
     assert( file < tor->info.fileCount );
     ret = tor->info.files[file].priority;
     tr_torrentUnlock( tor );

@@ -43,8 +43,12 @@ enum
     /* how frequently to change which peers are choked */
     RECHOKE_PERIOD_MSEC = (10 * 1000),
 
-    /* minimum interval for refilling peers' request lists */
-    REFILL_PERIOD_MSEC = 500,
+    /* how frequently to refill peers' request lists */
+    REFILL_PERIOD_MSEC = 666,
+
+    /* following the BT spec, we consider ourselves `snubbed' if 
+     * we're we don't get piece data from a peer in this long */
+    SNUBBED_SEC = 60,
 
     /* when many peers are available, keep idle ones this long */
     MIN_UPLOAD_IDLE_SECS = (60 * 3),
@@ -56,14 +60,13 @@ enum
     RECONNECT_PERIOD_MSEC = (2 * 1000),
 
     /* max # of peers to ask fer per torrent per reconnect pulse */
-    MAX_RECONNECTIONS_PER_PULSE = 4,
+    MAX_RECONNECTIONS_PER_PULSE = 1,
 
     /* max number of peers to ask for per second overall.
      * this throttle is to avoid overloading the router */
     MAX_CONNECTIONS_PER_SECOND = 8,
 
-    /* number of unchoked peers per torrent.
-     * FIXME: this probably ought to be configurable */
+    /* number of unchoked peers per torrent */
     MAX_UNCHOKED_PEERS = 12,
 
     /* number of bad pieces a peer is allowed to send before we ban them */
@@ -248,11 +251,11 @@ static tr_peer*
 getExistingPeer( Torrent * torrent, const struct in_addr * in_addr )
 {
     assert( torrentIsLocked( torrent ) );
-    assert( in_addr );
+    assert( in_addr != NULL );
 
-    return tr_ptrArrayFindSorted( torrent->peers,
-                                  in_addr,
-                                  peerCompareToAddr );
+    return (tr_peer*) tr_ptrArrayFindSorted( torrent->peers,
+                                             in_addr,
+                                             peerCompareToAddr );
 }
 
 static struct peer_atom*
@@ -305,8 +308,8 @@ getPeer( Torrent * torrent, const struct in_addr * in_addr )
 static void
 peerDestructor( tr_peer * peer )
 {
-    assert( peer );
-    assert( peer->msgs );
+    assert( peer != NULL );
+    assert( peer->msgs != NULL );
 
     tr_peerMsgsUnsubscribe( peer->msgs, peer->msgsTag );
     tr_peerMsgsFree( peer->msgs );
@@ -330,7 +333,7 @@ removePeer( Torrent * t, tr_peer * peer )
     assert( torrentIsLocked( t ) );
 
     atom = getExistingAtom( t, &peer->in_addr );
-    assert( atom );
+    assert( atom != NULL );
     atom->time = time( NULL );
 
     removed = tr_ptrArrayRemoveSorted( t->peers, peer, peerCompare );
@@ -350,9 +353,9 @@ torrentDestructor( Torrent * t )
 {
     uint8_t hash[SHA_DIGEST_LENGTH];
 
-    assert( t );
+    assert( t != NULL );
     assert( !t->isRunning );
-    assert( t->peers );
+    assert( t->peers != NULL );
     assert( torrentIsLocked( t ) );
     assert( tr_ptrArrayEmpty( t->outgoingHandshakes ) );
     assert( tr_ptrArrayEmpty( t->peers ) );
@@ -480,7 +483,7 @@ getConnectedPeers( Torrent * t, int * setmeCount )
     ret = tr_new( tr_peer*, peerCount );
 
     for( i=connectionCount=0; i<peerCount; ++i )
-        if( peers[i]->msgs )
+        if( peers[i]->msgs != NULL )
             ret[connectionCount++] = peers[i];
 
     *setmeCount = connectionCount;
@@ -868,13 +871,6 @@ peerCallbackFunc( void * vpeer, void * vevent, void * vt )
 
                 if( err )
                     gotBadPiece( t, p );
-                else {
-                    int i, peerCount;
-                    tr_peer ** peers = getConnectedPeers( t, &peerCount );
-                    for( i=0; i<peerCount; ++i )
-                        tr_peerMsgsHave( peers[i]->msgs, p );
-                    tr_free( peers );
-                }
 
                 tr_torrentRecheckCompleteness( tor );
             }
@@ -936,7 +932,7 @@ myHandshakeDoneCB( tr_handshake    * handshake,
     Torrent * t;
     tr_handshake * ours;
 
-    assert( io );
+    assert( io != NULL );
     assert( isConnected==0 || isConnected==1 );
 
     t = tr_peerIoHasTorrentHash( io )
@@ -946,16 +942,16 @@ myHandshakeDoneCB( tr_handshake    * handshake,
     if( tr_peerIoIsIncoming ( io ) )
         ours = tr_ptrArrayRemoveSorted( manager->incomingHandshakes,
                                         handshake, handshakeCompare );
-    else if( t )
+    else if( t != NULL )
         ours = tr_ptrArrayRemoveSorted( t->outgoingHandshakes,
                                         handshake, handshakeCompare );
     else
         ours = handshake;
 
-    assert( ours );
+    assert( ours != NULL );
     assert( ours == handshake );
 
-    if( t )
+    if( t != NULL )
         torrentLock( t );
 
     addr = tr_peerIoGetAddress( io, &port );
@@ -965,18 +961,7 @@ myHandshakeDoneCB( tr_handshake    * handshake,
         if( t ) {
             struct peer_atom * atom = getExistingAtom( t, addr );
             if( atom )
-            {
-                /* if we talked but the connection failed, mark a failure
-                 * in the peer's permanent record.  if they didn't send
-                 * us anything at all, mark the peer as unreachable. */
-                if( tr_peerIoCountBytesFromPeer( io ) ) {
-                    ++atom->numFails;
-                    tordbg( t, "handshake failed; incremented fail count to %d", (int)atom->numFails );
-                } else {
-                    tordbg( t, "no data received at all during handshake; marking as unreachable" );
-                    atom->myflags |= MYFLAG_UNREACHABLE;
-                }
-            }
+                ++atom->numFails;
         }
 
         tr_peerIoFree( io );
@@ -1000,7 +985,7 @@ myHandshakeDoneCB( tr_handshake    * handshake,
         {
             tr_peer * peer = getExistingPeer( t, addr );
 
-            if( peer ) /* we already have this peer */
+            if( peer != NULL ) /* we already have this peer */
             {
                 tr_peerIoFree( io );
             }
@@ -1024,7 +1009,7 @@ myHandshakeDoneCB( tr_handshake    * handshake,
         }
     }
 
-    if( t )
+    if( t != NULL )
         torrentUnlock( t );
 }
 
@@ -1136,8 +1121,8 @@ tr_peerMgrSetBlame( tr_peerMgr     * manager,
 int
 tr_pexCompare( const void * va, const void * vb )
 {
-    const tr_pex * a = va;
-    const tr_pex * b = vb;
+    const tr_pex * a = (const tr_pex *) va;
+    const tr_pex * b = (const tr_pex *) vb;
     int i = memcmp( &a->in_addr, &b->in_addr, sizeof(struct in_addr) );
     if( i ) return i;
     if( a->port < b->port ) return -1;
@@ -1210,7 +1195,7 @@ tr_peerMgrStartTorrent( tr_peerMgr     * manager,
 
     t = getExistingTorrent( manager, torrentHash );
 
-    assert( t );
+    assert( t != NULL );
     assert( ( t->isRunning != 0 ) == ( t->reconnectTimer != NULL ) );
     assert( ( t->isRunning != 0 ) == ( t->rechokeTimer != NULL ) );
 
@@ -1274,7 +1259,7 @@ tr_peerMgrAddTorrent( tr_peerMgr * manager,
 
     managerLock( manager );
 
-    assert( tor );
+    assert( tor != NULL );
     assert( getExistingTorrent( manager, tor->info.hash ) == NULL );
 
     t = torrentConstructor( manager, tor );
@@ -1292,7 +1277,7 @@ tr_peerMgrRemoveTorrent( tr_peerMgr     * manager,
     managerLock( manager );
 
     t = getExistingTorrent( manager, torrentHash );
-    assert( t );
+    assert( t != NULL );
     stopTorrent( t );
     tr_ptrArrayRemoveSorted( manager->torrents, t, torrentCompare );
     torrentDestructor( t );
@@ -1534,8 +1519,9 @@ tr_peerMgrPeerStats( const tr_peerMgr  * manager,
 
 struct ChokeData
 {
-    unsigned int  doUnchoke     : 1;
-    unsigned int  isInterested  : 1;
+    uint8_t doUnchoke;
+    uint8_t isInterested;
+    uint32_t rate;
     tr_peer * peer;
 };
 
@@ -1544,16 +1530,7 @@ compareChoke( const void * va, const void * vb )
 {
     const struct ChokeData * a = va;
     const struct ChokeData * b = vb;
-    int diff = 0;
-
-    if( diff == 0 ) /* prefer higher dl speeds */
-        diff = -tr_compareDouble( a->peer->rateToClient, b->peer->rateToClient );
-    if( diff == 0 ) /* prefer higher ul speeds */
-        diff = -tr_compareDouble( a->peer->rateToPeer, b->peer->rateToPeer );
-    if( diff == 0 ) /* prefer unchoked */
-        diff = (int)a->peer->peerIsChoked - (int)b->peer->peerIsChoked;
-
-    return diff;
+    return -tr_compareUint32( a->rate, b->rate );
 }
 
 static int
@@ -1572,12 +1549,20 @@ isSame( const tr_peer * peer )
 ***
 **/
 
+static int
+getWeightedRate( const tr_peer * peer, int clientIsSeed )
+{
+    return (int)( 10.0 * ( clientIsSeed ? peer->rateToPeer
+                                        : peer->rateToClient ) );
+}
+
 static void
 rechoke( Torrent * t )
 {
     int i, peerCount, size, unchokedInterested;
     tr_peer ** peers = getConnectedPeers( t, &peerCount );
     struct ChokeData * choke = tr_new0( struct ChokeData, peerCount );
+    const int clientIsSeed = tr_torrentIsSeed( t->tor );
 
     assert( torrentIsLocked( t ) );
     
@@ -1591,6 +1576,7 @@ rechoke( Torrent * t )
             struct ChokeData * node = &choke[size++];
             node->peer = peer;
             node->isInterested = peer->peerIsInterested;
+            node->rate = getWeightedRate( peer, clientIsSeed );
         }
     }
 
@@ -1632,7 +1618,7 @@ rechoke( Torrent * t )
                 if( isNew( peer ) ) x *= 3;
                 if( isSame( peer ) ) x *= 3;
                 for( y=0; y<x; ++y )
-                    tr_ptrArrayAppend( randPool, &choke[i] );
+                    tr_ptrArrayAppend( randPool, choke );
             }
         }
 
@@ -1809,14 +1795,14 @@ getPeerCandidates( Torrent * t, int * setmeSize )
          * hold off on this peer to give another one a try instead */
         if( ( now - atom->piece_data_time ) > 30 )
         {
-            int minWait = (60 * 5); /* five minutes */
-            int maxWait = minWait * 3;
+            int minWait = (60 * 10); /* ten minutes */
+            int maxWait = (60 * 30); /* thirty minutes */
             int wait = atom->numFails * minWait;
             if( wait < minWait ) wait = minWait;
             if( wait > maxWait ) wait = maxWait;
             if( ( now - atom->time ) < wait ) {
-                /*tordbg( t, "RECONNECT peer %d (%s) is in its grace period of %d seconds..",
-                          i, tr_peerIoAddrStr(&atom->addr,atom->port), wait );*/
+                tordbg( t, "RECONNECT peer %d (%s) is in its grace period of %d seconds..",
+                        i, tr_peerIoAddrStr(&atom->addr,atom->port), wait );
                 continue;
             }
         }
@@ -1896,7 +1882,7 @@ reconnectPulse( void * vtorrent )
             io = tr_peerIoNewOutgoing( mgr->handle, &atom->addr, atom->port, t->hash );
             if( io == NULL )
             {
-                /* we've temporarily exceeded our max connection limit... */
+                atom->myflags |= MYFLAG_UNREACHABLE;
             }
             else
             {
@@ -1905,7 +1891,7 @@ reconnectPulse( void * vtorrent )
                                                             myHandshakeDoneCB,
                                                             mgr );
 
-                assert( tr_peerIoGetTorrentHash( io ) );
+                assert( tr_peerIoGetTorrentHash( io ) != NULL );
 
                 ++newConnectionsThisSecond;
 

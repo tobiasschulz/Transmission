@@ -27,6 +27,7 @@
 #import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "UKKQueue.h"
+#import "EMKeychainProxy.h"
 
 #define DOWNLOAD_FOLDER     0
 #define DOWNLOAD_TORRENT    2
@@ -50,13 +51,11 @@
 #define TOOLBAR_NETWORK     @"TOOLBAR_NETWORK"
 #define TOOLBAR_REMOTE      @"TOOLBAR_REMOTE"
 
-#define PROXY_KEYCHAIN_SERVICE  "Transmission:Proxy"
-#define PROXY_KEYCHAIN_NAME     "Proxy"
+#define PROXY_KEYCHAIN_SERVICE  @"Transmission:Proxy"
+#define PROXY_KEYCHAIN_NAME     @"Proxy"
 
-#define RPC_KEYCHAIN_SERVICE    "Transmission:Remote"
-#define RPC_KEYCHAIN_NAME       "Remote"
-
-#define WEBUI_URL   @"http://localhost:%d/transmission/web/"
+#define RPC_KEYCHAIN_SERVICE    @"Transmission:Remote"
+#define RPC_KEYCHAIN_NAME       @"Remote"
 
 @interface PrefsController (Private)
 
@@ -66,7 +65,7 @@
 - (void) incompleteFolderSheetClosed: (NSOpenPanel *) openPanel returnCode: (int) code contextInfo: (void *) info;
 - (void) importFolderSheetClosed: (NSOpenPanel *) openPanel returnCode: (int) code contextInfo: (void *) info;
 
-- (void) setKeychainPassword: (const char *) password forService: (const char *) service username: (const char *) username;
+- (void) setKeychainPassword: (NSString *) password forService: (NSString *) service username: (NSString *) username;
 
 @end
 
@@ -203,7 +202,7 @@
     [fQueueSeedField setIntValue: [fDefaults integerForKey: @"QueueSeedNumber"]];
     [fStalledField setIntValue: [fDefaults integerForKey: @"StalledMinutes"]];
     
-    //set proxy type
+    //set proxy fields
     [fProxyAddressField setStringValue: [fDefaults stringForKey: @"ProxyAddress"]];
     int proxyType;
     switch(tr_sessionGetProxyType(fHandle))
@@ -218,23 +217,14 @@
             proxyType = PROXY_HTTP;
     }
     [fProxyTypePopUp selectItemAtIndex: proxyType];
-    
-    //set proxy password - does NOT need to be released
     [fProxyPasswordField setStringValue: [NSString stringWithUTF8String: tr_sessionGetProxyPassword(fHandle)]];
-    
-    //set proxy port
-    [fProxyPortField setIntValue: [fDefaults integerForKey: @"ProxyPort"]];
     
     //set blocklist
     [self updateBlocklistFields];
     
     //set rpc port
     [fRPCPortField setIntValue: [fDefaults integerForKey: @"RPCPort"]];
-    
-    //set rpc password - has to be released
-    const char * rpcPassword = tr_sessionGetRPCPassword(fHandle);
-    [fRPCPasswordField setStringValue: [NSString stringWithUTF8String: rpcPassword]];
-    tr_free(rpcPassword);
+    [fRPCPasswordField setStringValue: [NSString stringWithUTF8String: tr_sessionGetRPCPassword(fHandle)]];
 }
 
 - (void) setUpdater: (SUUpdater *) updater
@@ -379,8 +369,12 @@
             [fPortStatusField setStringValue: NSLocalizedString(@"Port is closed", "Preferences -> Network -> port status")];
             [fPortStatusImage setImage: [NSImage imageNamed: @"RedDot.png"]];
             break;
+        case PORT_STATUS_STEALTH:
+            [fPortStatusField setStringValue: NSLocalizedString(@"Port is stealth", "Preferences -> Network -> port status")];
+            [fPortStatusImage setImage: [NSImage imageNamed: @"RedDot.png"]];
+            break;
         case PORT_STATUS_ERROR:
-            [fPortStatusField setStringValue: NSLocalizedString(@"Port check website is down", "Preferences -> Network -> port status")];
+            [fPortStatusField setStringValue: NSLocalizedString(@"Unable to check status", "Preferences -> Network -> port status")];
             [fPortStatusImage setImage: [NSImage imageNamed: @"YellowDot.png"]];
             break;
     }
@@ -583,7 +577,6 @@
     [fDefaults setBool: YES forKey: @"WarningResetStats"];
     [fDefaults setBool: YES forKey: @"WarningCreatorBlankAddress"];
     [fDefaults setBool: YES forKey: @"WarningRemoveBuiltInTracker"];
-    [fDefaults setBool: YES forKey: @"WarningInvalidOpen"];
 }
 
 - (void) setCheckForUpdate: (id) sender
@@ -690,6 +683,7 @@
 
 - (void) setProxyEnabled: (id) sender
 {
+    BOOL enable = [fDefaults boolForKey: @"Proxy"];
     tr_sessionSetProxyEnabled(fHandle, [fDefaults boolForKey: @"Proxy"]);
 }
 
@@ -712,13 +706,6 @@
         NSBeep();
         [sender setStringValue: [fDefaults stringForKey: @"ProxyAddress"]];
     }
-}
-
-- (void) setProxyPort: (id) sender
-{
-    int port = [sender intValue];
-    [fDefaults setInteger: port forKey: @"ProxyPort"];
-    tr_sessionSetProxyPort(fHandle, port);
 }
 
 - (void) setProxyType: (id) sender
@@ -775,40 +762,29 @@
 
 - (void) setProxyPassword: (id) sender
 {
-    const char * password = [[sender stringValue] UTF8String];
+    NSString * password = [[sender stringValue] retain];
     [self setKeychainPassword: password forService: PROXY_KEYCHAIN_SERVICE username: PROXY_KEYCHAIN_NAME];
     
-    tr_sessionSetProxyPassword(fHandle, password);
+    tr_sessionSetProxyPassword(fHandle, [password UTF8String]);
 }
 
 - (void) updateProxyPassword
 {
-    UInt32 passwordLength;
-    const char * password = nil;
-    SecKeychainFindGenericPassword(NULL, strlen(PROXY_KEYCHAIN_SERVICE), PROXY_KEYCHAIN_SERVICE,
-        strlen(PROXY_KEYCHAIN_NAME), PROXY_KEYCHAIN_NAME, &passwordLength, (void **)&password, NULL);
+    EMGenericKeychainItem * keychainItem = [[EMKeychainProxy sharedProxy] genericKeychainItemForService: PROXY_KEYCHAIN_SERVICE
+                                            withUsername: PROXY_KEYCHAIN_NAME];
     
-    if (password != NULL)
-    {
-        char fullPassword[passwordLength+1];
-        strncpy(fullPassword, password, passwordLength);
-        fullPassword[passwordLength] = '\0';
-        SecKeychainItemFreeContent(NULL, (void *)password);
-        
-        tr_sessionSetProxyPassword(fHandle, fullPassword);
-        [fProxyPasswordField setStringValue: [NSString stringWithUTF8String: fullPassword]];
-    }
+    NSString * password;
+    if (!(password = [keychainItem password]))
+        password = @"";
+    
+    tr_sessionSetProxyPassword(fHandle, [password UTF8String]);
+    
+    [fProxyPasswordField setStringValue: password];
 }
 
 - (void) setRPCEnabled: (id) sender
 {
     tr_sessionSetRPCEnabled(fHandle, [fDefaults boolForKey: @"RPC"]);
-}
-
-- (void) linkWebUI: (id) sender
-{
-    NSString * urlString = [NSString stringWithFormat: WEBUI_URL, [fDefaults integerForKey: @"RPCPort"]];
-    [[NSWorkspace sharedWorkspace] openURL: [NSURL URLWithString: urlString]];
 }
 
 - (void) setRPCAuthorize: (id) sender
@@ -823,29 +799,24 @@
 
 - (void) setRPCPassword: (id) sender
 {
-    const char * password = [[sender stringValue] UTF8String];
+    NSString * password = [[sender stringValue] retain];
     [self setKeychainPassword: password forService: RPC_KEYCHAIN_SERVICE username: RPC_KEYCHAIN_NAME];
     
-    tr_sessionSetRPCPassword(fHandle, password);
+    tr_sessionSetRPCPassword(fHandle, [password UTF8String]);
 }
 
 - (void) updateRPCPassword
 {
-    UInt32 passwordLength;
-    const char * password = nil;
-    SecKeychainFindGenericPassword(NULL, strlen(RPC_KEYCHAIN_SERVICE), RPC_KEYCHAIN_SERVICE,
-        strlen(RPC_KEYCHAIN_NAME), RPC_KEYCHAIN_NAME, &passwordLength, (void **)&password, NULL);
+    EMGenericKeychainItem * keychainItem = [[EMKeychainProxy sharedProxy] genericKeychainItemForService: RPC_KEYCHAIN_SERVICE
+                                            withUsername: RPC_KEYCHAIN_NAME];
     
-    if (password != NULL)
-    {
-        char fullPassword[passwordLength+1];
-        strncpy(fullPassword, password, passwordLength);
-        fullPassword[passwordLength] = '\0';
-        SecKeychainItemFreeContent(NULL, (void *)password);
-        
-        tr_sessionSetRPCPassword(fHandle, fullPassword);
-        [fRPCPasswordField setStringValue: [NSString stringWithUTF8String: fullPassword]];
-    }
+    NSString * password;
+    if (!(password = [keychainItem password]))
+        password = @"";
+    
+    tr_sessionSetRPCPassword(fHandle, [password UTF8String]);
+    
+    [fRPCPasswordField setStringValue: password];
 }
 
 - (void) setRPCPort: (id) sender
@@ -961,8 +932,8 @@
                                         [oldDict objectForKey: @"Allow"], @"Allow", nil];
             [fRPCAccessArray replaceObjectAtIndex: row withObject: newDict];
             
-            NSSortDescriptor * descriptor = [[[NSSortDescriptor alloc] initWithKey: @"IP" ascending: YES
-                                                selector: @selector(compareNumeric:)] autorelease];
+            NSSortDescriptor * descriptor = [[[NSSortDescriptor alloc] initWithKey: @"IP" ascending: YES selector: @selector(compareIP:)]
+                                                autorelease];
             [fRPCAccessArray sortUsingDescriptors: [NSArray arrayWithObject: descriptor]];
         }
         else
@@ -1172,39 +1143,23 @@
     [fImportFolderPopUp selectItemAtIndex: 0];
 }
 
-- (void) setKeychainPassword: (const char *) password forService: (const char *) service username: (const char *) username
+- (void) setKeychainPassword: (NSString *) password forService: (NSString *) service username: (NSString *) username
 {
-    SecKeychainItemRef item = NULL;
-    NSUInteger passwordLength = strlen(password);
+    BOOL shouldAdd = password && ![password isEqualToString: @""];
     
-    OSStatus result = SecKeychainFindGenericPassword(NULL, strlen(service), service, strlen(username), username, NULL, NULL, &item);
-    if (result == noErr && item)
+    EMGenericKeychainItem * keychainItem = [[EMKeychainProxy sharedProxy] genericKeychainItemForService: service withUsername: username];
+    if (keychainItem)
     {
-        if (passwordLength > 0) //found, so update
-        {
-            result = SecKeychainItemModifyAttributesAndData(item, NULL, passwordLength, (const void *)password);
-            if (result != noErr)
-                NSLog(@"Problem updating Keychain item: %s", GetMacOSStatusErrorString(result));
-        }
-        else //remove the item
-        {
-            result = SecKeychainItemDelete(item);
-            if (result != noErr)
-                NSLog(@"Problem removing Keychain item: %s", GetMacOSStatusErrorString(result));
-        }
-    }
-    else if (result == errSecItemNotFound) //not found, so add
-    {
-        if (passwordLength > 0)
-        {
-            result = SecKeychainAddGenericPassword(NULL, strlen(service), service, strlen(username), username,
-                        passwordLength, (const void *)password, NULL);
-            if (result != noErr)
-                NSLog(@"Problem adding Keychain item: %s", GetMacOSStatusErrorString(result));
-        }
+        if (shouldAdd)
+            [keychainItem setPassword: password];
+        else
+            [keychainItem removeFromKeychain];
     }
     else
-        NSLog(@"Problem accessing Keychain: %s", GetMacOSStatusErrorString(result));
+    {
+        if (shouldAdd)
+            [[EMKeychainProxy sharedProxy] addGenericKeychainItemForService: service withUsername: username password: password];
+    }
 }
 
 @end

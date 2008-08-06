@@ -1,5 +1,5 @@
 AM_CPPFLAGS = -I. -I$(top_srcdir) -I$(top_srcdir)/third-party/ -D__TRANSMISSION__ $(LIBEVENT_CPPFLAGS)
-AM_CFLAGS = $(LIBCURL_CFLAGS) $(OPENSSL_CFLAGS) $(PTHREAD_CFLAGS)
+AM_CFLAGS = $(OPENSSL_CFLAGS) $(LIBCURL_CFLAGS) $(PTHREAD_CFLAGS)
 
 noinst_LIBRARIES = libtransmission.a
 
@@ -37,7 +37,6 @@ libtransmission_a_SOURCES = \
     stats.c \
     torrent.c \
     torrent-ctor.c \
-    tr-getopt.c \
     tracker.c \
     trevent.c \
     upnp.c \
@@ -82,7 +81,6 @@ noinst_HEADERS = \
     stats.h \
     torrent.h \
     tracker.h \
-    tr-getopt.h \
     transmission.h \
     trevent.h \
     upnp.h \
@@ -110,8 +108,8 @@ APPS_LDADD = \
     $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
     $(top_builddir)/third-party/libevent/libevent.la \
     $(INTLLIBS) \
-    $(LIBCURL_LIBS) \
     $(OPENSSL_LIBS) \
+    $(LIBCURL_LIBS) \
     $(PTHREAD_LIBS) \
     -lm
 

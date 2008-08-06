@@ -23,7 +23,6 @@
  *****************************************************************************/
 
 #import "NSStringAdditions.h"
-#import "NSApplicationAdditions.h"
 #import <transmission.h>
 
 @implementation NSString (NSStringAdditions)
@@ -109,10 +108,10 @@
 
 + (NSString *) timeString: (uint64_t) seconds showSeconds: (BOOL) showSeconds
 {
-    return [NSString timeString: seconds showSeconds: showSeconds maxFields: UINT_MAX];
+    return [NSString timeString: seconds showSeconds: showSeconds maxDigits: UINT_MAX];
 }
 
-+ (NSString *) timeString: (NSUInteger) seconds showSeconds: (BOOL) showSeconds maxFields: (NSUInteger) max
++ (NSString *) timeString: (NSUInteger) seconds showSeconds: (BOOL) showSeconds maxDigits: (NSUInteger) max
 {
     NSMutableArray * timeArray = [NSMutableArray arrayWithCapacity: MIN(max, 4)];
     NSUInteger remaining = seconds;
@@ -145,18 +144,22 @@
     return [timeArray componentsJoinedByString: @" "];
 }
 
-- (NSComparisonResult) compareFinder: (NSString *) string
+- (NSComparisonResult) compareIP: (NSString *) string
 {
-    int comparisonOptions = [NSApp isOnLeopardOrBetter] ? (NSCaseInsensitiveSearch | NSNumericSearch
-                                                            | NSWidthInsensitiveSearch | NSForcedOrderingSearch)
-                                                        : (NSCaseInsensitiveSearch | NSNumericSearch);
-    return [self compare: string options: comparisonOptions range: NSMakeRange(0, [self length]) locale: [NSLocale currentLocale]];
-}
+    NSArray * selfSections = [self componentsSeparatedByString: @"."],
+            * newSections = [string componentsSeparatedByString: @"."];
+    
+    if ([selfSections count] != [newSections count])
+        return [selfSections count] > [newSections count] ? NSOrderedDescending : NSOrderedAscending;
 
-- (NSComparisonResult) compareNumeric: (NSString *) string
-{
-    int comparisonOptions = [NSApp isOnLeopardOrBetter] ? (NSNumericSearch | NSForcedOrderingSearch) : NSNumericSearch;
-    return [self compare: string options: comparisonOptions range: NSMakeRange(0, [self length]) locale: [NSLocale currentLocale]];
+    NSEnumerator * selfSectionsEnum = [selfSections objectEnumerator], * newSectionsEnum = [newSections objectEnumerator];
+    NSString * selfString, * newString;
+    NSComparisonResult result;
+    while ((selfString = [selfSectionsEnum nextObject]) && (newString = [newSectionsEnum nextObject]))
+        if ((result = [selfString compare: newString options: NSNumericSearch]) != NSOrderedSame)
+            return result;
+    
+    return NSOrderedSame;
 }
 
 @end

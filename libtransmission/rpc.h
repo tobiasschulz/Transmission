@@ -39,5 +39,4 @@ tr_rpc_parse_list_str( struct tr_benc  * setme,
                        const char      * list_str,
                        size_t            list_str_len );
 
-
 #endif

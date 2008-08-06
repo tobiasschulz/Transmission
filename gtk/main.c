@@ -22,7 +22,6 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#include <locale.h>
 #include <sys/param.h>
 #include <signal.h>
 #include <string.h>
@@ -115,7 +114,6 @@ struct cbdata
     GtkWidget    * msgwin;
     GtkWidget    * prefs;
     GSList       * errqueue;
-    GSList       * dupqueue;
     GHashTable   * tor2details;
     GHashTable   * details2tor;
 };
@@ -305,7 +303,7 @@ onRPCIdle( void * vdata )
             /* this should be automatic */
             break;
         case TR_RPC_TORRENT_REMOVING:
-            tr_core_torrent_destroyed( data->cbdata->core, data->torrentId );
+            /* FIXME */
             break;
         case TR_RPC_TORRENT_CHANGED:
         case TR_RPC_SESSION_CHANGED:
@@ -364,7 +362,6 @@ main( int argc, char ** argv )
     cbdata->details2tor = g_hash_table_new( g_direct_hash, g_direct_equal );
 
     /* bind the gettext domain */
-    setlocale( LC_ALL, "" );
     bindtextdomain( domain, TRANSMISSIONLOCALEDIR );
     bind_textdomain_codeset( domain, "UTF-8" );
     textdomain( domain );
@@ -435,7 +432,6 @@ main( int argc, char ** argv )
                             pref_string_get( PREF_KEY_RPC_PASSWORD ),
                             pref_flag_get( PREF_KEY_PROXY_SERVER_ENABLED ),
                             pref_string_get( PREF_KEY_PROXY_SERVER ),
-                            pref_int_get( PREF_KEY_PROXY_PORT ),
                             pref_int_get( PREF_KEY_PROXY_TYPE ),
                             pref_flag_get( PREF_KEY_PROXY_AUTH_ENABLED ),
                             pref_string_get( PREF_KEY_PROXY_USERNAME ),
@@ -480,7 +476,6 @@ appsetup( TrWindow * wind, GSList * torrentFiles,
     cbdata->timer      = 0;
     cbdata->closing    = FALSE;
     cbdata->errqueue   = NULL;
-    cbdata->dupqueue   = NULL;
     cbdata->minimized  = minimized;
 
     if( minimized )
@@ -661,10 +656,6 @@ quitThreadFunc( gpointer gdata )
         g_slist_foreach( cbdata->errqueue, (GFunc)g_free, NULL );
         g_slist_free( cbdata->errqueue );
     }
-    if( cbdata->dupqueue ) {
-        g_slist_foreach( cbdata->dupqueue, (GFunc)g_free, NULL );
-        g_slist_free( cbdata->dupqueue );
-    }
 
     g_hash_table_destroy( cbdata->details2tor );
     g_hash_table_destroy( cbdata->tor2details );
@@ -831,76 +822,39 @@ setupdrag(GtkWidget *widget, struct cbdata *data) {
 }
 
 static void
-flushAddTorrentErrors( GtkWindow * window, const char * primary, GSList ** files )
-{
-    GString * s = g_string_new( NULL );
-    GSList * l;
-    GtkWidget * w;
-    for( l=*files; l; l=l->next )
-        g_string_append_printf( s, "%s\n", (const char*)l->data );
-    w = gtk_message_dialog_new( window,
-                                GTK_DIALOG_DESTROY_WITH_PARENT,
-                                GTK_MESSAGE_ERROR,
-                                GTK_BUTTONS_CLOSE,
-                                primary );
-    gtk_message_dialog_format_secondary_text( GTK_MESSAGE_DIALOG( w ), s->str );
-    g_signal_connect_swapped( w, "response",
-                              G_CALLBACK( gtk_widget_destroy ), w );
-    gtk_widget_show_all( w );
-    g_string_free( s, TRUE );
-
-    g_slist_foreach( *files, (GFunc)g_free, NULL );
-    g_slist_free( *files );
-    *files = NULL;
-}
-
-static void
-showTorrentErrors( struct cbdata * cbdata )
-{
-    if( cbdata->errqueue )
-        flushAddTorrentErrors( GTK_WINDOW( cbdata->wind ),
-                               ngettext( "Couldn't add corrupt torrent",
-                                         "Couldn't add corrupt torrents",
-                                         g_slist_length( cbdata->errqueue ) ),
-                               &cbdata->errqueue );
-
-    if( cbdata->dupqueue )
-        flushAddTorrentErrors( GTK_WINDOW( cbdata->wind ),
-                               ngettext( "Couldn't add duplicate torrent",
-                                         "Couldn't add duplicate torrents",
-                                         g_slist_length( cbdata->dupqueue ) ),
-                               &cbdata->dupqueue );
-}
-
-static void
 coreerr( TrCore * core UNUSED, enum tr_core_err code, const char * msg,
          gpointer gdata )
 {
-    struct cbdata * c = gdata;
+    struct cbdata * cbdata = gdata;
+    char          * joined;
 
     switch( code )
     {
-        case TR_EINVALID:
-            c->errqueue = g_slist_append( c->errqueue, g_path_get_basename( msg ) );
-            break;
-
-        case TR_EDUPLICATE:
-            c->dupqueue = g_slist_append( c->dupqueue, g_path_get_basename( msg ) );
-            break;
-
+        case TR_CORE_ERR_ADD_TORRENT:
+            cbdata->errqueue = g_slist_append( cbdata->errqueue,
+                                               g_strdup( msg ) );
+            return;
         case TR_CORE_ERR_NO_MORE_TORRENTS:
-            showTorrentErrors( c );
-            break;
-
+            if( cbdata->errqueue )
+            {
+                joined = joinstrlist( cbdata->errqueue, "\n" );
+                errmsg( cbdata->wind,
+                        ngettext( "Failed to load torrent file: %s",
+                                  "Failed to load torrent files: %s",
+                                  g_slist_length( cbdata->errqueue ) ),
+                        joined );
+                g_slist_foreach( cbdata->errqueue, (GFunc) g_free, NULL );
+                g_slist_free( cbdata->errqueue );
+                cbdata->errqueue = NULL;
+                g_free( joined );
+            }
+            return;
         case TR_CORE_ERR_SAVE_STATE:
-            errmsg( c->wind, "%s", msg );
-            break;
-
-        default:
-            g_assert_not_reached();
-            break;
+            errmsg( cbdata->wind, "%s", msg );
+            return;
     }
 
+    g_assert_not_reached();
 }
 
 #if GTK_CHECK_VERSION(2,8,0)
@@ -1048,25 +1002,23 @@ g_message( "setting encryption to %d", encryption );
 }
 
 gboolean
-updatemodel( gpointer gdata )
-{
-    struct cbdata *data = gdata;
-    const gboolean done = data->closing || global_sigcount;
+updatemodel(gpointer gdata) {
+  struct cbdata *data = gdata;
 
-    if( !done )
-    {
-        /* update the torrent data in the model */
-        tr_core_update( data->core );
+  if( !data->closing && 0 < global_sigcount )
+  {
+      wannaquit( data );
+      return FALSE;
+  }
 
-        /* update the main window's statusbar and toolbar buttons */
-        if( data->wind )
-            tr_window_update( data->wind );
+  /* update the torrent data in the model */
+  tr_core_update( data->core );
 
-        /* update the actions */
-        refreshTorrentActions( tr_window_get_selection( data->wind ) );
-    }
+  /* update the main window's statusbar and toolbar buttons */
+  if( data->wind )
+      tr_window_update( data->wind );
 
-    return !done;
+  return TRUE;
 }
 
 static void

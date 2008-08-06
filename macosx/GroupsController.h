@@ -42,7 +42,7 @@
 - (NSImage *) imageForIndex: (int) index;
 
 - (NSColor *) colorForIndex: (int) index;
-- (void) setColor: (NSColor *) color forIndex: (int) index;
+- (NSColor *) setColor: (NSColor *) color forIndex: (int) index;
 
 - (void) addNewGroup;
 - (void) removeGroupWithRowIndexes: (NSIndexSet *) rowIndexes;

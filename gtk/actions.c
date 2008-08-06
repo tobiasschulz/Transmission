@@ -128,10 +128,25 @@ static GtkActionEntry entries[] =
   { "open-torrent-folder", GTK_STOCK_OPEN,
     N_("_Open Folder"), NULL, NULL, G_CALLBACK(action_cb) },
   { "show-about-dialog", GTK_STOCK_ABOUT, NULL, NULL, NULL, G_CALLBACK(action_cb) },
-  { "help", GTK_STOCK_HELP, N_("_Contents"), "F1", NULL, G_CALLBACK(action_cb) },
+  { "help", GTK_STOCK_HELP, NULL, NULL, NULL, G_CALLBACK(action_cb) },
   { "update-tracker", GTK_STOCK_NETWORK,
     N_("Ask Tracker for _More Peers"), NULL, NULL, G_CALLBACK(action_cb) }
 };
+
+static void
+ensure_tooltip (GtkActionEntry * e)
+{
+    if( !e->tooltip && e->label )
+    {
+        const char * src;
+        char *tgt;
+        e->tooltip = g_malloc( strlen( e->label ) + 1 );
+        for( src=e->label, tgt=(char*)e->tooltip; *src; ++src )
+            if( *src != '_' )
+                *tgt++ = *src;
+        *tgt++ = '\0';
+    }
+}
 
 typedef struct
 {
@@ -198,7 +213,10 @@ actions_init( GtkUIManager * ui_manager, gpointer callback_user_data )
 
   myUIManager = ui_manager;
 
-  register_my_icons( );
+  register_my_icons ();
+
+  for( i=0; i<n_entries; ++i )
+    ensure_tooltip (&entries[i]);
 
   action_group = myGroup = gtk_action_group_new( "Actions" );
   gtk_action_group_set_translation_domain( action_group, NULL );

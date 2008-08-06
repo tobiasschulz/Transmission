@@ -1,14 +1,26 @@
-/*
- * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
- *
- * This file is licensed by the GPL version 2.  Works owned by the
- * Transmission project are granted a special exemption to clause 2(b)
- * so that the bulk of its code can remain under the MIT license. 
- * This exemption does not extend to derived works not owned by
- * the Transmission project.
- *
+/******************************************************************************
  * $Id$
- */
+ *
+ * Copyright (c) 2005-2008 Transmission authors and contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *****************************************************************************/
 
 #include <assert.h>
 #include <stdlib.h>
@@ -61,6 +73,7 @@ tr_peerIdNew( void )
     }
 
     val = total % base ? base - (total % base) : 0;
+    total += val;
     buf[19] = pool[val];
     buf[20] = '\0';
 
@@ -83,7 +96,7 @@ tr_getPeerId( void )
 tr_encryption_mode
 tr_sessionGetEncryption( tr_session * session )
 {
-    assert( session );
+    assert( session != NULL );
 
     return session->encryptionMode;
 }
@@ -91,7 +104,7 @@ tr_sessionGetEncryption( tr_session * session )
 void
 tr_sessionSetEncryption( tr_session * session, tr_encryption_mode mode )
 {
-    assert( session );
+    assert( session != NULL );
     assert( mode==TR_ENCRYPTION_PREFERRED
          || mode==TR_ENCRYPTION_REQUIRED
          || mode==TR_PLAINTEXT_PREFERRED );
@@ -144,8 +157,8 @@ loadBlocklists( tr_session * session )
                 const char * dot = strrchr( d->d_name, '.' );
                 const int len = dot ? dot - d->d_name : (int)strlen( d->d_name );
                 char tmp[MAX_PATH_LENGTH];
-                tr_snprintf( tmp, sizeof( tmp ),
-                             "%s%c%*.*s.bin", dirname, TR_PATH_DELIMITER, len, len, d->d_name );
+                snprintf( tmp, sizeof( tmp ),
+                          "%s%c%*.*s.bin", dirname, TR_PATH_DELIMITER, len, len, d->d_name );
                 b = _tr_blocklistNew( tmp, isEnabled );
                 _tr_blocklistSetContent( b, filename );
                 tr_list_append( &list, b );
@@ -176,7 +189,7 @@ tr_sessionInitFull( const char    * configDir,
                     const char    * downloadDir,
                     int             isPexEnabled,
                     int             isPortForwardingEnabled,
-                    int             publicPort,
+                    int               publicPort,
                     int             encryptionMode,
                     int             isUploadLimitEnabled,
                     int             uploadLimit,
@@ -195,7 +208,6 @@ tr_sessionInitFull( const char    * configDir,
                     const char    * rpcPassword,
                     int             proxyIsEnabled,
                     const char    * proxy,
-                    int             proxyPort,
                     tr_proxy_type   proxyType,
                     int             proxyAuthIsEnabled,
                     const char    * proxyUsername,
@@ -224,7 +236,6 @@ tr_sessionInitFull( const char    * configDir,
     h->downloadDir = tr_strdup( downloadDir );
     h->isProxyEnabled = proxyIsEnabled ? 1 : 0;
     h->proxy = tr_strdup( proxy );
-    h->proxyPort = proxyPort;
     h->proxyType = proxyType;
     h->isProxyAuthEnabled = proxyAuthIsEnabled ? 1 : 0;
     h->proxyUsername = tr_strdup( proxyUsername );
@@ -305,7 +316,6 @@ tr_sessionInit( const char * configDir,
                                "potzrebie",
                                TR_DEFAULT_PROXY_ENABLED,
                                TR_DEFAULT_PROXY,
-                               TR_DEFAULT_PROXY_PORT,
                                TR_DEFAULT_PROXY_TYPE,
                                TR_DEFAULT_PROXY_AUTH_ENABLED,
                                TR_DEFAULT_PROXY_USERNAME,
@@ -392,7 +402,7 @@ tr_sessionSetPeerPort( tr_handle * handle, int port )
 int
 tr_sessionGetPeerPort( const tr_handle * h )
 {
-    assert( h );
+    assert( h != NULL );
     return tr_sharedGetPeerPort( h->shared );
 }
 
@@ -489,40 +499,36 @@ compareTorrentByCur( const void * va, const void * vb )
 }
 
 static void
-tr_closeAllConnections( void * vsession )
+tr_closeAllConnections( void * vh )
 {
-    tr_handle * session = vsession;
+    tr_handle * h = vh;
     tr_torrent * tor;
     int i, n;
     tr_torrent ** torrents;
 
-    tr_statsClose( session );
-    tr_sharedShuttingDown( session->shared );
-    tr_rpcClose( &session->rpcServer );
+    tr_sharedShuttingDown( h->shared );
+    tr_trackerShuttingDown( h );
+    tr_rpcClose( &h->rpcServer );
 
     /* close the torrents.  get the most active ones first so that
      * if we can't get them all closed in a reasonable amount of time,
      * at least we get the most important ones first. */
     tor = NULL;
-    n = session->torrentCount;
-    torrents = tr_new( tr_torrent*, session->torrentCount );
+    n = h->torrentCount;
+    torrents = tr_new( tr_torrent*, h->torrentCount );
     for( i=0; i<n; ++i )
-        torrents[i] = tor = tr_torrentNext( session, tor );
+        torrents[i] = tor = tr_torrentNext( h, tor );
     qsort( torrents, n, sizeof(tr_torrent*), compareTorrentByCur );
     for( i=0; i<n; ++i )
         tr_torrentFree( torrents[i] );
     tr_free( torrents );
 
-    tr_peerMgrFree( session->peerMgr );
+    tr_peerMgrFree( h->peerMgr );
 
-    tr_rcClose( session->upload );
-    tr_rcClose( session->download );
-
-    tr_trackerSessionClose( session );
-    tr_list_free( &session->blocklists, (TrListForeachFunc)_tr_blocklistFree );
-    tr_webClose( &session->web );
+    tr_rcClose( h->upload );
+    tr_rcClose( h->download );
     
-    session->isClosed = TRUE;
+    h->isClosed = TRUE;
 }
 
 static int
@@ -533,56 +539,41 @@ deadlineReached( const uint64_t deadline )
 
 #define SHUTDOWN_MAX_SECONDS 30
 
-#define dbgmsg(fmt...) tr_deepLog( __FILE__, __LINE__, NULL, ##fmt )
-
 void
-tr_sessionClose( tr_handle * session )
+tr_sessionClose( tr_handle * h )
 {
     int i;
     const int maxwait_msec = SHUTDOWN_MAX_SECONDS * 1000;
     const uint64_t deadline = tr_date( ) + maxwait_msec;
 
-    dbgmsg( "shutting down transmission session %p", session );
+    tr_deepLog( __FILE__, __LINE__, NULL, "shutting down transmission session %p", h );
+    tr_statsClose( h );
 
-    /* close the session */
-    tr_runInEventThread( session, tr_closeAllConnections, session );
-    while( !session->isClosed && !deadlineReached( deadline ) ) {
-        dbgmsg( "waiting for the shutdown commands to run in the main thread" );
+    tr_runInEventThread( h, tr_closeAllConnections, h );
+    while( !h->isClosed && !deadlineReached( deadline ) )
         tr_wait( 100 );
-    }
 
-    /* "shared" and "tracker" have live sockets,
-     * so we need to keep the transmission thread alive
-     * for a bit while they tell the router & tracker
-     * that we're closing now */
-    while( ( session->shared || session->tracker ) && !deadlineReached( deadline ) ) {
-        dbgmsg( "waiting on port unmap (%p) or tracker (%p)",
-                session->shared, session->tracker );
+    tr_list_free( &h->blocklists, (TrListForeachFunc)_tr_blocklistFree );
+    tr_webClose( &h->web );
+
+    tr_eventClose( h );
+    while( h->events && !deadlineReached( deadline ) )
         tr_wait( 100 );
-    }
+
     tr_fdClose( );
-
-    /* close the libtransmission thread */
-    tr_eventClose( session );
-    while( session->events && !deadlineReached( deadline ) ) {
-        dbgmsg( "waiting for the libevent thread to shutdown cleanly" );
-        tr_wait( 100 );
-    }
-
-    /* free the session memory */
-    tr_lockFree( session->lock );
-    for( i=0; i<session->metainfoLookupCount; ++i )
-        tr_free( session->metainfoLookup[i].filename );
-    tr_free( session->metainfoLookup );
-    tr_free( session->tag );
-    tr_free( session->configDir );
-    tr_free( session->resumeDir );
-    tr_free( session->torrentDir );
-    tr_free( session->downloadDir );
-    tr_free( session->proxy );
-    tr_free( session->proxyUsername );
-    tr_free( session->proxyPassword );
-    tr_free( session );
+    tr_lockFree( h->lock );
+    for( i=0; i<h->metainfoLookupCount; ++i )
+        tr_free( h->metainfoLookup[i].filename );
+    tr_free( h->metainfoLookup );
+    tr_free( h->tag );
+    tr_free( h->configDir );
+    tr_free( h->resumeDir );
+    tr_free( h->torrentDir );
+    tr_free( h->downloadDir );
+    tr_free( h->proxy );
+    tr_free( h->proxyUsername );
+    tr_free( h->proxyPassword );
+    free( h );
 }
 
 tr_torrent **
@@ -611,12 +602,14 @@ tr_sessionLoadTorrents ( tr_handle   * h,
                 tr_torrent * tor;
                 char filename[MAX_PATH_LENGTH];
                 tr_buildPath( filename, sizeof(filename), dirname, d->d_name, NULL );
-
-                tr_ctorSetMetainfoFromFile( ctor, filename );
-                tor = tr_torrentNew( h, ctor, NULL );
-                if( tor ) {
-                    tr_list_append( &list, tor );
-                    ++n;
+                if( tr_stringEndsWith( filename, ".torrent" ) )
+                {
+                    tr_ctorSetMetainfoFromFile( ctor, filename );
+                    tor = tr_torrentNew( h, ctor, NULL );
+                    if( tor ) {
+                        tr_list_append( &list, tor );
+                        ++n;
+                    }
                 }
             }
         }
@@ -844,7 +837,7 @@ tr_sessionSetTorrentFile( tr_handle    * h,
                                              h->metainfoLookupCount,
                                              sizeof( struct tr_metainfo_lookup ),
                                              compareHashStringToLookupEntry );
-    if( l )
+    if( l != NULL )
     {
         if( l->filename != filename )
         {
@@ -983,11 +976,6 @@ tr_sessionGetProxy( const tr_session * session )
 {
     return session->proxy;
 }
-int
-tr_sessionGetProxyPort( const tr_session * session )
-{
-    return session->proxyPort;
-}
 void
 tr_sessionSetProxy( tr_session * session, const char * proxy )
 {
@@ -996,11 +984,6 @@ tr_sessionSetProxy( tr_session * session, const char * proxy )
         tr_free( session->proxy );
         session->proxy = tr_strdup( proxy );
     }
-}
-void
-tr_sessionSetProxyPort( tr_session * session, int port )
-{
-    session->proxyPort = port;
 }
 int
 tr_sessionIsProxyAuthEnabled( const tr_session * session )
