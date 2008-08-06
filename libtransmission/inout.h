@@ -32,22 +32,22 @@ struct tr_torrent;
  * @return 0 on success, TR_ERROR_ASSERT if the arguments are incorrect,
  * or TR_ERROR_IO_* otherwise.
  */
-tr_errno tr_ioRead( const struct tr_torrent  * tor,
-                    tr_piece_index_t           pieceIndex,
-                    uint32_t                   offset,
-                    uint32_t                   len,
-                    uint8_t                  * setme );
+int tr_ioRead  ( const struct tr_torrent  * tor,
+                 int                        pieceIndex,
+                 int                        offset,
+                 int                        len,
+                 uint8_t                  * setme );
 
 /**
  * Writes the block specified by the piece index, offset, and length.
  * @return 0 on success, TR_ERROR_ASSERT if the arguments are incorrect,
  * or TR_ERROR_IO_* otherwise.
  */
-tr_errno tr_ioWrite( const struct tr_torrent  * tor,
-                     tr_piece_index_t           pieceIndex,
-                     uint32_t                   offset,
-                     uint32_t                   len,
-                     const uint8_t            * writeme );
+tr_errno tr_ioWrite ( struct tr_torrent  * tor,
+                      int                  pieceIndex,
+                      int                  offset,
+                      int                  len,
+                      const uint8_t      * writeme );
 
 /**
  * returns 0 if the piece matches its metainfo's SHA1 checksum,
@@ -55,17 +55,6 @@ tr_errno tr_ioWrite( const struct tr_torrent  * tor,
  * or TR_ERROR if the checksum didn't match.
  */
 tr_errno tr_ioTestPiece( const tr_torrent*, int piece );
-
-
-/**
- * Converts a piece index + offset into a file index + offset.
- */
-void tr_ioFindFileLocation( const tr_torrent * tor,
-                            tr_piece_index_t   pieceIndex,
-                            uint32_t           pieceOffset,
-                            tr_file_index_t  * fileIndex,
-                            uint64_t         * fileOffset );
-
 
 
 #endif

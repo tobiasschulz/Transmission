@@ -29,13 +29,13 @@
 {
     tr_handle * fLib;
     
-    int fCompleted;
-    
-    //tiger-only fields
     NSImage * fDockIcon, * fBadge;
+    
     NSDictionary * fAttributes;
-    int fCompletedBadged;
-    BOOL fSpeedBadge, fQuittingTiger;
+    int fCompleted, fCompletedBadged;
+    BOOL fSpeedBadge;
+    
+    BOOL fQuittingTiger;
 }
 
 - (id) initWithLib: (tr_handle *) lib;

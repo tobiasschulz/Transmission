@@ -49,7 +49,7 @@
     Torrent * fMenuTorrent;
     
     float fPiecesBarPercent;
-    NSAnimation * fPiecesBarAnimation;
+    NSTimer * fPiecesBarTimer;
 }
 
 - (BOOL) isGroupCollapsed: (int) value;
@@ -66,10 +66,6 @@
 - (NSArray *) selectedValues;
 - (NSArray *) selectedTorrents;
 
-- (NSRect) iconRectForRow: (int) row;
-
-- (void) paste: (id) sender;
-
 - (void) toggleControlForTorrent: (Torrent *) torrent;
 
 - (void) displayTorrentMenuForEvent: (NSEvent *) event;
@@ -81,7 +77,6 @@
 - (void) setQuickRatio: (id) sender;
 
 - (void) checkFile: (id) sender;
-- (void) moveDataFile: (id) sender;
 
 - (void) togglePiecesBar;
 - (float) piecesBarPercent;

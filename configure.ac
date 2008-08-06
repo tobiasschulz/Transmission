@@ -1,6 +1,6 @@
-AC_INIT([transmission],[1.31],[http://trac.transmissionbt.com/newticket])
-PEERID_PREFIX="-TR1310-"
-USERAGENT_PREFIX="1.31"
+AC_INIT([transmission],[1.06Z],[http://trac.transmissionbt.com/newticket])
+PEERID_PREFIX="-TR106Z-"
+USERAGENT_PREFIX="1.06+"
 AC_SUBST(PEERID_PREFIX,[$PEERID_PREFIX])
 AC_SUBST(USERAGENT_PREFIX,[$USERAGENT_PREFIX])
 
@@ -10,22 +10,14 @@ AC_CONFIG_SRCDIR(libtransmission/transmission.h)
 AM_INIT_AUTOMAKE([1.9 tar-ustar])
 AC_PROG_LIBTOOL
 
-OPENSSL_MINIMUM=0.9.4
-CURL_MINIMUM=7.16.3
-GIO_MINIMUM=2.15.5
 GLIB_MINIMUM=2.6.0
 GTK_MINIMUM=2.6.0
 WX_MINIMUM=2.6.0
 LIBNOTIFY_MINIMUM=0.4.4
-DBUS_GLIB_MINIMUM=0.70
-AC_SUBST(OPENSSL_MINIMUM)
-AC_SUBST(CURL_MINIMUM)
-AC_SUBST(GIO_MINIMUM)
 AC_SUBST(GLIB_MINIMUM)
 AC_SUBST(GTK_MINIMUM)
 AC_SUBST(WX_MINIMUM)
 AC_SUBST(LIBNOTIFY_MINIMUM)
-AC_SUBST(DBUS_GLIB_MINIMUM)
 
 AC_PROG_CC
 AC_PROG_CXX
@@ -35,7 +27,7 @@ if test "x$GCC" = "xyes" ; then
 fi
 AC_HEADER_STDC
 AC_HEADER_TIME
-AC_CHECK_FUNCS([lrintf strlcpy daemon dirname basename daemon strcasecmp])
+AC_CHECK_FUNCS([lrintf strlcpy strlcat daemon dirname basename])
 AC_CHECK_SIZEOF([void*])
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
@@ -44,8 +36,7 @@ ACX_PTHREAD
 
 AC_SEARCH_LIBS([socket], [socket net])
 AC_SEARCH_LIBS([gethostbyname], [nsl bind])
-PKG_CHECK_MODULES(OPENSSL, [openssl >= $OPENSSL_MINIMUM])
-PKG_CHECK_MODULES(LIBCURL, [libcurl >= $CURL_MINIMUM])
+PKG_CHECK_MODULES(OPENSSL, [openssl >= 0.9.4])
 
 AC_SYS_LARGEFILE
 
@@ -92,9 +83,6 @@ AC_ARG_ENABLE([gtk],
               [want_gtk=${enableval}],
               [want_gtk=${have_gtk}])
 build_gtk=no
-use_gio=no
-use_libnotify=no
-use_dbus_glib=no
 if test "x$want_gtk" = "xyes" ; then
     if test "x$have_gtk" = "xyes"; then
       build_gtk=yes
@@ -106,47 +94,16 @@ AM_CONDITIONAL([BUILD_GTK],[test "x$build_gtk" = "xyes"])
 AC_SUBST(GTK_LIBS)
 AC_SUBST(GTK_CFLAGS)
 
-if test "x$build_gtk" = "xyes"; then
-
-    PKG_CHECK_MODULES([GIO],
-                      [gio-2.0 >= $GIO_MINIMUM],
-                      [use_gio=yes],
-                      [use_gio=no])
-    AC_SUBST(GIO_LIBS)
-    AC_SUBST(GIO_CFLAGS)
-    if test "x$use_gio" = "xyes"; then
-        AC_DEFINE([HAVE_GIO], 1)
-    fi
-
-    PKG_CHECK_MODULES([LIBNOTIFY],
-                      [libnotify >= $LIBNOTIFY_MINIMUM],
-                      [have_libnotify=yes],
-                      [have_libnotify=no])
-    AC_ARG_ENABLE([libnotify], 
-                  AS_HELP_STRING([--enable-libnotify],[enable notifications]),, 
-                  [enable_libnotify=yes]) 
-    use_libnotify=no
-    if test "x$enable_libnotify" = "xyes" ; then
-        if test "x$have_libnotify" = "xyes"; then
-            use_libnotify=yes
-            AC_SUBST(LIBNOTIFY_LIBS) 
-            AC_SUBST(LIBNOTIFY_CFLAGS) 
-            AC_DEFINE([HAVE_LIBNOTIFY], 1) 
-        fi
-    fi
-
-    PKG_CHECK_MODULES([DBUS_GLIB],
-                      [dbus-glib-1 >= $DBUS_GLIB_MINIMUM],
-                      [use_dbus_glib=yes],
-                      [use_dbus_glib=no])
-    AC_SUBST(DBUS_GLIB_LIBS)
-    AC_SUBST(DBUS_GLIB_CFLAGS)
-    if test "x$use_dbus_glib" = "xyes"; then
-        AC_DEFINE([HAVE_DBUS_GLIB], 1)
-    fi
+PKG_CHECK_MODULES([LIBNOTIFY],
+                  [libnotify >= $LIBNOTIFY_MINIMUM],
+                  [use_libnotify=yes],
+                  [use_libnotify=no])
+AC_SUBST(LIBNOTIFY_LIBS)
+AC_SUBST(LIBNOTIFY_CFLAGS)
+if test "x$use_libnotify" = "xyes"; then
+    AC_DEFINE([HAVE_LIBNOTIFY], 1)
 fi
 
-AC_CHECK_HEADERS([libintl.h])
 IT_PROG_INTLTOOL([0.23],[no-xml])
 GETTEXT_PACKAGE=transmission
 AC_SUBST(GETTEXT_PACKAGE)
@@ -295,12 +252,10 @@ AC_CONFIG_FILES([Makefile
                  beos/Makefile
                  cli/Makefile
                  daemon/Makefile
-                 doc/Makefile
                  libtransmission/Makefile
                  third-party/Makefile
                  third-party/miniupnp/Makefile
                  third-party/libnatpmp/Makefile
-                 third-party/shttpd/Makefile
                  macosx/Makefile
                  wx/Makefile
                  wx/images/Makefile
@@ -321,8 +276,6 @@ Configuration:
         Build Daemon:               ${build_daemon}
         Build BeOS client:          ${build_beos}
         Build GTK+ client:          ${build_gtk}
-          ... gio support:          ${use_gio}
-          ... dbus-glib support:    ${use_dbus_glib}
           ... libnotify support:    ${use_libnotify}
         Build OS X client:          ${build_darwin}
         Build wxWidgets client:     ${build_wx}

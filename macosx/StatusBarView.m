@@ -23,6 +23,8 @@
  *****************************************************************************/
 
 #import "StatusBarView.h"
+#import "NSApplicationAdditions.h"
+#import "CTGradient.h"
 
 @implementation StatusBarView
 
@@ -30,40 +32,35 @@
 {
     if ((self = [super initWithFrame: rect]))
     {
-        fGrayBorderColor = [[NSColor colorWithCalibratedRed: 171.0/255.0 green: 171.0/255.0 blue: 171.0/255.0 alpha: 1.0] retain];
+        fShow = [NSApp isOnLeopardOrBetter];
+            
+        NSColor * startingColor = [NSColor colorWithCalibratedRed: 208.0/255.0 green: 208.0/255.0 blue: 208.0/255.0 alpha: 1.0];
+        NSColor * endingColor = [NSColor colorWithCalibratedRed: 233.0/255.0 green: 233.0/255.0 blue: 233.0/255.0 alpha: 1.0];
+        fGradient = [[CTGradient gradientWithBeginningColor: startingColor endingColor: endingColor] retain];
     }
     return self;
 }
 
 - (void) dealloc
 {
-    [fGrayBorderColor release];
+    [fGradient release];
     [super dealloc];
+}
+
+- (void) setShowOnTiger: (BOOL) show
+{
+    fShow = show || [NSApp isOnLeopardOrBetter];
+}
+
+- (BOOL) isOpaque
+{
+    return fShow;
 }
 
 - (void) drawRect: (NSRect) rect
 {
-    NSRect lineBorderRect = NSMakeRect(rect.origin.x, [self bounds].size.height - 1.0, rect.size.width, 1.0);
-    if (NSIntersectsRect(lineBorderRect, rect))
-    {
-        [[NSColor whiteColor] set];
-        NSRectFill(lineBorderRect);
-        
-        rect.size.height--;
-    }
-    
-    lineBorderRect.origin.y = 0.0;
-    if (NSIntersectsRect(lineBorderRect, rect))
-    {
-        [fGrayBorderColor set];
-        NSRectFill(lineBorderRect);
-        
-        rect.origin.y++;
-        rect.size.height--;
-    }
-    
-    [[NSColor controlColor] set];
-    NSRectFill(rect);
+    if (fShow)
+        [fGradient fillRect: rect angle: 90];
 }
 
 @end

@@ -1,14 +1,26 @@
-/*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
- *
- * This file is licensed by the GPL version 2.  Works owned by the
- * Transmission project are granted a special exemption to clause 2(b)
- * so that the bulk of its code can remain under the MIT license. 
- * This exemption does not extend to derived works not owned by
- * the Transmission project.
- * 
+/******************************************************************************
  * $Id$
- */
+ *
+ * Copyright (c) 2006-2008 Transmission authors and contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *****************************************************************************/
 
 #include <glib/gi18n.h>
 #include <gtk/gtk.h>
@@ -25,8 +37,6 @@ tr_icon_new( TrCore * core )
 }
 
 #else
-
-#define UPDATE_INTERVAL 2500
 
 static void
 activated ( GtkStatusIcon   * self        UNUSED,
@@ -47,37 +57,31 @@ popup ( GtkStatusIcon  * self,
                     self, button, when );
 }
 
+static void
+core_destroyed( gpointer data, GObject * core UNUSED )
+{
+    g_source_remove( GPOINTER_TO_UINT( data ) );
+}
+
 static gboolean
 refresh_tooltip_cb( gpointer data )
 {
     GtkStatusIcon * icon = GTK_STATUS_ICON( data );
     TrCore * core = g_object_get_data( G_OBJECT( icon ), "tr-core" );
-    struct core_stats stats;
+    const struct core_stats * stats = tr_core_get_stats( core );
     char downStr[32], upStr[32];
     char tip[256];
 
-    tr_core_get_stats( core, &stats );
-
-    tr_strlspeed( downStr, stats.clientDownloadSpeed, sizeof( downStr ) );
-    tr_strlspeed( upStr, stats.clientUploadSpeed, sizeof( upStr ) );
+    tr_strlspeed( downStr, stats->clientDownloadSpeed, sizeof( downStr ) );
+    tr_strlspeed( upStr, stats->clientUploadSpeed, sizeof( upStr ) );
     g_snprintf( tip, sizeof( tip ),
-                /* %1$'d is the number of torrents we're seeding,
-                   %2$'d is the number of torrents we're downloading,
-                   %3$s is our download speed,
-                   %4$s is our upload speed */
-                _( "%1$'d Seeding, %2$'d Downloading\nDown: %3$s, Up: %4$s" ), 
-                stats.seedingCount,
-                stats.downloadCount,
+                _( "%d Seeding, %d Downloading\nDown: %s, Up: %s" ), 
+                stats->seedingCount,
+                stats->downloadCount,
                 downStr, upStr );
     gtk_status_icon_set_tooltip( GTK_STATUS_ICON( icon ), tip );
 
     return TRUE;
-}
-
-static void
-closeTag( gpointer tag )
-{
-    g_source_remove( GPOINTER_TO_UINT( tag ) );
 }
 
 gpointer
@@ -87,9 +91,9 @@ tr_icon_new( TrCore * core )
     GtkStatusIcon * icon = gtk_status_icon_new_from_icon_name( "transmission" );
     g_signal_connect( icon, "activate", G_CALLBACK( activated ), NULL );
     g_signal_connect( icon, "popup-menu", G_CALLBACK( popup ), NULL );
-    id = g_timeout_add( UPDATE_INTERVAL, refresh_tooltip_cb, icon );
+    id = g_timeout_add( 1000, refresh_tooltip_cb, icon );
+    g_object_weak_ref( G_OBJECT( core ), core_destroyed, GUINT_TO_POINTER( id ) );
     g_object_set_data( G_OBJECT( icon ), "tr-core", core );
-    g_object_set_data_full( G_OBJECT( icon ), "update-tag", GUINT_TO_POINTER( id ), closeTag );
     return icon;
 }
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2008 Transmission authors and contributors
+ * Copyright (c) 2007 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,10 +24,12 @@
 
 #import "CTGradient.h"
 
+@interface CTGradient (ActionBarView)
++ (CTGradient *)actionNormalGradient;
++ (CTGradient *)actionPressedGradient;
+@end
+
 @interface CTGradient (ProgressBar)
-
-+ (CTGradient *) progressGradientForRed: (float) redComponent green: (float) greenComponent blue: (float) blueComponent;
-
 + (CTGradient *)progressWhiteGradient;
 + (CTGradient *)progressGrayGradient;
 + (CTGradient *)progressLightGrayGradient;
@@ -38,5 +40,11 @@
 + (CTGradient *)progressDarkGreenGradient;
 + (CTGradient *)progressRedGradient;
 + (CTGradient *)progressYellowGradient;
++ (CTGradient *)progressTransparentGradient;
+@end
 
+@interface CTGradient (MiddleColour)
++ (CTGradient *)gradientWithBeginningColor:(NSColor *)begin middleColor:(NSColor *)middle endingColor:(NSColor *)end;
++ (CTGradient *)gradientWithBeginningColor:(NSColor *)begin middleColor1:(NSColor *)middle1
+                middleColor2:(NSColor *)middle2 endingColor:(NSColor *)end;
 @end

@@ -180,6 +180,16 @@ makeview( PrivateData * p, TrCore * core )
 }
 
 static void
+realized_cb ( GtkWidget * wind, gpointer unused UNUSED )
+{
+    PrivateData * p = get_private_data( GTK_WINDOW( wind ) );
+    sizingmagic( GTK_WINDOW(wind),
+                 GTK_SCROLLED_WINDOW( p->scroll ),
+                 GTK_POLICY_NEVER,
+                 GTK_POLICY_AUTOMATIC );
+}
+
+static void
 prefsChanged( TrCore * core UNUSED, const char * key, gpointer wind )
 {
     PrivateData * p = get_private_data( GTK_WINDOW( wind ) );
@@ -190,12 +200,12 @@ prefsChanged( TrCore * core UNUSED, const char * key, gpointer wind )
        gtk_tree_view_column_queue_resize( p->column );
        gtk_widget_queue_draw( p->view );
     }
-    else if( !strcmp( key, PREF_KEY_STATUSBAR ) )
+    else if( !strcmp( key, PREF_KEY_STATUS_BAR ) )
     {
         const gboolean isEnabled = pref_flag_get( key );
         g_object_set( p->status, "visible", isEnabled, NULL );
     }
-    else if( !strcmp( key, PREF_KEY_FILTERBAR ) )
+    else if( !strcmp( key, PREF_KEY_FILTER_BAR ) )
     {
         const gboolean isEnabled = pref_flag_get( key );
         g_object_set( p->filter, "visible", isEnabled, NULL );
@@ -205,7 +215,7 @@ prefsChanged( TrCore * core UNUSED, const char * key, gpointer wind )
         const gboolean isEnabled = pref_flag_get( key );
         g_object_set( p->toolbar, "visible", isEnabled, NULL );
     }
-    else if( !strcmp( key, PREF_KEY_STATUSBAR_STATS ) )
+    else if( !strcmp( key, PREF_KEY_STATUS_BAR_STATS ) )
     {
         tr_window_update( (TrWindow*)wind );
     }
@@ -246,7 +256,7 @@ status_menu_toggled_cb( GtkCheckMenuItem  * menu_item,
     {
         PrivateData * p = vprivate;
         const char * val = g_object_get_data( G_OBJECT( menu_item ), STATS_MODE );
-        tr_core_set_pref( p->core, PREF_KEY_STATUSBAR_STATS, val );
+        tr_core_set_pref( p->core, PREF_KEY_STATUS_BAR_STATS, val );
     }
 }
 
@@ -259,7 +269,7 @@ checkFilterText( filter_text_mode_t    filter_text_mode,
                  const tr_info       * torInfo,
                  const char          * text )
 {
-    tr_file_index_t i;
+    int i;
     int ret = 0;
     char * pch;
 
@@ -274,7 +284,7 @@ checkFilterText( filter_text_mode_t    filter_text_mode,
             break;
 
         case FILTER_TEXT_MODE_TRACKER:
-            pch = g_ascii_strdown( torInfo->trackers[0].announce, -1 );
+            pch = g_ascii_strdown( torInfo->primaryAddress, -1 );
             ret = !text || ( strstr( pch, text ) != NULL );
             g_free( pch );
             break;
@@ -291,26 +301,27 @@ checkFilterText( filter_text_mode_t    filter_text_mode,
 
 static int
 checkFilterMode( filter_mode_t       filter_mode,
-                 tr_torrent        * tor )
+                 const tr_stat     * torStat )
 {
     int ret = 0;
+    const int haveDown = torStat->peersSendingToUs > 0;
+    const int haveUp = torStat->peersGettingFromUs > 0;
 
     switch( filter_mode )
     {
+        case FILTER_MODE_ACTIVE:
+            ret = haveUp || haveDown;
+            break;
         case FILTER_MODE_DOWNLOADING:
-            ret = tr_torrentGetStatus( tor ) == TR_STATUS_DOWNLOAD;
+            ret = torStat->status == TR_STATUS_DOWNLOAD;
             break;
         case FILTER_MODE_SEEDING:
-            ret = tr_torrentGetStatus( tor ) == TR_STATUS_SEED;
+            ret =    ( torStat->status == TR_STATUS_DONE )
+                  || ( torStat->status == TR_STATUS_SEED );
             break;
         case FILTER_MODE_PAUSED:
-            ret = tr_torrentGetStatus( tor ) == TR_STATUS_STOPPED;
+            ret = torStat->status == TR_STATUS_STOPPED;
             break;
-        case FILTER_MODE_ACTIVE: {
-            const tr_stat * s = tr_torrentStatCached( tor );
-            ret = s->peersSendingToUs>0 || s->peersGettingFromUs>0;
-            break;
-        }
         default: /* all */
             ret = 1;
     }
@@ -327,7 +338,7 @@ is_row_visible( GtkTreeModel   * model,
     tr_torrent * tor;
     gtk_tree_model_get( model, iter, MC_TORRENT_RAW, &tor, -1 );
 
-    return checkFilterMode( p->filter_mode, tor )
+    return checkFilterMode( p->filter_mode, tr_torrentStatCached( tor ) )
         && checkFilterText( p->filter_text_mode, tr_torrentInfo( tor ), p->filter_text );
 }
 
@@ -412,23 +423,15 @@ GtkWidget *
 tr_window_new( GtkUIManager * ui_manager, TrCore * core )
 {
     int i, n;
-    const char * pch;
+    int status_stats_mode;
+    char * pch;
     PrivateData * p;
     GtkWidget *vbox, *w, *self, *h, *c, *s, *image, *menu;
-    GtkWindow *win;
     GSList * l;
     GSList * toggles;
     const char * filter_names[FILTER_MODE_QTY] = {
-        /* show all torrents */
-        N_( "A_ll"),
-        /* show only torrents that have connected peers */
-        N_("_Active"),
-        /* show only torrents that are trying to download */
-        N_("_Downloading"),
-        /* show only torrents that are trying to upload */
-        N_("_Seeding"),
-        /* show only torrents that are paused */
-        N_("_Paused")
+        N_( "A_ll"), N_("_Active"),
+        N_("_Downloading"), N_("_Seeding"), N_("_Paused")
     };
     const char * filter_text_names[FILTER_TEXT_MODE_QTY] = {
         N_("Name"), N_("Files"), N_("Tracker")
@@ -442,14 +445,11 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
     /* make the window */
     self = gtk_window_new (GTK_WINDOW_TOPLEVEL);
     g_object_set_data_full(G_OBJECT(self), PRIVATE_DATA_KEY, p, privateFree );
-    win = GTK_WINDOW( self );
-    gtk_window_set_title( win, g_get_application_name());
-    gtk_window_set_role( win, "tr-main" );
-    gtk_window_set_default_size( win, pref_int_get( PREF_KEY_MAIN_WINDOW_WIDTH ),
-                                      pref_int_get( PREF_KEY_MAIN_WINDOW_HEIGHT ) );
-    gtk_window_move( win, pref_int_get( PREF_KEY_MAIN_WINDOW_X ),
-                          pref_int_get( PREF_KEY_MAIN_WINDOW_Y ) );
-    gtk_window_add_accel_group( win, gtk_ui_manager_get_accel_group( ui_manager ) );
+    gtk_window_set_title( GTK_WINDOW( self ), g_get_application_name());
+    gtk_window_set_role( GTK_WINDOW( self ), "tr-main" );
+    gtk_window_add_accel_group (GTK_WINDOW(self),
+                                gtk_ui_manager_get_accel_group (ui_manager));
+    g_signal_connect( self, "realize", G_CALLBACK(realized_cb), NULL);
 
     /* window's main container */
     vbox = gtk_vbox_new (FALSE, 0);
@@ -495,8 +495,9 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
 
     /* status menu */
     menu = p->status_menu = gtk_menu_new( );
+    status_stats_mode = 0;
     l = NULL;
-    pch = pref_string_get( PREF_KEY_STATUSBAR_STATS );
+    pch = pref_string_get( PREF_KEY_STATUS_BAR_STATS );
     for( i=0, n=G_N_ELEMENTS(stats_modes); i<n; ++i )
     {
         const char * val = stats_modes[i].val;
@@ -508,11 +509,12 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
         gtk_menu_shell_append( GTK_MENU_SHELL(menu), w );
         gtk_widget_show( w );
     }
+    g_free( pch );
 
     /* status */
     h = p->status = gtk_hbox_new( FALSE, GUI_PAD );
     gtk_container_set_border_width( GTK_CONTAINER( h ), GUI_PAD );
-    w = p->gutter_lb = gtk_label_new( "N Torrents" );
+    w = p->gutter_lb = gtk_label_new( "N transfers" );
     gtk_box_pack_start( GTK_BOX(h), w, 0, 0, 0 );
     w = p->ul_lb = gtk_label_new( NULL );
     gtk_box_pack_end( GTK_BOX(h), w, FALSE, FALSE, 0 );
@@ -555,7 +557,6 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
     /* workarea */
     p->view = makeview( p, core );
     w = p->scroll = gtk_scrolled_window_new( NULL, NULL );
-    gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(w), GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC );
     gtk_container_add( GTK_CONTAINER(w), p->view );
     gtk_box_pack_start_defaults( GTK_BOX(vbox), w );
     gtk_container_set_focus_child( GTK_CONTAINER( vbox ), w );
@@ -566,9 +567,9 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
     /* listen for prefs changes that affect the window */
     p->core = core;
     prefsChanged( core, PREF_KEY_MINIMAL_VIEW, self );
-    prefsChanged( core, PREF_KEY_FILTERBAR, self );
-    prefsChanged( core, PREF_KEY_STATUSBAR, self );
-    prefsChanged( core, PREF_KEY_STATUSBAR_STATS, self );
+    prefsChanged( core, PREF_KEY_FILTER_BAR, self );
+    prefsChanged( core, PREF_KEY_STATUS_BAR, self );
+    prefsChanged( core, PREF_KEY_STATUS_BAR_STATS, self );
     prefsChanged( core, PREF_KEY_TOOLBAR, self );
     p->pref_handler_id = g_signal_connect( core, "prefs-changed",
                                            G_CALLBACK(prefsChanged), self );
@@ -587,13 +588,13 @@ updateTorrentCount( PrivateData * p )
         const int visibleCount = gtk_tree_model_iter_n_children( p->filter_model, NULL );
 
         if( torrentCount != visibleCount )
-            g_snprintf( buf, sizeof( buf ), ngettext( "%1$'d of %2$'d Torrent",
-                                                      "%1$'d of %2$'d Torrents",
+            g_snprintf( buf, sizeof( buf ), ngettext( "%d of %d Transfer",
+                                                      "%d of %d Transfers",
                                                       torrentCount ),
                                             visibleCount, torrentCount );
         else
-            g_snprintf( buf, sizeof( buf ), ngettext( "%'d Torrent",
-                                                      "%'d Torrents",
+            g_snprintf( buf, sizeof( buf ), ngettext( "%d Transfer",
+                                                      "%d Transfers",
                                                       torrentCount ),
                                             torrentCount );
         gtk_label_set_text( GTK_LABEL( p->gutter_lb ), buf );
@@ -603,38 +604,33 @@ updateTorrentCount( PrivateData * p )
 static void
 updateStats( PrivateData * p )
 {
-    const char * pch;
+    char * pch;
     char up[32], down[32], ratio[32], buf[128];
     struct tr_session_stats stats;
     tr_handle * handle = tr_core_handle( p->core );
 
     /* update the stats */
-    pch = pref_string_get( PREF_KEY_STATUSBAR_STATS );
+    pch = pref_string_get( PREF_KEY_STATUS_BAR_STATS );
     if( !strcmp( pch, "session-ratio" ) ) {
-        tr_sessionGetStats( handle, &stats );
+        tr_getSessionStats( handle, &stats );
         tr_strlratio( ratio, stats.ratio, sizeof( ratio ) );
         g_snprintf( buf, sizeof(buf), _("Ratio: %s"), ratio );
     } else if( !strcmp( pch, "session-transfer" ) ) {
-        tr_sessionGetStats( handle, &stats );
+        tr_getSessionStats( handle, &stats );
         tr_strlsize( up, stats.uploadedBytes, sizeof( up ) );
         tr_strlsize( down, stats.downloadedBytes, sizeof( down ) );
-        /* Translators: do not translate the "size|" disambiguation prefix.
-           %1$s is the size of the data we've downloaded
-           %2$s is the size of the data we've uploaded */
-        g_snprintf( buf, sizeof( buf ), Q_( "size|Down: %1$s, Up: %2$s" ), down, up );
+        g_snprintf( buf, sizeof( buf ), _( "Down: %s  Up: %s" ), down, up );
     } else if( !strcmp( pch, "total-transfer" ) ) { 
-        tr_sessionGetCumulativeStats( handle, &stats );
+        tr_getCumulativeSessionStats( handle, &stats );
         tr_strlsize( up, stats.uploadedBytes, sizeof( up ) );
         tr_strlsize( down, stats.downloadedBytes, sizeof( down ) );
-        /* Translators: do not translate the "size|" disambiguation prefix.
-           %1$s is the size of the data we've downloaded
-           %2$s is the size of the data we've uploaded */
-        g_snprintf( buf, sizeof( buf ), Q_( "size|Down: %1$s, Up: %2$s" ), down, up );
+        g_snprintf( buf, sizeof( buf ), _( "Down: %s  Up: %s" ), down, up );
     } else { /* default is total-ratio */
-        tr_sessionGetCumulativeStats( handle, &stats );
+        tr_getCumulativeSessionStats( handle, &stats );
         tr_strlratio( ratio, stats.ratio, sizeof( ratio ) );
         g_snprintf( buf, sizeof(buf), _("Ratio: %s"), ratio );
     }
+    g_free( pch );
     gtk_label_set_text( GTK_LABEL( p->stats_lb ), buf );
 }
 
@@ -645,7 +641,7 @@ updateSpeeds( PrivateData * p )
     float u, d;
     tr_handle * handle = tr_core_handle( p->core );
 
-    tr_sessionGetSpeed( handle, &d, &u );
+    tr_torrentRates( handle, &d, &u );
     tr_strlspeed( buf, d, sizeof( buf ) );
     gtk_label_set_text( GTK_LABEL( p->dl_lb ), buf );
     tr_strlspeed( buf, u, sizeof( buf ) );

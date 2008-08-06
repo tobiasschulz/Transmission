@@ -1,126 +1,183 @@
-/*
- * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
- *
- * This file is licensed by the GPL version 2.  Works owned by the
- * Transmission project are granted a special exemption to clause 2(b)
- * so that the bulk of its code can remain under the MIT license. 
- * This exemption does not extend to derived works not owned by
- * the Transmission project.
- * 
+/******************************************************************************
  * $Id$
- */
+ *
+ * Copyright (c) 2006-2008 Transmission authors and contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *****************************************************************************/
 
 #include <errno.h>
 #include <stdio.h>
 #include <string.h>
 
-#include <glib/gi18n.h>
 #include <gtk/gtk.h>
+#include <glib/gi18n.h>
 
 #include <libtransmission/transmission.h>
 
 #include "conf.h"
 #include "hig.h"
 #include "msgwin.h"
-#include "tr-core.h"
 #include "tr-prefs.h"
 #include "util.h"
 
-enum
+#define MAX_MSGCOUNT 5000
+
+#define COL_LVL 0
+#define COL_MSG 1
+
+static GtkTextBuffer * textbuf = NULL;
+
+static GtkTextTag*
+get_or_create_tag (GtkTextTagTable * table, const char * key)
 {
-    COL_SEQUENCE,
-    COL_NAME,
-    COL_MESSAGE,
-    COL_TR_MSG,
-    N_COLUMNS
-};
+  GtkTextTag * tag;
 
-struct MsgData
+  g_assert (table);
+  g_assert (key && *key);
+
+  tag = gtk_text_tag_table_lookup (table, key);
+  if (!tag) {
+    tag = gtk_text_tag_new (key);
+    gtk_text_tag_table_add (table, tag);
+    g_object_unref (tag); /* table refs it */
+  }
+
+  return tag;
+}
+
+static GtkTextBuffer*
+debug_window_text_buffer_new ( void )
 {
-    TrCore * core;
-    GtkTreeView * view;
-    GtkListStore * store;
-    GtkTreeModel * filter;
-    GtkTreeModel * sort;
-    int maxLevel;
-    gboolean isPaused;
-    guint refresh_tag;
-};
+  GtkTextBuffer * buffer = gtk_text_buffer_new ( NULL );
 
-static struct tr_msg_list * myTail = NULL;
-static struct tr_msg_list * myHead = NULL;
+  GtkTextTagTable * table = gtk_text_buffer_get_tag_table (buffer);
 
-/***
-****
-***/
+  g_object_set (get_or_create_tag(table,"bold"),
+      "weight", PANGO_WEIGHT_BOLD,
+      NULL);
+  
+  g_object_set (get_or_create_tag (table, "info"),
+      "foreground", "black",
+      NULL);
+ 
+  g_object_set (get_or_create_tag (table, "error"),
+      "foreground", "red",
+      NULL);
+
+  g_object_set (get_or_create_tag (table, "debug"),
+      "foreground", "gray",
+      NULL);
+
+  return buffer;
+}
+
+void
+msgwin_update( void )
+{
+  tr_msg_list * msgs, * ii;
+
+  g_assert( textbuf != NULL );
+
+  msgs = tr_getQueuedMessages();
+  for( ii = msgs; NULL != ii; ii = ii->next )
+  {
+    int len;
+    char * line;
+    const char * tag = NULL;
+    struct tm * tm = localtime( &ii->when );
+    GtkTextIter mark_start, mark_end;
+
+    switch( ii->level ) {
+      case TR_MSG_ERR: tag = "error"; break;
+      case TR_MSG_INF: tag = "info"; break;
+      case TR_MSG_DBG: tag = "debug"; break;
+    }
+
+    line = g_strdup_printf( "%02i:%02i:%02i %s\n", tm->tm_hour, tm->tm_min, tm->tm_sec, ii->message );
+    len = strlen( line );
+
+    gtk_text_buffer_get_end_iter( textbuf, &mark_end );
+    gtk_text_buffer_insert( textbuf, &mark_end, line, len );
+    mark_start = mark_end;
+    gtk_text_iter_backward_chars( &mark_start, len );
+    gtk_text_buffer_apply_tag_by_name (textbuf, tag, &mark_start, &mark_end);
+
+    g_free( line );
+  }
+  tr_freeMessageList( msgs );
+
+#if 0
+  count = gtk_text_buffer_get_line_count( textbuf );
+  if( MAX_MSGCOUNT < count ) {
+    gtk_text_buffer_get_iter_at_line( textbuf, &front, 0 );
+    gtk_text_buffer_get_iter_at_line( textbuf, &iter, count - MAX_MSGCOUNT );
+    gtk_text_buffer_delete( textbuf, &front, &iter );
+  }
+#endif
+}
 
 static void
-level_combo_changed_cb( GtkWidget * w, gpointer gdata )
+level_combo_changed_cb( GtkWidget * w, TrCore * core )
 {
-    struct MsgData * data = gdata;
     GtkTreeIter iter;
-    if( gtk_combo_box_get_active_iter( GTK_COMBO_BOX(w), &iter ) )
-    {
-        int level = 0;
-        GtkTreeModel * m = gtk_combo_box_get_model( GTK_COMBO_BOX( w ) );
-        gtk_tree_model_get( m, &iter, 1, &level, -1 );
-
-        tr_setMessageLevel( level );
-        tr_core_set_pref_int( data->core, PREF_KEY_MSGLEVEL, level );
-        data->maxLevel = level;
-        gtk_tree_model_filter_refilter( GTK_TREE_MODEL_FILTER( data->filter ) );
+    if( gtk_combo_box_get_active_iter( GTK_COMBO_BOX(w), &iter ) ) {
+        int id = 0;
+        GtkTreeModel * m = gtk_combo_box_get_model( GTK_COMBO_BOX(w) );
+        gtk_tree_model_get( m, &iter, 1, &id, -1 );
+        tr_setMessageLevel( id );
+        tr_core_set_pref_int( core, PREF_KEY_MSGLEVEL, id );
+        msgwin_update( );
     }
 }
 
 static void
-doSave( GtkWindow      * parent,
-        struct MsgData * data,
-        const char     * filename )
-{
-    FILE * fp = fopen( filename, "w+" );
-    if( !fp )
-    {
-        errmsg( parent,
-                _("Couldn't save file \"%1$s\": %2$s"),
-                filename, g_strerror( errno ) );
-    }
-    else
-    {
-        GtkTreeIter iter;
-        GtkTreeModel * model = GTK_TREE_MODEL( data->sort );
-        if( gtk_tree_model_iter_children( model, &iter, NULL ) ) do
-        {
-            char * date;
-            const char * levelStr;
-            const struct tr_msg_list * node;
-
-            gtk_tree_model_get( model, &iter,
-                                COL_TR_MSG, &node,
-                                -1 );
-            date = gtr_localtime( node->when );
-            switch( node->level ) {
-                case TR_MSG_DBG: levelStr = "debug"; break;
-                case TR_MSG_ERR: levelStr = "error"; break;
-                default:         levelStr = "     "; break;
-            }
-            fprintf( fp, "%s\t%s\t%s\t%s\n", date, levelStr,
-                     ( node->name ? node->name : "" ),
-                     ( node->message ? node->message : "" ) );
-
-            g_free( date );
-        }
-        while( gtk_tree_model_iter_next( model, &iter ) );
-        fclose( fp );
-    }
-}
-
-static void
-onSaveDialogResponse( GtkWidget * d, int response, gpointer data )
+save_dialog_response_cb( GtkWidget * d, int response, GtkTextBuffer * textbuf )
 {
   if( response == GTK_RESPONSE_ACCEPT )
   {
       char * filename = gtk_file_chooser_get_filename( GTK_FILE_CHOOSER( d ) );
-      doSave( GTK_WINDOW( d ), data, filename );
+      FILE * fp = fopen( filename, "w+" );
+      if( !fp )
+      {
+          errmsg( GTK_WINDOW(d),
+                  _("Error writing to \"%s\": %s"),
+                  filename, g_strerror( errno ) );
+      }
+      else
+      {
+          char * buf;
+          GtkTextIter front, back;
+          gtk_text_buffer_get_start_iter( textbuf, &front );
+          gtk_text_buffer_get_end_iter( textbuf, &back );
+          buf = gtk_text_buffer_get_text( textbuf, &front, &back, FALSE );
+          if( buf ) {
+              const size_t len = strlen( buf );
+              if( len > fwrite( buf, 1, len, fp ) ) {
+                  errmsg( GTK_WINDOW( d ),
+                          _("Error writing to \"%s\": %s"),
+                          filename, g_strerror( errno ) );
+              }
+              g_free( buf );
+          }
+          fclose( fp );
+      }
       g_free( filename );
   }
 
@@ -128,7 +185,7 @@ onSaveDialogResponse( GtkWidget * d, int response, gpointer data )
 }
 
 static void
-onSaveRequest( GtkWidget * w, gpointer data )
+save_cb( GtkWidget * w, GtkTextBuffer * textbuf )
 {
   GtkWindow * window = GTK_WINDOW( gtk_widget_get_toplevel( w ) );
   GtkWidget * d = gtk_file_chooser_dialog_new( _("Save Log"), window,
@@ -136,352 +193,128 @@ onSaveRequest( GtkWidget * w, gpointer data )
                                                GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                                                GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT,
                                                NULL );
-  gtk_dialog_set_alternative_button_order( GTK_DIALOG( d ),
-                                           GTK_RESPONSE_ACCEPT,
-                                           GTK_RESPONSE_CANCEL,
-                                           -1 );
   g_signal_connect( d, "response",
-                    G_CALLBACK( onSaveDialogResponse ), data );
+                    G_CALLBACK( save_dialog_response_cb ), textbuf );
   gtk_widget_show( d );
 }
 
 static void
-onClearRequest( GtkWidget * w UNUSED, gpointer gdata )
+clear_cb( GtkWidget * w UNUSED, GtkTextBuffer * textbuf )
 {
-    struct MsgData * data = gdata;
-    gtk_list_store_clear( data->store );
-    tr_freeMessageList( myHead );
-    myHead = myTail = NULL;
-}
-
-static void
-onPauseToggled( GtkToggleToolButton * w, gpointer gdata )
-{
-    struct MsgData * data = gdata;
-    data->isPaused = gtk_toggle_tool_button_get_active( w );
+  GtkTextIter front, back;
+  gtk_text_buffer_get_start_iter( textbuf, &front );
+  gtk_text_buffer_get_end_iter( textbuf, &back );
+  gtk_text_buffer_delete( textbuf, &front, &back );
 }
 
 static struct {
   const char * label;
   const char * pref;
+  const char * text;
   int id;
 } trLevels[] = {
-  { N_("Error"), "error", TR_MSG_ERR },
-  { N_("Information"), "info",  TR_MSG_INF },
-  { N_("Debug"), "debug", TR_MSG_DBG },
+  { N_("Error"), "error", "ERR", TR_MSG_ERR },
+  { N_("Info"),  "info",  "INF", TR_MSG_INF },
+  { N_("Debug"), "debug", "DBG", TR_MSG_DBG },
 };
 
-static const char*
-getForegroundColor( int msgLevel )
-{
-    const char * foreground;
-    switch( msgLevel ) {
-        case TR_MSG_DBG: foreground = "gray"; break;
-        case TR_MSG_INF: foreground = "black"; break;
-        case TR_MSG_ERR: foreground = "red"; break;
-        default: g_assert_not_reached( );
-    }
-    return foreground;
-}
-
-static void
-renderText( GtkTreeViewColumn  * column UNUSED,
-            GtkCellRenderer    * renderer,
-            GtkTreeModel       * tree_model,
-            GtkTreeIter        * iter,
-            gpointer             gcol )
-{
-    const int col = GPOINTER_TO_INT( gcol );
-    char * str = NULL;
-    const struct tr_msg_list * node;
-    gtk_tree_model_get( tree_model, iter, col, &str, COL_TR_MSG, &node, -1 );
-    g_object_set( renderer, "text", str,
-                            "foreground", getForegroundColor( node->level ),
-                            "ellipsize", PANGO_ELLIPSIZE_END,
-                            NULL );
-}
-
-static void
-renderTime( GtkTreeViewColumn  * column UNUSED,
-            GtkCellRenderer    * renderer,
-            GtkTreeModel       * tree_model,
-            GtkTreeIter        * iter,
-            gpointer             data UNUSED )
-{
-    struct tm tm;
-    char buf[16];
-    const struct tr_msg_list * node;
-
-    gtk_tree_model_get(tree_model, iter, COL_TR_MSG, &node, -1 );
-    tm = *localtime( &node->when );
-    g_snprintf( buf, sizeof( buf ), "%02d:%02d:%02d", tm.tm_hour, tm.tm_min, tm.tm_sec );
-    g_object_set (renderer, "text", buf,
-                            "foreground", getForegroundColor( node->level ),
-                            NULL );
-}
-
-static void
-appendColumn( GtkTreeView * view, int col )
-{
-    GtkCellRenderer * r;
-    GtkTreeViewColumn * c;
-    const char * title = NULL;
-
-    switch( col ) {
-        case COL_SEQUENCE: title = _( "Time" ); break;
-        /* noun.  column title for a list */
-        case COL_NAME: title = _( "Name"); break;
-        /* noun.  column title for a list */
-        case COL_MESSAGE:  title = _( "Message" ); break;
-        default: g_assert_not_reached( );
-    }
-
-    switch( col )
-    {
-        case COL_NAME:
-            r = gtk_cell_renderer_text_new( );
-            c = gtk_tree_view_column_new_with_attributes( title, r, NULL );
-            gtk_tree_view_column_set_cell_data_func( c, r, renderText, GINT_TO_POINTER(col), NULL );
-            gtk_tree_view_column_set_sizing( c, GTK_TREE_VIEW_COLUMN_FIXED );
-            gtk_tree_view_column_set_fixed_width( c, 200 );
-            gtk_tree_view_column_set_resizable( c, TRUE );
-            break;
-
-        case COL_MESSAGE:
-            r = gtk_cell_renderer_text_new( );
-            c = gtk_tree_view_column_new_with_attributes( title, r, NULL );
-            gtk_tree_view_column_set_cell_data_func( c, r, renderText, GINT_TO_POINTER(col), NULL );
-            gtk_tree_view_column_set_sizing( c, GTK_TREE_VIEW_COLUMN_FIXED );
-            gtk_tree_view_column_set_fixed_width( c, 500 );
-            gtk_tree_view_column_set_resizable( c, TRUE );
-            break;
-
-        case COL_SEQUENCE:
-            r = gtk_cell_renderer_text_new( );
-            c = gtk_tree_view_column_new_with_attributes( title, r, NULL );
-            gtk_tree_view_column_set_cell_data_func( c, r, renderTime, NULL, NULL );
-            gtk_tree_view_column_set_resizable( c, TRUE );
-            break;
-
-        default:
-            g_assert_not_reached( );
-            break;
-    }
-
-    gtk_tree_view_column_set_sort_column_id( c, col );
-    gtk_tree_view_append_column( view, c );
-}
-
-static gboolean
-isRowVisible( GtkTreeModel * model, GtkTreeIter * iter, gpointer gdata )
-{
-    const struct MsgData * data = gdata;
-    const struct tr_msg_list * node;
-    gtk_tree_model_get( model, iter, COL_TR_MSG, &node, -1 );
-    return node->level <= data->maxLevel;
-}
-
-static void
-onWindowDestroyed( gpointer gdata, GObject * deadWindow UNUSED )
-{
-    struct MsgData * data = gdata;
-    g_source_remove( data->refresh_tag );
-    g_free( data );
-}
-
-static tr_msg_list *
-addMessages( GtkListStore * store, struct tr_msg_list * head )
-{
-    const char * default_name = g_get_application_name( );
-    static unsigned int sequence = 1;
-    tr_msg_list * i;
-
-    for( i=head; i; i=i->next )
-    {
-        GtkTreeIter unused;
-
-        gtk_list_store_insert_with_values( store, &unused, 0,
-                                           COL_TR_MSG, i,
-                                           COL_NAME, ( i->name ? i->name : default_name ),
-                                           COL_MESSAGE, i->message,
-                                           COL_SEQUENCE, sequence++,
-                                           -1 );
-
-         if( !i->next )
-             break;
-    }
-
-    return i; /* tail */
-}
-
-static gboolean
-onRefresh( gpointer gdata )
-{
-    struct MsgData * data = gdata;
-    if( !data->isPaused )
-    {
-        tr_msg_list * msgs = tr_getQueuedMessages( );
-        if( msgs )
-        {
-            /* add the new messages and append them to the end of
-             * our persistent list */
-            tr_msg_list * tail = addMessages( data->store, msgs );
-            if( myTail )
-                myTail->next = msgs;
-            else
-                myHead = msgs;
-            myTail = tail;
-        }
-    }
-    return TRUE;
-}
-
-static GtkWidget*
-debug_level_combo_new( void )
-{
-    unsigned int i;
-    int ii;
-    int curlevel;
-    GtkWidget * levels;
-    GtkListStore * store;
-    GtkCellRenderer * renderer;
-
-    store = gtk_list_store_new (2, G_TYPE_STRING, G_TYPE_INT);
-
-    curlevel = pref_int_get( PREF_KEY_MSGLEVEL );
-    for( i=ii=0; i<G_N_ELEMENTS(trLevels); ++i ) {
-        GtkTreeIter iter;
-        gtk_list_store_append (store, &iter);
-        gtk_list_store_set (store, &iter, 0, _(trLevels[i].label),
-                                          1, trLevels[i].id,
-                                         -1);
-        if( trLevels[i].id == curlevel )
-            ii = i;
-    }
-    levels = gtk_combo_box_new_with_model (GTK_TREE_MODEL(store));
-    g_object_unref( G_OBJECT( store ) );
-    store = NULL;
-
-    renderer = gtk_cell_renderer_text_new ();
-    gtk_cell_layout_pack_start( GTK_CELL_LAYOUT(levels), renderer, TRUE );
-    gtk_cell_layout_set_attributes( GTK_CELL_LAYOUT(levels), renderer,
-                                    "text", 0,
-                                    NULL );
-    gtk_combo_box_set_active( GTK_COMBO_BOX( levels ), ii );
-
-    return levels;
-}
-
-
-/**
-***  Public Functions
-**/
-
 GtkWidget *
-msgwin_new( TrCore * core )
+msgwin_create( TrCore * core )
 {
-    GtkWidget * win;
-    GtkWidget * vbox;
-    GtkWidget * toolbar;
-    GtkWidget * w;
-    GtkWidget * view;
-    GtkToolItem * item;
-    struct MsgData * data;
+  unsigned int i;
+  GtkListStore * store;
+  GtkWidget * win, * vbox, * scroll, * text;
+  GtkWidget * levels;
+  GtkWidget * toolbar;
+  GtkWidget * w;
+  GtkCellRenderer * renderer;
+  int ii, curlevel;
 
-    data = g_new0( struct MsgData, 1 );
-    data->core = core;
+  win = gtk_window_new( GTK_WINDOW_TOPLEVEL );
+  gtk_window_set_title( GTK_WINDOW( win ), _( "Message Log" ) );
+  gtk_window_set_default_size( GTK_WINDOW( win ), 600, 400 );
+  gtk_window_set_role( GTK_WINDOW( win ), "message-log" );
+  vbox = gtk_vbox_new( FALSE, 0 );
 
-    win = gtk_window_new( GTK_WINDOW_TOPLEVEL );
-    gtk_window_set_title( GTK_WINDOW( win ), _( "Message Log" ) );
-    gtk_window_set_default_size( GTK_WINDOW( win ), 560, 350 );
-    gtk_window_set_role( GTK_WINDOW( win ), "message-log" );
-    vbox = gtk_vbox_new( FALSE, 0 );
+  /**
+  ***  toolbar
+  **/
 
-    /**
-    ***  toolbar
-    **/
+  toolbar = gtk_toolbar_new ();
+  gtk_toolbar_set_style( GTK_TOOLBAR( toolbar), GTK_TOOLBAR_BOTH_HORIZ );
 
-    toolbar = gtk_toolbar_new( );
-    gtk_toolbar_set_orientation( GTK_TOOLBAR( toolbar ), GTK_ORIENTATION_HORIZONTAL );
-    gtk_toolbar_set_style( GTK_TOOLBAR( toolbar ), GTK_TOOLBAR_BOTH_HORIZ );
+  gtk_toolbar_insert_stock(GTK_TOOLBAR(toolbar), GTK_STOCK_SAVE,
+                           NULL, NULL,
+                           G_CALLBACK(save_cb), textbuf, -1);
 
-      item = gtk_tool_button_new_from_stock( GTK_STOCK_SAVE );
-      g_object_set( G_OBJECT( item ), "is-important", TRUE, NULL );
-      g_signal_connect( item, "clicked", G_CALLBACK(onSaveRequest), data );
-      gtk_toolbar_insert( GTK_TOOLBAR( toolbar ), item, -1 );
+  gtk_toolbar_insert_stock(GTK_TOOLBAR(toolbar), GTK_STOCK_CLEAR,
+                           NULL, NULL,
+                           G_CALLBACK(clear_cb), textbuf, -1);
 
-      item = gtk_tool_button_new_from_stock( GTK_STOCK_CLEAR );
-      g_object_set( G_OBJECT( item ), "is-important", TRUE, NULL );
-      g_signal_connect( item, "clicked", G_CALLBACK(onClearRequest), data );
-      gtk_toolbar_insert( GTK_TOOLBAR( toolbar ), item, -1 );
-
-    item = gtk_separator_tool_item_new( );
-    gtk_toolbar_insert( GTK_TOOLBAR( toolbar ), item, -1 );
-
-      item = gtk_toggle_tool_button_new_from_stock( GTK_STOCK_MEDIA_PAUSE );
-      g_object_set( G_OBJECT( item ), "is-important", TRUE, NULL );
-      g_signal_connect( item, "toggled", G_CALLBACK(onPauseToggled), data );
-      gtk_toolbar_insert( GTK_TOOLBAR( toolbar ), item, -1 );
-
-    item = gtk_separator_tool_item_new( );
-    gtk_toolbar_insert( GTK_TOOLBAR( toolbar ), item, -1 );
-
-      w = gtk_label_new( _( "Level" ) );
-      gtk_misc_set_padding( GTK_MISC( w ), GUI_PAD, 0 );
-      item = gtk_tool_item_new( );
-      gtk_container_add( GTK_CONTAINER( item ), w );
-      gtk_toolbar_insert( GTK_TOOLBAR( toolbar ), item, -1 );
-
-      w = debug_level_combo_new( );
-      g_signal_connect( w, "changed", G_CALLBACK(level_combo_changed_cb), data );
-      item = gtk_tool_item_new( );
-      gtk_container_add( GTK_CONTAINER( item ), w );
-      gtk_toolbar_insert( GTK_TOOLBAR( toolbar ), item, -1 );
-
-    gtk_box_pack_start( GTK_BOX( vbox ), toolbar, FALSE, FALSE, 0 );
-
-    /**
-    ***  messages
-    **/
-
-    data->store = gtk_list_store_new( N_COLUMNS,
-                                      G_TYPE_UINT,       /* sequence */
-                                      G_TYPE_POINTER,    /* category */
-                                      G_TYPE_POINTER,    /* message */
-                                      G_TYPE_POINTER);   /* struct tr_msg_list */
-
-    addMessages( data->store, myHead );
-    onRefresh( data ); /* much faster to populate *before* it has listeners */
-
-    data->filter = gtk_tree_model_filter_new( GTK_TREE_MODEL( data->store ), NULL );
-    data->sort = gtk_tree_model_sort_new_with_model( data->filter );
-    gtk_tree_sortable_set_sort_column_id( GTK_TREE_SORTABLE( data->sort ),
-                                          COL_SEQUENCE,
-                                          GTK_SORT_ASCENDING );
-    data->maxLevel = pref_int_get( PREF_KEY_MSGLEVEL );
-    gtk_tree_model_filter_set_visible_func( GTK_TREE_MODEL_FILTER( data->filter ),
-                                            isRowVisible, data, NULL );
+  gtk_toolbar_insert_space(GTK_TOOLBAR(toolbar), -1);
 
 
-    view = gtk_tree_view_new_with_model( data->sort );
-    data->view = GTK_TREE_VIEW( view );
-    gtk_tree_view_set_rules_hint( data->view, TRUE );
-    appendColumn( data->view, COL_SEQUENCE );
-    appendColumn( data->view, COL_NAME );
-    appendColumn( data->view, COL_MESSAGE );
-    w = gtk_scrolled_window_new( NULL, NULL );
-    gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW( w ),
-                                    GTK_POLICY_AUTOMATIC,
-                                    GTK_POLICY_AUTOMATIC );
-    gtk_scrolled_window_set_shadow_type( GTK_SCROLLED_WINDOW( w ),
-                                         GTK_SHADOW_IN);
-    gtk_container_add( GTK_CONTAINER( w ), view );
-    gtk_box_pack_start( GTK_BOX( vbox ), w, TRUE, TRUE, 0 );
-    gtk_container_add( GTK_CONTAINER( win ), vbox );
+  gtk_toolbar_append_element(GTK_TOOLBAR(toolbar),
+                             GTK_TOOLBAR_CHILD_WIDGET, gtk_label_new(_("Level ")),
+                             NULL, _("Select the debug filter level."),
+                             NULL, NULL, NULL, NULL);
 
-    data->refresh_tag = g_timeout_add( 1666, onRefresh, data );
-    g_object_weak_ref( G_OBJECT( win ), onWindowDestroyed, data );
+  w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
+  gtk_widget_set_size_request( w, GUI_PAD_SMALL, GUI_PAD_SMALL );
+  gtk_toolbar_append_element( GTK_TOOLBAR(toolbar),
+                              GTK_TOOLBAR_CHILD_WIDGET, w,
+                              NULL, NULL, NULL, NULL, NULL, NULL);
 
-    gtk_widget_show_all( win );
-    return win;
+  store = gtk_list_store_new (2, G_TYPE_STRING, G_TYPE_INT);
+
+  curlevel = pref_int_get( PREF_KEY_MSGLEVEL );
+  for( i=ii=0; i<G_N_ELEMENTS(trLevels); ++i ) {
+      GtkTreeIter iter;
+      gtk_list_store_append (store, &iter);
+      gtk_list_store_set (store, &iter, 0, _(trLevels[i].label),
+                                        1, trLevels[i].id,
+                                       -1);
+      if( trLevels[i].id == curlevel )
+          ii = i;
+  }
+  levels = gtk_combo_box_new_with_model (GTK_TREE_MODEL(store));
+  g_object_unref (G_OBJECT(store));
+  renderer = gtk_cell_renderer_text_new ();
+  gtk_cell_layout_pack_start (GTK_CELL_LAYOUT(levels), renderer, TRUE);
+  gtk_cell_layout_set_attributes (GTK_CELL_LAYOUT(levels), renderer, "text", 0, NULL);
+  gtk_combo_box_set_active( GTK_COMBO_BOX( levels ), ii );
+  g_signal_connect( levels, "changed", G_CALLBACK(level_combo_changed_cb), core );
+
+  gtk_toolbar_append_element(GTK_TOOLBAR(toolbar),
+                             GTK_TOOLBAR_CHILD_WIDGET, levels,
+                             NULL, _("Select the debug filter level."),
+                             NULL, NULL, NULL, NULL);
+
+  gtk_box_pack_start( GTK_BOX( vbox ), toolbar, FALSE, FALSE, 0 );
+
+  /**
+  ***  text area
+  **/
+
+  text = gtk_text_view_new_with_buffer( textbuf );
+  gtk_text_view_set_editable( GTK_TEXT_VIEW( text ), FALSE );
+
+  scroll = gtk_scrolled_window_new( NULL, NULL );
+  gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW( scroll ),
+                                  GTK_POLICY_AUTOMATIC,
+                                  GTK_POLICY_AUTOMATIC );
+  gtk_container_add( GTK_CONTAINER( scroll ), text );
+
+  gtk_box_pack_start( GTK_BOX( vbox ), scroll, TRUE, TRUE, 0 );
+
+  msgwin_update( );
+  gtk_container_add( GTK_CONTAINER( win ), vbox );
+  gtk_widget_show_all( win );
+  return win;
+}
+
+void
+msgwin_loadpref( void )
+{
+    textbuf = debug_window_text_buffer_new ( );
 }

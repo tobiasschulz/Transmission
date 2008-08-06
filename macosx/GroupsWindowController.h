@@ -28,14 +28,23 @@
 
 @interface GroupsWindowController : NSWindowController
 {
+    NSMutableArray * fGroups;
+    
     IBOutlet NSTableView * fTableView;
     IBOutlet NSSegmentedControl * fAddRemoveControl;
     
-    int fCurrentColorIndex;
+    NSMutableDictionary * fCurrentColorDict;
 }
 
-+ (GroupsWindowController *) groupsWindow;
++ (GroupsWindowController *) groups;
+
+- (int) orderValueForIndex: (int) index;
+- (CTGradient *) gradientForIndex: (int) index;
+- (NSString *) nameForIndex: (int) index;
+- (NSImage *) imageForIndex: (int) index isSmall: (BOOL) small;
 
 - (void) addRemoveGroup: (id) sender;
+
+- (NSMenu *) groupMenuWithTarget: (id) target action: (SEL) action isSmall: (BOOL) small;
 
 @end

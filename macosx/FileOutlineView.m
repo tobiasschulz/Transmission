@@ -26,8 +26,6 @@
 #import "FileNameCell.h"
 #import "FilePriorityCell.h"
 #import "Torrent.h"
-#import "FileListNode.h"
-#import "QuickLookController.h"
 #import "CTGradient.h"
 
 @implementation FileOutlineView
@@ -66,6 +64,8 @@
     [fLowPriorityGradient release];
     [fMixedPriorityGradient release];
     
+    [fMouseCell release];
+    
     [super dealloc];
 }
 
@@ -85,20 +85,6 @@
     [super mouseDown: event];
 }
 
-- (void) keyDown: (NSEvent *) event
-{
-    unichar firstChar = [[event charactersIgnoringModifiers] characterAtIndex: 0];
-    if (firstChar == ' ')
-        [[QuickLookController quickLook] toggleQuickLook];
-    else if (firstChar == NSRightArrowFunctionKey)
-        [[QuickLookController quickLook] pressRight];
-    else if (firstChar == NSLeftArrowFunctionKey)
-        [[QuickLookController quickLook] pressLeft];
-    else;
-    
-    [super keyDown: event];  
-}
-
 - (NSMenu *) menuForEvent: (NSEvent *) event
 {
     int row = [self rowAtPoint: [self convertPoint: [event locationInWindow] fromView: nil]];
@@ -112,15 +98,6 @@
         [self deselectAll: self];
     
     return [self menu];
-}
-
-- (NSRect) iconRectForRow: (int) row
-{
-    FileNameCell * cell = (FileNameCell *)[self preparedCellAtColumn: [self columnWithIdentifier: @"Name"] row: row];
-    NSRect iconRect = [cell imageRectForBounds: [self rectOfRow: row]];
-    
-    iconRect.origin.x += [self indentationPerLevel] * (float)([self levelForRow: row] + 1);
-    return iconRect;
 }
 
 - (void) updateTrackingAreas
@@ -153,18 +130,24 @@
     }
 }
 
-- (int) hoveredRow
-{
-    return fMouseRow;
-}
-
 - (void) mouseEntered: (NSEvent *) event
 {
     NSNumber * row;
     if ((row = [(NSDictionary *)[event userData] objectForKey: @"Row"]))
     {
-        fMouseRow = [row intValue];
-        [self setNeedsDisplayInRect: [self frameOfCellAtColumn: [self columnWithIdentifier: @"Priority"] row: fMouseRow]];
+        int rowVal = [row intValue];
+        FilePriorityCell * cell = (FilePriorityCell *)[self preparedCellAtColumn: [self columnWithIdentifier: @"Priority"] row: rowVal];
+        if (fMouseCell != cell)
+        {
+            [fMouseCell release];
+            
+            fMouseRow = rowVal;
+            fMouseCell = [cell copy];
+            
+            [fMouseCell setControlView: self];
+            [fMouseCell mouseEntered: event];
+            [fMouseCell setRepresentedObject: [cell representedObject]];
+        }
     }
 }
 
@@ -173,9 +156,31 @@
     NSNumber * row;
     if ((row = [(NSDictionary *)[event userData] objectForKey: @"Row"]))
     {
-        [self setNeedsDisplayInRect: [self frameOfCellAtColumn: [self columnWithIdentifier: @"Priority"] row: [row intValue]]];
+        FilePriorityCell * cell = (FilePriorityCell *)[self preparedCellAtColumn: [self columnWithIdentifier: @"Priority"]
+                                                        row: [row intValue]];
+        [cell setControlView: self];
+        [cell mouseExited: event];
+        
+        [fMouseCell release];
+        fMouseCell = nil;
         fMouseRow = -1;
     }
+}
+
+- (NSCell *) preparedCellAtColumn: (NSInteger) column row: (NSInteger) row
+{
+    if (![self selectedCell] && row == fMouseRow && column == [self columnWithIdentifier: @"Priority"])
+        return fMouseCell;
+    else
+        return [super preparedCellAtColumn: column row: row];
+}
+
+- (void) updateCell: (NSCell *) cell
+{
+    if (cell == fMouseCell)
+        [self setNeedsDisplayInRect: [self frameOfCellAtColumn: [self columnWithIdentifier: @"Priority"] row: fMouseRow]];
+    else
+        [super updateCell: cell];
 }
 
 - (void) drawRow: (int) row clipRect: (NSRect) clipRect
@@ -183,7 +188,7 @@
     if (![self isRowSelected: row])
     {
         NSDictionary * item = [self itemAtRow: row]; 
-        NSIndexSet * indexes = [(FileListNode *)item indexes];
+        NSIndexSet * indexes = [item objectForKey: @"Indexes"];
         
         if ([fTorrent checkForFiles: indexes] != NSOffState)
         {

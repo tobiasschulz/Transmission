@@ -14,7 +14,7 @@
 
 #include "transmission.h"
 #include "completion.h"
-#include "resume.h" /* tr_torrentSaveResume() */
+#include "fastresume.h" /* tr_fastResumeSave() */
 #include "inout.h"
 #include "list.h"
 #include "platform.h"
@@ -34,10 +34,10 @@ struct verify_node
 
 static void
 fireCheckDone( tr_torrent          * torrent,
-               tr_verify_done_cb     verify_done_cb )
+               tr_verify_done_cb    verify_done_cb )
 {
-    if( verify_done_cb )
-        verify_done_cb( torrent );
+    if( verify_done_cb != NULL )
+        (*verify_done_cb)( torrent );
 }
 
 static struct verify_node currentNode;
@@ -56,19 +56,18 @@ static tr_lock* getVerifyLock( void )
     return lock;
 }
 
-static int
-checkFile( tr_torrent       * tor,
-           tr_file_index_t    fileIndex,
-           int              * abortFlag )
+static void
+checkFile( tr_torrent   * tor,
+           int            fileIndex,
+           int          * abortFlag )
 {
-    tr_piece_index_t i;
-    int changed = FALSE;
+    int i;
     int nofile;
     struct stat sb;
     char path[MAX_PATH_LENGTH];
     const tr_file * file = &tor->info.files[fileIndex];
 
-    tr_buildPath ( path, sizeof(path), tor->downloadDir, file->name, NULL );
+    tr_buildPath ( path, sizeof(path), tor->destination, file->name, NULL );
     nofile = stat( path, &sb ) || !S_ISREG( sb.st_mode );
 
     for( i=file->firstPiece; i<=file->lastPiece && i<tor->info.pieceCount && (!*abortFlag); ++i )
@@ -79,14 +78,11 @@ checkFile( tr_torrent       * tor,
         }
         else if( !tr_torrentIsPieceChecked( tor, i ) )
         {
-            const int wasComplete = tr_cpPieceIsComplete( tor->completion, i );
             const tr_errno err = tr_ioTestPiece( tor, i );
 
             if( !err ) /* yay */
             {
                 tr_torrentSetHasPiece( tor, i, TRUE );
-                if( !wasComplete )
-                    changed = TRUE;
             }
             else
             {
@@ -95,17 +91,13 @@ checkFile( tr_torrent       * tor,
                  * it being incomplete, do nothing -- we don't
                  * want to lose blocks in those incomplete pieces */
 
-                if( wasComplete ) {
+                if( tr_cpPieceIsComplete( tor->completion, i ) )
                     tr_torrentSetHasPiece( tor, i, FALSE );
-                    changed = TRUE;
-                }
             }
         }
 
         tr_torrentSetPieceChecked( tor, i, TRUE );
     }
-
-    return changed;
 }
 
 static void
@@ -113,8 +105,7 @@ verifyThreadFunc( void * unused UNUSED )
 {
     for( ;; )
     {
-        int changed = 0;
-        tr_file_index_t i;
+        int i;
         tr_torrent * tor;
         struct verify_node * node;
 
@@ -134,16 +125,15 @@ verifyThreadFunc( void * unused UNUSED )
 
         tor->verifyState = TR_VERIFY_NOW;
 
-        tr_torinf( tor, _( "Verifying torrent" ) );
+        tr_inf( "Verifying some pieces of \"%s\"", tor->info.name );
         for( i=0; i<tor->info.fileCount && !stopCurrent; ++i )
-            changed |= checkFile( tor, i, &stopCurrent );
+            checkFile( tor, i, &stopCurrent );
 
         tor->verifyState = TR_VERIFY_NONE;
 
         if( !stopCurrent )
         {
-            if( changed )
-                tr_torrentSaveResume( tor );
+            tr_fastResumeSave( tor );
             fireCheckDone( tor, currentNode.verify_done_cb );
         }
     }
@@ -161,13 +151,13 @@ tr_verifyAdd( tr_torrent          * tor,
     if( !uncheckedCount )
     {
         /* doesn't need to be checked... */
-        fireCheckDone( tor, verify_done_cb );
+        verify_done_cb( tor );
     }
     else
     {
         struct verify_node * node;
 
-        tr_torinf( tor, _( "Queued for verification" ) );
+        tr_inf( "Queueing %s to verify %d local file pieces", tor->info.name, uncheckedCount );
 
         node = tr_new( struct verify_node, 1 );
         node->torrent = tor;

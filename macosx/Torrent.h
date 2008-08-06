@@ -34,22 +34,23 @@ typedef enum
     TORRENT_FILE_DEFAULT
 } torrentFileState;
 
-#define STAT_TIME_NONE -1
-#define STAT_TIME_NOW -2
-
 @interface Torrent : NSObject
 {
+    tr_handle * fLib;
     tr_torrent * fHandle;
     const tr_info * fInfo;
     const tr_stat * fStat;
     
-    BOOL fResumeOnWake;
+    int fID;
     
-    BOOL fUseIncompleteFolder;
-    NSString * fDownloadFolder, * fIncompleteFolder;
+    BOOL         fResumeOnWake;
+    NSDate       * fDateAdded, * fDateCompleted, * fDateActivity;
     
-    BOOL fPublicTorrent;
-    NSString * fPublicTorrentLocation;
+    BOOL        fUseIncompleteFolder;
+    NSString    * fDownloadFolder, * fIncompleteFolder;
+    
+    BOOL        fPublicTorrent;
+    NSString    * fPublicTorrentLocation;
 	
     NSUserDefaults * fDefaults;
 
@@ -57,11 +58,15 @@ typedef enum
     
     NSString * fNameString, * fHashString;
     
-    tr_file_stat * fFileStat;
+    NSArray * fAllTrackers;
+    
+    tr_file_stat * fileStat;
     NSArray * fFileList;
     
-    NSIndexSet * fPreviousFinishedIndexes;
-    NSDate * fPreviousFinishedIndexesDate;
+    NSMenu * fFileMenu;
+    
+    float * fPreviousFinishedPieces;
+    NSDate * fFinishedPiecesDate;
     
     float fRatioLimit;
     int fRatioSetting;
@@ -69,19 +74,16 @@ typedef enum
     
     int fOrderValue, fGroupValue;
     
-    BOOL fAddedTrackers;
-    
     NSDictionary * fQuickPauseDict;
 }
 
 - (id) initWithPath: (NSString *) path location: (NSString *) location deleteTorrentFile: (torrentFileState) torrentDelete
         lib: (tr_handle *) lib;
-- (id) initWithTorrentStruct: (tr_torrent *) torrentStruct location: (NSString *) location lib: (tr_handle *) lib;
+- (id) initWithData: (NSData *) data location: (NSString *) location lib: (tr_handle *) lib;
 - (id) initWithHistory: (NSDictionary *) history lib: (tr_handle *) lib;
 
 - (NSDictionary *) history;
 
-- (void) closeRemoveTorrentInterface;
 - (void) closeRemoveTorrent;
 
 - (void) changeIncompleteDownloadFolder: (NSString *) folder;
@@ -90,8 +92,8 @@ typedef enum
 
 - (void) getAvailability: (int8_t *) tab size: (int) size;
 - (void) getAmountFinished: (float *) tab size: (int) size;
-- (NSIndexSet *) previousFinishedPieces;
--(void) setPreviousFinishedPieces: (NSIndexSet *) indexes;
+- (float *) getPreviousAmountFinished;
+-(void) setPreviousAmountFinished: (float *) tab;
 
 - (void) update;
 
@@ -138,10 +140,11 @@ typedef enum
 - (NSImage *) icon;
 
 - (NSString *) name;
-- (BOOL) isFolder;
+- (BOOL) folder;
 - (uint64_t) size;
 - (uint64_t) sizeLeft;
 
+- (NSString *) trackerAddress;
 - (NSString *) trackerAddressAnnounce;
 - (NSDate *) lastAnnounceTime;
 - (int) nextAnnounceTime;
@@ -152,10 +155,7 @@ typedef enum
 - (int) nextScrapeTime;
 - (NSString *) scrapeResponse;
 
-- (NSMutableArray *) allTrackers: (BOOL) separators;
-- (BOOL) updateAllTrackersForAdd: (NSMutableArray *) trackers;
-- (void) updateAllTrackersForRemove: (NSMutableArray *) trackers;
-- (BOOL) hasAddedTrackers;
+- (NSArray *) allTrackers;
 
 - (NSString *) comment;
 - (NSString *) creator;
@@ -185,16 +185,12 @@ typedef enum
 - (BOOL) isActive;
 - (BOOL) isSeeding;
 - (BOOL) isChecking;
-- (BOOL) isCheckingWaiting;
 - (BOOL) allDownloaded;
 - (BOOL) isComplete;
 - (BOOL) isError;
 - (NSString *) errorMessage;
 
 - (NSArray *) peers;
-
-- (NSUInteger) webSeedCount;
-- (NSArray *) webSeeds;
 
 - (NSString *) progressString;
 - (NSString *) statusString;
@@ -222,7 +218,6 @@ typedef enum
 - (float) totalRate;
 - (uint64_t) haveVerified;
 - (uint64_t) haveTotal;
-- (uint64_t) totalSizeSelected;
 - (uint64_t) downloadedTotal;
 - (uint64_t) uploadedTotal;
 - (uint64_t) failedHash;
@@ -250,6 +245,8 @@ typedef enum
 - (BOOL) hasFilePriority: (int) priority forIndexes: (NSIndexSet *) indexSet;
 - (NSSet *) filePrioritiesForIndexes: (NSIndexSet *) indexSet;
 
+- (NSMenu *) fileMenu;
+
 - (NSDate *) dateAdded;
 - (NSDate *) dateCompleted;
 - (NSDate *) dateActivity;
@@ -258,8 +255,10 @@ typedef enum
 - (int) stalledMinutes;
 - (BOOL) isStalled;
 
-- (NSInteger) stateSortKey;
+- (NSNumber *) stateSortKey;
 
-- (tr_torrent *) torrentStruct;
+- (int) torrentID;
+- (const tr_info *) torrentInfo;
+- (const tr_stat *) torrentStat;
 
 @end

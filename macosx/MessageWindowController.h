@@ -29,10 +29,8 @@
     IBOutlet NSTableView * fMessageTable;
     
     IBOutlet NSPopUpButton * fLevelButton;
-    IBOutlet NSButton * fSaveButton, * fClearButton;
     
     NSMutableArray * fMessages;
-    unsigned int fIndex;
     
     NSDictionary * fAttributes;
     

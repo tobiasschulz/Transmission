@@ -34,6 +34,27 @@ enum
     ENCRYPTION_PREFERENCE_NO
 };
 
+/**
+*** The "SWIFT" system is described by Karthik Tamilmani,
+*** Vinay Pai, and Alexander Mohr of Stony Brook University
+*** in their paper "SWIFT: A System With Incentives For Trading"
+*** http://citeseer.ist.psu.edu/tamilmani04swift.html
+***
+*** More SWIFT constants are defined in peer-mgr.c
+**/
+
+/**
+ * Use SWIFT?
+ */
+static const int SWIFT_ENABLED = 0;
+
+/**
+ * For every byte the peer uploads to us,
+ * allow them to download this many bytes from us
+ */
+static const double SWIFT_REPAYMENT_RATIO = 1.33;
+
+
 typedef struct tr_peer
 {
     unsigned int  peerIsChoked : 1;
@@ -50,6 +71,7 @@ typedef struct tr_peer
     struct in_addr in_addr;
     struct tr_peerIo * io;
 
+    struct tr_bitfield * banned;
     struct tr_bitfield * blame;
     struct tr_bitfield * have;
     float progress;
@@ -67,8 +89,10 @@ typedef struct tr_peer
     struct tr_ratecontrol * rcToClient;
     struct tr_ratecontrol * rcToPeer;
 
-    float rateToClient;
-    float rateToPeer;
+    double rateToClient;
+    double rateToPeer;
+
+    int64_t credit;
 }
 tr_peer;
 

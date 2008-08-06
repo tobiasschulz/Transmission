@@ -24,9 +24,15 @@
 
 #import <Cocoa/Cocoa.h>
 
+@class CTGradient;
+
 @interface StatusBarView : NSView
 {
-    NSColor * fGrayBorderColor;
+    BOOL fShow;
+    
+    CTGradient * fGradient;
 }
+
+- (void) setShowOnTiger: (BOOL) show;
 
 @end

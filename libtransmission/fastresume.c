@@ -42,7 +42,6 @@
  **********************************************************************/
 
 #include <assert.h>
-#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h> /* calloc */
 #include <string.h> /* strcpy, memset, memcmp */
@@ -56,7 +55,6 @@
 #include "fastresume.h"
 #include "peer-mgr.h"
 #include "platform.h"
-#include "resume.h" /* TR_FR_ bitwise enum */
 #include "torrent.h"
 #include "utils.h"
 
@@ -100,8 +98,8 @@ enum
     /* IPs and ports of connectable peers */
     FR_ID_PEERS = 11,
 
-    /* download dir of the torrent: zero-terminated string */
-    FR_ID_DOWNLOAD_DIR = 12,
+    /* destination of the torrent: zero-terminated string */
+    FR_ID_DESTINATION = 12,
 
     /* pex flag
      * 't' if pex is enabled, 'f' if disabled */
@@ -116,16 +114,15 @@ enum
 #define FR_MTIME_LEN( t ) \
   ( sizeof(tr_time_t) * (t)->info.fileCount )
 #define FR_BLOCK_BITFIELD_LEN( t ) \
-  ( ( (t)->blockCount + 7u ) / 8u )
+  ( ( (t)->blockCount + 7 ) / 8 )
 #define FR_PROGRESS_LEN( t ) \
   ( FR_MTIME_LEN( t ) + FR_BLOCK_BITFIELD_LEN( t ) )
 #define FR_SPEED_LEN (2 * (sizeof(uint16_t) + sizeof(uint8_t) ) )
 
-#if 0
 static void
 fastResumeFileName( char * buf, size_t buflen, const tr_torrent * tor, int tag )
 {
-    const char * cacheDir = tr_getResumeDir( tor->handle );
+    const char * cacheDir = tr_getCacheDirectory ();
     const char * hash = tor->info.hashString;
 
     if( !tag )
@@ -135,11 +132,10 @@ fastResumeFileName( char * buf, size_t buflen, const tr_torrent * tor, int tag )
     else
     {
         char base[1024];
-        tr_snprintf( base, sizeof(base), "%s-%s", hash, tor->handle->tag );
+        snprintf( base, sizeof(base), "%s-%s", hash, tor->handle->tag );
         tr_buildPath( buf, buflen, cacheDir, base, NULL );
     }
 }
-#endif
 
 static tr_time_t*
 getMTimes( const tr_torrent * tor, int * setme_n )
@@ -152,7 +148,7 @@ getMTimes( const tr_torrent * tor, int * setme_n )
         char fname[MAX_PATH_LENGTH];
         struct stat sb;
         tr_buildPath( fname, sizeof(fname),
-                      tor->downloadDir, tor->info.files[i].name, NULL );
+                      tor->destination, tor->info.files[i].name, NULL );
         if ( !stat( fname, &sb ) && S_ISREG( sb.st_mode ) ) {
 #ifdef SYS_DARWIN
             m[i] = sb.st_mtimespec.tv_sec;
@@ -166,7 +162,6 @@ getMTimes( const tr_torrent * tor, int * setme_n )
     return m;
 }
 
-#if 0
 static void
 fastResumeWriteData( uint8_t       id,
                      const void  * data,
@@ -191,23 +186,23 @@ tr_fastResumeSave( const tr_torrent * tor )
 
     fastResumeFileName( path, sizeof path, tor, 1 );
     file = fopen( path, "wb+" );
-    if( !file ) {
-        tr_torerr( tor, _( "Couldn't open \"%1$s\": %2$s" ), path, tr_strerror( errno ) );
+    if( NULL == file ) {
+        tr_err( "Couldn't open '%s' for writing", path );
         return;
     }
     
     /* Write format version */
     fwrite( &version, 4, 1, file );
 
-    if( TRUE ) /* FR_ID_DOWNLOAD_DIR */
+    if( TRUE ) /* FR_ID_DESTINATION */
     {
-        const char * d = tor->downloadDir ? tor->downloadDir : "";
+        const char * d = tor->destination ? tor->destination : "";
         const int byteCount = strlen( d ) + 1;
-        fastResumeWriteData( FR_ID_DOWNLOAD_DIR, d, 1, byteCount, file );
+        fastResumeWriteData( FR_ID_DESTINATION, d, 1, byteCount, file );
     }
 
     /* Write progress data */
-    {
+    if (1) {
         int i, n;
         tr_time_t * mtimes;
         uint8_t * buf = malloc( FR_PROGRESS_LEN( tor ) );
@@ -327,8 +322,9 @@ tr_fastResumeSave( const tr_torrent * tor )
     }
 
     fclose( file );
+
+    /*tr_dbg( "Wrote resume file for '%s'", tor->info.name );*/
 }
-#endif
 
 /***
 ****
@@ -349,7 +345,7 @@ internalIdToPublicBitfield( uint8_t id )
         case FR_ID_RUN:            ret = TR_FR_RUN;           break;
         case FR_ID_CORRUPT:        ret = TR_FR_CORRUPT;       break;
         case FR_ID_PEERS:          ret = TR_FR_PEERS;         break;
-        case FR_ID_DOWNLOAD_DIR:   ret = TR_FR_DOWNLOAD_DIR;  break;
+        case FR_ID_DESTINATION:    ret = TR_FR_DESTINATION;   break;
         case FR_ID_MAX_PEERS:      ret = TR_FR_MAX_PEERS;     break;
     }
 
@@ -404,11 +400,11 @@ parseProgress( tr_torrent     * tor,
                const uint8_t  * buf,
                uint32_t         len )
 {
+    int i;
     uint64_t ret = 0;
    
     if( len == FR_PROGRESS_LEN( tor ) )
     {
-        int i;
         int n;
         tr_bitfield bitfield;
 
@@ -422,32 +418,25 @@ parseProgress( tr_torrent     * tor,
                 tr_torrentSetFileChecked( tor, i, TRUE );
             else {
                 tr_torrentSetFileChecked( tor, i, FALSE );
-                tr_tordbg( tor, "Torrent needs to be verified" );
+                tr_dbg( "File '%s' recheck needed", tor->info.files[i].name );
             }
         }
         free( curMTimes );
 
         /* get the completion bitfield */
         memset( &bitfield, 0, sizeof bitfield );
-        bitfield.byteCount = FR_BLOCK_BITFIELD_LEN( tor );
-        bitfield.bitCount = bitfield.byteCount * 8;
+        bitfield.len = FR_BLOCK_BITFIELD_LEN( tor );
         bitfield.bits = (uint8_t*) walk;
-        if( !tr_cpBlockBitfieldSet( tor->completion, &bitfield ) )
-            ret = TR_FR_PROGRESS;
-        else {
-            tr_torrentUncheck( tor );
-            tr_tordbg( tor, "Torrent needs to be verified" );
-        }
+        tr_cpBlockBitfieldSet( tor->completion, &bitfield );
+
+        ret = TR_FR_PROGRESS;
     }
 
     /* the files whose mtimes are wrong,
        remove from completion pending a recheck... */
-    {
-        tr_piece_index_t i;
-        for( i=0; i<tor->info.pieceCount; ++i )
-            if( !tr_torrentIsPieceChecked( tor, i ) )
-                tr_cpPieceRem( tor->completion, i );
-    }
+    for( i=0; i<tor->info.pieceCount; ++i )
+        if( !tr_torrentIsPieceChecked( tor, i ) )
+            tr_cpPieceRem( tor->completion, i );
 
     return ret;
 }
@@ -461,8 +450,8 @@ parsePriorities( tr_torrent * tor, const uint8_t * buf, uint32_t len )
     {
         const size_t n = tor->info.fileCount;
         const size_t len = 2 * n;
-        tr_file_index_t *dnd = NULL, dndCount = 0;
-        tr_file_index_t *dl = NULL, dlCount = 0;
+        int *dnd = NULL, dndCount = 0;
+        int *dl = NULL, dlCount = 0;
         size_t i;
         const uint8_t * walk = buf;
 
@@ -479,8 +468,8 @@ parsePriorities( tr_torrent * tor, const uint8_t * buf, uint32_t len )
         }
 
         /* set the dnd flags */
-        dl = tr_new( tr_file_index_t, len );
-        dnd = tr_new( tr_file_index_t, len );
+        dl = tr_new( int, len );
+        dnd = tr_new( int, len );
         for( i=0; i<n; ++i )
             if( *walk++ == 't' ) /* 't' means the DND flag is true */
                 dnd[dndCount++] = i;
@@ -552,7 +541,7 @@ parsePeers( tr_torrent * tor, const uint8_t * buf, uint32_t len )
             tr_peerMgrAddPex( tor->handle->peerMgr, tor->info.hash, TR_PEER_FROM_CACHE, &pex );
         }
 
-        tr_tordbg( tor, "Loaded %d peers from resume file", count );
+        tr_dbg( "found %i peers in resume file", count );
         ret = TR_FR_PEERS;
     }
 
@@ -560,14 +549,14 @@ parsePeers( tr_torrent * tor, const uint8_t * buf, uint32_t len )
 }
 
 static uint64_t
-parseDownloadDir( tr_torrent * tor, const uint8_t * buf, uint32_t len )
+parseDestination( tr_torrent * tor, const uint8_t * buf, uint32_t len )
 {
     uint64_t ret = 0;
 
     if( buf && *buf && len ) {
-        tr_free( tor->downloadDir );
-        tor->downloadDir = tr_strndup( (char*)buf, len );
-        ret = TR_FR_DOWNLOAD_DIR;
+        tr_free( tor->destination );
+        tor->destination = tr_strndup( (char*)buf, len );
+        ret = TR_FR_DESTINATION;
     }
 
     return ret;
@@ -586,11 +575,7 @@ parseVersion1( tr_torrent * tor, const uint8_t * buf, const uint8_t * end,
         readBytes( &id, &buf, sizeof(id) );
         readBytes( &len, &buf, sizeof(len) );
 
-        if( buf + len > end )
-        {
-            tr_torerr( tor, "Resume file seems to be corrupt.  Skipping." );
-        }
-        else if( fieldsToLoad & internalIdToPublicBitfield( id ) ) switch( id )
+        if( fieldsToLoad & internalIdToPublicBitfield( id ) ) switch( id )
         {
             case FR_ID_DOWNLOADED:   ret |= parseDownloaded( tor, buf, len ); break;
             case FR_ID_UPLOADED:     ret |= parseUploaded( tor, buf, len ); break;
@@ -601,8 +586,8 @@ parseVersion1( tr_torrent * tor, const uint8_t * buf, const uint8_t * end,
             case FR_ID_CORRUPT:      ret |= parseCorrupt( tor, buf, len ); break;
             case FR_ID_PEERS:        ret |= parsePeers( tor, buf, len ); break;
             case FR_ID_MAX_PEERS:    ret |= parseConnections( tor, buf, len ); break;
-            case FR_ID_DOWNLOAD_DIR: ret |= parseDownloadDir( tor, buf, len ); break;
-            default:                 tr_tordbg( tor, "Skipping unknown resume code %d", (int)id ); break;
+            case FR_ID_DESTINATION:  ret |= parseDestination( tor, buf, len ); break;
+            default:                 tr_dbg( "Skipping unknown resume code %d", (int)id ); break;
         }
 
         buf += len;
@@ -616,13 +601,13 @@ loadResumeFile( const tr_torrent * tor, size_t * len )
 {
     uint8_t * ret = NULL;
     char path[MAX_PATH_LENGTH];
-    const char * cacheDir = tr_getResumeDir( tor->handle );
+    const char * cacheDir = tr_getCacheDirectory ();
     const char * hash = tor->info.hashString;
 
     if( !ret && tor->handle->tag )
     {
         char base[1024];
-        tr_snprintf( base, sizeof(base), "%s-%s", hash, tor->handle->tag );
+        snprintf( base, sizeof(base), "%s-%s", hash, tor->handle->tag );
         tr_buildPath( path, sizeof(path), cacheDir, base, NULL );
         ret = tr_loadFile( path, len );
     }
@@ -645,8 +630,7 @@ fastResumeLoadImpl ( tr_torrent   * tor,
     uint8_t * buf = loadResumeFile( tor, &size );
 
     if( !buf )
-        /* %s is the torrent name */
-        tr_torinf( tor, _( "Couldn't read resume file" ) );
+        tr_inf( "Couldn't read resume file for '%s'", tor->info.name );
     else {
         const uint8_t * walk = buf;
         const uint8_t * end = walk + size;
@@ -656,8 +640,7 @@ fastResumeLoadImpl ( tr_torrent   * tor,
             if( version == 1 )
                 ret |= parseVersion1 ( tor, walk, end, fieldsToLoad );
             else
-                /* %s is the torrent name */
-                tr_torinf( tor, _( "Couldn't read resume file" ) );
+                tr_inf( "Unsupported resume file %d for '%s'", version, tor->info.name );
         }
 
         tr_free( buf );
@@ -666,24 +649,74 @@ fastResumeLoadImpl ( tr_torrent   * tor,
     return ret;
 }
 
+static uint64_t
+setFromCtor( tr_torrent * tor, uint64_t fields, const tr_ctor * ctor, int mode )
+{
+    uint64_t ret = 0;
+
+    if( fields & TR_FR_RUN ) {
+        uint8_t isPaused;
+        if( !tr_ctorGetPaused( ctor, mode, &isPaused ) ) {
+            tor->isRunning = !isPaused;
+            ret |= TR_FR_RUN;
+        }
+    }
+
+    if( fields & TR_FR_MAX_PEERS ) 
+        if( !tr_ctorGetMaxConnectedPeers( ctor, mode, &tor->maxConnectedPeers ) )
+            ret |= TR_FR_MAX_PEERS;
+
+    if( fields & TR_FR_DESTINATION ) {
+        const char * destination;
+        if( !tr_ctorGetDestination( ctor, mode, &destination ) ) {
+            ret |= TR_FR_DESTINATION;
+            tr_free( tor->destination );
+            tor->destination = tr_strdup( destination );
+        }
+    }
+
+    return ret;
+}
+
+static uint64_t
+useManditoryFields( tr_torrent * tor, uint64_t fields, const tr_ctor * ctor )
+{
+    return setFromCtor( tor, fields, ctor, TR_FORCE );
+}
+
+static uint64_t
+useFallbackFields( tr_torrent * tor, uint64_t fields, const tr_ctor * ctor )
+{
+    return setFromCtor( tor, fields, ctor, TR_FALLBACK );
+}
+
 uint64_t
 tr_fastResumeLoad( tr_torrent     * tor,
-                   uint64_t         fieldsToLoad )
+                   uint64_t         fieldsToLoad,
+                   const tr_ctor  * ctor )
 {
-    return fastResumeLoadImpl( tor, fieldsToLoad );
+    uint64_t ret = 0;
+
+    ret |= useManditoryFields( tor, fieldsToLoad, ctor );
+    fieldsToLoad &= ~ret;
+    ret |= fastResumeLoadImpl( tor, fieldsToLoad );
+    fieldsToLoad &= ~ret;
+    ret |= useFallbackFields( tor, fieldsToLoad, ctor );
+
+    return ret;
 }
 
 void
 tr_fastResumeRemove( const tr_torrent * tor )
 {
     char path[MAX_PATH_LENGTH];
-    const char * cacheDir = tr_getResumeDir( tor->handle );
+    const char * cacheDir = tr_getCacheDirectory ();
     const char * hash = tor->info.hashString;
 
     if( tor->handle->tag )
     {
         char base[1024];
-        tr_snprintf( base, sizeof(base), "%s-%s", hash, tor->handle->tag );
+        snprintf( base, sizeof(base), "%s-%s", hash, tor->handle->tag );
         tr_buildPath( path, sizeof(path), cacheDir, base, NULL );
         unlink( path );
     }

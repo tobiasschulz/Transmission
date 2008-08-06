@@ -20,7 +20,7 @@
  * TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
  * SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
  *
- * $Id$
+ * $Id:$
  */
 
 #include "TRWindow.h"
@@ -109,7 +109,7 @@ TRWindow::TRWindow() : BWindow(BRect(10, 40, 350, 110), "Transmission", B_TITLED
 	delete rectFrame;
 	
 	// Bring up the Transmission Engine
-	engine = tr_sessionInit( "beos" );
+	engine = tr_init( "beos" );
 	LoadSettings();
 	
 	UpdateList(-1, true);
@@ -119,8 +119,20 @@ TRWindow::TRWindow() : BWindow(BRect(10, 40, 350, 110), "Transmission", B_TITLED
 	Show();
 }
 
+static void torrentclose(tr_torrent_t *torrent, void *)
+{
+	tr_torrentClose(torrent);
+}
+
 TRWindow::~TRWindow() {
-	tr_sessionClose(engine);
+	tr_torrentIterate(engine, torrentclose, NULL);
+	const int MAX_EXIT_WAIT_SECS = 10;
+	const time_t deadline = time(0) + MAX_EXIT_WAIT_SECS;
+	while (tr_torrentCount(engine) && time(NULL) < deadline) {
+		snooze(100000);
+	}
+	/* XXX there's no way to make sure the torrent threads are running so this might crash */
+	tr_close(engine);
 	stop_watching(this);
 	delete quitter;
 }
@@ -341,7 +353,7 @@ void TRWindow::MessageReceived(BMessage *msg) {
 		
 		// Remove the file from the filesystem.
 		TRTransfer *item = (TRTransfer*)transfers->RemoveItem(index);
-		tr_torrentRemove(item->GetTorrent());
+		tr_torrentClose(item->GetTorrent());
 		BEntry *entry = new BEntry(item->GetCachedPath(), true);
 		entry->Remove();
 		delete entry;

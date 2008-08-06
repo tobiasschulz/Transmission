@@ -24,7 +24,7 @@
 
 #import "TorrentCell.h"
 #import "TorrentTableView.h"
-#import "GroupsController.h"
+#import "GroupsWindowController.h"
 #import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "NSBezierPathAdditions.h"
@@ -54,8 +54,7 @@
 #define PADDING_BETWEEN_BAR_AND_STATUS 2.0
 
 #define PIECES_TOTAL_PERCENT 0.6
-
-#define MAX_PIECES (18*18)
+#define MAX_PIECES 324
 
 @interface TorrentCell (Private)
 
@@ -98,10 +97,58 @@
                                 paragraphStyle, NSParagraphStyleAttributeName, nil];
         [paragraphStyle release];
         
-        fBluePieceColor = [[NSColor colorWithCalibratedRed: 0.0 green: 0.4 blue: 0.8 alpha: 1.0] retain];
-        fBarBorderColor = [[NSColor colorWithDeviceWhite: 0.0 alpha: 0.2] retain];
+        //store box colors
+        fGrayColor = [[NSColor colorWithCalibratedRed: 0.9 green: 0.9 blue: 0.9 alpha: 1.0] retain];
+        fBlue1Color = [[NSColor colorWithCalibratedRed: 0.8 green: 1.0 blue: 1.0 alpha: 1.0] retain];
+        fBlue2Color = [[NSColor colorWithCalibratedRed: 0.6 green: 1.0 blue: 1.0 alpha: 1.0] retain];
+        fBlue3Color = [[NSColor colorWithCalibratedRed: 0.6 green: 0.8 blue: 1.0 alpha: 1.0] retain];
+        fBlue4Color = [[NSColor colorWithCalibratedRed: 0.4 green: 0.6 blue: 1.0 alpha: 1.0] retain];
+        fBlueColor = [[NSColor colorWithCalibratedRed: 0.0 green: 0.4 blue: 0.8 alpha: 1.0] retain];
+        fOrangeColor = [[NSColor orangeColor] retain];
+        
+        fBarOverlayColor = [[NSColor colorWithDeviceWhite: 0.0 alpha: 0.2] retain];
+        
+        fFieldBackColor = [[NSColor colorWithDeviceWhite: 0.65 alpha: 0.7] retain];
     }
 	return self;
+}
+
+- (id) copyWithZone: (NSZone *) zone
+{
+    TorrentCell * copy = [super copyWithZone: zone];
+    
+    copy->fBitmap = nil;
+    
+    copy->fGrayGradient = [fGrayGradient retain];
+    copy->fLightGrayGradient = [fLightGrayGradient retain];
+    copy->fBlueGradient = [fBlueGradient retain];
+    copy->fDarkBlueGradient = [fDarkBlueGradient retain];
+    copy->fGreenGradient = [fGreenGradient retain];
+    copy->fLightGreenGradient = [fLightGreenGradient retain];
+    copy->fDarkGreenGradient = [fDarkGreenGradient retain];
+    copy->fYellowGradient = [fYellowGradient retain];
+    copy->fRedGradient = [fRedGradient retain];
+    copy->fTransparentGradient = [fTransparentGradient retain];
+    
+    return copy;
+}
+
+- (void) dealloc
+{
+    [fBitmap release];
+    
+    [fGrayGradient release];
+    [fLightGrayGradient release];
+    [fBlueGradient release];
+    [fDarkBlueGradient release];
+    [fGreenGradient release];
+    [fLightGreenGradient release];
+    [fDarkGreenGradient release];
+    [fYellowGradient release];
+    [fRedGradient release];
+    [fTransparentGradient release];
+    
+    [super dealloc];
 }
 
 - (NSRect) iconRectForBounds: (NSRect) bounds
@@ -124,18 +171,12 @@
 
 - (NSRect) minimalStatusRectForBounds: (NSRect) bounds
 {
-    if (![fDefaults boolForKey: @"SmallView"])
-        return NSZeroRect;
-    
     return [self rectForMinimalStatusWithString: [self attributedStatusString: [self minimalStatusString] withColor: nil]
             inBounds: bounds];
 }
 
 - (NSRect) progressRectForBounds: (NSRect) bounds
 {
-    if ([fDefaults boolForKey: @"SmallView"])
-        return NSZeroRect;
-    
     return [self rectForProgressWithString: [self attributedStatusString: [[self representedObject] progressString] withColor: nil]
             inBounds: bounds];
 }
@@ -161,9 +202,6 @@
 
 - (NSRect) statusRectForBounds: (NSRect) bounds
 {
-    if ([fDefaults boolForKey: @"SmallView"])
-        return NSZeroRect;
-    
     return [self rectForStatusWithString: [self attributedStatusString: [self statusString] withColor: nil] inBounds: bounds];
 }
 
@@ -201,14 +239,15 @@
 
 - (NSRect) actionButtonRectForBounds: (NSRect) bounds
 {
-    NSRect result = [self iconRectForBounds: bounds];
-    if (![fDefaults boolForKey: @"SmallView"])
-    {
-        result.origin.x += (result.size.width - ACTION_BUTTON_WIDTH) * 0.5;
-        result.origin.y += (result.size.height - ACTION_BUTTON_WIDTH) * 0.5;
-        result.size.width = ACTION_BUTTON_WIDTH;
-        result.size.height = ACTION_BUTTON_WIDTH;
-    }
+    NSRect iconRect = [self iconRectForBounds: bounds];
+    if ([fDefaults boolForKey: @"SmallView"])
+        return iconRect;
+    
+    NSRect result = iconRect;
+    result.origin.x += (iconRect.size.width - ACTION_BUTTON_WIDTH) * 0.5;
+    result.origin.y += (iconRect.size.height - ACTION_BUTTON_WIDTH) * 0.5;
+    result.size.width = ACTION_BUTTON_WIDTH;
+    result.size.height = ACTION_BUTTON_WIDTH;
     
     return result;
 }
@@ -218,7 +257,9 @@
     NSPoint point = [controlView convertPoint: [event locationInWindow] fromView: nil];
     
     if (NSMouseInRect(point, [self controlButtonRectForBounds: cellFrame], [controlView isFlipped])
-        || NSMouseInRect(point, [self revealButtonRectForBounds: cellFrame], [controlView isFlipped]))
+        || NSMouseInRect(point, [self revealButtonRectForBounds: cellFrame], [controlView isFlipped])
+        || NSMouseInRect(point, [self progressRectForBounds: cellFrame], [controlView isFlipped])
+        || NSMouseInRect(point, [self minimalStatusRectForBounds: cellFrame], [controlView isFlipped]))
         return NSCellHitContentArea | NSCellHitTrackableArea;
     
     return NSCellHitContentArea;
@@ -243,6 +284,12 @@
     NSRect revealRect = [self revealButtonRectForBounds: cellFrame];
     BOOL checkReveal = NSMouseInRect(point, revealRect, [controlView isFlipped]);
     
+    NSRect progressRect = [self progressRectForBounds: cellFrame];
+    BOOL checkProgress = NSMouseInRect(point, progressRect, [controlView isFlipped]);
+    
+    NSRect minimalStatusRect = [self minimalStatusRectForBounds: cellFrame];
+    BOOL checkMinStatus = NSMouseInRect(point, minimalStatusRect, [controlView isFlipped]);
+    
     [(TorrentTableView *)controlView removeButtonTrackingAreas];
     
     while ([event type] != NSLeftMouseUp)
@@ -264,6 +311,24 @@
             if (fMouseDownRevealButton != inRevealButton)
             {
                 fMouseDownRevealButton = inRevealButton;
+                [controlView setNeedsDisplayInRect: cellFrame];
+            }
+        }
+        else if (checkProgress)
+        {
+            BOOL inProgressField = NSMouseInRect(point, progressRect, [controlView isFlipped]);
+            if (fMouseDownProgressField != inProgressField)
+            {
+                fMouseDownProgressField = inProgressField;
+                [controlView setNeedsDisplayInRect: cellFrame];
+            }
+        }
+        else if (checkMinStatus)
+        {
+            BOOL inMinStatusField = NSMouseInRect(point, minimalStatusRect, [controlView isFlipped]);
+            if (fMouseDownMinimalStatusField != inMinStatusField)
+            {
+                fMouseDownMinimalStatusField = inMinStatusField;
                 [controlView setNeedsDisplayInRect: cellFrame];
             }
         }
@@ -290,6 +355,20 @@
         [controlView setNeedsDisplayInRect: cellFrame];
         
         [[self representedObject] revealData];
+    }
+    else if (fMouseDownProgressField)
+    {
+        fMouseDownProgressField = NO;
+        
+        [fDefaults setBool: ![fDefaults boolForKey: @"DisplayStatusProgressSelected"] forKey: @"DisplayStatusProgressSelected"];
+        [(TorrentTableView *)controlView reloadData];
+    }
+    else if (fMouseDownMinimalStatusField)
+    {
+        fMouseDownMinimalStatusField = NO;
+        
+        [fDefaults setBool: ![fDefaults boolForKey: @"DisplaySmallStatusRegular"] forKey: @"DisplaySmallStatusRegular"];
+        [(TorrentTableView *)controlView reloadData];
     }
     else;
     
@@ -356,17 +435,17 @@
 
 - (void) setControlHover: (BOOL) hover
 {
-    fHoverControl = hover;
+    fHoverControl = [NSApp isOnLeopardOrBetter] ? hover : NO;
 }
 
 - (void) setRevealHover: (BOOL) hover
 {
-    fHoverReveal = hover;
+    fHoverReveal = [NSApp isOnLeopardOrBetter] ? hover : NO;
 }
 
 - (void) setActionHover: (BOOL) hover
 {
-    fHoverAction = hover;
+    fHoverAction = [NSApp isOnLeopardOrBetter] ? hover : NO;
 }
 
 - (void) setActionPushed: (BOOL) pushed
@@ -386,28 +465,15 @@
     int groupValue = [torrent groupValue];
     if (groupValue != -1)
     {
-        NSRect groupRect = NSInsetRect(iconRect, -1.0, -2.0);
+        NSRect groupRect = NSInsetRect(iconRect, -2.0, -3.0);
         if (!minimal)
         {
             groupRect.size.height--;
             groupRect.origin.y--;
         }
-        float radius = minimal ? 3.0 : 6.0;
         
-        NSColor * groupColor = [[GroupsController groups] colorForIndex: groupValue],
-                * darkGroupColor = [groupColor blendedColorWithFraction: 0.2 ofColor: [NSColor whiteColor]];
-        
-        //border
-        NSBezierPath * bp = [NSBezierPath bezierPathWithRoundedRect: groupRect radius: radius];
-        [darkGroupColor set];
-        [bp setLineWidth: 2.0];
-        [bp stroke];
-        
-        //inside
-        bp = [NSBezierPath bezierPathWithRoundedRect: groupRect radius: radius];
-        CTGradient * gradient = [CTGradient gradientWithBeginningColor: [groupColor blendedColorWithFraction: 0.7
-                                    ofColor: [NSColor whiteColor]] endingColor: darkGroupColor];
-        [gradient fillBezierPath: bp angle: 90.0];
+        [[[GroupsWindowController groups] gradientForIndex: groupValue] fillBezierPath:
+            [NSBezierPath bezierPathWithRoundedRect: groupRect radius: 6.0] angle: 90.0];
     }
     
     //error image
@@ -434,7 +500,7 @@
     
     //text color
     NSColor * titleColor, * statusColor;
-    if ([self isHighlighted]
+    if ([NSApp isOnLeopardOrBetter] ? [self backgroundStyle] == NSBackgroundStyleDark : [self isHighlighted]
         && [[self highlightColorWithFrame: cellFrame inView: controlView] isEqual: [NSColor alternateSelectedControlColor]])
     {
         titleColor = [NSColor whiteColor];
@@ -453,6 +519,12 @@
         NSAttributedString * minimalString = [self attributedStatusString: [self minimalStatusString] withColor: statusColor];
         minimalStatusRect = [self rectForMinimalStatusWithString: minimalString inBounds: cellFrame];
         
+        if (fMouseDownMinimalStatusField)
+        {
+            [fFieldBackColor set];
+            [[NSBezierPath bezierPathWithRoundedRect: NSInsetRect(minimalStatusRect, -2.0, 0.0) radius: 5.0] fill];
+        }
+        
         [minimalString drawInRect: minimalStatusRect];
     }
     
@@ -466,6 +538,12 @@
     {
         NSAttributedString * progressString = [self attributedStatusString: [torrent progressString] withColor: statusColor];
         NSRect progressRect = [self rectForProgressWithString: progressString inBounds: cellFrame];
+        
+        if (fMouseDownProgressField)
+        {
+            [fFieldBackColor set];
+            [[NSBezierPath bezierPathWithRoundedRect: NSInsetRect(progressRect, -2.0, 0.0) radius: 5.0] fill];
+        }
         
         [progressString drawInRect: progressRect];
     }
@@ -500,31 +578,31 @@
         fraction: 1.0];
     
     //reveal button
-    NSString * revealImageString;
+    NSString * revealImageSuffix;
     if (fMouseDownRevealButton)
-        revealImageString = @"RevealOn.png";
+        revealImageSuffix = @"On.png";
     else if (!fTracking && fHoverReveal)
-        revealImageString = @"RevealHover.png";
+        revealImageSuffix = @"Hover.png";
     else
-        revealImageString = @"RevealOff.png";
+        revealImageSuffix = @"Off.png";
     
-    NSImage * revealImage = [NSImage imageNamed: revealImageString];
+    NSImage * revealImage = [NSImage imageNamed: [@"Reveal" stringByAppendingString: revealImageSuffix]];
     [revealImage setFlipped: YES];
     [revealImage drawInRect: [self revealButtonRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver
         fraction: 1.0];
     
     //action button
-    NSString * actionImageString;
+    NSString * actionImageSuffix;
     if (fMouseDownActionButton)
-        actionImageString = @"ActionOn.png";
+        actionImageSuffix = @"On.png";
     else if (!fTracking && fHoverAction)
-        actionImageString = @"ActionHover.png";
+        actionImageSuffix = @"Hover.png";
     else
-        actionImageString = nil;
+        actionImageSuffix = nil;
     
-    if (actionImageString)
+    if (actionImageSuffix)
     {
-        NSImage * actionImage = [NSImage imageNamed: actionImageString];
+        NSImage * actionImage = [NSImage imageNamed: [@"Action" stringByAppendingString: actionImageSuffix]];
         [actionImage setFlipped: YES];
         [actionImage drawInRect: [self actionButtonRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver
             fraction: 1.0];
@@ -557,12 +635,14 @@
     }
     else
     {
-        [[self representedObject] setPreviousFinishedPieces: nil];
+        [fBitmap release];
+        fBitmap = nil;
+        [[self representedObject] setPreviousAmountFinished: NULL];
         
         [self drawRegularBar: barRect];
     }
     
-    [fBarBorderColor set];
+    [fBarOverlayColor set];
     [NSBezierPath strokeRect: NSInsetRect(barRect, 0.5, 0.5)];
 }
 
@@ -588,7 +668,9 @@
             noIncludeRect.origin.x += barRect.size.width - rightNoIncludeWidth;
             noIncludeRect.size.width = rightNoIncludeWidth;
             
-            [[CTGradient progressLightGrayGradient] fillRect: noIncludeRect angle: 90];
+            if (!fLightGrayGradient)
+                fLightGrayGradient = [[CTGradient progressLightGrayGradient] retain];
+            [fLightGrayGradient fillRect: noIncludeRect angle: -90];
         }
         
         if (rightWidth > 0)
@@ -596,16 +678,18 @@
             if ([torrent isActive] && ![torrent allDownloaded] && ![torrent isChecking]
                 && [fDefaults boolForKey: @"DisplayProgressBarAvailable"])
             {
-                int notAvailableWidth = ceil(rightWidth * [torrent notAvailableDesired]);
+                int notAvailableWidth = MIN(ceil(barRect.size.width * [torrent notAvailableDesired]), rightWidth);
+                rightWidth -= notAvailableWidth;
+                
                 if (notAvailableWidth > 0)
                 {
-                    rightWidth -= notAvailableWidth;
-                    
                     NSRect notAvailableRect = barRect;
                     notAvailableRect.origin.x += leftWidth + rightWidth;
                     notAvailableRect.size.width = notAvailableWidth;
                     
-                    [[CTGradient progressRedGradient] fillRect: notAvailableRect angle: 90];
+                    if (!fRedGradient)
+                        fRedGradient = [[CTGradient progressRedGradient] retain];
+                    [fRedGradient fillRect: notAvailableRect angle: -90];
                 }
             }
             
@@ -615,7 +699,9 @@
                 includeRect.origin.x += leftWidth;
                 includeRect.size.width = rightWidth;
                 
-                [[CTGradient progressWhiteGradient] fillRect: includeRect angle: 90];
+                if (!fWhiteGradient)
+                    fWhiteGradient = [[CTGradient progressWhiteGradient] retain];
+                [fWhiteGradient fillRect: includeRect angle: -90];
             }
         }
     }
@@ -628,7 +714,11 @@
         if ([torrent isActive])
         {
             if ([torrent isChecking])
-                [[CTGradient progressYellowGradient] fillRect: completeRect angle: 90];
+            {
+                if (!fYellowGradient)
+                    fYellowGradient = [[CTGradient progressYellowGradient] retain];
+                [fYellowGradient fillRect: completeRect angle: -90];
+            }
             else if ([torrent isSeeding])
             {
                 int ratioLeftWidth = leftWidth * (1.0 - [torrent progressStopRatio]);
@@ -640,79 +730,111 @@
                     ratioLeftRect.origin.x += leftWidth;
                     ratioLeftRect.size.width = ratioLeftWidth;
                     
-                    [[CTGradient progressLightGreenGradient] fillRect: ratioLeftRect angle: 90];
+                    if (!fLightGreenGradient)
+                        fLightGreenGradient = [[CTGradient progressLightGreenGradient] retain];
+                    [fLightGreenGradient fillRect: ratioLeftRect angle: -90];
                 }
                 
                 if (leftWidth > 0)
                 {
                     completeRect.size.width = leftWidth;
                     
-                    [[CTGradient progressGreenGradient] fillRect: completeRect angle: 90];
+                    if (!fGreenGradient)
+                        fGreenGradient = [[CTGradient progressGreenGradient] retain];
+                    [fGreenGradient fillRect: completeRect angle: -90];
                 }
             }
             else
-                [[CTGradient progressBlueGradient] fillRect: completeRect angle: 90];
+            {
+                if (!fBlueGradient)
+                    fBlueGradient = [[CTGradient progressBlueGradient] retain];
+                [fBlueGradient fillRect: completeRect angle: -90];
+            }
         }
         else
         {
             if ([torrent waitingToStart])
             {
                 if ([torrent progressLeft] <= 0.0)
-                    [[CTGradient progressDarkGreenGradient] fillRect: completeRect angle: 90];
+                {
+                    if (!fDarkGreenGradient)
+                        fDarkGreenGradient = [[CTGradient progressDarkGreenGradient] retain];
+                    [fDarkGreenGradient fillRect: completeRect angle: -90];
+                }
                 else
-                    [[CTGradient progressDarkBlueGradient] fillRect: completeRect angle: 90];
+                {
+                    if (!fDarkBlueGradient)
+                        fDarkBlueGradient = [[CTGradient progressDarkBlueGradient] retain];
+                    [fDarkBlueGradient fillRect: completeRect angle: -90];
+                }
             }
             else
-                [[CTGradient progressGrayGradient] fillRect: completeRect angle: 90];
+            {
+                if (!fGrayGradient)
+                    fGrayGradient = [[CTGradient progressGrayGradient] retain];
+                [fGrayGradient fillRect: completeRect angle: -90];
+            }
         }
     }
 }
 
 - (void) drawPiecesBar: (NSRect) barRect
 {
+    if (!fBitmap)
+        fBitmap = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes: nil
+            pixelsWide: MAX_PIECES pixelsHigh: 1 bitsPerSample: 8 samplesPerPixel: 4 hasAlpha: YES
+            isPlanar: NO colorSpaceName: NSCalibratedRGBColorSpace bytesPerRow: 0 bitsPerPixel: 0];
+    
     Torrent * torrent = [self representedObject];
     
     int pieceCount = MIN([torrent pieceCount], MAX_PIECES);
-    float * piecesPercent = malloc(pieceCount * sizeof(float));
-    [torrent getAmountFinished: piecesPercent size: pieceCount];
+    float * piecePercent = malloc(pieceCount * sizeof(float)),
+        * previousPiecePercent = [torrent getPreviousAmountFinished];
+    [torrent getAmountFinished: piecePercent size: pieceCount];
     
-    NSBitmapImageRep * bitmap = [[NSBitmapImageRep alloc] initWithBitmapDataPlanes: nil
-                                    pixelsWide: pieceCount pixelsHigh: 1 bitsPerSample: 8 samplesPerPixel: 4 hasAlpha: YES
-                                    isPlanar: NO colorSpaceName: NSCalibratedRGBColorSpace bytesPerRow: 0 bitsPerPixel: 0];
-    
-    NSIndexSet * previousFinishedIndexes = [torrent previousFinishedPieces];
-    NSMutableIndexSet * finishedIndexes = [NSMutableIndexSet indexSet];
-    
-    int i;
-    for (i = 0; i < pieceCount; i++)
+    int i, index;
+    float increment = (float)pieceCount / MAX_PIECES;
+    NSColor * pieceColor;
+    for (i = 0; i < MAX_PIECES; i++)
     {
-        NSColor * pieceColor;
-        if (piecesPercent[i] == 1.0)
+        index = i * increment;
+        if (piecePercent[index] >= 1.0)
         {
-            if (previousFinishedIndexes && ![previousFinishedIndexes containsIndex: i])
-                pieceColor = [NSColor orangeColor];
+            if (previousPiecePercent != NULL && previousPiecePercent[index] < 1.0)
+                pieceColor = fOrangeColor;
             else
-                pieceColor = fBluePieceColor;
-            [finishedIndexes addIndex: i];
+                pieceColor = fBlueColor;
         }
+        else if (piecePercent[index] <= 0.0)
+            pieceColor = fGrayColor;
+        else if (piecePercent[index] <= 0.25)
+            pieceColor = fBlue1Color;
+        else if (piecePercent[index] <= 0.5)
+            pieceColor = fBlue2Color;
+        else if (piecePercent[index] <= 0.75)
+            pieceColor = fBlue3Color;
         else
-            pieceColor = [[NSColor whiteColor] blendedColorWithFraction: piecesPercent[i] ofColor: fBluePieceColor];
+            pieceColor = fBlue4Color;
         
-        //it's faster to just set color instead of checking previous color
-        [bitmap setColor: pieceColor atX: i y: 0];
+        if (![pieceColor isEqual: [fBitmap colorAtX: i y: 0]])
+            [fBitmap setColor: pieceColor atX: i y: 0];
     }
     
-    free(piecesPercent);
-    
-    [torrent setPreviousFinishedPieces: [finishedIndexes count] > 0 ? finishedIndexes : nil]; //don't bother saving if none are complete
+    [torrent setPreviousAmountFinished: piecePercent];
     
     //actually draw image
-    [bitmap drawInRect: barRect];
-    [bitmap release];
+    [fBitmap drawInRect: barRect];
+    
+    if (!fTransparentGradient)
+        fTransparentGradient = [[CTGradient progressTransparentGradient] retain];
+    [fTransparentGradient fillRect: barRect angle: -90];
 }
 
 - (NSRect) rectForMinimalStatusWithString: (NSAttributedString *) string inBounds: (NSRect) bounds
 {
+    if (![fDefaults boolForKey: @"SmallView"])
+        return NSZeroRect;
+    
     NSRect result = bounds;
     result.size = [string size];
     
@@ -740,6 +862,9 @@
 
 - (NSRect) rectForProgressWithString: (NSAttributedString *) string inBounds: (NSRect) bounds
 {
+    if ([fDefaults boolForKey: @"SmallView"])
+        return NSZeroRect;
+    
     NSRect result = bounds;
     result.origin.y += PADDING_ABOVE_TITLE + HEIGHT_TITLE + PADDING_BETWEEN_TITLE_AND_PROGRESS;
     result.origin.x += PADDING_HORIZONTAL + IMAGE_SIZE_REG + PADDING_BETWEEN_IMAGE_AND_TITLE;
@@ -752,6 +877,9 @@
 
 - (NSRect) rectForStatusWithString: (NSAttributedString *) string inBounds: (NSRect) bounds
 {
+    if ([fDefaults boolForKey: @"SmallView"])
+        return NSZeroRect;
+    
     NSRect result = bounds;
     result.origin.y += PADDING_ABOVE_TITLE + HEIGHT_TITLE + PADDING_BETWEEN_TITLE_AND_PROGRESS + HEIGHT_STATUS
                         + PADDING_BETWEEN_PROGRESS_AND_BAR + BAR_HEIGHT + PADDING_BETWEEN_BAR_AND_STATUS;

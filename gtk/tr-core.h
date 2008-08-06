@@ -31,8 +31,9 @@
 #include <gtk/gtk.h>
 
 #include <libtransmission/transmission.h>
-#include "conf.h" /* pref_flag_t */
+
 #include "tr-torrent.h"
+#include "util.h"
 
 #define TR_CORE_TYPE (tr_core_get_type())
 #define TR_CORE(o) G_TYPE_CHECK_INSTANCE_CAST((o),TR_CORE_TYPE,TrCore)
@@ -64,9 +65,8 @@ typedef struct TrCoreClass
        void handler( TrCore *, enum tr_core_err, const char *, gpointer ) */
     int errsig;
 
-    /* "add-torrent-prompt" signal:
-       void handler( TrCore *, gpointer ctor, gpointer userData )
-       The handler assumes ownership of ctor and must free when done */
+    /* "directory-prompt" signal:
+       void handler( TrCore *, GList *, gpointer ctor, gpointer userData ) */
     int promptsig;
 
     /* "quit" signal:
@@ -81,25 +81,22 @@ TrCoreClass;
 
 enum tr_core_err
 {
-    TR_CORE_ERR_ADD_TORRENT_ERR  = TR_EINVALID,
-    TR_CORE_ERR_ADD_TORRENT_DUP  = TR_EDUPLICATE,
-    TR_CORE_ERR_NO_MORE_TORRENTS,  /* finished adding a batch */
-    TR_CORE_ERR_SAVE_STATE         /* error saving state */
+    TR_CORE_ERR_ADD_TORRENT,    /* adding a torrent failed */
+    /* no more torrents to be added, used for grouping torrent add errors */
+    TR_CORE_ERR_NO_MORE_TORRENTS,
+    TR_CORE_ERR_SAVE_STATE      /* error saving state */
 };
 
 GType tr_core_get_type( void );
 
-TrCore * tr_core_new( tr_handle * );
-
-void tr_core_close( TrCore* );
+TrCore * tr_core_new( void );
 
 /* Return the model used without incrementing the reference count */
 GtkTreeModel * tr_core_model( TrCore * self );
 
 tr_handle * tr_core_handle( TrCore * self );
 
-void tr_core_get_stats( const TrCore      * core, 
-                        struct core_stats * setme );
+const struct core_stats* tr_core_get_stats( const TrCore * self );
 
 /******
 *******
@@ -112,25 +109,23 @@ void tr_core_get_stats( const TrCore      * core,
 int tr_core_load( TrCore * self, gboolean forcepaused );
 
 /**
+ * Add a torrent.
+ * May trigger an "error" signal with TR_CORE_ERR_ADD_TORRENT
+ * Caller must free the ctor.
+ */
+void tr_core_add_ctor( TrCore * self, tr_ctor * ctor );
+
+/**
  * Add a list of torrents.
- * This function assumes ownership of torrentFiles
- *
- * May pop up dialogs for each torrent if that preference is enabled.
  * May trigger one or more "error" signals with TR_CORE_ERR_ADD_TORRENT
  */
-void tr_core_add_list( TrCore      * self,
-                       GSList      * torrentFiles,
-                       pref_flag_t   start,
-                       pref_flag_t   prompt );
+void tr_core_add_list( TrCore   * self,
+                       GList    * torrentFiles,
+                       tr_ctor  * ctor );
 
-#define tr_core_add_list_defaults(c,l) \
-        tr_core_add_list(c,l,PREF_FLAG_DEFAULT,PREF_FLAG_DEFAULT)
-
-
-/** Add a torrent. */
-gboolean tr_core_add_file( TrCore*, const char * filename, gboolean * setme_success, GError ** err );
-
-/** Add a torrent. */
+/**
+ * Add a torrent.
+ */
 void tr_core_add_torrent( TrCore*, TrTorrent* );
 
 /**
@@ -143,11 +138,8 @@ void tr_core_torrents_added( TrCore * self );
 *******
 ******/
 
-/* we've gotten notice from RPC that a torrent has been destroyed;
-   update our gui accordingly */
-void tr_core_torrent_destroyed( TrCore * self, int id );
+void tr_core_delete_torrent( TrCore * self, GtkTreeIter * iter );
 
-/* remove a torrent */
 void tr_core_remove_torrent( TrCore * self, TrTorrent * gtor, int deleteFiles );
 
 /* update the model with current torrent status */
@@ -178,9 +170,11 @@ enum
 {
     MC_NAME,
     MC_NAME_COLLATED,
+    MC_HASH,
     MC_TORRENT,
     MC_TORRENT_RAW,
     MC_STATUS,
+    MC_ID,
     MC_ROW_COUNT
 };
 

@@ -40,7 +40,7 @@
 #include <sys/resource.h> /* getrlimit */
 #endif
 #include <unistd.h>
-#include <libgen.h> /* dirname */
+#include <libgen.h> /* basename, dirname */
 #include <fcntl.h> /* O_LARGEFILE */
 
 #include <event.h>
@@ -50,6 +50,7 @@
 #include "list.h"
 #include "net.h"
 #include "platform.h" /* tr_lock */
+#include "trcompat.h" /* strlcpy */
 #include "utils.h"
 
 #if SIZEOF_VOIDP==8
@@ -58,7 +59,34 @@
 #define TR_UINT_TO_PTR(i) ((void*)((uint32_t)i))
 #endif
 
-#define dbgmsg(fmt...) tr_deepLog( __FILE__, __LINE__, NULL, ##fmt )
+/**
+***
+**/
+
+static void
+myDebug( const char * file, int line, const char * fmt, ... )
+{
+    FILE * fp = tr_getLog( );
+    if( fp != NULL )
+    {
+        va_list args;
+        char s[64];
+        struct evbuffer * buf = evbuffer_new( );
+        char * myfile = tr_strdup( file );
+
+        evbuffer_add_printf( buf, "[%s] ", tr_getLogTimeStr( s, sizeof(s) ) );
+        va_start( args, fmt );
+        evbuffer_add_vprintf( buf, fmt, args );
+        va_end( args );
+        evbuffer_add_printf( buf, " (%s:%d)\n", basename(myfile), line );
+        fwrite( EVBUFFER_DATA(buf), 1, EVBUFFER_LENGTH(buf), fp );
+
+        tr_free( myfile );
+        evbuffer_free( buf );
+    }
+}
+
+#define dbgmsg(fmt...) myDebug(__FILE__, __LINE__, ##fmt )
 
 /**
 ***
@@ -135,7 +163,7 @@ TrOpenFile( int           i,
     file->fd = open( filename, flags, 0666 );
     if( file->fd == -1 ) {
         const int err = errno;
-        tr_err( _( "Couldn't open \"%1$s\": %2$s" ), filename, tr_strerror(err) );
+        tr_err( "Couldn't open '%s': %s", filename, tr_strerror(err) );
         return tr_ioErrorFromErrno( err );
     }
 
@@ -263,7 +291,7 @@ tr_fdFileCheckout( const char * folder,
         }
 
         dbgmsg( "opened '%s' in slot %d, write %c", filename, winner, write?'y':'n' );
-        tr_strlcpy( o->filename, filename, sizeof( o->filename ) );
+        strlcpy( o->filename, filename, sizeof( o->filename ) );
         o->isWritable = write;
     }
 
@@ -359,7 +387,7 @@ tr_fdSocketCreate( int type, int isReserved )
 
     if( isReserved || ( gFd->normal < getSocketMax( gFd ) ) )
         if( ( s = socket( AF_INET, type, 0 ) ) < 0 )
-            tr_err( _( "Couldn't create socket: %s" ), tr_strerror( sockerrno ) );
+            tr_err( "Couldn't create socket (%s)", tr_strerror( sockerrno ) );
 
     if( s > -1 )
     {
@@ -385,8 +413,8 @@ tr_fdSocketAccept( int b, struct in_addr * addr, tr_port_t * port )
     unsigned int len;
     struct sockaddr_in sock;
 
-    assert( addr );
-    assert( port );
+    assert( addr != NULL );
+    assert( port != NULL );
 
     tr_lockLock( gFd->lock );
     if( gFd->normal < getSocketMax( gFd ) )

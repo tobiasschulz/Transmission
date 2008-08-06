@@ -22,6 +22,4 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-void tr_clientForId( char       * buf,
-                     size_t       buflen,
-                     const void * peer_id );
+char * tr_clientForId( const uint8_t * );

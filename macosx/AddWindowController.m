@@ -24,7 +24,7 @@
 
 #import "AddWindowController.h"
 #import "Controller.h"
-#import "GroupsController.h"
+#import "GroupsWindowController.h"
 #import "NSStringAdditions.h"
 #import "NSMenuAdditions.h"
 #import "NSApplicationAdditions.h"
@@ -69,9 +69,6 @@
 
 - (void) awakeFromNib
 {
-    [[NSNotificationCenter defaultCenter] addObserver: self selector: @selector(updateStatusField:)
-        name: @"TorrentFileCheckChange" object: fTorrent];
-    
     [[NSNotificationCenter defaultCenter] addObserver: self selector: @selector(updateGroupMenu:)
         name: @"UpdateGroups" object: nil];
     
@@ -86,7 +83,18 @@
     [fIconView setImage: icon];
     [icon release];
     
-    [self updateStatusField: nil];
+    NSString * statusString = [NSString stringForFileSize: [fTorrent size]];
+    if ([fTorrent folder])
+    {
+        NSString * fileString;
+        int count = [fTorrent fileCount];
+        if (count != 1)
+            fileString = [NSString stringWithFormat: NSLocalizedString(@"%d Files, ", "Add torrent -> info"), count];
+        else
+            fileString = NSLocalizedString(@"1 File, ", "Add torrent -> info");
+        statusString = [fileString stringByAppendingString: statusString];
+    }
+    [fStatusField setStringValue: statusString];
     
     [self setGroupsMenu];
     [fGroupPopUp selectItemWithTag: -1];
@@ -204,27 +212,6 @@
     [fFileController reloadData];
 }
 
-- (void) updateStatusField: (NSNotification *) notification
-{
-    NSString * statusString = [NSString stringForFileSize: [fTorrent size]];
-    if ([fTorrent isFolder])
-    {
-        NSString * fileString;
-        int count = [fTorrent fileCount];
-        if (count != 1)
-            fileString = [NSString stringWithFormat: NSLocalizedString(@"%d files", "Add torrent -> info"), count];
-        else
-            fileString = NSLocalizedString(@"1 file", "Add torrent -> info");
-        
-        NSString * selectedString = [NSString stringWithFormat: NSLocalizedString(@"%@ selected", "Add torrent -> info"),
-                                        [NSString stringForFileSize: [fTorrent totalSizeSelected]]];
-        
-        statusString = [NSString stringWithFormat: @"%@, %@ (%@)", fileString, statusString, selectedString];
-    }
-    
-    [fStatusField setStringValue: statusString];
-}
-
 - (void) updateGroupMenu: (NSNotification *) notification
 {
     [self setGroupsMenu];
@@ -293,7 +280,7 @@
     for (i = [menu numberOfItems]-1 - 2; i >= 0; i--)
         [menu removeItemAtIndex: i];
         
-    NSMenu * groupMenu = [[GroupsController groups] groupMenuWithTarget: self action: @selector(changeGroupValue:) isSmall: NO];
+    NSMenu * groupMenu = [[GroupsWindowController groups] groupMenuWithTarget: self action: @selector(changeGroupValue:) isSmall: NO];
     [menu appendItemsFromMenu: groupMenu atIndexes: [NSIndexSet indexSetWithIndexesInRange:
             NSMakeRange(0, [groupMenu numberOfItems])] atBottom: NO];
 }

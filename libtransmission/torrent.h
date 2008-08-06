@@ -1,5 +1,5 @@
 /******************************************************************************
- * $Id$
+ * $Id:$
  *
  * Copyright (c) 2005-2008 Transmission authors and contributors
  *
@@ -26,10 +26,10 @@
 #define TR_TORRENT_H 1
 
 /* just like tr_torrentSetFileDLs but doesn't trigger a fastresume save */
-void tr_torrentInitFileDLs( tr_torrent       * tor,
-                            tr_file_index_t  * files,
-                            tr_file_index_t    fileCount,
-                            int                do_download );
+void tr_torrentInitFileDLs( tr_torrent   * tor,
+                            int          * files,
+                            int            fileCount,
+                            int            do_download );
 
 int tr_torrentIsPrivate( const tr_torrent * );
 
@@ -37,9 +37,7 @@ void tr_torrentRecheckCompleteness( tr_torrent * );
 
 void tr_torrentResetTransferStats( tr_torrent * );
 
-void tr_torrentSetHasPiece( tr_torrent       * tor,
-                            tr_piece_index_t   pieceIndex,
-                            int                has );
+void tr_torrentSetHasPiece( tr_torrent * tor, int pieceIndex, int has );
 
 void tr_torrentLock    ( const tr_torrent * );
 void tr_torrentUnlock  ( const tr_torrent * );
@@ -48,10 +46,8 @@ int  tr_torrentIsSeed  ( const tr_torrent * );
 
 void tr_torrentChangeMyPort  ( tr_torrent * );
 
-int tr_torrentExists( const tr_handle *, const uint8_t * );
-tr_torrent* tr_torrentFindFromId( tr_handle *, int id );
+int tr_torrentExists( tr_handle *, const uint8_t * );
 tr_torrent* tr_torrentFindFromHash( tr_handle *, const uint8_t * );
-tr_torrent* tr_torrentFindFromHashString( tr_handle *, const char * );
 tr_torrent* tr_torrentFindFromObfuscatedHash( tr_handle *, const uint8_t* );
 
 void tr_torrentGetRates( const tr_torrent *, float * toClient, float * toPeer );
@@ -77,35 +73,21 @@ int tr_torrentAllowsPex( const tr_torrent * );
     ( ((block)==((tor)->blockCount-1)) ? (tor)->lastBlockSize : (tor)->blockSize )
 
 #define tr_block(a,b) _tr_block(tor,a,b)
-tr_block_index_t _tr_block( const tr_torrent * tor,
-                            tr_piece_index_t   index,
-                            uint32_t           offset );
+int _tr_block( const tr_torrent * tor, int index, int begin );
 
-int tr_torrentReqIsValid( const tr_torrent * tor,
-                          tr_piece_index_t   index,
-                          uint32_t           offset,
-                          uint32_t           length );
+uint64_t tr_pieceOffset( const tr_torrent * tor, int index, int begin, int length );
 
-uint64_t tr_pieceOffset( const tr_torrent * tor,
-                         tr_piece_index_t   index,
-                         uint32_t           offset,
-                         uint32_t           length );
-
-void tr_torrentInitFilePriority( tr_torrent       * tor,
-                                 tr_file_index_t    fileIndex,
-                                 tr_priority_t      priority );
+void tr_torrentInitFilePriority( tr_torrent   * tor,
+                                 int            fileIndex,
+                                 tr_priority_t  priority );
 
 
 int  tr_torrentCountUncheckedPieces( const tr_torrent * );
-int  tr_torrentIsPieceChecked      ( const tr_torrent *, tr_piece_index_t piece );
-int  tr_torrentIsFileChecked       ( const tr_torrent *, tr_file_index_t file );
-void tr_torrentSetPieceChecked     ( tr_torrent *, tr_piece_index_t piece, int isChecked );
-void tr_torrentSetFileChecked      ( tr_torrent *, tr_file_index_t file, int isChecked );
+int  tr_torrentIsPieceChecked      ( const tr_torrent *, int piece );
+int  tr_torrentIsFileChecked       ( const tr_torrent *, int file );
+void tr_torrentSetPieceChecked     ( tr_torrent *, int piece, int isChecked );
+void tr_torrentSetFileChecked      ( tr_torrent *, int file, int isChecked );
 void tr_torrentUncheck             ( tr_torrent * );
-
-int tr_torrentPromoteTracker       ( tr_torrent *, int trackerIndex );
-
-time_t* tr_torrentGetMTimes        ( const tr_torrent *, int * setmeCount );
 
 typedef enum
 {
@@ -117,14 +99,14 @@ tr_verify_state;
 
 struct tr_torrent
 {
-    tr_handle                * handle;
-    tr_info                    info;
+    tr_handle                 * handle;
+    tr_info                     info;
 
-    tr_speedlimit              uploadLimitMode;
-    tr_speedlimit              downloadLimitMode;
-    struct tr_ratecontrol    * upload;
-    struct tr_ratecontrol    * download;
-    struct tr_ratecontrol    * swarmSpeed;
+    tr_speedlimit               uploadLimitMode;
+    tr_speedlimit               downloadLimitMode;
+    struct tr_ratecontrol     * upload;
+    struct tr_ratecontrol     * download;
+    struct tr_ratecontrol     * swarmspeed;
 
     int                        error;
     char                       errorString[128];
@@ -132,17 +114,17 @@ struct tr_torrent
     uint8_t                    obfuscatedHash[SHA_DIGEST_LENGTH];
 
     /* Where to download */
-    char                     * downloadDir;
+    char                     * destination;
     
     /* How many bytes we ask for per request */
-    uint32_t                   blockSize;
-    tr_block_index_t           blockCount;
+    int                        blockSize;
+    int                        blockCount;
 
-    uint32_t                   lastBlockSize;
-    uint32_t                   lastPieceSize;
+    int                        lastBlockSize;
+    int                        lastPieceSize;
 
-    uint32_t                   blockCountInPiece;
-    uint32_t                   blockCountInLastPiece;
+    int                        blockCountInPiece;
+    int                        blockCountInLastPiece;
     
     struct tr_completion     * completion;
 
@@ -159,27 +141,28 @@ struct tr_torrent
     uint64_t                   corruptCur;
     uint64_t                   corruptPrev;
 
-    time_t                     addedDate;
-    time_t                     activityDate;
-    time_t                     doneDate;
-    time_t                     startDate;
+    uint64_t                   startDate;
+    uint64_t                   stopDate;
+    uint64_t                   activityDate;
 
     tr_torrent_status_func   * status_func;
     void                     * status_func_user_data;
 
+    tr_torrent_active_func   * active_func;
+    void                     * active_func_user_data;
+
+    unsigned int               statCur : 1;
     unsigned int               isRunning : 1;
     unsigned int               isDeleting : 1;
 
     uint16_t                   maxConnectedPeers;
 
-    tr_verify_state            verifyState;
+    tr_verify_state           verifyState;
 
     time_t                     lastStatTime;
-    tr_stat                    stats;
+    tr_stat                    stats[2];
 
     tr_torrent               * next;
-
-    int                        uniqueId;
 };
 
 #endif

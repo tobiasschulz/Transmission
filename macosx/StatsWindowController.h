@@ -28,14 +28,10 @@
 @interface StatsWindowController : NSWindowController
 {
     IBOutlet NSTextField * fUploadedField, * fUploadedAllField, * fDownloadedField, * fDownloadedAllField,
-                        * fRatioField, * fRatioAllField, * fTimeField, * fTimeAllField, * fNumOpenedField,
-                        * fUploadedLabelField, * fDownloadedLabelField, * fRatioLabelField, * fTimeLabelField, * fNumOpenedLabelField;
-    IBOutlet NSButton * fResetButton;
+                        * fRatioField, * fRatioAllField, * fTimeField, * fTimeAllField, * fNumOpenedField;
     NSTimer * fTimer;
 }
 
 + (StatsWindowController *) statsWindow: (tr_handle *) lib;
-
-- (void) resetStats: (id) sender;
 
 @end

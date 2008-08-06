@@ -23,7 +23,6 @@
  *****************************************************************************/
 
 #import "NSStringAdditions.h"
-#import "NSApplicationAdditions.h"
 #import <transmission.h>
 
 @implementation NSString (NSStringAdditions)
@@ -41,34 +40,33 @@
 + (NSString *) stringForFileSize: (uint64_t) size
 {
     if (size < 1024)
-        return [NSString stringWithFormat: @"%lld %@", size, NSLocalizedString(@"bytes", "File size - bytes")];
+        return [NSString stringWithFormat: NSLocalizedString(@"%lld bytes", "File size"), size];
 
     float convertedSize;
     NSString * unit;
     if (size < 1048576)
     {
         convertedSize = size / 1024.0;
-        unit = NSLocalizedString(@"KB", "File size - kilobytes");
+        unit = NSLocalizedString(@"KB", "File size");
     }
     else if (size < 1073741824)
     {
         convertedSize = size / 1048576.0;
-        unit = NSLocalizedString(@"MB", "File size - megabytes");
+        unit = NSLocalizedString(@"MB", "File size");
     }
     else if (size < 1099511627776.0)
     {
         convertedSize = size / 1073741824.0;
-        unit = NSLocalizedString(@"GB", "File size - gigabytes");
+        unit = NSLocalizedString(@"GB", "File size");
     }
     else
     {
         convertedSize = size / 1099511627776.0;
-        unit = NSLocalizedString(@"TB", "File size - terabytes");
+        unit = NSLocalizedString(@"TB", "File size");
     }
     
     //attempt to have minimum of 3 digits with at least 1 decimal
-    return convertedSize <= 9.995 ? [NSString localizedStringWithFormat: @"%.2f %@", convertedSize, unit]
-                                : [NSString localizedStringWithFormat: @"%.1f %@", convertedSize, unit];
+    return [NSString stringWithFormat: convertedSize < 10.0 ? @"%.2f %@" : @"%.1f %@", convertedSize, unit];
 }
 
 + (NSString *) stringForSpeed: (float) speed
@@ -78,17 +76,14 @@
 
 + (NSString *) stringForSpeedAbbrev: (float) speed
 {
-    if (speed <= 999.95) //0.0 K to 999.9 K
-        return [NSString localizedStringWithFormat: @"%.1f K", speed];
-    
-    speed /= 1024.0;
-    
-    if (speed <= 99.995) //0.98 M to 99.99 M
-        return [NSString localizedStringWithFormat: @"%.2f M", speed];
-    else if (speed <= 999.95) //100.0 M to 999.9 M
-        return [NSString localizedStringWithFormat: @"%.1f M", speed];
+    if (speed < 1000.0) //0.0 K to 999.9 K
+        return [NSString stringWithFormat: @"%.1f K", speed];
+    else if (speed < 102400.0) //0.98 M to 99.99 M
+        return [NSString stringWithFormat: @"%.2f M", speed / 1024.0];
+    else if (speed < 1024000.0) //100.0 M to 999.9 M
+        return [NSString stringWithFormat: @"%.1f M", speed / 1024.0];
     else //insane speeds
-        return [NSString localizedStringWithFormat: @"%.2f G", (speed / 1024.0)];
+        return [NSString stringWithFormat: @"%.2f G", speed / 1048576.0];
 }
 
 + (NSString *) stringForRatio: (float) ratio
@@ -99,20 +94,20 @@
         return [NSString stringWithUTF8String: "\xE2\x88\x9E"];
     else;
     
-    if (ratio <= 9.995) //0.00 to 9.99
-        return [NSString localizedStringWithFormat: @"%.2f", ratio];
-    else if (ratio <= 99.95) //10.0 to 99.9
-        return [NSString localizedStringWithFormat: @"%.1f", ratio];
-    else //rest are single digit
-        return [NSString localizedStringWithFormat: @"%.0f", ratio];
+    if (ratio < 10.0)
+        return [NSString stringWithFormat: @"%.2f", ratio];
+    else if (ratio < 100.0)
+        return [NSString stringWithFormat: @"%.1f", ratio];
+    else
+        return [NSString stringWithFormat: @"%.0f", ratio];
 }
 
 + (NSString *) timeString: (uint64_t) seconds showSeconds: (BOOL) showSeconds
 {
-    return [NSString timeString: seconds showSeconds: showSeconds maxFields: UINT_MAX];
+    return [NSString timeString: seconds showSeconds: showSeconds maxDigits: UINT_MAX];
 }
 
-+ (NSString *) timeString: (NSUInteger) seconds showSeconds: (BOOL) showSeconds maxFields: (NSUInteger) max
++ (NSString *) timeString: (NSUInteger) seconds showSeconds: (BOOL) showSeconds maxDigits: (NSUInteger) max
 {
     NSMutableArray * timeArray = [NSMutableArray arrayWithCapacity: MIN(max, 4)];
     NSUInteger remaining = seconds;
@@ -145,18 +140,22 @@
     return [timeArray componentsJoinedByString: @" "];
 }
 
-- (NSComparisonResult) compareFinder: (NSString *) string
+- (NSComparisonResult) compareIP: (NSString *) string
 {
-    int comparisonOptions = [NSApp isOnLeopardOrBetter] ? (NSCaseInsensitiveSearch | NSNumericSearch
-                                                            | NSWidthInsensitiveSearch | NSForcedOrderingSearch)
-                                                        : (NSCaseInsensitiveSearch | NSNumericSearch);
-    return [self compare: string options: comparisonOptions range: NSMakeRange(0, [self length]) locale: [NSLocale currentLocale]];
-}
+    NSArray * selfSections = [self componentsSeparatedByString: @"."],
+            * newSections = [string componentsSeparatedByString: @"."];
+    
+    if ([selfSections count] != [newSections count])
+        return [selfSections count] > [newSections count] ? NSOrderedDescending : NSOrderedAscending;
 
-- (NSComparisonResult) compareNumeric: (NSString *) string
-{
-    int comparisonOptions = [NSApp isOnLeopardOrBetter] ? (NSNumericSearch | NSForcedOrderingSearch) : NSNumericSearch;
-    return [self compare: string options: comparisonOptions range: NSMakeRange(0, [self length]) locale: [NSLocale currentLocale]];
+    NSEnumerator * selfSectionsEnum = [selfSections objectEnumerator], * newSectionsEnum = [newSections objectEnumerator];
+    NSString * selfString, * newString;
+    NSComparisonResult result;
+    while ((selfString = [selfSectionsEnum nextObject]) && (newString = [newSectionsEnum nextObject]))
+        if ((result = [selfString compare: newString options: NSNumericSearch]) != NSOrderedSame)
+            return result;
+    
+    return NSOrderedSame;
 }
 
 @end

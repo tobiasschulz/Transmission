@@ -144,7 +144,7 @@ namespace
         for ( i=0; size>>10; ++i )
             size = size >> 10;
         char buf[512];
-        tr_snprintf( buf, sizeof(buf), "%.*f %s", bestDecimal(size), (double)size, sizestrs[i] );
+        snprintf( buf, sizeof(buf), "%.*f %s", bestDecimal(size), (double)size, sizestrs[i] );
         return toWxStr( buf );
     }
 
@@ -236,12 +236,12 @@ TorrentListCtrl :: RefreshTorrent( tr_torrent   * tor,
         switch( *it )
         {
             case COL_POSITION:
-                tr_snprintf( buf, sizeof(buf), "%d", 666 );
+                snprintf( buf, sizeof(buf), "%d", 666 );
                 xstr = toWxStr( buf );
                 break;
 
             case COL_PERCENT_DONE:
-                tr_snprintf( buf, sizeof(buf), "%d%%", (int)(s->percentDone*100.0) );
+                snprintf( buf, sizeof(buf), "%d%%", (int)(s->percentDone*100.0) );
                 xstr = toWxStr( buf );
                 break;
 
@@ -307,6 +307,7 @@ TorrentListCtrl :: RefreshTorrent( tr_torrent   * tor,
                     case TR_STATUS_CHECK:       xstr = wxString::Format ( _("Checking Files (%.0f)"), s->recheckProgress );  break;
                     case TR_STATUS_CHECK_WAIT:  xstr = _("Waiting to Check"); break;
                     case TR_STATUS_DOWNLOAD:    xstr = _("Downloading"); break;
+                    case TR_STATUS_DONE:
                     case TR_STATUS_SEED:        xstr = _("Seeding"); break;
                     default: assert( 0 );
                 }
@@ -440,7 +441,7 @@ TorrentListCtrl :: Compare( long item1, long item2, long sortData )
 
         case COL_PEERS:
             /* FIXME: this is all peers, not just leechers 
-            tr_snprintf( buf, sizeof(buf), "%d (%d)", s->peersTotal, s->peersConnected );
+            snprintf( buf, sizeof(buf), "%d (%d)", s->peersTotal, s->peersConnected );
             xstr = toWxStr( buf );*/
             break;
 
@@ -475,7 +476,7 @@ TorrentListCtrl :: Compare( long item1, long item2, long sortData )
             break;
 
         case COL_SEEDS:
-            /*tr_snprintf( buf, sizeof(buf), "%d", s->seeders );
+            /*snprintf( buf, sizeof(buf), "%d", s->seeders );
             xstr = toWxStr( buf );*/
             break;
 

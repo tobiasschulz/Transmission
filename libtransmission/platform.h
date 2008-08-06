@@ -35,19 +35,11 @@
 typedef struct tr_lock   tr_lock;
 typedef struct tr_thread tr_thread;
 
-struct tr_handle;
-
-void tr_setConfigDir  ( struct tr_handle * handle,
-                        const char       * configDir );
-
-const char * tr_getResumeDir  ( const struct tr_handle * );
-
-const char * tr_getTorrentDir ( const struct tr_handle * );
-
-const char * tr_getClutchDir  ( const struct tr_handle * );
-
+const char * tr_getCacheDirectory( void );
+const char * tr_getTorrentsDirectory( void );
 
 tr_thread*   tr_threadNew  ( void (*func)(void *), void * arg, const char * name );
+void         tr_threadJoin ( tr_thread * );
 int          tr_amInThread ( const tr_thread * );
 
 tr_lock *    tr_lockNew        ( void );
@@ -55,15 +47,5 @@ void         tr_lockFree       ( tr_lock * );
 void         tr_lockLock       ( tr_lock * );
 void         tr_lockUnlock     ( tr_lock * );
 int          tr_lockHave       ( const tr_lock * );
-
-
-enum
-{
-  TR_LOCKFILE_SUCCESS,
-  TR_LOCKFILE_EOPEN,
-  TR_LOCKFILE_ELOCK
-};
-
-int          tr_lockfile       ( const char * filename );
 
 #endif

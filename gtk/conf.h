@@ -29,35 +29,19 @@
 #ifndef TG_CONF_H
 #define TG_CONF_H
 
-int          pref_int_get            ( const char * key );
-void         pref_int_set            ( const char * key, int value );
-void         pref_int_set_default    ( const char * key, int value );
+int       pref_int_get            ( const char * key );
+void      pref_int_set            ( const char * key, int value );
+void      pref_int_set_default    ( const char * key, int value );
 
-gboolean     pref_flag_get           ( const char * key );
-void         pref_flag_set           ( const char * key, gboolean value );
-void         pref_flag_set_default   ( const char * key, gboolean value );
+gboolean  pref_flag_get           ( const char * key );
+void      pref_flag_set           ( const char * key, gboolean value );
+void      pref_flag_set_default   ( const char * key, gboolean value );
 
-const char*  pref_string_get         ( const char * key );
-void         pref_string_set         ( const char * key, const char * value );
-void         pref_string_set_default ( const char * key, const char * value );
+char*     pref_string_get         ( const char * key );
+void      pref_string_set         ( const char * key, const char * value );
+void      pref_string_set_default ( const char * key, const char * value );
 
-void         pref_save               ( void );
-
-/**
-***
-**/
-
-enum
-{
-    PREF_FLAG_DEFAULT = 0,
-    PREF_FLAG_FALSE = 1,
-    PREF_FLAG_TRUE = 2
-};
-
-typedef int pref_flag_t;
-
-gboolean pref_flag_eval( pref_flag_t val, const char * key );
-
+void      pref_save               ( char **errstr );
 
 /**
 ***
@@ -67,6 +51,8 @@ gboolean
 cf_init(const char *confdir, char **errstr);
 gboolean
 cf_lock(char **errstr);
+char *
+cf_sockname(void);
 void
 cf_check_older_configs(void);
 

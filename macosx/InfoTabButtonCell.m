@@ -32,7 +32,7 @@
     
     NSNotificationCenter * nc = [NSNotificationCenter defaultCenter];
     [nc addObserver: self selector: @selector(updateControlTint:)
-        name: NSControlTintDidChangeNotification object: nil];
+            name: NSControlTintDidChangeNotification object: nil];
     
     fSelected = NO;
 }
@@ -42,6 +42,9 @@
     [[NSNotificationCenter defaultCenter] removeObserver: self];
     
     [fIcon release];
+    
+    [fRegularImage release];
+    [fSelectedImage release];
     [super dealloc];
 }
 
@@ -49,6 +52,17 @@
 {
     [fIcon release];
     fIcon = [image retain];
+    
+    if (fRegularImage)
+    {
+        [fRegularImage release];
+        fRegularImage = nil;
+    }
+    if (fSelectedImage)
+    {
+        [fSelectedImage release];
+        fSelectedImage = nil;
+    }
     
     [self setSelectedTab: fSelected];
 }
@@ -58,29 +72,49 @@
     fSelected = selected;
     
     NSImage * tabImage;
+    BOOL createImage = NO;
     if (fSelected)
-        tabImage = [NSColor currentControlTint] == NSGraphiteControlTint
-                    ? [[NSImage imageNamed: @"InfoTabBackGraphite.png"] copy] : [[NSImage imageNamed: @"InfoTabBackBlue.png"] copy];
-    else
-        tabImage = [[NSImage imageNamed: @"InfoTabBack.png"] copy];
-    
-    if (fIcon)
     {
-        NSSize iconSize = [fIcon size], tabSize = [tabImage size];
-        NSPoint point = NSMakePoint(floorf((tabSize.width - iconSize.width) * 0.5),
-                                    floorf((tabSize.height - iconSize.height) * 0.5));
-        
-        [tabImage lockFocus];
-        [fIcon compositeToPoint: point operation: NSCompositeSourceOver];
-        [tabImage unlockFocus];
+        if (!fSelectedImage)
+        {
+            fSelectedImage = [NSColor currentControlTint] == NSGraphiteControlTint
+                ? [[NSImage imageNamed: @"InfoTabBackGraphite.png"] copy] : [[NSImage imageNamed: @"InfoTabBackBlue.png"] copy];
+            createImage = YES;
+        }
+        tabImage = fSelectedImage;
+    }
+    else
+    {
+        if (!fRegularImage)
+        {
+            fRegularImage = [[NSImage imageNamed: @"InfoTabBack.png"] copy];
+            createImage = YES;
+        }
+        tabImage = fRegularImage;
+    }
+    
+    if (createImage)
+    {
+        if (fIcon)
+        {
+            NSSize iconSize = [fIcon size], tabSize = [tabImage size];
+            NSPoint point = NSMakePoint(floorf((tabSize.width - iconSize.width) * 0.5),
+                                        floorf((tabSize.height - iconSize.height) * 0.5));
+            
+            [tabImage lockFocus];
+            [fIcon compositeToPoint: point operation: NSCompositeSourceOver];
+            [tabImage unlockFocus];
+        }
     }
     
     [self setImage: tabImage];
-    [tabImage release];
 }
 
 - (void) updateControlTint: (NSNotification *) notification
 {
+    [fSelectedImage release];
+    fSelectedImage = nil;
+    
     if (fSelected)
         [self setSelectedTab: YES];
 }

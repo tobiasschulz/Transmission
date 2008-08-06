@@ -35,6 +35,21 @@ typedef enum  _CTBlendingMode
 
 + (id)gradientWithBeginningColor:(NSColor *)begin endingColor:(NSColor *)end;
 
++ (id)aquaSelectedGradient;
++ (id)aquaNormalGradient;
++ (id)aquaPressedGradient;
+
++ (id)unifiedSelectedGradient;
++ (id)unifiedNormalGradient;
++ (id)unifiedPressedGradient;
++ (id)unifiedDarkGradient;
+
++ (id)sourceListSelectedGradient;
++ (id)sourceListUnselectedGradient;
+
++ (id)rainbowGradient;
++ (id)hydrogenSpectrumGradient;
+
 - (CTGradient *)gradientWithAlphaComponent:(float)alpha;
 
 - (void)addElement:(CTGradientElement*)newElement;

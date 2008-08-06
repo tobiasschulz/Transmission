@@ -28,6 +28,9 @@
 #include <stdlib.h>
 #include <string.h>
 
+#include <fcntl.h>
+#include <sys/types.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
 #include <glib.h>
@@ -36,7 +39,6 @@
 
 #include <libtransmission/transmission.h>
 #include <libtransmission/bencode.h>
-#include <libtransmission/platform.h>
 
 #include "conf.h"
 #include "util.h"
@@ -51,13 +53,13 @@ cf_init(const char *dir, char **errstr)
     if( errstr != NULL )
         *errstr = NULL;
 
-    gl_confdir = g_strdup( dir );
+    gl_confdir = g_build_filename( dir, "gtk", NULL );
 
-    if( mkdir_p( gl_confdir, 0755 ) )
+    if( mkdir_p(gl_confdir, 0755 ) )
         return TRUE;
 
     if( errstr != NULL )
-        *errstr = g_strdup_printf( _( "Couldn't create \"%1$s\": %2$s" ),
+        *errstr = g_strdup_printf( _("Failed to create the directory %s:\n%s"),
                                    gl_confdir, g_strerror(errno) );
 
     return FALSE;
@@ -70,27 +72,47 @@ cf_init(const char *dir, char **errstr)
 ***/
 
 /* errstr may be NULL, this might be called before GTK is initialized */
-static gboolean
-lockfile(const char * filename, char **errstr)
+static int
+lockfile(const char *file, char **errstr)
 {
-    const int state = tr_lockfile( filename );
-    const gboolean success = state == TR_LOCKFILE_SUCCESS;
+    int fd;
+    struct flock lk;
 
-    if( errstr ) switch( state ) {
-        case TR_LOCKFILE_EOPEN:
-        *errstr = g_strdup_printf( _( "Couldn't open \"%1$s\": %2$s" ),
-                                   filename, g_strerror( errno ) );
-            break;
-        case TR_LOCKFILE_ELOCK:
-            *errstr = g_strdup_printf( _( "%s is already running." ),
-                                       g_get_application_name( ) );
-            break;
-        case TR_LOCKFILE_SUCCESS:
-            *errstr = NULL;
-            break;
+    if( errstr )
+        *errstr = NULL;
+
+    fd = open( file, O_RDWR | O_CREAT, 0666 );
+    if( fd < 0 )
+    { 
+        const int savederr = errno;
+        if( errstr )
+            *errstr = g_strdup_printf(
+                          _("Failed to open the file %s for writing:\n%s"),
+                          file, g_strerror( errno ) );
+        errno = savederr;
+        return -1;
     }
 
-    return success;
+    memset( &lk, 0,  sizeof( lk ) );
+    lk.l_start = 0;
+    lk.l_len = 0;
+    lk.l_type = F_WRLCK;
+    lk.l_whence = SEEK_SET;
+    if( -1 == fcntl( fd, F_SETLK, &lk ) )
+    {
+        const int savederr = errno;
+        if( errstr )
+            *errstr = ( errno == EAGAIN )
+                ? g_strdup_printf( _( "Another copy of %s is already running." ),
+                                   g_get_application_name( ) )
+                : g_strdup_printf( _( "Failed to lock the file %s:\n%s" ),
+                                  file, g_strerror( errno ) );
+        close( fd );
+        errno = savederr;
+        return -1;
+    }
+
+    return fd;
 }
 
 static char*
@@ -103,10 +125,8 @@ getLockFilename( void )
 static void
 cf_removelocks( void )
 {
-    if( gl_lockpath ) {
-      g_unlink( gl_lockpath );
-      g_free( gl_lockpath );
-    }
+    g_unlink( gl_lockpath );
+    g_free( gl_lockpath );
 }
 
 /* errstr may be NULL, this might be called before GTK is initialized */
@@ -114,12 +134,19 @@ gboolean
 cf_lock( char ** errstr )
 {
     char * path = getLockFilename( );
-    const gboolean didLock = lockfile( path, errstr );
-    if( didLock )
+    int fd = lockfile( path, errstr );
+    if( fd >= 0 )
         gl_lockpath = g_strdup( path );
     g_atexit( cf_removelocks );
     g_free( path );
-    return didLock;
+    return fd >= 0;
+}
+
+char*
+cf_sockname( void )
+{
+    assert( gl_confdir != NULL );
+    return g_build_filename( gl_confdir, "socket", NULL );
 }
 
 /***
@@ -128,127 +155,98 @@ cf_lock( char ** errstr )
 ****
 ***/
 
+#define GROUP "general"
+
 static char*
 getPrefsFilename( void )
 {
     assert( gl_confdir != NULL );
-    return g_build_filename( gl_confdir, "settings.json", NULL );
+    return g_build_filename( gl_confdir, "prefs.ini", NULL );
 }
 
-static tr_benc*
-getPrefs( void )
+static GKeyFile*
+getPrefsKeyFile( void )
 {
-    static tr_benc dict;
-    static gboolean loaded = FALSE;
+    static GKeyFile * myKeyFile = NULL;
 
-    if( !loaded )
+    if( myKeyFile == NULL )
     {
         char * filename = getPrefsFilename( );
-        if( tr_bencLoadJSONFile( filename, &dict ) )
-            tr_bencInitDict( &dict, 100 );
+        myKeyFile = g_key_file_new( );
+        g_key_file_load_from_file( myKeyFile, filename, 0, NULL );
         g_free( filename );
-        loaded = TRUE;
     }
 
-    return &dict;
+    return myKeyFile;
 }
-
-/***
-****
-***/
 
 int
-pref_int_get( const char * key )
-{
-    int64_t i;
-    tr_bencDictFindInt( getPrefs( ), key, &i );
-    return i;
+pref_int_get( const char * key ) {
+    return g_key_file_get_integer( getPrefsKeyFile( ), GROUP, key, NULL );
 }
 void
-pref_int_set( const char * key, int value )
-{
-    tr_benc * d = getPrefs( );
-    tr_bencDictRemove( d, key );
-    tr_bencDictAddInt( d, key, value );
+pref_int_set( const char * key, int value ) {
+    g_key_file_set_integer( getPrefsKeyFile( ), GROUP, key, value );
 }
 void
-pref_int_set_default( const char * key, int value )
-{
-    if( !tr_bencDictFind( getPrefs( ), key ) )
+pref_int_set_default( const char * key, int value ) {
+    if( !g_key_file_has_key( getPrefsKeyFile( ), GROUP, key, NULL ) )
         pref_int_set( key, value );
 }
 
-/***
-****
-***/
-
 gboolean
-pref_flag_get ( const char * key )
-{
-    int64_t i;
-    tr_bencDictFindInt( getPrefs( ), key, &i );
-    return i != 0;
-}
-gboolean
-pref_flag_eval( pref_flag_t val, const char * key )
-{
-    switch( val ) {
-        case PREF_FLAG_TRUE: return TRUE;
-        case PREF_FLAG_FALSE: return FALSE;
-        default: return pref_flag_get( key );
-    }
+pref_flag_get ( const char * key ) {
+    return g_key_file_get_boolean( getPrefsKeyFile( ), GROUP, key, NULL );
 }
 void
-pref_flag_set( const char * key, gboolean value )
-{
-    pref_int_set( key, value!=0 );
+pref_flag_set( const char * key, gboolean value ) {
+    g_key_file_set_boolean( getPrefsKeyFile( ), GROUP, key, value );
 }
 void
-pref_flag_set_default( const char * key, gboolean value )
-{
-    pref_int_set_default( key, value!=0 );
+pref_flag_set_default( const char * key, gboolean value ) {
+    if( !g_key_file_has_key( getPrefsKeyFile( ), GROUP, key, NULL ) )
+        pref_flag_set( key, value );
 }
 
-/***
-****
-***/
-
-const char*
-pref_string_get( const char * key )
-{
-    const char * str = NULL;
-    tr_bencDictFindStr( getPrefs( ), key, &str );
-    return str;
+char*
+pref_string_get( const char * key ) {
+    return g_key_file_get_string( getPrefsKeyFile( ), GROUP, key, NULL );
 }
-
 void
-pref_string_set( const char * key, const char * value )
-{
-    tr_benc * d = getPrefs( );
-    tr_bencDictRemove( d, key );
-    tr_bencDictAddStr( d, key, value );
+pref_string_set( const char * key, const char * value ) {
+    g_key_file_set_string( getPrefsKeyFile( ), GROUP, key, value );
 }
-
 void
-pref_string_set_default( const char * key, const char * value )
-{
-    if( !tr_bencDictFind( getPrefs( ), key ) )
+pref_string_set_default( const char * key, const char * value ) {
+    if( !g_key_file_has_key( getPrefsKeyFile( ), GROUP, key, NULL ) )
         pref_string_set( key, value );
 }
 
-/***
-****
-***/
-
 void
-pref_save( void )
+pref_save(char **errstr)
 {
-    char * filename = getPrefsFilename( );
-    char * path = g_path_get_dirname( filename );
+    gsize datalen;
+    GError * err = NULL;
+    char * data;
+    char * filename;
+    char * path;
 
+    filename = getPrefsFilename( );
+    path = g_path_get_dirname( filename );
     mkdir_p( path, 0755 );
-    tr_bencSaveJSONFile( filename, getPrefs( ) );
 
+    data = g_key_file_to_data( getPrefsKeyFile(), &datalen, &err );
+    if( !err ) {
+        GIOChannel * out = g_io_channel_new_file( filename, "w+", &err );
+        g_io_channel_write_chars( out, data, datalen, NULL, &err );
+        g_io_channel_unref( out );
+    }
+
+    if( errstr != NULL )
+        *errstr = err ? g_strdup( err->message ) : NULL;
+
+    g_clear_error( &err );
+    g_free( data );
     g_free( path );
     g_free( filename );
 }
@@ -271,23 +269,10 @@ tr_file_set_contents( const char * filename, const void * out, size_t len, GErro
 #endif
 
 static char*
-getCompat080PrefsFilename( void )
+getCompat08PrefsFilename( void )
 {
     assert( gl_confdir != NULL );
-    return g_build_filename( g_get_home_dir(), ".transmission", "gtk", "prefs", NULL );
-}
-
-static char*
-getCompat090PrefsFilename( void )
-{
-    assert( gl_confdir != NULL );
-    return g_build_filename( g_get_home_dir(), ".transmission", "gtk", "prefs.ini", NULL );
-}
-
-static char*
-getCompat121PrefsFilename( void )
-{
-    return g_build_filename( g_get_user_config_dir(), "transmission", "gtk", "prefs.ini", NULL );
+    return g_build_filename( gl_confdir, "prefs", NULL );
 }
 
 static void
@@ -341,98 +326,16 @@ translate_08_to_09( const char* oldfile, const char* newfile )
     g_free( contents );
 }
 
-static void
-translate_keyfile_to_json( const char * old_file, const char * new_file )
-{
-    tr_benc dict;
-    GKeyFile * keyfile;
-    gchar ** keys;
-    gsize i;
-    gsize length;
-
-    static struct pref_entry {
-	const char* oldkey;
-	const char* newkey;
-    } renamed[] = {
-	{ "default-download-directory", "download-dir" },
-        { "encrypted-connections-only", "encryption" },
-	{ "listening-port", "peer-port" },
-        { "nat-traversal-enabled", "port-forwarding-enabled" },
-        { "open-dialog-folder", "open-dialog-dir" },
-        { "watch-folder", "watch-dir" },
-        { "watch-folder-enabled", "watch-dir-enabled" }
-    };
-
-    keyfile = g_key_file_new( );
-    g_key_file_load_from_file( keyfile, old_file, 0, NULL );
-    length = 0;
-    keys = g_key_file_get_keys( keyfile, "general", &length, NULL );
-
-    tr_bencInitDict( &dict, length );
-    for( i=0; i<length; ++i )
-    {
-        guint j;
-        const char * key = keys[i];
-        gchar * val = g_key_file_get_value( keyfile, "general", key, NULL );
-
-        for( j=0; j<G_N_ELEMENTS(renamed); ++j )
-            if( !strcmp( renamed[j].oldkey, key ) )
-                key = renamed[j].newkey;
-
-        if( !strcmp(val,"true") || !strcmp(val,"false") )
-            tr_bencDictAddInt( &dict, key, !strcmp( val, "true" ) );
-        else {
-            char * end;
-            long l;
-            errno = 0;
-            l = strtol( val, &end, 10 );
-            if( !errno && end && !*end )
-                tr_bencDictAddInt( &dict, key, l );
-            else
-                tr_bencDictAddStr( &dict, key, val );
-        }
-
-        g_free( val );
-    }
-
-    g_key_file_free( keyfile );
-    tr_bencSaveJSONFile( new_file, &dict );
-    tr_bencFree( &dict );
-}
-
 void
 cf_check_older_configs( void )
 {
-    char * filename = getPrefsFilename( );
+    char * cfn = getPrefsFilename( );
+    char * cfn08 = getCompat08PrefsFilename( );
 
-    if( !g_file_test( filename, G_FILE_TEST_IS_REGULAR ) )
-    {
-        char * key1 = getCompat121PrefsFilename( );
-        char * key2 = getCompat090PrefsFilename( );
-        char * benc = getCompat080PrefsFilename( );
+    if( !g_file_test( cfn,   G_FILE_TEST_IS_REGULAR )
+      && g_file_test( cfn08, G_FILE_TEST_IS_REGULAR ) )
+        translate_08_to_09( cfn08, cfn );
 
-        if( g_file_test( key1, G_FILE_TEST_IS_REGULAR ) )
-        {
-            translate_keyfile_to_json( key1, filename );
-        }
-        else if( g_file_test( key2, G_FILE_TEST_IS_REGULAR ) )
-        {
-            translate_keyfile_to_json( key2, filename );
-        }
-        else if( g_file_test( benc, G_FILE_TEST_IS_REGULAR ) )
-        {
-            char * tmpfile;
-            int fd = g_file_open_tmp( "transmission-prefs-XXXXXX", &tmpfile, NULL );
-            if( fd != -1 ) close( fd );
-            translate_08_to_09( benc, tmpfile );
-            translate_keyfile_to_json( tmpfile, filename );
-            unlink( tmpfile );
-        }
-
-        g_free( benc );
-        g_free( key2 );
-        g_free( key1 );
-    }
-
-    g_free( filename );
+    g_free( cfn08 );
+    g_free( cfn );
 }

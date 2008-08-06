@@ -34,8 +34,6 @@
     IBOutlet FileOutlineView * fOutline;
 }
 
-- (FileOutlineView *) outlineView;
-
 - (void) setTorrent: (Torrent *) torrent;
 
 - (void) reloadData;

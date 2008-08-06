@@ -16,6 +16,7 @@
 #include <limits.h> /* UCHAR_MAX */
 #include <string.h>
 #include <stdio.h>
+#include <libgen.h> /* basename */
 
 #include <event.h>
 
@@ -25,7 +26,6 @@
 #include "crypto.h"
 #include "handshake.h"
 #include "peer-io.h"
-#include "peer-mgr.h"
 #include "torrent.h"
 #include "trevent.h"
 #include "utils.h"
@@ -133,7 +133,32 @@ enum
 ***
 **/
 
-#define dbgmsg(handshake, fmt...) tr_deepLog( __FILE__, __LINE__, tr_peerIoGetAddrStr( handshake->io ), ##fmt )
+static void
+myDebug( const char * file, int line, const tr_handshake * handshake, const char * fmt, ... )
+{
+    FILE * fp = tr_getLog( );
+    if( fp != NULL )
+    {
+        va_list args;
+        char timestr[64];
+        struct evbuffer * buf = evbuffer_new( );
+        char * myfile = tr_strdup( file );
+
+        evbuffer_add_printf( buf, "[%s] %s: ",
+                             tr_getLogTimeStr( timestr, sizeof(timestr) ),
+                             tr_peerIoGetAddrStr( handshake->io ) );
+        va_start( args, fmt );
+        evbuffer_add_vprintf( buf, fmt, args );
+        va_end( args );
+        evbuffer_add_printf( buf, " (%s:%d)\n", basename(myfile), line );
+        fwrite( EVBUFFER_DATA(buf), 1, EVBUFFER_LENGTH(buf), fp );
+
+        tr_free( myfile );
+        evbuffer_free( buf );
+    }
+}
+
+#define dbgmsg(handshake, fmt...) myDebug(__FILE__, __LINE__, handshake, ##fmt )
 
 static const char* getStateName( short state )
 {
@@ -228,10 +253,9 @@ parseHandshake( tr_handshake     * handshake,
 
     /* torrent hash */
     tr_peerIoReadBytes( handshake->io, inbuf, hash, sizeof(hash) );
+    assert( tr_torrentExists( handshake->handle, hash ) );
     assert( tr_peerIoHasTorrentHash( handshake->io ) );
-    if( !tr_torrentExists( handshake->handle, hash )
-        || memcmp( hash, tr_peerIoGetTorrentHash(handshake->io), SHA_DIGEST_LENGTH ) )
-    {
+    if( memcmp( hash, tr_peerIoGetTorrentHash(handshake->io), SHA_DIGEST_LENGTH ) ) {
         dbgmsg( handshake, "peer returned the wrong hash. wtf?" );
         return HANDSHAKE_BAD_TORRENT;
     }
@@ -286,7 +310,7 @@ sendYa( tr_handshake * handshake )
     /* add our public key (Ya) */
     public_key = tr_cryptoGetMyPublicKey( handshake->crypto, &len );
     assert( len == KEY_LEN );
-    assert( public_key );
+    assert( public_key != NULL );
     evbuffer_add( outbuf, public_key, len );
 
     /* add some bullshit padding */
@@ -666,8 +690,8 @@ readHandshake( tr_handshake * handshake, struct evbuffer * inbuf )
 static int
 readPeerId( tr_handshake * handshake, struct evbuffer * inbuf )
 {
+    char * client;
     int peerIsGood;
-    char client[128];
 
     if( EVBUFFER_LENGTH(inbuf) < PEER_ID_LEN )
         return READ_MORE;
@@ -676,8 +700,9 @@ readPeerId( tr_handshake * handshake, struct evbuffer * inbuf )
     tr_peerIoReadBytes( handshake->io, inbuf, handshake->peer_id, PEER_ID_LEN );
     tr_peerIoSetPeersId( handshake->io, handshake->peer_id );
     handshake->havePeerID = TRUE;
-    tr_clientForId( client, sizeof( client ), handshake->peer_id );
+    client = tr_clientForId( handshake->peer_id );
     dbgmsg( handshake, "peer-id is [%s] ... isIncoming is %d", client, tr_peerIoIsIncoming( handshake->io ) );
+    tr_free( client );
 
     /* if we've somehow connected to ourselves, don't keep the connection */
     peerIsGood = memcmp( handshake->peer_id, tr_getPeerId(), PEER_ID_LEN ) ? 1 : 0;
@@ -785,22 +810,11 @@ readCryptoProvide( tr_handshake * handshake, struct evbuffer * inbuf )
     tr_sha1( req3, "req3", 4, handshake->mySecret, KEY_LEN, NULL );
     for( i=0; i<SHA_DIGEST_LENGTH; ++i )
         obfuscatedTorrentHash[i] = req2[i] ^ req3[i];
-    if(( tor = tr_torrentFindFromObfuscatedHash( handshake->handle, obfuscatedTorrentHash )))
-    {
+    tor = tr_torrentFindFromObfuscatedHash( handshake->handle, obfuscatedTorrentHash );
+    if( tor != NULL ) {
         dbgmsg( handshake, "found the torrent; it's [%s]", tor->info.name );
         tr_peerIoSetTorrentHash( handshake->io, tor->info.hash );
-        if( !tr_torrentAllowsPex( tor ) &&
-            tr_peerMgrPeerIsSeed( handshake->handle->peerMgr,
-                                  tor->info.hash,
-                                  tr_peerIoGetAddress( handshake->io, NULL )))
-        {
-            dbgmsg( handshake, "a peer has tried to reconnect to us!" );
-            tr_handshakeDone( handshake, FALSE );
-            return READ_DONE;
-        }
-    }
-    else
-    {
+    } else {
         dbgmsg( handshake, "can't find that torrent..." );
         tr_handshakeDone( handshake, FALSE );
         return READ_DONE;
@@ -1057,8 +1071,8 @@ tr_handshakeNew( tr_peerIo           * io,
 const struct in_addr *
 tr_handshakeGetAddr( const struct tr_handshake * handshake, uint16_t * port )
 {
-    assert( handshake );
-    assert( handshake->io );
+    assert( handshake != NULL );
+    assert( handshake->io != NULL );
 
     return tr_peerIoGetAddress( handshake->io, port );
 }

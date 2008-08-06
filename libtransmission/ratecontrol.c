@@ -29,8 +29,8 @@
 #include "ratecontrol.h"
 #include "utils.h"
 
-#define GRANULARITY_MSEC 500
-#define SHORT_INTERVAL_MSEC 1000
+#define GRANULARITY_MSEC 250
+#define SHORT_INTERVAL_MSEC 4000
 #define LONG_INTERVAL_MSEC 8000
 #define HISTORY_SIZE (LONG_INTERVAL_MSEC / GRANULARITY_MSEC)
 
@@ -42,6 +42,7 @@ struct tr_transfer
 
 struct tr_ratecontrol
 {
+    tr_lock * lock;
     int limit;
     int newest;
     struct tr_transfer transfers[HISTORY_SIZE];
@@ -56,7 +57,7 @@ rateForInterval( const tr_ratecontrol * r, int interval_msec )
     int i = r->newest;
     for( ;; )
     {
-        if( r->transfers[i].date <= cutoff )
+        if( r->transfers[i].date < cutoff )
             break;
 
         bytes += r->transfers[i].size;
@@ -77,6 +78,7 @@ tr_rcInit( void )
 {
     tr_ratecontrol * r = tr_new0( tr_ratecontrol, 1 );
     r->limit = 0;
+    r->lock = tr_lockNew( );
     return r;
 }
 
@@ -84,6 +86,7 @@ void
 tr_rcClose( tr_ratecontrol * r )
 {
     tr_rcReset( r );
+    tr_lockFree( r->lock );
     tr_free( r );
 }
 
@@ -96,12 +99,18 @@ tr_rcBytesLeft( const tr_ratecontrol * r )
 {
     size_t bytes = 0;
 
-    if( r )
+    if( r != NULL )
     {
-        const float cur = rateForInterval( r, SHORT_INTERVAL_MSEC );
-        const float max = r->limit;
-        const float kb = max>cur ? max-cur : 0;
+        float cur, max, kb;
+ 
+        tr_lockLock( (tr_lock*)r->lock );
+
+        cur = rateForInterval( r, SHORT_INTERVAL_MSEC );
+        max = r->limit;
+        kb = max>cur ? max-cur : 0;
         bytes = (size_t)(kb * 1024);
+
+        tr_lockUnlock( (tr_lock*)r->lock );
     }
 
     return bytes;
@@ -110,10 +119,15 @@ tr_rcBytesLeft( const tr_ratecontrol * r )
 float
 tr_rcRate( const tr_ratecontrol * r )
 {
-    float ret = 0.0f;
+    float ret;
 
-    if( r )
+    if( r == NULL )
+        ret = 0.0f;
+    else {
+        tr_lockLock( (tr_lock*)r->lock );
         ret = rateForInterval( r, LONG_INTERVAL_MSEC );
+        tr_lockUnlock( (tr_lock*)r->lock );
+    }
 
     return ret;
 }
@@ -125,8 +139,11 @@ tr_rcRate( const tr_ratecontrol * r )
 void
 tr_rcTransferred( tr_ratecontrol * r, size_t size )
 {
-    const uint64_t now = tr_date ();
+    uint64_t now;
 
+    tr_lockLock( (tr_lock*)r->lock );
+
+    now = tr_date ();
     if( r->transfers[r->newest].date + GRANULARITY_MSEC >= now )
         r->transfers[r->newest].size += size;
     else {
@@ -134,19 +151,25 @@ tr_rcTransferred( tr_ratecontrol * r, size_t size )
         r->transfers[r->newest].date = now;
         r->transfers[r->newest].size = size;
     }
+
+    tr_lockUnlock( (tr_lock*)r->lock );
 }
 
 void
 tr_rcReset( tr_ratecontrol * r )
 {
+    tr_lockLock( (tr_lock*)r->lock );
     r->newest = 0;
     memset( r->transfers, 0, sizeof(struct tr_transfer) * HISTORY_SIZE );
+    tr_lockUnlock( (tr_lock*)r->lock );
 }
 
 void
 tr_rcSetLimit( tr_ratecontrol * r, int limit )
 {
+    tr_lockLock( (tr_lock*)r->lock );
     r->limit = limit;
+    tr_lockUnlock( (tr_lock*)r->lock );
 }
 
 int

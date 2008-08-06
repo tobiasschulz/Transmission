@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -45,8 +45,10 @@ tr_ptrArrayDup( tr_ptrArray* in )
     tr_ptrArray * out;
 
     out = tr_new( tr_ptrArray, 1 );
-    out->n_items = out->n_alloc = in->n_items;
-    out->items = tr_memdup( in->items, out->n_items * sizeof(void*) );
+    out->n_items = in->n_items;
+    out->n_alloc = in->n_items;
+    out->items = tr_new( void*, out->n_alloc );
+    memcpy( out->items, in->items, out->n_items * sizeof(void*) );
 
     return out;
 }
@@ -56,9 +58,9 @@ tr_ptrArrayForeach( tr_ptrArray * t, PtrArrayForeachFunc func )
 {
     int i;
 
-    assert( t );
-    assert( t->items );
-    assert( func );
+    assert( t != NULL );
+    assert( t->items != NULL );
+    assert( func != NULL );
 
     for( i=0; i<t->n_items; ++i )
         func( t->items[i] );
@@ -67,10 +69,10 @@ tr_ptrArrayForeach( tr_ptrArray * t, PtrArrayForeachFunc func )
 void
 tr_ptrArrayFree( tr_ptrArray * t, PtrArrayForeachFunc func )
 {
-    assert( t );
-    assert( t->items );
+    assert( t != NULL );
+    assert( t->items != NULL );
 
-    if( func )
+    if( func != NULL )
         tr_ptrArrayForeach( t, func );
 
     tr_free( t->items );
@@ -84,16 +86,10 @@ tr_ptrArrayPeek( tr_ptrArray * t, int * size )
     return t->items;
 }
 
-void**
-tr_ptrArrayBase( tr_ptrArray * t )
-{
-    return t->items;
-}
-
 void*
 tr_ptrArrayNth( tr_ptrArray* t, int i )
 {
-    assert( t );
+    assert( t != NULL  );
     assert( i >= 0 );
     assert( i < t->n_items );
 

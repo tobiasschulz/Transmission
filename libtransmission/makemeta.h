@@ -20,18 +20,6 @@ typedef struct tr_metainfo_builder_file
 }
 tr_metainfo_builder_file;
 
-typedef enum
-{
-    TR_MAKEMETA_OK,
-    TR_MAKEMETA_URL,
-    TR_MAKEMETA_CANCELLED,
-    TR_MAKEMETA_IO_READ,   /* see builder.errfile, builder.errno */
-    TR_MAKEMETA_IO_WRITE   /* see builder.errfile, builder.errno */
-}
-tr_metainfo_builder_err;
-
-    
-
 typedef struct tr_metainfo_builder
 {
     /**
@@ -54,8 +42,7 @@ typedef struct tr_metainfo_builder
     ***  and cleaned up by tr_metaInfoBuilderFree()
     **/
 
-    tr_tracker_info  * trackers;
-    int trackerCount;
+    char * announce;
     char * comment;
     char * outputFile;
     int isPrivate;
@@ -70,13 +57,7 @@ typedef struct tr_metainfo_builder
     uint32_t pieceIndex;
     int abortFlag;
     int isDone;
-    tr_metainfo_builder_err result;
-
-    /* file in use when result was set to _IO_READ or _IO_WRITE */
-    char errfile[2048];
-
-    /* errno encountered when result was set to _IO_READ or _IO_WRITE */
-    int my_errno;
+    int failed; /* only meaningful if isDone is set */
 
     /**
     ***  This is an implementation detail.
@@ -96,7 +77,7 @@ void
 tr_metaInfoBuilderFree( tr_metainfo_builder* );
 
 /**
- * @brief create a new .torrent file
+ * 'outputFile' if NULL, builder->top + ".torrent" will be used.
  *
  * This is actually done in a worker thread, not the main thread!
  * Otherwise the client's interface would lock up while this runs.
@@ -104,21 +85,13 @@ tr_metaInfoBuilderFree( tr_metainfo_builder* );
  * It is the caller's responsibility to poll builder->isDone
  * from time to time!  When the worker thread sets that flag,
  * the caller must pass the builder to tr_metaInfoBuilderFree().
- *
- * @param outputFile if NULL, builder->top + ".torrent" will be used.
-
- * @param trackers An array of trackers, sorted by tier from first to last.
- *                 NOTE: only the `tier' and `announce' fields are used.
- *
- * @param trackerCount size of the `trackers' array
  */
 void
-tr_makeMetaInfo( tr_metainfo_builder     * builder,
-                 const char              * outputFile,
-                 const tr_tracker_info   * trackers,
-                 int                       trackerCount,
-                 const char              * comment,
-                 int                       isPrivate );
+tr_makeMetaInfo( tr_metainfo_builder  * builder,
+                 const char           * outputFile,
+                 const char           * announce,
+                 const char           * comment,
+                 int                    isPrivate );
 
 
 #endif
