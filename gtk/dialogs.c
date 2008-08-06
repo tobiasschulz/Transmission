@@ -109,9 +109,9 @@ askquit( TrCore          * core,
 
     wind = gtk_message_dialog_new_with_markup( parent,
                                                GTK_DIALOG_DESTROY_WITH_PARENT,
-                                               GTK_MESSAGE_WARNING,
+                                               GTK_MESSAGE_QUESTION,
                                                GTK_BUTTONS_NONE,
-                                               _("<big><b>Quit Transmission?</b></big>") );
+                                               _("<b>Really Quit?</b>") );
 
     gtk_dialog_add_buttons( GTK_DIALOG(wind),
                             GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
@@ -120,9 +120,8 @@ askquit( TrCore          * core,
     gtk_dialog_set_default_response( GTK_DIALOG( wind ),
                                      GTK_RESPONSE_ACCEPT );
     gtk_dialog_set_alternative_button_order( GTK_DIALOG( wind ),
-                                             GTK_RESPONSE_ACCEPT,
-                                             GTK_RESPONSE_CANCEL,
-                                             -1 );
+                                     GTK_RESPONSE_ACCEPT,
+                                     GTK_RESPONSE_CANCEL );
 
     dontask = gtk_check_button_new_with_mnemonic( _("_Don't ask me again") );
     stuff->dontask = dontask;
@@ -153,7 +152,6 @@ removeTorrents( struct DeleteData * data )
     for( l=data->torrents; l!=NULL; l=l->next )
         tr_core_remove_torrent( data->core, l->data, data->delete_files );
     g_slist_free( data->torrents );
-    data->torrents = NULL;
 }
 
 
@@ -168,7 +166,6 @@ removeResponse( GtkDialog * dialog, gint response, gpointer gdata )
         g_slist_foreach( data->torrents, (GFunc)g_object_unref, NULL );
 
     gtk_widget_destroy( GTK_WIDGET( dialog ) );
-    g_slist_free( data->torrents );
     g_free( data );
 }
 
@@ -230,9 +227,9 @@ confirmRemove( GtkWindow * parent,
 
     d = gtk_message_dialog_new_with_markup( parent,
                                             GTK_DIALOG_DESTROY_WITH_PARENT,
-                                            GTK_MESSAGE_WARNING,
+                                            ( delete_files ? GTK_MESSAGE_WARNING : GTK_MESSAGE_QUESTION ),
                                             GTK_BUTTONS_NONE,
-                                            "<big><b>%s</b></big>", primary_text );
+                                            "<b>%s</b>", primary_text );
     if( secondary_text )
         gtk_message_dialog_format_secondary_markup( GTK_MESSAGE_DIALOG( d ), secondary_text );
     gtk_dialog_add_buttons( GTK_DIALOG( d ),

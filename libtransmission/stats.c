@@ -10,11 +10,11 @@
  * $Id$
  */
 
-#include <assert.h>
+#include <string.h> /* memset */
 
 #include "transmission.h"
 #include "bencode.h"
-#include "platform.h" /* tr_sessionGetConfigDir() */
+#include "platform.h" /* tr_getPrefsDirectory */
 #include "utils.h" /* tr_buildPath */
 
 /***
@@ -28,72 +28,81 @@ struct tr_stats_handle
     time_t startTime;
 };
 
-static char*
-getOldFilename( const tr_handle * handle, char * buf, size_t buflen )
-{
-    tr_buildPath( buf, buflen, tr_sessionGetConfigDir(handle),
-                               "stats.benc",
-                               NULL );
-    return buf;
-}
-
-static char*
-getFilename( const tr_handle * handle, char * buf, size_t buflen )
-{
-    tr_buildPath( buf, buflen, tr_sessionGetConfigDir(handle),
-                               "stats.json",
-                               NULL );
-    return buf;
-}
-
 static void
-loadCumulativeStats( const tr_handle * handle, tr_session_stats * setme )
+parseCumulativeStats( tr_session_stats  * setme,
+                      const uint8_t     * content,
+                      size_t              len )
 {
-    int loaded = FALSE;
-    char filename[MAX_PATH_LENGTH];
     tr_benc top;
 
-    getFilename( handle, filename, sizeof(filename) );
-    loaded = !tr_bencLoadJSONFile( filename, &top );
-    if( !loaded ) {
-        getOldFilename( handle, filename, sizeof(filename) );
-        loaded = !tr_bencLoadFile( filename, &top );
-    }
-    if( loaded )
+    if( !tr_bencLoad( content, len, &top, NULL ) )
     {
-        int64_t i;
+        const tr_benc * val;
 
-        if( tr_bencDictFindInt( &top, "downloaded-bytes", &i ) )
-            setme->downloadedBytes = (uint64_t) i;
-        if( tr_bencDictFindInt( &top, "files-added", &i ) )
-            setme->filesAdded = (uint64_t) i;
-        if( tr_bencDictFindInt( &top, "seconds-active", &i ) )
-            setme->secondsActive = (uint64_t) i;
-        if( tr_bencDictFindInt( &top, "session-count", &i ) )
-            setme->sessionCount = (uint64_t) i;
-        if( tr_bencDictFindInt( &top, "uploaded-bytes", &i ) )
-            setme->uploadedBytes = (uint64_t) i;
+        if(( val = tr_bencDictFindType( &top, "uploaded-bytes", TYPE_INT )))
+            setme->uploadedBytes = (uint64_t) tr_bencGetInt( val );
+
+        if(( val = tr_bencDictFindType( &top, "downloaded-bytes", TYPE_INT )))
+            setme->downloadedBytes = (uint64_t) tr_bencGetInt( val );
+
+        if(( val = tr_bencDictFindType( &top, "files-added", TYPE_INT )))
+            setme->filesAdded = (uint64_t) tr_bencGetInt( val );
+
+        if(( val = tr_bencDictFindType( &top, "session-count", TYPE_INT )))
+            setme->sessionCount = (uint64_t) tr_bencGetInt( val );
+
+        if(( val = tr_bencDictFindType( &top, "seconds-active", TYPE_INT )))
+            setme->secondsActive = (uint64_t) tr_bencGetInt( val );
 
         tr_bencFree( &top );
     }
 }
 
-static void
-saveCumulativeStats( const tr_handle * handle, const tr_session_stats * s )
+static char*
+getFilename( char * buf, size_t buflen )
 {
+    tr_buildPath( buf, buflen, tr_getPrefsDirectory(), "stats.benc", NULL );
+    return buf;
+}
+
+static void
+loadCumulativeStats( tr_session_stats * setme )
+{
+    size_t len;
+    uint8_t * content;
     char filename[MAX_PATH_LENGTH];
+
+    getFilename( filename, sizeof(filename) );
+    content = tr_loadFile( filename, &len );
+    if( content != NULL )
+        parseCumulativeStats( setme, content, len );
+
+    tr_free( content );
+}
+
+static void
+saveCumulativeStats( const tr_session_stats * stats )
+{
+    FILE * fp;
+    char * str;
+    char filename[MAX_PATH_LENGTH];
+    int len;
     tr_benc top;
 
-    tr_bencInitDict( &top, 5 );
-    tr_bencDictAddInt( &top, "downloaded-bytes", s->downloadedBytes );
-    tr_bencDictAddInt( &top, "files-added",      s->filesAdded );
-    tr_bencDictAddInt( &top, "seconds-active",   s->secondsActive );
-    tr_bencDictAddInt( &top, "session-count",    s->sessionCount );
-    tr_bencDictAddInt( &top, "uploaded-bytes",   s->uploadedBytes );
+    tr_bencInit( &top, TYPE_DICT );
+    tr_bencDictReserve( &top, 5 );
+    tr_bencInitInt( tr_bencDictAdd( &top, "uploaded-bytes" ), stats->uploadedBytes );
+    tr_bencInitInt( tr_bencDictAdd( &top, "downloaded-bytes" ), stats->downloadedBytes );
+    tr_bencInitInt( tr_bencDictAdd( &top, "files-added" ), stats->filesAdded );
+    tr_bencInitInt( tr_bencDictAdd( &top, "session-count" ), stats->sessionCount );
+    tr_bencInitInt( tr_bencDictAdd( &top, "seconds-active" ), stats->secondsActive );
 
-    getFilename( handle, filename, sizeof(filename) );
-    tr_deepLog( __FILE__, __LINE__, NULL, "Saving stats to \"%s\"", filename );
-    tr_bencSaveJSONFile( filename, &top );
+    str = tr_bencSave( &top, &len );
+    getFilename( filename, sizeof(filename) );
+    fp = fopen( filename, "wb+" );
+    fwrite( str, 1, len, fp );
+    fclose( fp );
+    tr_free( str );
 
     tr_bencFree( &top );
 }
@@ -106,7 +115,7 @@ void
 tr_statsInit( tr_handle * handle )
 {
     struct tr_stats_handle * stats = tr_new0( struct tr_stats_handle, 1 );
-    loadCumulativeStats( handle, &stats->old );
+    loadCumulativeStats( &stats->old );
     stats->single.sessionCount = 1;
     stats->startTime = time( NULL );
     handle->sessionStats = stats;
@@ -116,8 +125,8 @@ void
 tr_statsClose( tr_handle * handle )
 {
     tr_session_stats cumulative;
-    tr_sessionGetCumulativeStats( handle, &cumulative );
-    saveCumulativeStats( handle, &cumulative );
+    tr_getCumulativeSessionStats( handle, &cumulative );
+    saveCumulativeStats( &cumulative );
 
     tr_free( handle->sessionStats );
     handle->sessionStats = NULL;
@@ -126,7 +135,11 @@ tr_statsClose( tr_handle * handle )
 static struct tr_stats_handle *
 getStats( const tr_handle * handle )
 {
-    return handle->sessionStats;
+    static struct tr_stats_handle nullObject;
+
+    return handle && handle->sessionStats
+        ? handle->sessionStats
+        : &nullObject;
 }
 
 /***
@@ -154,40 +167,22 @@ addStats( tr_session_stats       * setme,
 }
 
 void
-tr_sessionGetStats( const tr_handle   * handle,
+tr_getSessionStats( const tr_handle   * handle,
                     tr_session_stats  * setme )
 {
     const struct tr_stats_handle * stats = getStats( handle );
-    assert( stats );
     *setme = stats->single;
     setme->secondsActive = time( NULL ) - stats->startTime;
     updateRatio( setme );
 }
 
 void
-tr_sessionGetCumulativeStats( const tr_handle   * handle,
+tr_getCumulativeSessionStats( const tr_handle   * handle,
                               tr_session_stats  * setme )
 {
-    const struct tr_stats_handle * stats = getStats( handle );
-    assert( stats );
     tr_session_stats current;
-    tr_sessionGetStats( handle, &current );
-    addStats( setme, &stats->old, &current );
-}
-
-void
-tr_sessionClearStats( tr_handle * handle )
-{
-    tr_session_stats zero;
-    zero.uploadedBytes = 0;
-    zero.downloadedBytes = 0;
-    zero.ratio = TR_RATIO_NA;
-    zero.filesAdded = 0;
-    zero.sessionCount = 0;
-    zero.secondsActive = 0;
-    handle->sessionStats->single = handle->sessionStats->old = zero;
-
-    handle->sessionStats->startTime = time( NULL );
+    tr_getSessionStats( handle, &current );
+    addStats( setme, &getStats(handle)->old, &current );
 }
 
 /**
@@ -197,23 +192,17 @@ tr_sessionClearStats( tr_handle * handle )
 void
 tr_statsAddUploaded( tr_handle * handle, uint32_t bytes )
 {
-    struct tr_stats_handle * s;
-    if(( s = getStats( handle )))
-        s->single.uploadedBytes += bytes;
+    getStats(handle)->single.uploadedBytes += bytes;
 }
 
 void
 tr_statsAddDownloaded( tr_handle * handle, uint32_t bytes )
 {
-    struct tr_stats_handle * s;
-    if(( s = getStats( handle )))
-        s->single.downloadedBytes += bytes;
+    getStats(handle)->single.downloadedBytes += bytes;
 }
 
 void
 tr_statsFileCreated( tr_handle * handle )
 {
-    struct tr_stats_handle * s;
-    if(( s = getStats( handle )))
-        s->single.filesAdded++;
+    getStats(handle)->single.filesAdded++;
 }

@@ -16,11 +16,6 @@
 #include "stats.h"
 #include "tr-core.h"
 
-enum
-{
-    TR_RESPONSE_CLEAR = 1
-};
-
 struct stat_ui
 {
     GtkWidget * one_up_lb;
@@ -57,8 +52,8 @@ updateStats( gpointer gdata )
 
     struct stat_ui * ui = gdata;
     tr_session_stats one, all;
-    tr_sessionGetStats( tr_core_handle( ui->core ), &one );
-    tr_sessionGetCumulativeStats( tr_core_handle( ui->core ), &all );
+    tr_getSessionStats( tr_core_handle( ui->core ), &one );
+    tr_getCumulativeSessionStats( tr_core_handle( ui->core ), &all );
 
     setLabel( ui->one_up_lb, tr_strlsize( buf, one.uploadedBytes, sizeof(buf) ) );
     setLabel( ui->one_down_lb, tr_strlsize( buf, one.downloadedBytes, sizeof(buf) ) );
@@ -77,27 +72,10 @@ updateStats( gpointer gdata )
 }
 
 static void
-dialogDestroyed( gpointer p, GObject * dialog UNUSED )
+dialogResponse( GtkDialog * dialog, gint response UNUSED, gpointer unused UNUSED )
 {
-    g_source_remove( GPOINTER_TO_UINT( p ) );
-}
-
-static void
-dialogResponse( GtkDialog * dialog, gint response, gpointer gdata )
-{
-    struct stat_ui * ui = gdata;
-
-    if( response == TR_RESPONSE_CLEAR )
-    {
-        tr_handle * handle = tr_core_handle( ui->core );
-        tr_sessionClearStats( handle );
-        updateStats( ui );
-    }
-
-    if( response == GTK_RESPONSE_CLOSE )
-    {
-        gtk_widget_destroy( GTK_WIDGET( dialog ) );
-    }
+    g_source_remove( GPOINTER_TO_UINT( g_object_get_data( G_OBJECT(dialog), "TrTimer" ) ) );
+    gtk_widget_destroy( GTK_WIDGET( dialog ) );
 }
 
 GtkWidget*
@@ -112,16 +90,9 @@ stats_dialog_create( GtkWindow * parent, TrCore * core )
 
     d = gtk_dialog_new_with_buttons( _("Statistics"),
                                      parent,
-                                     GTK_DIALOG_DESTROY_WITH_PARENT|GTK_DIALOG_NO_SEPARATOR,
-                                     GTK_STOCK_DELETE, TR_RESPONSE_CLEAR,
+                                     GTK_DIALOG_DESTROY_WITH_PARENT,
                                      GTK_STOCK_CLOSE, GTK_RESPONSE_CLOSE,
                                      NULL );
-    gtk_dialog_set_default_response( GTK_DIALOG( d ),
-                                     GTK_RESPONSE_CLOSE );
-    gtk_dialog_set_alternative_button_order( GTK_DIALOG( d ),
-                                             GTK_RESPONSE_CLOSE,
-                                             TR_RESPONSE_CLEAR,
-                                             -1 );
     t = hig_workarea_create( );
     gtk_box_pack_start_defaults( GTK_BOX(GTK_DIALOG(d)->vbox), t );
     ui->core = core;
@@ -152,8 +123,8 @@ stats_dialog_create( GtkWindow * parent, TrCore * core )
 
     updateStats( ui );
     g_object_set_data_full( G_OBJECT(d), "data", ui, g_free );
-    g_signal_connect( d, "response", G_CALLBACK(dialogResponse), ui );
+    g_signal_connect( d, "response", G_CALLBACK(dialogResponse), NULL );
     i = g_timeout_add( 1000, updateStats, ui );
-    g_object_weak_ref( G_OBJECT( d ), dialogDestroyed, GUINT_TO_POINTER( i ) );
+    g_object_set_data( G_OBJECT(d), "TrTimer", GUINT_TO_POINTER(i) );
     return d;
 }

@@ -52,7 +52,7 @@ getProgressString( const tr_info * info, const tr_stat * torStat )
                      %3$.2f%% is a percentage of the two */
                   _("%1$s of %2$s (%3$.2f%%)"),
                   tr_strlsize( buf1, haveTotal, sizeof(buf1) ),
-                  tr_strlsize( buf2, torStat->sizeWhenDone, sizeof(buf2) ),
+                  tr_strlsize( buf2, torStat->desiredSize, sizeof(buf2) ),
                   torStat->percentDone * 100.0 );
     else if( !isSeed )
         str = g_strdup_printf(
@@ -83,9 +83,7 @@ getProgressString( const tr_info * info, const tr_stat * torStat )
         const int eta = torStat->eta;
         GString * gstr = g_string_new( str );
         g_string_append( gstr, " - " );
-        if( eta == TR_ETA_NOT_AVAIL )
-            g_string_append( gstr, _( "Data not fully available" ) );
-         else if( eta == TR_ETA_UNKNOWN )
+        if( eta < 0 )
             g_string_append( gstr, _( "Stalled" ) );
         else {
             char timestr[128];
@@ -151,7 +149,8 @@ getShortStatusString( const tr_stat * torStat )
             break;
 
         case TR_STATUS_DOWNLOAD:
-        case TR_STATUS_SEED: {
+        case TR_STATUS_SEED:
+        case TR_STATUS_DONE: {
             char buf[128];
             if( torStat->status != TR_STATUS_DOWNLOAD ) {
                 tr_strlratio( buf, torStat->ratio, sizeof( buf ) );
@@ -199,10 +198,11 @@ getStatusString( const tr_stat * torStat )
                 ngettext( "Downloading from %1$'d of %2$'d connected peer",
                           "Downloading from %1$'d of %2$'d connected peers",
                           torStat->peersConnected ),
-                torStat->peersSendingToUs + torStat->webseedsSendingToUs,
-                torStat->peersConnected + torStat->webseedsSendingToUs );
+                torStat->peersSendingToUs,
+                torStat->peersConnected );
             break;
 
+        case TR_STATUS_DONE:
         case TR_STATUS_SEED:
             g_string_append_printf( gstr,
                 ngettext( "Seeding to %1$'d of %2$'d connected peer",
@@ -249,6 +249,8 @@ torrent_cell_renderer_get_size( GtkCellRenderer  * cell,
                                 gint             * height)
 {
     TorrentCellRenderer * self = TORRENT_CELL_RENDERER( cell );
+    int xpad, ypad;
+    g_object_get( self, "xpad", &xpad, "ypad", &ypad, NULL );
 
     if( self && self->priv->tor )
     {
@@ -317,13 +319,13 @@ torrent_cell_renderer_get_size( GtkCellRenderer  * cell,
         if( cell_area ) {
             if( x_offset ) *x_offset = 0;
             if( y_offset ) {
-                *y_offset = 0.5 * (cell_area->height - (h + (2 * cell->ypad)));
+                *y_offset = 0.5 * (cell_area->height - (h + (2 * ypad)));
                 *y_offset = MAX( *y_offset, 0 );
             }
         }
 
-        *width = w + cell->xpad * 2;
-        *height = h + cell->ypad * 2;
+        *width = w + xpad*2;
+        *height = h + ypad*2;
     }
 }
 
@@ -352,6 +354,7 @@ torrent_cell_renderer_render( GtkCellRenderer      * cell,
         GdkRectangle my_bg;
         GdkRectangle my_cell;
         GdkRectangle my_expose;
+        int xpad, ypad;
         int w, h;
         struct TorrentCellRendererPrivate * p = self->priv;
         GtkCellRenderer * text_renderer = torStat->error != 0
@@ -359,10 +362,12 @@ torrent_cell_renderer_render( GtkCellRenderer      * cell,
             : p->text_renderer;
         const gboolean isActive = torStat->status != TR_STATUS_STOPPED;
 
+        g_object_get( self, "xpad", &xpad, "ypad", &ypad, NULL );
+
         my_bg = *background_area; 
-        my_bg.x += cell->xpad;
-        my_bg.y += cell->ypad;
-        my_bg.width -= cell->xpad * 2;
+        my_bg.x += xpad;
+        my_bg.y += ypad;
+        my_bg.width -= xpad*2;
         my_cell = my_expose = my_bg;
 
         g_object_set( text_renderer, "sensitive", isActive, NULL );
@@ -453,7 +458,9 @@ torrent_cell_renderer_render( GtkCellRenderer      * cell,
         my_cell.height = p->bar_height;
         if( 1 )
         {
-            g_object_set( p->progress_renderer, "value", (int)(torStat->percentDone*100.0), 
+            const double havePercent = ( torStat->haveValid + torStat->haveUnchecked )
+                                                              / (double)info->totalSize;
+            g_object_set( p->progress_renderer, "value", (int)(havePercent*100.0), 
                                                 "text", "",
                                                 NULL );
             gtk_cell_renderer_render( p->progress_renderer,

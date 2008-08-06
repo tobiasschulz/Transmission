@@ -34,16 +34,16 @@ typedef enum
     TORRENT_FILE_DEFAULT
 } torrentFileState;
 
-#define STAT_TIME_NONE -1
-#define STAT_TIME_NOW -2
-
 @interface Torrent : NSObject
 {
     tr_torrent * fHandle;
     const tr_info * fInfo;
     const tr_stat * fStat;
     
+    int fID;
+    
     BOOL fResumeOnWake;
+    NSDate * fDateAdded, * fDateCompleted, * fDateActivity;
     
     BOOL fUseIncompleteFolder;
     NSString * fDownloadFolder, * fIncompleteFolder;
@@ -60,8 +60,8 @@ typedef enum
     tr_file_stat * fFileStat;
     NSArray * fFileList;
     
-    NSIndexSet * fPreviousFinishedIndexes;
-    NSDate * fPreviousFinishedIndexesDate;
+    float * fPreviousFinishedPieces;
+    NSDate * fFinishedPiecesDate;
     
     float fRatioLimit;
     int fRatioSetting;
@@ -69,19 +69,16 @@ typedef enum
     
     int fOrderValue, fGroupValue;
     
-    BOOL fAddedTrackers;
-    
     NSDictionary * fQuickPauseDict;
 }
 
 - (id) initWithPath: (NSString *) path location: (NSString *) location deleteTorrentFile: (torrentFileState) torrentDelete
         lib: (tr_handle *) lib;
-- (id) initWithTorrentStruct: (tr_torrent *) torrentStruct location: (NSString *) location lib: (tr_handle *) lib;
+- (id) initWithData: (NSData *) data location: (NSString *) location lib: (tr_handle *) lib;
 - (id) initWithHistory: (NSDictionary *) history lib: (tr_handle *) lib;
 
 - (NSDictionary *) history;
 
-- (void) closeRemoveTorrentInterface;
 - (void) closeRemoveTorrent;
 
 - (void) changeIncompleteDownloadFolder: (NSString *) folder;
@@ -90,8 +87,8 @@ typedef enum
 
 - (void) getAvailability: (int8_t *) tab size: (int) size;
 - (void) getAmountFinished: (float *) tab size: (int) size;
-- (NSIndexSet *) previousFinishedPieces;
--(void) setPreviousFinishedPieces: (NSIndexSet *) indexes;
+- (float *) getPreviousAmountFinished;
+-(void) setPreviousAmountFinished: (float *) tab;
 
 - (void) update;
 
@@ -138,10 +135,11 @@ typedef enum
 - (NSImage *) icon;
 
 - (NSString *) name;
-- (BOOL) isFolder;
+- (BOOL) folder;
 - (uint64_t) size;
 - (uint64_t) sizeLeft;
 
+- (NSString *) trackerAddress;
 - (NSString *) trackerAddressAnnounce;
 - (NSDate *) lastAnnounceTime;
 - (int) nextAnnounceTime;
@@ -152,10 +150,7 @@ typedef enum
 - (int) nextScrapeTime;
 - (NSString *) scrapeResponse;
 
-- (NSMutableArray *) allTrackers: (BOOL) separators;
-- (BOOL) updateAllTrackersForAdd: (NSMutableArray *) trackers;
-- (void) updateAllTrackersForRemove: (NSMutableArray *) trackers;
-- (BOOL) hasAddedTrackers;
+- (NSArray *) allTrackers: (BOOL) separators;
 
 - (NSString *) comment;
 - (NSString *) creator;
@@ -192,9 +187,6 @@ typedef enum
 - (NSString *) errorMessage;
 
 - (NSArray *) peers;
-
-- (NSUInteger) webSeedCount;
-- (NSArray *) webSeeds;
 
 - (NSString *) progressString;
 - (NSString *) statusString;
@@ -258,8 +250,10 @@ typedef enum
 - (int) stalledMinutes;
 - (BOOL) isStalled;
 
-- (NSInteger) stateSortKey;
+- (NSNumber *) stateSortKey;
 
-- (tr_torrent *) torrentStruct;
+- (int) torrentID;
+- (const tr_info *) torrentInfo;
+- (const tr_stat *) torrentStat;
 
 @end

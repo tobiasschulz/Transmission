@@ -9,31 +9,28 @@ AM_CPPFLAGS = \
 AM_CFLAGS = \
     $(GTK_CFLAGS) \
     $(OPENSSL_CFLAGS) \
-    $(LIBCURL_CFLAGS) \
     $(PTHREAD_CFLAGS) \
     $(GIO_CFLAGS) \
-    $(DBUS_GLIB_CFLAGS) \
     $(LIBNOTIFY_CFLAGS)
 
 noinst_HEADERS = \
     actions.h \
-    add-dialog.h \
     conf.h \
     details.h \
     dialogs.h \
     hig.h \
+    ipc.h \
     file-list.h \
     lock.h \
     logo.h \
     makemeta-ui.h \
     msgwin.h \
     notify.h \
+    open-dialog.h \
     stats.h \
     sexy-icon-entry.h \
     torrent-cell-renderer.h \
-    tracker-list.h \
     tr-core.h \
-    tr-core-dbus.h \
     tr-icon.h \
     tr-io.h \
     tr-prefs.h \
@@ -46,20 +43,20 @@ bin_PROGRAMS = transmission
 
 transmission_SOURCES = \
     actions.c \
-    add-dialog.c \
     conf.c \
     details.c \
     dialogs.c \
     file-list.c \
     hig.c \
+    ipc.c \
     main.c \
     makemeta-ui.c \
     msgwin.c \
     notify.c \
+    open-dialog.c \
     sexy-icon-entry.c \
     stats.c \
     torrent-cell-renderer.c \
-    tracker-list.c \
     tr-core.c \
     tr-icon.c \
     tr-io.c \
@@ -72,16 +69,13 @@ dist_man_MANS = transmission.1
 
 transmission_LDADD = \
     $(top_builddir)/libtransmission/libtransmission.a \
-    $(top_builddir)/third-party/libevent/libevent_core.la \
+    $(top_builddir)/third-party/libevent/libevent.la \
     $(top_builddir)/third-party/miniupnp/libminiupnp.a \
     $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
-    $(top_builddir)/third-party/shttpd/libshttpd.a \
     $(GTK_LIBS) \
     $(GIO_LIBS) \
     $(LIBNOTIFY_LIBS) \
-    $(DBUS_GLIB_LIBS) \
     $(OPENSSL_LIBS) \
-    $(LIBCURL_LIBS) \
     $(PTHREAD_LIBS) -lm
 
 DESKTOP_IN_FILES=transmission.desktop.in

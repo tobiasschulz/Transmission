@@ -81,7 +81,7 @@ doSave( GtkWindow      * parent,
     if( !fp )
     {
         errmsg( parent,
-                _("Couldn't save file \"%1$s\": %2$s"),
+                _("Couldn't save file \"%s\": %s"),
                 filename, g_strerror( errno ) );
     }
     else
@@ -97,15 +97,13 @@ doSave( GtkWindow      * parent,
             gtk_tree_model_get( model, &iter,
                                 COL_TR_MSG, &node,
                                 -1 );
-            date = gtr_localtime( node->when );
+            date = rfc822date( node->when*1000u );
             switch( node->level ) {
                 case TR_MSG_DBG: levelStr = "debug"; break;
                 case TR_MSG_ERR: levelStr = "error"; break;
                 default:         levelStr = "     "; break;
             }
-            fprintf( fp, "%s\t%s\t%s\t%s\n", date, levelStr,
-                     ( node->name ? node->name : "" ),
-                     ( node->message ? node->message : "" ) );
+            fprintf( fp, "%s\t%s\t%s\t%s\n", date, levelStr, node->name, node->message );
 
             g_free( date );
         }

@@ -21,12 +21,11 @@
 #include <arpa/inet.h> /* inet_ntoa */
 #endif
 
-#define ENABLE_STRNATPMPERR
 #include <libnatpmp/natpmp.h>
 
 #include "transmission.h"
 #include "natpmp.h"
-#include "port-forwarding.h"
+#include "shared.h"
 #include "utils.h"
 
 #define LIFETIME_SECS 3600
@@ -65,14 +64,12 @@ struct tr_natpmp
 static void
 logVal( const char * func, int ret )
 {
-    if( ret == NATPMP_TRYAGAIN )
-        return;
-    if( ret >= 0 )
+    if( ret==NATPMP_TRYAGAIN )
+        tr_ndbg( getKey(), _( "%s responded \"try again\"" ), func );
+    else if( ret >= 0 )
         tr_ninf( getKey(), _( "%s succeeded (%d)" ), func, ret );
     else
-        tr_ndbg( getKey(), "%s failed.  natpmp returned %d (%s); errno is %d (%s)",
-                 func, ret, strnatpmperr(ret), errno, tr_strerror(errno) );
-
+        tr_ninf( getKey(), _( "%s failed (%d): %s (%d)" ), func, ret, tr_strerror(errno), errno );
 }
 
 struct tr_natpmp*
@@ -88,11 +85,13 @@ tr_natpmpInit( void )
 void
 tr_natpmpClose( tr_natpmp * nat )
 {
-    if( nat )
-    {
-        closenatpmp( &nat->natpmp );
-        tr_free( nat );
-    }
+    assert( !nat->isMapped );
+    assert( ( nat->state == TR_NATPMP_IDLE )
+         || ( nat->state == TR_NATPMP_ERR )
+         || ( nat->state == TR_NATPMP_DISCOVER ) );
+
+    closenatpmp( &nat->natpmp );
+    tr_free( nat );
 }
 
 static int
@@ -105,6 +104,14 @@ static void
 setCommandTime( struct tr_natpmp * nat )
 {
     nat->commandTime = time(NULL) + COMMAND_WAIT_SECS;
+}
+
+static void
+setErrorState( struct tr_natpmp * nat )
+{
+    tr_ninf( getKey(), _( "If your router supports NAT-PMP, please make sure NAT-PMP is enabled!" ) );
+    tr_ninf( getKey(), _( "NAT-PMP port forwarding unsuccessful, trying UPnP next" ) );
+    nat->state = TR_NATPMP_ERR;
 }
 
 int
@@ -129,10 +136,10 @@ tr_natpmpPulse( struct tr_natpmp * nat, int port, int isEnabled )
         const int val = readnatpmpresponseorretry( &nat->natpmp, &response );
         logVal( "readnatpmpresponseorretry", val );
         if( val >= 0 ) {
-            tr_ninf( getKey(), _( "Found public address \"%s\"" ), inet_ntoa( response.pnu.publicaddress.addr ) );
+            tr_ninf( getKey(), _( "Found public address \"%s\"" ), inet_ntoa( response.publicaddress.addr ) );
             nat->state = TR_NATPMP_IDLE;
         } else if( val != NATPMP_TRYAGAIN ) {
-            nat->state = TR_NATPMP_ERR;
+            setErrorState( nat );
         }
     }
 
@@ -161,7 +168,7 @@ tr_natpmpPulse( struct tr_natpmp * nat, int port, int isEnabled )
             nat->port = -1;
             nat->isMapped = 0;
         } else if( val != NATPMP_TRYAGAIN ) {
-            nat->state = TR_NATPMP_ERR;
+            setErrorState( nat );
         }
     }
 
@@ -191,22 +198,22 @@ tr_natpmpPulse( struct tr_natpmp * nat, int port, int isEnabled )
             nat->state = TR_NATPMP_IDLE;
             nat->isMapped = 1;
             nat->renewTime = time( NULL ) + LIFETIME_SECS;
-            nat->port = resp.pnu.newportmapping.privateport;
-            tr_ninf( getKey(), _( "Port %d forwarded successfully" ), nat->port );
+            nat->port = resp.newportmapping.privateport;
+            tr_ninf( getKey(), _( "port %d forwarded successfully" ), nat->port );
         } else if( val != NATPMP_TRYAGAIN ) {
-            nat->state = TR_NATPMP_ERR;
+            setErrorState( nat );
         }
     }
 
     switch( nat->state ) {
-        case TR_NATPMP_IDLE:        ret = nat->isMapped ? TR_PORT_MAPPED : TR_PORT_UNMAPPED; break;
-        case TR_NATPMP_DISCOVER:    ret = TR_PORT_UNMAPPED; break;
+        case TR_NATPMP_IDLE:        ret = nat->isMapped ? TR_NAT_TRAVERSAL_MAPPED : TR_NAT_TRAVERSAL_UNMAPPED; break;
+        case TR_NATPMP_DISCOVER:    ret = TR_NAT_TRAVERSAL_UNMAPPED; break;
         case TR_NATPMP_RECV_PUB:
         case TR_NATPMP_SEND_MAP:
-        case TR_NATPMP_RECV_MAP:    ret = TR_PORT_MAPPING; break;
+        case TR_NATPMP_RECV_MAP:    ret = TR_NAT_TRAVERSAL_MAPPING; break;
         case TR_NATPMP_SEND_UNMAP:
-        case TR_NATPMP_RECV_UNMAP:  ret = TR_PORT_UNMAPPING; break;
-        default:                    ret = TR_PORT_ERROR; break;
+        case TR_NATPMP_RECV_UNMAP:  ret = TR_NAT_TRAVERSAL_UNMAPPING; break;
+        default:                    ret = TR_NAT_TRAVERSAL_ERROR; break;
     }
     return ret;
 }

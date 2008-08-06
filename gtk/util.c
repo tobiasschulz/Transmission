@@ -22,7 +22,6 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#include <ctype.h> /* isxdigit() */
 #include <stdarg.h>
 #include <stdlib.h> /* free() */
 #include <string.h> /* strcmp() */
@@ -33,19 +32,23 @@
 #ifdef HAVE_GIO
 #include <gio/gio.h> /* g_file_trash() */
 #endif
-#ifdef HAVE_DBUS_GLIB
-#include <dbus/dbus-glib.h>
-#endif
 
 #include <libevent/evhttp.h>
 
 #include <libtransmission/transmission.h> /* TR_RATIO_NA, TR_RATIO_INF */
-#include <libtransmission/utils.h> /* tr_inf */
 
 #include "conf.h"
-#include "hig.h"
 #include "tr-prefs.h"
 #include "util.h"
+
+int
+tr_strcmp( const char * a, const char * b )
+{
+    if( a && b ) return strcmp( a, b );
+    if( a ) return 1;
+    if( b ) return -1;
+    return 0;
+}
 
 char*
 tr_strlratio( char * buf, double ratio, size_t buflen )
@@ -118,57 +121,59 @@ tr_strlspeed( char * buf, double kb_sec, size_t buflen )
 char*
 tr_strltime( char * buf, int seconds, size_t buflen )
 {
-    int days, hours, minutes;
-    char d[128], h[128], m[128], s[128];
+    int hours;
+    int days;
 
     if( seconds < 0 )
         seconds = 0;
 
-    days = seconds / 86400;
-    hours = (seconds % 86400) / 3600;
-    minutes = (seconds % 3600) / 60;
-    seconds = (seconds % 3600) % 60;
-
-    g_snprintf( d, sizeof( d ), ngettext( "%'d day", "%'d days", days ), days );
-    g_snprintf( h, sizeof( h ), ngettext( "%'d hour", "%'d hours", hours ), hours );
-    g_snprintf( m, sizeof( m ), ngettext( "%'d minute", "%'d minutes", minutes ), minutes );
-    g_snprintf( s, sizeof( s ), ngettext( "%'d second", "%'d seconds", seconds ), seconds );
-
-    if( days ) {
-        if( days >= 4 || !hours ) {
-            g_strlcpy( buf, d, buflen );
-        } else {
-            g_snprintf( buf, buflen, "%s, %s", d, h );
-        }
-    } else if( hours ) {
-        if( hours >= 4 || !minutes ) {
-            g_strlcpy( buf, h, buflen );
-        } else {
-            g_snprintf( buf, buflen, "%s, %s", h, m );
-        }
-    } else if( minutes ) {
-        if( minutes >= 4 || !seconds ) {
-            g_strlcpy( buf, m, buflen );
-        } else {
-            g_snprintf( buf, buflen, "%s, %s", m, s );
-        }
-    } else {
-        g_strlcpy( buf, s, buflen );
+    if( seconds < 60 )
+    {
+        g_snprintf( buf, buflen, ngettext( "%'d second", "%'d seconds", (int)seconds ), (int) seconds );
+        return buf;
     }
 
+    if( seconds < ( 60 * 60 ) )
+    {
+        const int minutes = ( seconds + 30 ) / 60;
+        g_snprintf( buf, buflen, ngettext( "%'d minute", "%'d minutes", minutes ), minutes );
+        return buf;
+    }
+
+    hours = seconds / ( 60 * 60 );
+
+    if( seconds < ( 60 * 60 * 4 ) )
+    {
+        char h[64];
+        char m[64];
+
+        const int minutes = ( seconds - hours * 60 * 60 + 30 ) / 60;
+
+        g_snprintf( h, sizeof(h), ngettext( "%'d hour", "%'d hours", hours ), hours );
+        g_snprintf( m, sizeof(m), ngettext( "%'d minute", "%'d minutes", minutes ), minutes );
+        g_snprintf( buf, buflen, "%s, %s", h, m );
+        return buf;
+    }
+
+    if( hours < 24 )
+    {
+        g_snprintf( buf, buflen, ngettext( "%'d hour", "%'d hours", hours ), hours );
+        return buf;
+    }
+
+    days = seconds / ( 60 * 60 * 24 );
+    g_snprintf( buf, buflen, ngettext( "%'d day", "%'d days", days ), days );
     return buf;
 }
 
+
 char *
-gtr_localtime( time_t time )
+rfc822date (guint64 epoch_msec)
 {
-    const struct tm tm = *localtime( &time );
-    char buf[256], *eoln;
-
-    g_strlcpy( buf, asctime( &tm ), sizeof( buf ) );
-    if(( eoln = strchr( buf, '\n' )))
-        *eoln = '\0';
-
+    const time_t secs = epoch_msec / 1000;
+    const struct tm tm = *localtime (&secs);
+    char buf[128];
+    strftime( buf, sizeof(buf), "%a, %d %b %Y %T %Z", &tm );
     return g_locale_to_utf8( buf, -1, NULL, NULL, NULL );
 }
 
@@ -214,27 +219,9 @@ freestrlist(GSList *list)
 char *
 decode_uri( const char * uri )
 {
-    gboolean in_query = FALSE;
-    char * ret = g_new( char, strlen( uri ) + 1 );
-    char * out = ret;
-    for( ; uri && *uri; ) {
-        char ch = *uri;
-        if( ch=='?' )
-            in_query = TRUE;
-        else if( ch=='+' && in_query )
-            ch = ' ';
-        else if( ch=='%' && isxdigit((unsigned char)uri[1])
-                         && isxdigit((unsigned char)uri[2])) {
-            char buf[3] = { uri[1], uri[2], '\0' };
-            ch = (char) g_ascii_strtoull( buf, NULL, 16 );
-            uri += 2;
-       }
-
-       ++uri;
-       *out++ = ch;
-    }
-
-    *out = '\0';
+    char * filename = evhttp_decode_uri( uri );
+    char * ret = g_strdup( filename );
+    free( filename );
     return ret;
 }
 
@@ -259,6 +246,51 @@ checkfilenames( int argc, char **argv )
 
     g_free( pwd );
     return g_slist_reverse( ret );
+}
+
+char *
+getdownloaddir( void )
+{
+    static char * wd = NULL;
+    char * dir = pref_string_get( PREF_KEY_DIR_DEFAULT );
+    if ( dir == NULL ) {
+        if( wd == NULL )
+            wd = g_get_current_dir();
+        dir = g_strdup( wd );
+    }
+    return dir;
+}
+
+/**
+ * don't use more than 50% the height of the screen, nor 80% the width.
+ * but don't be too small, either -- set the minimums to 500 x 300
+ */
+void
+sizingmagic( GtkWindow         * wind,
+             GtkScrolledWindow * scroll,
+             GtkPolicyType       hscroll,
+             GtkPolicyType       vscroll )
+{
+    int width;
+    int height;
+    GtkRequisition req;
+
+    GdkScreen * screen = gtk_widget_get_screen( GTK_WIDGET( wind ) );
+
+    gtk_scrolled_window_set_policy( scroll, GTK_POLICY_NEVER,
+                                            GTK_POLICY_NEVER );
+
+    gtk_widget_size_request( GTK_WIDGET( wind ), &req );
+    req.height = MAX( req.height, 300 );
+    height = MIN( req.height, gdk_screen_get_height( screen ) / 5 * 4 );
+
+    gtk_scrolled_window_set_policy( scroll, GTK_POLICY_NEVER, vscroll );
+    gtk_widget_size_request( GTK_WIDGET( wind ), &req );
+    req.width = MAX( req.width, 500 );
+    width = MIN( req.width, gdk_screen_get_width( screen ) / 2 );
+
+    gtk_window_set_default_size( wind, width, height );
+    gtk_scrolled_window_set_policy( scroll, hscroll, vscroll );
 }
 
 static void
@@ -302,34 +334,6 @@ verrmsg_full( GtkWindow * wind, callbackfunc_t func, void * data,
   g_free(msg);
 
   return dialog;
-}
-
-void
-addTorrentErrorDialog( GtkWidget * child, int err, const char * filename )
-{
-    GtkWidget * w;
-    GtkWidget * win;
-    const char * fmt;
-    char * secondary;
-    switch( err ) {
-        case TR_EINVALID: fmt = _( "The torrent file \"%s\" contains invalid data." ); break;
-        case TR_EDUPLICATE: fmt = _( "The torrent file \"%s\" is already in use." ); break;
-        default: fmt = _( "The torrent file \"%s\" encountered an unknown error." ); break;
-    }
-    secondary = g_strdup_printf( fmt, filename );
-    win = ( !child || GTK_IS_WINDOW( child ) )
-        ? child
-        : gtk_widget_get_ancestor( child ? GTK_WIDGET( child ) : NULL, GTK_TYPE_WINDOW );
-    w = gtk_message_dialog_new( GTK_WINDOW( win ),
-                                GTK_DIALOG_DESTROY_WITH_PARENT,
-                                GTK_MESSAGE_ERROR,
-                                GTK_BUTTONS_CLOSE,
-                                _( "Error opening torrent" ) );
-    gtk_message_dialog_format_secondary_text( GTK_MESSAGE_DIALOG( w ), secondary );
-    g_signal_connect_swapped( w, "response",
-                              G_CALLBACK( gtk_widget_destroy ), w );
-    gtk_widget_show_all( w );
-    g_free( secondary );
 }
 
 void
@@ -431,78 +435,4 @@ tr_file_trash_or_unlink( const char * filename )
         if( !trashed )
             g_unlink( filename );
     }
-}
-
-char*
-gtr_get_help_url( void )
-{
-    const char * fmt = "http://www.transmissionbt.com/help/gtk/%d.%dx";
-    int major, minor;
-    sscanf( SHORT_VERSION_STRING, "%d.%d", &major, &minor );
-    return g_strdup_printf( fmt, major, minor/10 );
-}
-
-void
-gtr_open_file( const char * path )
-{
-    if( path )
-    {
-        gboolean opened = FALSE;
-#ifdef HAVE_GIO
-        if( !opened )
-        {
-            GFile * file = g_file_new_for_path( path );
-            char * uri = g_file_get_uri( file );
-            opened = g_app_info_launch_default_for_uri( uri, NULL, NULL );
-            g_free( uri );
-            g_object_unref( G_OBJECT( file ) );
-        }
-#endif
-        if( !opened )
-        {
-            char * argv[] = { "xdg-open", (char*)path, NULL };
-            g_spawn_async( NULL, argv, NULL, G_SPAWN_SEARCH_PATH,
-                           NULL, NULL, NULL, NULL );
-        }
-    }
-}
-
-#define VALUE_SERVICE_NAME        "com.transmissionbt.Transmission"
-#define VALUE_SERVICE_OBJECT_PATH "/com/transmissionbt/Transmission"
-#define VALUE_SERVICE_INTERFACE   "com.transmissionbt.Transmission"
-
-gboolean
-gtr_dbus_add_torrent( const char * filename )
-{
-    static gboolean success = FALSE;
-#ifdef HAVE_DBUS_GLIB
-    DBusGProxy * proxy = NULL;
-    GError * err = NULL;
-    DBusGConnection * conn;
-    if(( conn = dbus_g_bus_get( DBUS_BUS_SESSION, &err )))
-        proxy = dbus_g_proxy_new_for_name (conn, VALUE_SERVICE_NAME,
-                                                 VALUE_SERVICE_OBJECT_PATH,
-                                                 VALUE_SERVICE_INTERFACE );
-    else if( err )
-       g_message( "err: %s", err->message );
-    if( proxy )
-        dbus_g_proxy_call( proxy, "AddFile", &err,
-                           G_TYPE_STRING, filename,
-                           G_TYPE_INVALID,
-                           G_TYPE_BOOLEAN, &success,
-                           G_TYPE_INVALID );
-    if( err )
-       g_message( "err: %s", err->message );
-#endif
-    return success;
-}
-
-GtkWidget *
-tr_button_new_from_stock( const char * stock,
-                          const char * mnemonic )
-{
-    GtkWidget * image = gtk_image_new_from_stock( stock, GTK_ICON_SIZE_BUTTON );
-    GtkWidget * button = gtk_button_new_with_mnemonic( mnemonic );
-    gtk_button_set_image( GTK_BUTTON( button ), image );
-    return button;
 }

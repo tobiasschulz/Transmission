@@ -40,11 +40,9 @@ uint64_t         tr_cpHaveTotal( const tr_completion * );
 uint64_t         tr_cpHaveValid( const tr_completion * );
 uint64_t         tr_cpLeftUntilComplete( const tr_completion * );
 uint64_t         tr_cpLeftUntilDone( const tr_completion * );
-uint64_t         tr_cpSizeWhenDone( const tr_completion * );
 float            tr_cpPercentComplete( const tr_completion * );
 float            tr_cpPercentDone( const tr_completion * );
 void             tr_cpInvalidateDND ( tr_completion * );
-void             tr_cpGetAmountDone( const tr_completion *, float * tab, int tabCount );
 
 /* Pieces */
 int              tr_cpPieceIsComplete( const tr_completion *, tr_piece_index_t piece );
@@ -54,9 +52,9 @@ void             tr_cpPieceRem( tr_completion *, tr_piece_index_t piece );
 /* Blocks */
 int              tr_cpBlockIsComplete( const tr_completion *, tr_block_index_t block );
 void             tr_cpBlockAdd( tr_completion *, tr_block_index_t block );
-tr_errno         tr_cpBlockBitfieldSet( tr_completion *, struct tr_bitfield * );
-int              tr_cpMissingBlocksInPiece( const tr_completion * cp,
-                                            tr_piece_index_t piece );
+void             tr_cpBlockBitfieldSet( tr_completion *, struct tr_bitfield * );
+float            tr_cpPercentBlocksInPiece( const tr_completion * cp, tr_piece_index_t piece );
+int              tr_cpMissingBlocksInPiece( const tr_completion * cp, tr_piece_index_t piece );
 
 
 const struct tr_bitfield * tr_cpPieceBitfield( const tr_completion* );

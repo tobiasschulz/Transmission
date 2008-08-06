@@ -23,14 +23,13 @@
  *****************************************************************************/
 
 #include <assert.h>
-#include <ctype.h> /* isalpha, tolower */
+#include <ctype.h> /* isalpha */
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h> /* strerror */
 
-#include <libgen.h> /* basename */
 #include <sys/time.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -44,7 +43,10 @@
     #include <kernel/OS.h>
 #endif
 
+#include <miniupnp/miniwget.h> /* parseURL */
+
 #include "transmission.h"
+#include "trcompat.h"
 #include "utils.h"
 #include "platform.h"
 
@@ -59,6 +61,33 @@ void tr_msgInit( void )
     if( !messageLock )
          messageLock = tr_lockNew( );
 }
+
+/*
+#if defined(SYS_DARWIN)
+
+const char * tr_getMacLocalizedCString(CFStringRef string)
+{
+    //if you need to be thread safe, add proper locks around that
+    static CFMutableDictionaryRef mapping = NULL;
+    if( mapping == NULL )
+    {
+        mapping = CFDictionaryCreateMutable(NULL, 0, &kCFTypeDictionaryKeyCallBacks, NULL);
+    }
+    
+    const char * result = (const char *)CFDictionaryGetValue(mapping, string);
+    if( result == NULL )
+    {
+        CFStringRef localizedString = CFCopyLocalizedStringFromTable(string, CFSTR("LibraryLocalizable"), NULL);
+        result = (const char *)malloc(CFStringGetMaximumSizeForEncoding(CFStringGetLength(localizedString), kCFStringEncodingUTF8));
+        CFStringGetCString(localizedString, (char *)result, CFStringGetLength(localizedString)+1, kCFStringEncodingUTF8);
+        CFDictionarySetValue(mapping, string, result);
+    }
+    
+    return result;
+}
+
+#endif
+*/
 
 FILE*
 tr_getLog( void )
@@ -81,6 +110,30 @@ tr_getLog( void )
     }
 
     return file;
+}
+
+char*
+tr_getLogTimeStr( char * buf, int buflen )
+{
+    char tmp[64];
+    time_t now;
+    struct tm now_tm;
+    struct timeval tv;
+    int milliseconds;
+
+    now = time( NULL );
+    gettimeofday( &tv, NULL );
+
+#ifdef WIN32
+    now_tm = *localtime( &now );
+#else
+    localtime_r( &now, &now_tm );
+#endif
+    strftime( tmp, sizeof(tmp), "%H:%M:%S", &now_tm );
+    milliseconds = (int)(tv.tv_usec / 1000);
+    snprintf( buf, buflen, "%s.%03d", tmp, milliseconds );
+
+    return buf;
 }
 
 void
@@ -144,62 +197,33 @@ tr_freeMessageList( tr_msg_list * list )
     }
 }
 
-/**
-***
-**/
-
-char*
-tr_getLogTimeStr( char * buf, int buflen )
+int
+tr_vasprintf( char **strp, const char *fmt, va_list ap )
 {
-    char tmp[64];
-    time_t now;
-    struct tm now_tm;
-    struct timeval tv;
-    int milliseconds;
-
-    now = time( NULL );
-    gettimeofday( &tv, NULL );
-
-#ifdef WIN32
-    now_tm = *localtime( &now );
-#else
-    localtime_r( &now, &now_tm );
-#endif
-    strftime( tmp, sizeof(tmp), "%H:%M:%S", &now_tm );
-    milliseconds = (int)(tv.tv_usec / 1000);
-    tr_snprintf( buf, buflen, "%s.%03d", tmp, milliseconds );
-
-    return buf;
-}
-
-void
-tr_deepLog( const char * file, int line, const char * name, const char * fmt, ... )
-{
-    FILE * fp = tr_getLog( );
-    if( fp )
-    {
-        va_list args;
-        char timestr[64];
-        struct evbuffer * buf = evbuffer_new( );
-        char * myfile = tr_strdup( file );
-
-        evbuffer_add_printf( buf, "[%s] ", tr_getLogTimeStr( timestr, sizeof(timestr) ) );
-        if( name )
-            evbuffer_add_printf( buf, "%s ", name );
-        va_start( args, fmt );
-        evbuffer_add_vprintf( buf, fmt, args );
-        va_end( args );
-        evbuffer_add_printf( buf, " (%s:%d)\n", basename(myfile), line );
-        fwrite( EVBUFFER_DATA(buf), 1, EVBUFFER_LENGTH(buf), fp );
-
-        tr_free( myfile );
-        evbuffer_free( buf );
+    int ret;
+    struct evbuffer * buf = evbuffer_new( );
+    *strp = NULL;
+    if( evbuffer_add_vprintf( buf, fmt, ap ) < 0 )
+        ret = -1;
+    else {
+        ret = EVBUFFER_LENGTH( buf );
+        *strp = tr_strndup( (char*)EVBUFFER_DATA(buf), ret );
     }
+    evbuffer_free( buf );
+    return ret;
+
 }
 
-/***
-****
-***/
+int
+tr_asprintf( char **strp, const char *fmt, ...)
+{
+    int ret;
+    va_list ap;
+    va_start( ap, fmt );
+    ret = tr_vasprintf( strp, fmt, ap );
+    va_end( ap );
+    return ret;
+}
 
 void
 tr_msg( const char * file, int line, int level,
@@ -223,14 +247,14 @@ tr_msg( const char * file, int line, int level,
     if( messageLevel >= level )
     {
         va_list ap;
-        struct evbuffer * buf = evbuffer_new( );
+        char * text;
 
         /* build the text message */
         va_start( ap, fmt );
-        evbuffer_add_vprintf( buf, fmt, ap );
+        tr_vasprintf( &text, fmt, ap );
         va_end( ap );
 
-        if( EVBUFFER_LENGTH( buf ) )
+        if( text != NULL )
         {
             if( messageQueuing )
             {
@@ -238,7 +262,7 @@ tr_msg( const char * file, int line, int level,
                 newmsg = tr_new0( tr_msg_list, 1 );
                 newmsg->level = level;
                 newmsg->when = time( NULL );
-                newmsg->message = tr_strdup( EVBUFFER_DATA( buf ) );
+                newmsg->message = text;
                 newmsg->file = file;
                 newmsg->line = line;
                 newmsg->name = tr_strdup( name );
@@ -250,14 +274,10 @@ tr_msg( const char * file, int line, int level,
             {
                 if( fp == NULL )
                     fp = stderr;
-                if( name )
-                    fprintf( fp, "%s: %s\n", name, (char*)EVBUFFER_DATA(buf) );
-                else
-                    fprintf( fp, "%s\n", (char*)EVBUFFER_DATA(buf) );
+                fprintf( stderr, "%s\n", text );
+                tr_free( text );
                 fflush( fp );
             }
-
-            evbuffer_free( buf );
         }
     }
 
@@ -354,61 +374,12 @@ tr_compareUint32( uint32_t a, uint32_t b )
     return 0;
 }
 
-int
-tr_compareUint64( uint64_t a, uint64_t b )
-{
-    if( a < b ) return -1;
-    if( a > b ) return 1;
-    return 0;
-}
-
-int
-tr_compareDouble( double a, double b )
-{
-    if( a < b ) return -1;
-    if( a > b ) return 1;
-    return 0;
-}
-
-int
-tr_compareTime( time_t a, time_t b )
-{
-    if( a < b ) return -1;
-    if( a > b ) return 1;
-    return 0;
-}
-
-int
-tr_strcmp( const void * a, const void * b )
-{
-    if( a && b ) return strcmp( a, b );
-    if( a ) return 1;
-    if( b ) return -1;
-    return 0;
-}
-
-int
-tr_strcasecmp( const char * a, const char * b )
-{
-    if( !a && !b ) return 0;
-    if( !a ) return -1;
-    if( !b ) return 1;
-#ifdef HAVE_STRCASECMP
-    return strcasecmp( a, b );
-#else
-    while( *a && ( tolower( *(uint8_t*)a ) == tolower( *(uint8_t*)b ) ) )
-        ++a, ++b;
-    return tolower( *(uint8_t*)a) - tolower(*(uint8_t*)b );
-#endif
-}
-
-
 /**
 ***
 **/
 
 struct timeval
-tr_timevalMsec( uint64_t milliseconds )
+timevalMsec( uint64_t milliseconds )
 {
     struct timeval ret;
     const uint64_t microseconds = milliseconds * 1000;
@@ -423,19 +394,18 @@ tr_loadFile( const char * path, size_t * size )
     uint8_t    * buf;
     struct stat  sb;
     FILE       * file;
-    const char * err_fmt = _( "Couldn't read \"%1$s\": %2$s" );
 
     /* try to stat the file */
     errno = 0;
     if( stat( path, &sb ) )
     {
-        tr_dbg( err_fmt, path, tr_strerror(errno) );
+        tr_err( _( "Couldn't read file \"%s\": %s" ), path, tr_strerror(errno) );
         return NULL;
     }
 
     if( ( sb.st_mode & S_IFMT ) != S_IFREG )
     {
-        tr_err( err_fmt, path, _( "Not a regular file" ) );
+        tr_err( _( "Couldn't read file \"%s\": %s" ), path, _( "Not a regular file" ) );
         return NULL;
     }
 
@@ -443,20 +413,20 @@ tr_loadFile( const char * path, size_t * size )
     file = fopen( path, "rb" );
     if( !file )
     {
-        tr_err( err_fmt, path, tr_strerror(errno) );
+        tr_err( _( "Couldn't read file \"%s\": %s" ), path, tr_strerror(errno) );
         return NULL;
     }
     buf = malloc( sb.st_size );
     if( NULL == buf )
     {
-        tr_err( err_fmt, path, _( "Memory allocation failed" ) );
+        tr_err( _( "Couldn't read file \"%s\": %s" ), path, _( "Memory allocation failed" ) );
         fclose( file );
         return NULL;
     }
     fseek( file, 0, SEEK_SET );
     if( fread( buf, sb.st_size, 1, file ) != 1 )
     {
-        tr_err( err_fmt, path, tr_strerror(errno) );
+        tr_err( _( "Couldn't read file \"%s\": %s" ), path, tr_strerror(errno) );
         free( buf );
         fclose( file );
         return NULL;
@@ -511,7 +481,7 @@ tr_mkdirp( const char * path_in, int permissions )
             /* Folder doesn't exist yet */
             if( tr_mkdir( path, permissions ) ) {
                 const int err = errno;
-                tr_err( _( "Couldn't create \"%1$s\": %2$s" ), path, tr_strerror( err ) );
+                tr_err( _( "Couldn't create \"%s\": %s" ), path, tr_strerror( err ) );
                 tr_free( path );
                 errno = err;
                 return -1;
@@ -521,8 +491,8 @@ tr_mkdirp( const char * path_in, int permissions )
         {
             /* Node exists but isn't a folder */
             char buf[MAX_PATH_LENGTH];
-            tr_snprintf( buf, sizeof( buf ), _( "File \"%s\" is in the way" ), path );
-            tr_err( _( "Couldn't create \"%1$s\": %2$s" ), path_in, buf );
+            snprintf( buf, sizeof( buf ), _( "File \"%s\" is in the way" ), path );
+            tr_err( _( "Couldn't create \"%s\": %s" ), path_in, buf );
             tr_free( path );
             errno = ENOTDIR;
             return -1;
@@ -554,7 +524,7 @@ tr_buildPath ( char *buf, size_t buflen, const char *first_element, ... )
         element = (const char*) va_arg( vl, const char* );
     }
     if( EVBUFFER_LENGTH(evbuf) )
-        tr_strlcpy( buf, (char*)EVBUFFER_DATA(evbuf), buflen );
+        strlcpy( buf, (char*)EVBUFFER_DATA(evbuf), buflen );
     else
         *buf = '\0';
     evbuffer_free( evbuf );
@@ -577,7 +547,7 @@ tr_ioErrorFromErrno( int err )
         case EFBIG:
             return TR_ERROR_IO_FILE_TOO_BIG;
         default:
-            tr_err( "generic i/o errno from errno: %s", tr_strerror( errno ) );
+            tr_dbg( "generic i/o errno from errno: %s", tr_strerror( errno ) );
             return TR_ERROR_IO_OTHER;
     }
 }
@@ -629,22 +599,14 @@ tr_errorString( int code )
 *****
 ****/
 
-void*
-tr_memdup( const void * in, int byteCount )
-{
-    void * out = tr_new( uint8_t, byteCount );
-    memcpy( out, in, byteCount );
-    return out;
-}
-    
 char*
-tr_strdup( const void * in )
+tr_strdup( const char * in )
 {
-    return tr_strndup( in, in ? strlen((const char*)in) : 0 );
+    return tr_strndup( in, in ? strlen(in) : 0 );
 }
 
 char*
-tr_strndup( const void * in, int len )
+tr_strndup( const char * in, int len )
 {
     char * out = NULL;
 
@@ -652,30 +614,13 @@ tr_strndup( const void * in, int len )
     {
         out = tr_strdup( in );
     }
-    else if( in )
+    else if( in != NULL )
     {
         out = tr_malloc( len+1 );
         memcpy( out, in, len );
         out[len] = '\0';
     }
-
     return out;
-}
-
-char*
-tr_strdup_printf( const char * fmt, ... )
-{
-    char * ret = NULL;
-    struct evbuffer * buf;
-    va_list ap;
-
-    buf = evbuffer_new( );
-    va_start( ap, fmt );
-    if( evbuffer_add_vprintf( buf, fmt, ap ) != -1 )
-        ret = tr_strdup( (char*)EVBUFFER_DATA( buf ) );
-    evbuffer_free( buf );
-
-    return ret;
 }
 
 void*
@@ -718,13 +663,21 @@ tr_strerror( int i )
 *****
 ****/
 
+/* note that the argument is how many bits are needed, not bytes */
 tr_bitfield*
-tr_bitfieldNew( size_t bitCount )
+tr_bitfieldNew( size_t bitcount )
 {
-    tr_bitfield * ret = tr_new0( tr_bitfield, 1 );
-    ret->bitCount = bitCount;
-    ret->byteCount = (bitCount+7u) / 8u;
-    ret->bits = tr_new0( uint8_t, ret->byteCount );
+    tr_bitfield * ret = calloc( 1, sizeof(tr_bitfield) );
+    if( NULL == ret )
+        return NULL;
+
+    ret->len = (bitcount+7u) / 8u;
+    ret->bits = calloc( ret->len, 1 );
+    if( NULL == ret->bits ) {
+        free( ret );
+        return NULL;
+    }
+
     return ret;
 }
 
@@ -732,26 +685,25 @@ tr_bitfield*
 tr_bitfieldDup( const tr_bitfield * in )
 {
     tr_bitfield * ret = calloc( 1, sizeof(tr_bitfield) );
-    ret->bitCount = in->bitCount;
-    ret->byteCount = in->byteCount;
-    ret->bits = tr_memdup( in->bits, in->byteCount );
+    ret->len = in->len;
+    ret->bits = malloc( ret->len );
+    memcpy( ret->bits, in->bits, ret->len );
     return ret;
 }
 
-void
-tr_bitfieldFree( tr_bitfield * bitfield )
+void tr_bitfieldFree( tr_bitfield * bitfield )
 {
     if( bitfield )
     {
-        tr_free( bitfield->bits );
-        tr_free( bitfield );
+        free( bitfield->bits );
+        free( bitfield );
     }
 }
 
 void
 tr_bitfieldClear( tr_bitfield * bitfield )
 {
-    memset( bitfield->bits, 0, bitfield->byteCount );
+    memset( bitfield->bits, 0, bitfield->len );
 }
 
 int
@@ -759,7 +711,7 @@ tr_bitfieldIsEmpty( const tr_bitfield * bitfield )
 {
     size_t i;
 
-    for( i=0; i<bitfield->byteCount; ++i )
+    for( i=0; i<bitfield->len; ++i )
         if( bitfield->bits[i] )
             return 0;
 
@@ -769,67 +721,28 @@ tr_bitfieldIsEmpty( const tr_bitfield * bitfield )
 int
 tr_bitfieldHas( const tr_bitfield * bitfield, size_t nth )
 {
-    return ( tr_bitfieldTestFast( bitfield, nth ) )
-        && ( tr_bitfieldHasFast( bitfield, nth ) );
+    static const uint8_t ands[8] = { 128, 64, 32, 16, 8, 4, 2, 1 };
+    const size_t i = nth >> 3u;
+    return ( bitfield != NULL )
+        && ( bitfield->bits != NULL )
+        && ( i < bitfield->len )
+        && ( ( bitfield->bits[i] & ands[nth&7u] ) != 0 );
 }
-
-#if 0
-static int
-find_top_bit( uint8_t val )
-{
-    int pos = 0;
-    if ( val & 0xF0U ) pos |= 4, val >>= 4;
-    if ( val & 0xCU )  pos |= 2, val >>= 2;
-    if ( val & 0x2 )   pos |= 1;
-    return 7 - pos;
-}
-
-int
-tr_bitfieldFindTrue( const tr_bitfield  * bitfield,
-                     size_t               startBit,
-                     size_t             * setmePos )
-{
-    if( bitfield && bitfield->bits && startBit < bitfield->bitCount )
-    {
-        const uint8_t * b   = bitfield->bits + startBit/8;
-        const uint8_t * end = bitfield->bits + bitfield->byteCount;
-
-        /* If first byte already contains a set bit after startBit*/
-        if( *b & ( 0xff >> (startBit&7) ) ) {
-            *setmePos  = 8 * ( b - bitfield->bits );
-            *setmePos += find_top_bit( *b & ( 0xff >> (startBit&7) ) );
-            return 1;
-        }
-
-        /* Test bitfield for first non zero byte */
-        ++b;
-        while( (b < end) && !*b )
-            ++b;
-
-        /* If we hit the end of our bitfield, no set bit was found */
-        if( b == end )
-            return 0;
-
-        /* New bitposition is byteoff*8 */
-        *setmePos = 8 * ( b - bitfield->bits ) + find_top_bit( *b );
-
-        return 1;
-    }
-
-    return 0;
-}
-#endif
 
 int
 tr_bitfieldAdd( tr_bitfield  * bitfield, size_t nth )
 {
-    assert( bitfield );
-    assert( bitfield->bits );
+    static const uint8_t ands[8] = { 128, 64, 32, 16, 8, 4, 2, 1 };
+    const size_t i = nth >> 3u;
 
-    if( nth >= bitfield->bitCount )
+    assert( bitfield != NULL );
+    assert( bitfield->bits != NULL );
+
+    if( i >= bitfield->len )
         return -1;
 
-    bitfield->bits[nth>>3u] |= (0x80 >> (nth&7u));
+    bitfield->bits[i] |= ands[nth&7u];
+    assert( tr_bitfieldHas( bitfield, nth ) );
     return 0;
 }
 
@@ -850,13 +763,17 @@ int
 tr_bitfieldRem( tr_bitfield   * bitfield,
                 size_t          nth )
 {
-    assert( bitfield );
-    assert( bitfield->bits );
+    static const uint8_t rems[8] = { 127, 191, 223, 239, 247, 251, 253, 254 };
+    const size_t i = nth >> 3u;
 
-    if( nth >= bitfield->bitCount )
+    assert( bitfield != NULL );
+    assert( bitfield->bits != NULL );
+
+    if( i >= bitfield->len )
         return -1;
 
-    bitfield->bits[nth>>3u] &= (0xff7f >> (nth&7u));
+    bitfield->bits[i] &= rems[nth&7u];
+    assert( !tr_bitfieldHas( bitfield, nth ) );
     return 0;
 }
 
@@ -879,27 +796,13 @@ tr_bitfieldOr( tr_bitfield * a, const tr_bitfield * b )
     uint8_t *ait;
     const uint8_t *aend, *bit;
 
-    assert( a->bitCount == b->bitCount );
+    assert( a->len == b->len );
 
-    for( ait=a->bits, bit=b->bits, aend=ait+a->byteCount; ait!=aend; )
+    for( ait=a->bits, bit=b->bits, aend=ait+a->len; ait!=aend; )
         *ait++ |= *bit++;
 
     return a;
 }
-
-/* set 'a' to all the flags that were in 'a' but not 'b' */
-void
-tr_bitfieldDifference( tr_bitfield * a, const tr_bitfield * b )
-{
-    uint8_t *ait;
-    const uint8_t *aend, *bit;
-
-    assert( a->bitCount == b->bitCount );
-
-    for( ait=a->bits, bit=b->bits, aend=ait+a->byteCount; ait!=aend; )
-        *ait++ &= ~(*bit++);
-}
-
 
 size_t
 tr_bitfieldCountTrueBits( const tr_bitfield* b )
@@ -928,7 +831,7 @@ tr_bitfieldCountTrueBits( const tr_bitfield* b )
     if( !b )
         return 0;
 
-    for( it=b->bits, end=it+b->byteCount; it!=end; ++it )
+    for( it=b->bits, end=it+b->len; it!=end; ++it )
         ret += trueBitCount[*it];
 
     return ret;
@@ -962,25 +865,8 @@ tr_wait( uint64_t delay_milliseconds )
 ****
 ***/
 
-int
-tr_stringEndsWith( const char * str, const char * end )
-{
-    const size_t slen = strlen( str );
-    const size_t elen = strlen( end );
-    return slen>=elen && !memcmp( &str[slen-elen], end, elen );
-}
 
-int
-tr_snprintf( char * buf, size_t buflen, const char * fmt, ... )
-{
-    int len;
-    va_list args;
-    va_start( args, fmt );
-    len = evutil_vsnprintf( buf, buflen, fmt, args );
-    va_end( args );
-    return len;
-}
-
+#ifndef HAVE_STRLCPY
 
 /*
  * Copy src to string dst of size siz.  At most siz-1 characters
@@ -988,37 +874,75 @@ tr_snprintf( char * buf, size_t buflen, const char * fmt, ... )
  * Returns strlen(src); if retval >= siz, truncation occurred.
  */
 size_t
-tr_strlcpy(char *dst, const char *src, size_t siz)
+strlcpy(char *dst, const char *src, size_t siz)
 {
-#ifdef HAVE_STRLCPY
-    return strlcpy( dst, src, siz );
-#else
-    char *d = dst;
-    const char *s = src;
-    size_t n = siz;
+	char *d = dst;
+	const char *s = src;
+	size_t n = siz;
 
-    assert( s );
-    assert( d );
+	assert( s != NULL );
+	assert( d != NULL );
 
-    /* Copy as many bytes as will fit */
-    if (n != 0) {
-        while (--n != 0) {
-            if ((*d++ = *s++) == '\0')
-                break;
-        }
-    }
+	/* Copy as many bytes as will fit */
+	if (n != 0) {
+		while (--n != 0) {
+			if ((*d++ = *s++) == '\0')
+				break;
+		}
+	}
 
-    /* Not enough room in dst, add NUL and traverse rest of src */
-    if (n == 0) {
-        if (siz != 0)
-            *d = '\0'; /* NUL-terminate dst */
-        while (*s++)
-            ;
-    }
+	/* Not enough room in dst, add NUL and traverse rest of src */
+	if (n == 0) {
+		if (siz != 0)
+			*d = '\0';		/* NUL-terminate dst */
+		while (*s++)
+			;
+	}
 
-    return(s - src - 1); /* count does not include NUL */
-#endif
+	return(s - src - 1);	/* count does not include NUL */
 }
+
+#endif /* HAVE_STRLCPY */
+
+
+#ifndef HAVE_STRLCAT
+
+/*
+ * Appends src to string dst of size siz (unlike strncat, siz is the
+ * full size of dst, not space left).  At most siz-1 characters
+ * will be copied.  Always NUL terminates (unless siz <= strlen(dst)).
+ * Returns strlen(src) + MIN(siz, strlen(initial dst)).
+ * If retval >= siz, truncation occurred.
+ */
+size_t
+strlcat(char *dst, const char *src, size_t siz)
+{
+	char *d = dst;
+	const char *s = src;
+	size_t n = siz;
+	size_t dlen;
+
+	/* Find the end of dst and adjust bytes left but don't go past end */
+	while (n-- != 0 && *d != '\0')
+		d++;
+	dlen = d - dst;
+	n = siz - dlen;
+
+	if (n == 0)
+		return(dlen + strlen(s));
+	while (*s != '\0') {
+		if (n != 1) {
+			*d++ = *s;
+			n--;
+		}
+		s++;
+	}
+	*d = '\0';
+
+	return(dlen + (s - src));	/* count does not include NUL */
+}
+
+#endif /* HAVE_STRLCAT */
 
 /***
 ****
@@ -1057,146 +981,27 @@ tr_sha1_to_hex( char * out, const uint8_t * sha1 )
 ***/
 
 int
-tr_httpIsValidURL( const char * url )
-{
-    const char * c;
-    static const char * rfc2396_valid_chars =
-        "abcdefghijklmnopqrstuvwxyz" /* lowalpha */
-        "ABCDEFGHIJKLMNOPQRSTUVWXYZ" /* upalpha */
-        "0123456789"                 /* digit */
-        "-_.!~*'()"                  /* mark */
-        ";/?:@&=+$,"                 /* reserved */
-        "<>#%<\""                    /* delims */
-        "{}|\\^[]`";                 /* unwise */
-
-    for( c=url; c && *c; ++c )
-        if( !strchr( rfc2396_valid_chars, *c ) )
-            return FALSE;
-
-    return !tr_httpParseURL( url, -1, NULL, NULL, NULL );
-}
-
-int
 tr_httpParseURL( const char * url_in, int len,
                  char ** setme_host,
                  int * setme_port,
                  char ** setme_path )
 {
-    int err;
-    int port = 0;
-    int n;
-    char * tmp;
-    char * pch;
-    const char * protocol = NULL;
-    const char * host = NULL;
-    const char * path = NULL;
+    char * url = tr_strndup( url_in, len );
+    char * path;
+    char host[4096+1];
+    unsigned short port;
+    int success;
 
-    tmp = tr_strndup( url_in, len );
-    if(( pch = strstr( tmp, "://" )))
-    {
-       *pch = '\0';
-       protocol = tmp;
-       pch += 3;
-/*fprintf( stderr, "protocol is [%s]... what's left is [%s]\n", protocol, pch );*/
-       if(( n = strcspn( pch, ":/" )))
-       {
-           const int havePort = pch[n] == ':';
-           host = pch;
-           pch += n;
-           *pch++ = '\0';
-/*fprintf( stderr, "host is [%s]... what's left is [%s]\n", host, pch );*/
-           if( havePort )
-           {
-               char * end;
-               port = strtol( pch, &end, 10 );
-               pch = end;
-/*fprintf( stderr, "port is [%d]... what's left is [%s]\n", port, pch );*/
-           }
-           path = pch;
-/*fprintf( stderr, "path is [%s]\n", path );*/
-       }
+    success = parseURL( url, host, &port, &path );
+
+    if( success ) {
+        if( setme_host ) *setme_host = tr_strdup( host );
+        if( setme_port ) *setme_port = port;
+        if( setme_path ) *setme_path = tr_strdup( path );
     }
 
-    err = !host || !path || !protocol || ( strcmp(protocol,"http") && strcmp(protocol,"https") );
+    tr_free( url );
 
-    if( !err && !port ) {
-        if( !strcmp(protocol,"http") ) port = 80;
-        if( !strcmp(protocol,"https") ) port = 443;
-    }
-
-    if( !err ) {
-        if( setme_host) { ((char*)host)[-3]=':'; *setme_host = tr_strdup( protocol ); }
-        if( setme_path) { ((char*)path)[-1]='/'; *setme_path = tr_strdup( path-1 ); }
-        if( setme_port) *setme_port = port;
-    }
-
-
-    tr_free( tmp );
-    return err;
+    return !success;
 }
 
-#include <string.h>
-#include <openssl/sha.h>
-#include <openssl/hmac.h>
-#include <openssl/evp.h>
-#include <openssl/bio.h>
-#include <openssl/buffer.h>
-
-char *
-tr_base64_encode( const void * input, int length, int * setme_len )
-{
-    char * ret;
-    BIO * b64;
-    BIO * bmem;
-    BUF_MEM * bptr;
-
-    if( length < 1 )
-       length = strlen( input );
-
-    bmem = BIO_new( BIO_s_mem( ) );
-    b64 = BIO_new( BIO_f_base64( ) );
-    b64 = BIO_push( b64, bmem );
-    BIO_write( b64, input, length );
-    (void) BIO_flush( b64 );
-    BIO_get_mem_ptr( b64, &bptr );
-    ret = tr_strndup( bptr->data, bptr->length );
-    if( setme_len )
-        *setme_len = bptr->length;
-
-    BIO_free_all( b64 );
-    return ret;
-}
-
-char *
-tr_base64_decode( const void * input, int length, int * setme_len )
-{
-    char * ret;
-    BIO * b64;
-    BIO * bmem;
-    int retlen;
-
-    if( length < 1 )
-       length = strlen( input );
-
-    ret = tr_new0( char, length );
-    b64 = BIO_new( BIO_f_base64( ) );
-    bmem = BIO_new_mem_buf( (unsigned char*)input, length );
-    bmem = BIO_push( b64, bmem );
-    retlen = BIO_read( bmem, ret, length );
-    if( !retlen )
-    {
-        /* try again, but with the BIO_FLAGS_BASE64_NO_NL flag */
-        BIO_free_all( bmem );
-        b64 = BIO_new( BIO_f_base64( ) );
-        BIO_set_flags( b64, BIO_FLAGS_BASE64_NO_NL );
-        bmem = BIO_new_mem_buf( (unsigned char*)input, length );
-        bmem = BIO_push( b64, bmem );
-        retlen = BIO_read( bmem, ret, length );
-    }
-
-    if( setme_len )
-        *setme_len = retlen;
-
-    BIO_free_all( bmem );
-    return ret;
-}

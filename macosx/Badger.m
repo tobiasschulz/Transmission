@@ -48,6 +48,8 @@
         fLib = lib;
         
         fCompleted = 0;
+        fCompletedBadged = 0;
+        fSpeedBadge = NO;
         
         if ([NSApp isOnLeopardOrBetter])
         {
@@ -56,11 +58,7 @@
             [view release];
         }
         else
-        {
             fQuittingTiger = NO;
-            fSpeedBadge = NO;
-            fCompletedBadged = 0;
-        }
         
         //change that just impacts the dock badge
         [[NSNotificationCenter defaultCenter] addObserver: self selector: @selector(updateBadge) name: @"DockBadgeChange" object: nil];
@@ -73,8 +71,7 @@
 {
     [[NSNotificationCenter defaultCenter] removeObserver: self];
     
-    if (![NSApp isOnLeopardOrBetter])
-        [NSApp setApplicationIconImage: nil]; //needed on 10.4
+    [NSApp setApplicationIconImage: nil]; //needed on 10.4
     
     [fDockIcon release];
     [fAttributes release];
@@ -86,16 +83,7 @@
 {
     if ([NSApp isOnLeopardOrBetter])
     {
-        float downloadRate = 0.0, uploadRate = 0.0;
-        BOOL badgeDownload = [[NSUserDefaults standardUserDefaults] boolForKey: @"BadgeDownloadRate"],
-            badgeUpload = [[NSUserDefaults standardUserDefaults] boolForKey: @"BadgeUploadRate"];
-        if (badgeDownload || badgeUpload)
-            tr_sessionGetSpeed(fLib, badgeDownload ? &downloadRate : NULL, badgeUpload ? &uploadRate : NULL);
-        
-        //only update if the badged values change
-        if ([(BadgeView *)[[NSApp dockTile] contentView] setRatesWithDownload: downloadRate upload: uploadRate])
-            [[NSApp dockTile] display];
-        
+        [[NSApp dockTile] display];
         return;
     }
     else if (fQuittingTiger)
@@ -154,7 +142,7 @@
         NSString * downloadRateString = nil, * uploadRateString = nil;
         
         float downloadRate, uploadRate;
-        tr_sessionGetSpeed(fLib, &downloadRate, &uploadRate);
+        tr_torrentRates(fLib, &downloadRate, &uploadRate);
         
         if (checkDownload && downloadRate >= 0.1)
             downloadRateString = [NSString stringForSpeedAbbrev: downloadRate];
@@ -243,7 +231,7 @@
     {
         [self clearCompleted];
         [(BadgeView *)[[NSApp dockTile] contentView] setQuitting];
-        [[NSApp dockTile] display];
+        [self updateBadge];
     }
     else
     {

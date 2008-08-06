@@ -25,7 +25,7 @@
 #import "PortChecker.h"
 #import "NSApplicationAdditions.h"
 
-#define CHECKER_URL @"http://portcheck.transmissionbt.com/%d"
+#define CHECKER_URL @"https://www.grc.com/x/portprobe=%d"
 #define CHECK_FIRE  3.0
 
 @implementation PortChecker
@@ -40,7 +40,7 @@
         fStatus = PORT_STATUS_CHECKING;
         
         fTimer = [NSTimer scheduledTimerWithTimeInterval: CHECK_FIRE target: self selector: @selector(startProbe)
-                    userInfo: nil repeats: NO];
+                        userInfo: nil repeats: NO];
     }
     
     return self;
@@ -114,26 +114,40 @@
 
 - (void) connectionDidFinishLoading: (NSURLConnection *) connection
 {
-    NSString * probeString = [[NSString alloc] initWithData: fPortProbeData encoding: NSUTF8StringEncoding];
+    NSXMLDocument * shieldsUpProbe = [[NSXMLDocument alloc] initWithData: fPortProbeData options: NSXMLDocumentTidyHTML error: nil];
     [fPortProbeData release];
     fPortProbeData = nil;
     
-    if (probeString)
+    if (shieldsUpProbe)
     {
-        if ([probeString isEqualToString: @"1"])
-            [self callBackWithStatus: PORT_STATUS_OPEN];
-        else if ([probeString isEqualToString: @"0"])
-            [self callBackWithStatus: PORT_STATUS_CLOSED];
+        NSArray * nodes = [shieldsUpProbe nodesForXPath: @"/html/body/center/table[3]/tr/td[2]" error: nil];
+        if ([nodes count] == 1)
+        {
+            NSString * portStatus = [[[[nodes objectAtIndex: 0] stringValue] stringByTrimmingCharactersInSet:
+                                                [[NSCharacterSet letterCharacterSet] invertedSet]] lowercaseString];
+            
+            if ([portStatus isEqualToString: @"open"])
+                [self callBackWithStatus: PORT_STATUS_OPEN];
+            else if ([portStatus isEqualToString: @"stealth"])
+                [self callBackWithStatus: PORT_STATUS_STEALTH];
+            else if ([portStatus isEqualToString: @"closed"])
+                [self callBackWithStatus: PORT_STATUS_CLOSED];
+            else
+            {
+                NSLog(@"Unable to get port status: unknown port state");
+                [self callBackWithStatus: PORT_STATUS_ERROR];
+            }
+        }
         else
         {
-            NSLog([NSString stringWithFormat: @"Unable to get port status: invalid response (%@)", probeString]);
-            [self callBackWithStatus: PORT_STATUS_ERROR];
+                NSLog(@"Unable to get port status: invalid response");
+                [self callBackWithStatus: PORT_STATUS_ERROR];
         }
-        [probeString release];
+        [shieldsUpProbe release];
     }
     else
     {
-        NSLog(@"Unable to get port status: invalid data received");
+        NSLog(@"Unable to get port status: failed to create xml document");
         [self callBackWithStatus: PORT_STATUS_ERROR];
     }
 }

@@ -39,7 +39,9 @@
 struct TrTorrentPrivate
 {
    tr_torrent * handle;
-   gboolean do_remove;
+   gboolean do_delete;
+   gboolean seeding_cap_enabled;
+   gdouble seeding_cap; /* ratio to stop seeding at */
 };
 
 
@@ -53,6 +55,7 @@ tr_torrent_init(GTypeInstance *instance, gpointer g_class UNUSED )
                                                   TR_TORRENT_TYPE,
                                                   struct TrTorrentPrivate );
     p->handle = NULL;
+    p->seeding_cap = 2.0;
 
 #ifdef REFDBG
     g_message( "torrent %p init", self );
@@ -60,9 +63,9 @@ tr_torrent_init(GTypeInstance *instance, gpointer g_class UNUSED )
 }
 
 static int
-isDisposed( const TrTorrent * tor )
+isDisposed( const TrTorrent * self )
 {
-    return !tor || !TR_IS_TORRENT( tor ) || !tor->priv;
+    return !self || !self->priv;
 }
 
 static void
@@ -75,10 +78,10 @@ tr_torrent_dispose( GObject * o )
     {
         if( self->priv->handle )
         {
-            if( self->priv->do_remove )
-                tr_torrentRemove( self->priv->handle );
+            if( self->priv->do_delete )
+                tr_torrentDelete( self->priv->handle );
             else
-                tr_torrentFree( self->priv->handle );
+                tr_torrentClose( self->priv->handle );
         }
 
         self->priv = NULL;
@@ -86,15 +89,6 @@ tr_torrent_dispose( GObject * o )
 
     parent = g_type_class_peek(g_type_parent(TR_TORRENT_TYPE));
     parent->dispose( o );
-}
-
-void
-tr_torrent_clear( TrTorrent * tor )
-{
-    g_return_if_fail( tor );
-    g_return_if_fail( tor->priv );
-
-    tor->priv->handle = NULL;
 }
 
 static void
@@ -132,6 +126,8 @@ tr_torrent_get_type( void )
 tr_torrent *
 tr_torrent_handle(TrTorrent *tor)
 {
+    g_assert( TR_IS_TORRENT(tor) );
+
     return isDisposed( tor ) ? NULL : tor->priv->handle;
 }
 
@@ -149,10 +145,28 @@ tr_torrent_info( TrTorrent * tor )
     return handle ? tr_torrentInfo( handle ) : NULL;
 }
 
+void
+tr_torrent_start( TrTorrent * self )
+{
+    tr_torrent * handle = tr_torrent_handle( self );
+    if( handle )
+        tr_torrentStart( handle );
+}
+
+void
+tr_torrent_stop( TrTorrent * self )
+{
+    tr_torrent * handle = tr_torrent_handle( self );
+    if( handle )
+        tr_torrentStop( handle );
+}
+
+
 static gboolean
 notifyInMainThread( gpointer user_data )
 {
-    tr_notify_send( TR_TORRENT( user_data ) );
+    if( pref_flag_get( PREF_KEY_NOTIFY ) )
+        tr_notify_send( TR_TORRENT( user_data ) );
     return FALSE;
 }
 static void
@@ -185,19 +199,20 @@ tr_torrent_new_ctor( tr_handle  * handle,
 {
     tr_torrent * tor;
     int errcode;
-    uint8_t doTrash = FALSE;
 
     errcode = -1;
     *err = NULL;
 
-    /* let the gtk client handle the removal, since libT
-     * doesn't have any concept of the glib trash API */
-    tr_ctorGetDeleteSource( ctor, &doTrash );
     tr_ctorSetDeleteSource( ctor, FALSE );
     tor = tr_torrentNew( handle, ctor, &errcode );
 
-    if( tor && doTrash )
-        tr_file_trash_or_unlink( tr_ctorGetSourceFile( ctor ) );
+    if( tor )
+    {
+        uint8_t doTrash = FALSE;
+        tr_ctorGetDeleteSource( ctor, &doTrash );
+        if( doTrash )
+            tr_file_trash_or_unlink( tr_ctorGetSourceFile( ctor ) );
+    }
   
     if( !tor )
     {
@@ -222,6 +237,26 @@ tr_torrent_new_ctor( tr_handle  * handle,
     }
 
     return maketorrent( tor );
+}
+
+void
+tr_torrent_check_seeding_cap ( TrTorrent *gtor)
+{
+  const tr_stat * st = tr_torrent_stat( gtor );
+  if ((gtor->priv->seeding_cap_enabled) && (st->ratio >= gtor->priv->seeding_cap))
+    tr_torrent_stop (gtor);
+}
+void
+tr_torrent_set_seeding_cap_ratio ( TrTorrent *gtor, gdouble ratio )
+{
+  gtor->priv->seeding_cap = ratio;
+  tr_torrent_check_seeding_cap (gtor);
+}
+void
+tr_torrent_set_seeding_cap_enabled ( TrTorrent *gtor, gboolean b )
+{
+  if ((gtor->priv->seeding_cap_enabled = b))
+    tr_torrent_check_seeding_cap (gtor);
 }
 
 char *
@@ -249,11 +284,8 @@ tr_torrent_status_str ( TrTorrent * gtor )
             break;
 
         case TR_STATUS_DOWNLOAD:
-
-            if( eta == TR_ETA_NOT_AVAIL )
-                top = g_strdup_printf( _("Data not fully available (%.1f%%)" ), prog );
-            else if( eta == TR_ETA_UNKNOWN )
-                top = g_strdup_printf( _( "Stalled (%.1f%%)" ), prog );
+            if( eta < 0 )
+                top = g_strdup_printf( _("Stalled (%.1f%%)"), prog );
             else {
                 char timestr[128];
                 tr_strltime( timestr, eta, sizeof( timestr ) );
@@ -261,6 +293,13 @@ tr_torrent_status_str ( TrTorrent * gtor )
                    %2$.1f is a percentage of how much of the torrent is done */
                 top = g_strdup_printf( _("%1$s remaining (%2$.1f%%)"), timestr, prog );
             }
+            break;
+
+        case TR_STATUS_DONE:
+            top = g_strdup_printf(
+                ngettext( "Uploading to %1$'d of %2$'d connected peer",
+                          "Uploading to %1$'d of %2$'d connected peers", tpeers ),
+                          upeers, tpeers );
             break;
 
         case TR_STATUS_SEED:
@@ -284,10 +323,10 @@ tr_torrent_status_str ( TrTorrent * gtor )
 }
 
 void
-tr_torrent_set_remove_flag( TrTorrent * gtor, gboolean do_remove )
+tr_torrent_set_delete_flag( TrTorrent * gtor, gboolean do_delete )
 {
     if( !isDisposed( gtor ) )
-        gtor->priv->do_remove = do_remove;
+        gtor->priv->do_delete = do_delete;
 }
 
 void
@@ -295,7 +334,7 @@ tr_torrent_delete_files( TrTorrent * gtor )
 {
     tr_file_index_t i;
     const tr_info * info = tr_torrent_info( gtor );
-    const char * stop = tr_torrentGetDownloadDir( tr_torrent_handle( gtor ) );
+    const char * stop = tr_torrentGetFolder( tr_torrent_handle( gtor ) );
 
     for( i=0; info && i<info->fileCount; ++i )
     {
@@ -309,16 +348,4 @@ tr_torrent_delete_files( TrTorrent * gtor )
         }
         g_free( file );
     }
-}
-
-void
-tr_torrent_open_folder( TrTorrent * gtor )
-{
-    tr_torrent * tor = tr_torrent_handle( gtor );
-    const tr_info * info = tr_torrent_info( gtor );
-    char * path = info->fileCount == 1
-        ? g_build_filename( tr_torrentGetDownloadDir(tor), NULL )
-        : g_build_filename( tr_torrentGetDownloadDir(tor), info->name, NULL );
-    gtr_open_file( path );
-    g_free( path );
 }
