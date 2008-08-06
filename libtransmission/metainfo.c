@@ -39,6 +39,7 @@
 #include "crypto.h" /* tr_sha1 */
 #include "metainfo.h"
 #include "platform.h"
+#include "trcompat.h" /* strlcpy */
 #include "utils.h"
 
 /***********************************************************************
@@ -131,7 +132,7 @@ getTorrentFilename( const tr_handle  * handle,
 {
     const char * dir = tr_getTorrentDir( handle );
     char base[MAX_PATH_LENGTH];
-    tr_snprintf( base, sizeof( base ), "%s.%16.16s.torrent", inf->name, inf->hashString );
+    snprintf( base, sizeof( base ), "%s.%16.16s.torrent", inf->name, inf->hashString );
     tr_buildPath( buf, buflen, dir, base, NULL );
 }
 
@@ -150,7 +151,7 @@ getTorrentOldFilename( const tr_handle * handle,
     else
     {
         char base[1024];
-        tr_snprintf( base, sizeof(base), "%s-%s", info->hashString, handle->tag );
+        snprintf( base, sizeof(base), "%s-%s", info->hashString, handle->tag );
         tr_buildPath( name, len, torDir, base, NULL );
     }
 }
@@ -170,28 +171,18 @@ tr_metainfoMigrate( tr_handle * handle,
         size_t contentLen;
         uint8_t * content;
 
-        tr_mkdirp( tr_getTorrentDir( handle ), 0777 );
         getTorrentOldFilename( handle, inf, old_name, sizeof( old_name ) );
         if(( content = tr_loadFile( old_name, &contentLen )))
         {
-            FILE * out;
-            errno = 0;
-            out = fopen( new_name, "wb+" );
-            if( !out )
+            FILE * out = fopen( new_name, "wb+" );
+            if( fwrite( content, sizeof( uint8_t ), contentLen, out ) == contentLen )
             {
-                tr_nerr( inf->name, _( "Couldn't create \"%1$s\": %2$s" ), new_name, tr_strerror( errno ) );
+                tr_free( inf->torrent );
+                inf->torrent = tr_strdup( new_name );
+                tr_sessionSetTorrentFile( handle, inf->hashString, new_name );
+                unlink( old_name );
             }
-            else
-            {
-                if( fwrite( content, sizeof( uint8_t ), contentLen, out ) == contentLen )
-                {
-                    tr_free( inf->torrent );
-                    inf->torrent = tr_strdup( new_name );
-                    tr_sessionSetTorrentFile( handle, inf->hashString, new_name );
-                    unlink( old_name );
-                }
-                fclose( out );
-            }
+            fclose( out );
         }
 
         tr_free( content );
@@ -221,26 +212,6 @@ announceToScrape( const char * announce )
     }
 
     return scrape;
-}
-
-static void
-geturllist( tr_info * inf, tr_benc * meta )
-{
-    benc_val_t * urls;
-
-    if( tr_bencDictFindList( meta, "url-list", &urls ) )
-    {
-        int i;
-        const char * url;
-        const int n = tr_bencListSize( urls );
-
-        inf->webseedCount = 0;
-        inf->webseeds = tr_new0( char*, n );
-
-        for( i=0; i<n; ++i )
-            if( tr_bencGetStr( tr_bencListChild( urls, i ), &url ) )
-                inf->webseeds[inf->webseedCount++] = tr_strdup( url );
-    }
 }
 
 static int
@@ -280,7 +251,7 @@ getannounce( tr_info * inf, tr_benc * meta )
 
         /* did we use any of the tiers? */
         if( !trackerCount ) {
-            tr_nerr( inf->name, _( "Invalid metadata entry \"%s\"" ), "announce-list" );
+            tr_inf( _( "Invalid metadata entry \"%s\"" ), "announce-list" );
             tr_free( trackers );
             trackers = NULL;
         }
@@ -300,9 +271,6 @@ getannounce( tr_info * inf, tr_benc * meta )
 
     inf->trackers = trackers;
     inf->trackerCount = trackerCount;
-
-    if( !inf->trackerCount )
-        tr_nerr( inf->name, _( "Invalid metadata entry \"%s\"" ), "announce" );
 
     return inf->trackerCount ? TR_OK : TR_ERROR;
 }
@@ -371,9 +339,9 @@ tr_metainfoParse( const tr_handle  * handle,
     if( !tr_bencIsInt( val ) )
     {
         if( val )
-            tr_nerr( inf->name, _( "Invalid metadata entry \"%s\"" ), "piece length" );
+            tr_err( _( "Invalid metadata entry \"%s\"" ), "piece length" );
         else
-            tr_nerr( inf->name, _( "Missing metadata entry \"%s\"" ), "piece length" );
+            tr_err( _( "Missing metadata entry \"%s\"" ), "piece length" );
         goto fail;
     }
     inf->pieceSize = val->val.i;
@@ -383,14 +351,14 @@ tr_metainfoParse( const tr_handle  * handle,
     if( !tr_bencIsString( val ) )
     {
         if( val )
-            tr_nerr( inf->name, _( "Invalid metadata entry \"%s\"" ), "pieces" );
+            tr_err( _( "Invalid metadata entry \"%s\"" ), "pieces" );
         else
-            tr_nerr( inf->name, _( "Missing metadata entry \"%s\"" ), "pieces" );
+            tr_err( _( "Missing metadata entry \"%s\"" ), "pieces" );
         goto fail;
     }
     if( val->val.s.i % SHA_DIGEST_LENGTH )
     {
-        tr_nerr( inf->name, _( "Invalid metadata entry \"%s\"" ), "pieces" );
+        tr_err( _( "Invalid metadata entry \"%s\"" ), "pieces" );
         goto fail;
     }
     inf->pieceCount = val->val.s.i / SHA_DIGEST_LENGTH;
@@ -404,7 +372,8 @@ tr_metainfoParse( const tr_handle  * handle,
 
     /* get file or top directory name */
     val = tr_bencDictFindFirst( beInfo, "name.utf-8", "name", NULL );
-    if( parseFiles( inf, val,
+    if( parseFiles( inf, tr_bencDictFindFirst( beInfo,
+                                               "name.utf-8", "name", NULL ),
                     tr_bencDictFind( beInfo, "files" ),
                     tr_bencDictFind( beInfo, "length" ) ) )
     {
@@ -413,7 +382,7 @@ tr_metainfoParse( const tr_handle  * handle,
 
     if( !inf->fileCount || !inf->totalSize )
     {
-        tr_nerr( inf->name, _( "Torrent is corrupt" ) ); /* the content is missing! */
+        tr_err( _( "Torrent is corrupt" ) ); /* the content is missing! */
         goto fail;
     }
 
@@ -422,16 +391,13 @@ tr_metainfoParse( const tr_handle  * handle,
     if( (uint64_t) inf->pieceCount !=
         ( inf->totalSize + inf->pieceSize - 1 ) / inf->pieceSize )
     {
-        tr_nerr( inf->name, _( "Torrent is corrupt" ) ); /* size of hashes and files don't match */
+        tr_err( _( "Torrent is corrupt" ) ); /* size of hashes and files don't match */
         goto fail;
     }
 
     /* get announce or announce-list */
     if( getannounce( inf, meta ) )
         goto fail;
-
-    /* get the url-list */
-    geturllist( inf, meta );
 
     /* filename of Transmission's copy */
     getTorrentFilename( handle, inf, buf, sizeof( buf ) );
@@ -450,13 +416,9 @@ void tr_metainfoFree( tr_info * inf )
     tr_file_index_t ff;
     int i;
 
-    for( i=0; i<inf->webseedCount; ++i )
-        tr_free( inf->webseeds[i] );
-
     for( ff=0; ff<inf->fileCount; ++ff )
         tr_free( inf->files[ff].name );
 
-    tr_free( inf->webseeds );
     tr_free( inf->pieces );
     tr_free( inf->files );
     tr_free( inf->comment );
@@ -587,18 +549,18 @@ parseFiles( tr_info * inf, tr_benc * name,
             if( getfile( &inf->files[ii].name, inf->name, path ) )
             {
                 if( path )
-                    tr_nerr( inf->name, _( "Invalid metadata entry \"%s\"" ), "path" );
+                    tr_err( _( "Invalid metadata entry \"%s\"" ), "path" );
                 else
-                    tr_nerr( inf->name, _( "Missing metadata entry \"%s\"" ), "path" );
+                    tr_err( _( "Missing metadata entry \"%s\"" ), "path" );
                 return TR_EINVALID;
             }
             length = tr_bencDictFind( item, "length" );
             if( !tr_bencIsInt( length ) )
             {
                 if( length )
-                    tr_nerr( inf->name, _( "Invalid metadata entry \"%s\"" ), "length" );
+                    tr_err( _( "Invalid metadata entry \"%s\"" ), "length" );
                 else
-                    tr_nerr( inf->name, _( "Missing metadata entry \"%s\"" ), "length" );
+                    tr_err( _( "Missing metadata entry \"%s\"" ), "length" );
                 return TR_EINVALID;
             }
             inf->files[ii].length = length->val.i;
@@ -627,7 +589,7 @@ parseFiles( tr_info * inf, tr_benc * name,
     }
     else
     {
-        tr_nerr( inf->name, _( "Invalid or missing metadata entries \"length\" and \"files\"" ) );
+        tr_err( _( "Invalid or missing metadata entries \"length\" and \"files\"" ) );
     }
 
     return TR_OK;

@@ -1,14 +1,26 @@
-/*
- * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
- *
- * This file is licensed by the GPL version 2.  Works owned by the
- * Transmission project are granted a special exemption to clause 2(b)
- * so that the bulk of its code can remain under the MIT license. 
- * This exemption does not extend to derived works not owned by
- * the Transmission project.
- *
+/******************************************************************************
  * $Id$
- */
+ *
+ * Copyright (c) 2005-2008 Transmission authors and contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *****************************************************************************/
 
 #include <errno.h>
 #include <string.h>
@@ -33,8 +45,8 @@ struct tr_shared
     unsigned int isEnabled      : 1;
     unsigned int isShuttingDown : 1;
 
-    tr_port_forwarding natpmpStatus;
-    tr_port_forwarding upnpStatus;
+    tr_nat_traversal_status natpmpStatus;
+    tr_nat_traversal_status upnpStatus;
 
     int bindPort;
     int bindSocket;
@@ -57,14 +69,14 @@ getNatStateStr( int state )
     switch( state )
     {
         /* we're in the process of trying to set up port forwarding */
-        case TR_PORT_MAPPING:   return _( "Starting" );
+        case TR_NAT_TRAVERSAL_MAPPING:   return _( "Starting" );
         /* we've successfully forwarded the port */
-        case TR_PORT_MAPPED:    return _( "Forwarded" );
+        case TR_NAT_TRAVERSAL_MAPPED:    return _( "Forwarded" );
         /* we're cancelling the port forwarding */
-        case TR_PORT_UNMAPPING: return _( "Stopping" );
+        case TR_NAT_TRAVERSAL_UNMAPPING: return _( "Stopping" );
         /* the port isn't forwarded */
-        case TR_PORT_UNMAPPED:  return _( "Not forwarded" );
-        case TR_PORT_ERROR:     return "???";
+        case TR_NAT_TRAVERSAL_UNMAPPED:  return _( "Not forwarded" );
+        case TR_NAT_TRAVERSAL_ERROR:     return "???";
     }
 
     return "notfound";
@@ -84,7 +96,7 @@ natPulse( tr_shared * s )
     newStatus = tr_sharedTraversalStatus( s );
 
     if( newStatus != oldStatus )
-        tr_ninf( getKey(), _( "State changed from \"%1$s\" to \"%2$s\"" ),
+        tr_ninf( getKey(), _( "State changed from \"%s\" to \"%s\"" ),
                  getNatStateStr(oldStatus),
                  getNatStateStr(newStatus) );
 }
@@ -178,8 +190,8 @@ tr_sharedInit( tr_handle * h, int isEnabled, int publicPort )
     s->upnp         = tr_upnpInit();
     s->pulseTimer   = tr_timerNew( h, sharedPulse, s, 1000 );
     s->isEnabled    = isEnabled ? 1 : 0;
-    s->upnpStatus   = TR_PORT_UNMAPPED;
-    s->natpmpStatus = TR_PORT_UNMAPPED;
+    s->upnpStatus   = TR_NAT_TRAVERSAL_UNMAPPED;
+    s->natpmpStatus = TR_NAT_TRAVERSAL_UNMAPPED;
 
     return s;
 }
@@ -193,16 +205,16 @@ tr_sharedShuttingDown( tr_shared * s )
 void
 tr_sharedSetPort( tr_shared * s, int port )
 {
-    tr_torrent * tor = NULL;
+    tr_torrent * tor;
 
     s->publicPort = port;
 
-    while(( tor = tr_torrentNext( s->h, tor )))
+    for( tor = s->h->torrentList; tor; tor = tor->next )
         tr_torrentChangeMyPort( tor );
 }
 
 int
-tr_sharedGetPeerPort( const tr_shared * s )
+tr_sharedGetPublicPort( const tr_shared * s )
 {
     return s->publicPort;
 }
@@ -211,12 +223,6 @@ void
 tr_sharedTraversalEnable( tr_shared * s, int isEnabled )
 {
     s->isEnabled = isEnabled;
-}
-
-int
-tr_sharedTraversalIsEnabled( const tr_shared * s )
-{
-    return s->isEnabled;
 }
 
 int

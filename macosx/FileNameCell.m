@@ -25,7 +25,6 @@
 #import "FileNameCell.h"
 #import "FileOutlineView.h"
 #import "Torrent.h"
-#import "FileListNode.h"
 #import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 
@@ -92,9 +91,8 @@
 
 - (NSImage *) image
 {
-    FileListNode * node = (FileListNode *)[self objectValue];
-    NSImage * image;
-    if ([node isFolder])
+    NSImage * image = [[self objectValue] objectForKey: @"Icon"];
+    if (!image)
     {
         if (!fFolderImage)
         {
@@ -103,9 +101,6 @@
         }
         image = fFolderImage;
     }
-    else
-        image = [node icon];
-    
     return image;
 }
 
@@ -115,7 +110,7 @@
     
     result.origin.x += PADDING_HORIZONAL;
     
-    const float IMAGE_SIZE = [(FileListNode *)[self objectValue] isFolder] ? IMAGE_FOLDER_SIZE : IMAGE_ICON_SIZE;
+    const float IMAGE_SIZE = [[[self objectValue] objectForKey: @"IsFolder"] boolValue] ? IMAGE_FOLDER_SIZE : IMAGE_ICON_SIZE;
     result.origin.y += (result.size.height - IMAGE_SIZE) * 0.5;
     result.size = NSMakeSize(IMAGE_SIZE, IMAGE_SIZE);
     
@@ -143,7 +138,7 @@
             && [[self highlightColorWithFrame: cellFrame inView: controlView] isEqual: [NSColor alternateSelectedControlColor]])
         specialColor = [NSColor whiteColor];
     else if ([[(FileOutlineView *)[self controlView] torrent] checkForFiles:
-                [(FileListNode *)[self objectValue] indexes]] == NSOffState)
+                    [[self objectValue] objectForKey: @"Indexes"]] == NSOffState)
         specialColor = [NSColor disabledControlTextColor];
     else;
     
@@ -152,7 +147,7 @@
     [titleString drawInRect: titleRect];
     
     //status
-    if (![(FileListNode *)[self objectValue] isFolder])
+    if (![[[self objectValue] objectForKey: @"IsFolder"] boolValue])
     {
         NSAttributedString * statusString = [self attributedStatusWithColor: specialColor ? specialColor : [NSColor darkGrayColor]];
         NSRect statusRect = [self rectForStatusWithString: statusString inBounds: cellFrame];
@@ -170,7 +165,7 @@
     
     NSRect result = bounds;
     
-    if (![(FileListNode *)[self objectValue] isFolder])
+    if (![[[self objectValue] objectForKey: @"IsFolder"] boolValue])
     {
         result.origin.x += PADDING_HORIZONAL + IMAGE_ICON_SIZE + PADDING_BETWEEN_IMAGE_AND_TITLE;
         result.origin.y += PADDING_ABOVE_TITLE_FILE;
@@ -188,7 +183,7 @@
 
 - (NSRect) rectForStatusWithString: (NSAttributedString *) string inBounds: (NSRect) bounds
 {
-    if ([(FileListNode *)[self objectValue] isFolder])
+    if ([[[self objectValue] objectForKey: @"IsFolder"] boolValue])
         return NSZeroRect;
     
     NSSize statusSize = [string size];
@@ -209,7 +204,7 @@
     if (color)
         [fTitleAttributes setObject: color forKey: NSForegroundColorAttributeName];
         
-    NSString * title = [(FileListNode *)[self objectValue] name];
+    NSString * title = [[self objectValue] objectForKey: @"Name"];
     return [[[NSAttributedString alloc] initWithString: title attributes: fTitleAttributes] autorelease];
 }
 
@@ -219,11 +214,11 @@
         [fStatusAttributes setObject: color forKey: NSForegroundColorAttributeName];
     
     Torrent * torrent = [(FileOutlineView *)[self controlView] torrent];
-    FileListNode * node = (FileListNode *)[self objectValue];
-    float percent = [torrent fileProgress: [[node indexes] firstIndex]] * 100.0;
+    float percent = [torrent fileProgress: [[[self objectValue] objectForKey: @"Indexes"] firstIndex]] * 100.0;
     
     NSString * status = [NSString localizedStringWithFormat: NSLocalizedString(@"%.2f%% of %@",
-                            "Inspector -> Files tab -> file status string"), percent, [NSString stringForFileSize: [node size]]];
+                            "Inspector -> Files tab -> file status string"), percent,
+                            [NSString stringForFileSize: [[[self objectValue] objectForKey: @"Size"] unsignedLongLongValue]]];
     
     return [[[NSAttributedString alloc] initWithString: status attributes: fStatusAttributes] autorelease];
 }

@@ -50,6 +50,7 @@
 #include "list.h"
 #include "net.h"
 #include "platform.h" /* tr_lock */
+#include "trcompat.h" /* strlcpy */
 #include "utils.h"
 
 #if SIZEOF_VOIDP==8
@@ -263,7 +264,7 @@ tr_fdFileCheckout( const char * folder,
         }
 
         dbgmsg( "opened '%s' in slot %d, write %c", filename, winner, write?'y':'n' );
-        tr_strlcpy( o->filename, filename, sizeof( o->filename ) );
+        strlcpy( o->filename, filename, sizeof( o->filename ) );
         o->isWritable = write;
     }
 
@@ -385,8 +386,8 @@ tr_fdSocketAccept( int b, struct in_addr * addr, tr_port_t * port )
     unsigned int len;
     struct sockaddr_in sock;
 
-    assert( addr );
-    assert( port );
+    assert( addr != NULL );
+    assert( port != NULL );
 
     tr_lockLock( gFd->lock );
     if( gFd->normal < getSocketMax( gFd ) )

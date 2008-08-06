@@ -41,35 +41,37 @@
 ***
 **/
 
+struct tr_extensions
+{
+    unsigned int extendedProtocolSupported : 1;
+    unsigned int fastPeersSupported : 1;
+};
+
 struct tr_peerIo
 {
-    unsigned int          isEncrypted : 1;
-    unsigned int          isIncoming : 1;
-    unsigned int          peerIdIsSet : 1;
-    unsigned int          extendedProtocolSupported : 1;
-    unsigned int          fastPeersSupported : 1;
+    struct tr_handle * handle;
 
-    uint8_t               encryptionMode;
-    uint8_t               timeout;
-    uint16_t              port;
-    int                   socket;
+    struct in_addr in_addr;
+    int port;
+    int socket;
+    int encryptionMode;
+    int timeout;
+    struct bufferevent * bufev;
+    uint8_t peerId[20];
+    time_t timeCreated;
 
-    uint8_t               peerId[20];
-    time_t                timeCreated;
+    tr_extensions extensions;
 
-    struct tr_handle    * handle;
+    unsigned int isEncrypted : 1;
+    unsigned int isIncoming : 1;
+    unsigned int peerIdIsSet : 1;
 
-    struct in_addr        in_addr;
-    struct bufferevent  * bufev;
+    tr_can_read_cb     canRead;
+    tr_did_write_cb    didWrite;
+    tr_net_error_cb    gotError;
+    void             * userData;
 
-    tr_can_read_cb        canRead;
-    tr_did_write_cb       didWrite;
-    tr_net_error_cb       gotError;
-    void                * userData;
-
-    tr_crypto           * crypto;
-
-    uint64_t              fromPeer;
+    tr_crypto * crypto;
 };
 
 /**
@@ -80,8 +82,8 @@ static void
 didWriteWrapper( struct bufferevent * e, void * userData )
 {
     tr_peerIo * c = (tr_peerIo *) userData;
-    if( c->didWrite )
-        c->didWrite( e, c->userData );
+    if( c->didWrite != NULL )
+        (*c->didWrite)( e, c->userData );
 }
 
 static void
@@ -98,7 +100,7 @@ canReadWrapper( struct bufferevent * e, void * userData )
 
     while( !done )
     {
-        const int ret = c->canRead( e, c->userData );
+        const int ret = (*c->canRead)( e, c->userData );
 
         switch( ret )
         {
@@ -118,8 +120,8 @@ static void
 gotErrorWrapper( struct bufferevent * e, short what, void * userData )
 {
     tr_peerIo * c = userData;
-    if( c->gotError )
-        c->gotError( e, what, c->userData );
+    if( c->gotError != NULL )
+        (*c->gotError)( e, what, c->userData );
 }
 
 /**
@@ -168,8 +170,8 @@ tr_peerIoNewIncoming( struct tr_handle      * handle,
                       uint16_t                port,
                       int                     socket )
 {
-    assert( handle );
-    assert( in_addr );
+    assert( handle != NULL );
+    assert( in_addr != NULL );
     assert( socket >= 0 );
 
     return tr_peerIoNew( handle, in_addr, port,
@@ -185,10 +187,10 @@ tr_peerIoNewOutgoing( struct tr_handle      * handle,
 {
     int socket;
 
-    assert( handle );
-    assert( in_addr );
+    assert( handle != NULL );
+    assert( in_addr != NULL );
     assert( port >= 0 );
-    assert( torrentHash );
+    assert( torrentHash != NULL );
 
     socket = tr_netOpenTCP( in_addr, port, 0 );
 
@@ -211,7 +213,7 @@ io_dtor( void * vio )
 void
 tr_peerIoFree( tr_peerIo * io )
 {
-    if( io )
+    if( io != NULL )
     {
         io->canRead = NULL;
         io->didWrite = NULL;
@@ -223,8 +225,8 @@ tr_peerIoFree( tr_peerIo * io )
 tr_handle*
 tr_peerIoGetHandle( tr_peerIo * io )
 {
-    assert( io );
-    assert( io->handle );
+    assert( io != NULL );
+    assert( io->handle != NULL );
 
     return io->handle;
 }
@@ -232,9 +234,9 @@ tr_peerIoGetHandle( tr_peerIo * io )
 const struct in_addr*
 tr_peerIoGetAddress( const tr_peerIo * io, uint16_t * port )
 {
-    assert( io );
+    assert( io != NULL );
 
-    if( port )
+    if( port != NULL )
        *port = io->port;
 
     return &io->in_addr;
@@ -244,7 +246,7 @@ const char*
 tr_peerIoAddrStr( const struct in_addr * addr, uint16_t port )
 {
     static char buf[512];
-    tr_snprintf( buf, sizeof(buf), "%s:%u", inet_ntoa( *addr ), ntohs( port ) );
+    snprintf( buf, sizeof(buf), "%s:%u", inet_ntoa( *addr ), ntohs( port ) );
     return buf;
 }
 
@@ -318,7 +320,6 @@ tr_peerIoSetTimeoutSecs( tr_peerIo * io, int secs )
 {
     io->timeout = secs;
     bufferevent_settimeout( io->bufev, io->timeout, io->timeout );
-    bufferevent_enable( io->bufev, EV_READ|EV_WRITE );
 }
 
 /**
@@ -329,7 +330,7 @@ void
 tr_peerIoSetTorrentHash( tr_peerIo     * io,
                          const uint8_t * hash )
 {
-    assert( io );
+    assert( io != NULL );
 
     tr_cryptoSetTorrentHash( io->crypto, hash );
 }
@@ -337,8 +338,8 @@ tr_peerIoSetTorrentHash( tr_peerIo     * io,
 const uint8_t*
 tr_peerIoGetTorrentHash( tr_peerIo * io )
 {
-    assert( io );
-    assert( io->crypto );
+    assert( io != NULL );
+    assert( io->crypto != NULL );
 
     return tr_cryptoGetTorrentHash( io->crypto );
 }
@@ -346,8 +347,8 @@ tr_peerIoGetTorrentHash( tr_peerIo * io )
 int
 tr_peerIoHasTorrentHash( const tr_peerIo * io )
 {
-    assert( io );
-    assert( io->crypto );
+    assert( io != NULL );
+    assert( io->crypto != NULL );
 
     return tr_cryptoHasTorrentHash( io->crypto );
 }
@@ -360,7 +361,7 @@ void
 tr_peerIoSetPeersId( tr_peerIo     * io,
                      const uint8_t * peer_id )
 {
-    assert( io );
+    assert( io != NULL );
 
     if(( io->peerIdIsSet = peer_id != NULL ))
         memcpy( io->peerId, peer_id, 20 );
@@ -371,7 +372,7 @@ tr_peerIoSetPeersId( tr_peerIo     * io,
 const uint8_t* 
 tr_peerIoGetPeersId( const tr_peerIo * io )
 {
-    assert( io );
+    assert( io != NULL );
     assert( io->peerIdIsSet );
 
     return io->peerId;
@@ -384,35 +385,35 @@ tr_peerIoGetPeersId( const tr_peerIo * io )
 void
 tr_peerIoEnableLTEP( tr_peerIo * io, int flag )
 {
-    assert( io );
+    assert( io != NULL );
     assert( flag==0 || flag==1 );
     
-    io->extendedProtocolSupported = flag;
+    io->extensions.extendedProtocolSupported = flag;
 }
 
 void
 tr_peerIoEnableFEXT( tr_peerIo * io, int flag )
 {
-    assert( io );
+    assert( io != NULL );
     assert( flag==0 || flag==1 );
     
-    io->fastPeersSupported = flag;
+    io->extensions.fastPeersSupported = flag;
 }
 
 int
 tr_peerIoSupportsLTEP( const tr_peerIo * io )
 {
-    assert( io );
+    assert( io != NULL );
     
-    return io->extendedProtocolSupported;
+    return io->extensions.extendedProtocolSupported;
 }
 
 int
 tr_peerIoSupportsFEXT( const tr_peerIo * io )
 {
-    assert( io );
+    assert( io != NULL );
     
-    return io->fastPeersSupported;
+    return io->extensions.fastPeersSupported;
 }
 /**
 ***
@@ -456,7 +457,7 @@ void
 tr_peerIoSetEncryption( tr_peerIo * io,
                         int         encryptionMode )
 {
-    assert( io );
+    assert( io != NULL );
     assert( encryptionMode==PEER_ENCRYPTION_NONE || encryptionMode==PEER_ENCRYPTION_RC4 );
 
     io->encryptionMode = encryptionMode;
@@ -539,11 +540,11 @@ tr_peerIoReadBytes( tr_peerIo        * io,
     switch( io->encryptionMode )
     {
         case PEER_ENCRYPTION_NONE:
-            io->fromPeer += evbuffer_remove( inbuf, bytes, byteCount );
+            evbuffer_remove( inbuf, bytes, byteCount );
             break;
 
         case PEER_ENCRYPTION_RC4:
-            io->fromPeer += evbuffer_remove( inbuf, bytes, byteCount );
+            evbuffer_remove( inbuf, bytes, byteCount );
             tr_cryptoDecrypt( io->crypto, byteCount, bytes, bytes );
             break;
 
@@ -595,10 +596,3 @@ tr_peerIoGetAge( const tr_peerIo * io )
 {
     return time( NULL ) - io->timeCreated;
 }
-
-int64_t
-tr_peerIoCountBytesFromPeer( const tr_peerIo * io )
-{
-    return io->fromPeer;
-}
-

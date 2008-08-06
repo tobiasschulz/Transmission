@@ -1,14 +1,26 @@
-/*
- * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
- *
- * This file is licensed by the GPL version 2.  Works owned by the
- * Transmission project are granted a special exemption to clause 2(b)
- * so that the bulk of its code can remain under the MIT license. 
- * This exemption does not extend to derived works not owned by
- * the Transmission project.
- *
+/******************************************************************************
  * $Id$
- */
+ *
+ * Copyright (c) 2005-2008 Transmission authors and contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *****************************************************************************/
 
 #include <assert.h>
 #include <stdlib.h>
@@ -30,7 +42,6 @@
 #include "platform.h" /* tr_lock */
 #include "port-forwarding.h"
 #include "ratecontrol.h"
-#include "rpc-server.h"
 #include "stats.h"
 #include "torrent.h"
 #include "tracker.h"
@@ -61,6 +72,7 @@ tr_peerIdNew( void )
     }
 
     val = total % base ? base - (total % base) : 0;
+    total += val;
     buf[19] = pool[val];
     buf[20] = '\0';
 
@@ -81,17 +93,17 @@ tr_getPeerId( void )
 ***/
 
 tr_encryption_mode
-tr_sessionGetEncryption( tr_session * session )
+tr_getEncryptionMode( tr_session * session )
 {
-    assert( session );
+    assert( session != NULL );
 
     return session->encryptionMode;
 }
 
 void
-tr_sessionSetEncryption( tr_session * session, tr_encryption_mode mode )
+tr_setEncryptionMode( tr_session * session, tr_encryption_mode mode )
 {
-    assert( session );
+    assert( session != NULL );
     assert( mode==TR_ENCRYPTION_PREFERRED
          || mode==TR_ENCRYPTION_REQUIRED
          || mode==TR_PLAINTEXT_PREFERRED );
@@ -103,103 +115,24 @@ tr_sessionSetEncryption( tr_session * session, tr_encryption_mode mode )
 ****
 ***/
 
-static void
-loadBlocklists( tr_session * session )
-{
-    int binCount = 0;
-    int newCount = 0;
-    struct stat sb;
-    char dirname[MAX_PATH_LENGTH];
-    DIR * odir = NULL;
-    tr_list * list = NULL;
-    const int isEnabled = session->isBlocklistEnabled;
-
-    /* walk through the directory and find blocklists */
-    tr_buildPath( dirname, sizeof( dirname ), session->configDir, "blocklists", NULL );
-    if( !stat( dirname, &sb ) && S_ISDIR( sb.st_mode ) && (( odir = opendir( dirname ))))
-    {
-        struct dirent *d;
-        for( d=readdir( odir ); d; d=readdir( odir ) )
-        {
-            char filename[MAX_PATH_LENGTH];
-
-            if( !d->d_name || d->d_name[0]=='.' ) /* skip dotfiles, ., and .. */
-                continue;
-
-            tr_buildPath( filename, sizeof(filename), dirname, d->d_name, NULL );
-
-            if( tr_stringEndsWith( filename, ".bin" ) )
-            {
-                /* if we don't already have this blocklist, add it */
-                if( !tr_list_find( list, filename, (TrListCompareFunc)strcmp ) )
-                {
-                    tr_list_append( &list, _tr_blocklistNew( filename, isEnabled ) );
-                    ++binCount;
-                }
-            }
-            else
-            {
-                /* strip out the file suffix, if there is one, and add ".bin" instead */
-                tr_blocklist * b;
-                const char * dot = strrchr( d->d_name, '.' );
-                const int len = dot ? dot - d->d_name : (int)strlen( d->d_name );
-                char tmp[MAX_PATH_LENGTH];
-                tr_snprintf( tmp, sizeof( tmp ),
-                             "%s%c%*.*s.bin", dirname, TR_PATH_DELIMITER, len, len, d->d_name );
-                b = _tr_blocklistNew( tmp, isEnabled );
-                _tr_blocklistSetContent( b, filename );
-                tr_list_append( &list, b );
-                ++newCount;
-            }
-        }
-
-        closedir( odir );
-    }
-
-    session->blocklists = list;
-
-    if( binCount )
-        tr_dbg( "Found %d blocklists in \"%s\"", binCount, dirname );
-    if( newCount )
-        tr_dbg( "Found %d new blocklists in \"%s\"", newCount, dirname );
-}
-
-/***
-****
-***/
-
 static void metainfoLookupRescan( tr_handle * h );
 
 tr_handle *
-tr_sessionInitFull( const char    * configDir,
-                    const char    * tag,
-                    const char    * downloadDir,
-                    int             isPexEnabled,
-                    int             isPortForwardingEnabled,
-                    int             publicPort,
-                    int             encryptionMode,
-                    int             isUploadLimitEnabled,
-                    int             uploadLimit,
-                    int             isDownloadLimitEnabled,
-                    int             downloadLimit,
-                    int             globalPeerLimit,
-                    int             messageLevel,
-                    int             isMessageQueueingEnabled,
-                    int             isBlocklistEnabled,
-                    int             peerSocketTOS,
-                    int             rpcIsEnabled,
-                    int             rpcPort,
-                    const char    * rpcACL,
-                    int             rpcAuthIsEnabled,
-                    const char    * rpcUsername,
-                    const char    * rpcPassword,
-                    int             proxyIsEnabled,
-                    const char    * proxy,
-                    int             proxyPort,
-                    tr_proxy_type   proxyType,
-                    int             proxyAuthIsEnabled,
-                    const char    * proxyUsername,
-                    const char    * proxyPassword )
+tr_initFull( const char * configDir,
+             const char * tag,
+             int          isPexEnabled,
+             int          isPortForwardingEnabled,
+             int          publicPort,
+             int          encryptionMode,
+             int          isUploadLimitEnabled,
+             int          uploadLimit,
+             int          isDownloadLimitEnabled,
+             int          downloadLimit,
+             int          globalPeerLimit,
+             int          messageLevel,
+             int          isMessageQueueingEnabled,
+             int          isBlocklistEnabled,
+             int          peerSocketTOS )
 {
     tr_handle * h;
     char filename[MAX_PATH_LENGTH];
@@ -221,14 +154,6 @@ tr_sessionInitFull( const char    * configDir,
     h->isPexEnabled = isPexEnabled ? 1 : 0;
     h->encryptionMode = encryptionMode;
     h->peerSocketTOS = peerSocketTOS;
-    h->downloadDir = tr_strdup( downloadDir );
-    h->isProxyEnabled = proxyIsEnabled ? 1 : 0;
-    h->proxy = tr_strdup( proxy );
-    h->proxyPort = proxyPort;
-    h->proxyType = proxyType;
-    h->isProxyAuthEnabled = proxyAuthIsEnabled ? 1 : 0;
-    h->proxyUsername = tr_strdup( proxyUsername );
-    h->proxyPassword = tr_strdup( proxyPassword );
 
     tr_setConfigDir( h, configDir );
 
@@ -262,14 +187,12 @@ tr_sessionInitFull( const char    * configDir,
     /* initialize the blocklist */
     tr_buildPath( filename, sizeof( filename ), h->configDir, "blocklists", NULL );
     tr_mkdirp( filename, 0777 );
-    h->isBlocklistEnabled = isBlocklistEnabled;
-    loadBlocklists( h );
+    tr_buildPath( filename, sizeof( filename ), h->configDir, "blocklists", "level1.bin", NULL );
+    h->blocklist = _tr_blocklistNew( filename, isBlocklistEnabled );
 
     tr_statsInit( h );
 
     h->web = tr_webInit( h );
-    h->rpcServer = tr_rpcInit( h, rpcIsEnabled, rpcPort, rpcACL,
-                                  rpcAuthIsEnabled, rpcUsername, rpcPassword );
 
     metainfoLookupRescan( h );
 
@@ -277,60 +200,24 @@ tr_sessionInitFull( const char    * configDir,
 }
 
 tr_handle *
-tr_sessionInit( const char * configDir,
-                const char * downloadDir,
-                const char * tag )
+tr_init( const char * configDir,
+         const char * tag )
 {
-    return tr_sessionInitFull( configDir,
-                               downloadDir,
-                               tag,
-                               TR_DEFAULT_PEX_ENABLED,
-                               TR_DEFAULT_PORT_FORWARDING_ENABLED,
-                               -1, /* public port */
-                               TR_ENCRYPTION_PREFERRED, /* encryption mode */
-                               FALSE, /* use upload speed limit? */ 
-                               -1, /* upload speed limit */
-                               FALSE, /* use download speed limit? */
-                               -1, /* download speed limit */
-                               TR_DEFAULT_GLOBAL_PEER_LIMIT,
-                               TR_MSG_INF, /* message level */
-                               FALSE, /* is message queueing enabled? */
-                               FALSE, /* is the blocklist enabled? */
-                               TR_DEFAULT_PEER_SOCKET_TOS,
-                               TR_DEFAULT_RPC_ENABLED,
-                               TR_DEFAULT_RPC_PORT,
-                               TR_DEFAULT_RPC_ACL,
-                               FALSE,
-                               "fnord",
-                               "potzrebie",
-                               TR_DEFAULT_PROXY_ENABLED,
-                               TR_DEFAULT_PROXY,
-                               TR_DEFAULT_PROXY_PORT,
-                               TR_DEFAULT_PROXY_TYPE,
-                               TR_DEFAULT_PROXY_AUTH_ENABLED,
-                               TR_DEFAULT_PROXY_USERNAME,
-                               TR_DEFAULT_PROXY_PASSWORD );
-
-}
-
-/***
-****
-***/
-
-void
-tr_sessionSetDownloadDir( tr_handle * handle, const char * dir )
-{
-    if( handle->downloadDir != dir )
-    {
-        tr_free( handle->downloadDir );
-        handle->downloadDir = tr_strdup( dir );
-    }
-}
-
-const char *
-tr_sessionGetDownloadDir( const tr_handle * handle )
-{
-    return handle->downloadDir;
+    return tr_initFull( configDir,
+                        tag,
+                        TR_DEFAULT_PEX_ENABLED,
+                        TR_DEFAULT_PORT_FORWARDING_ENABLED,
+                        -1, /* public port */
+                        TR_ENCRYPTION_PREFERRED, /* encryption mode */
+                        FALSE, /* use upload speed limit? */ 
+                        -1, /* upload speed limit */
+                        FALSE, /* use download speed limit? */
+                        -1, /* download speed limit */
+                        TR_DEFAULT_GLOBAL_PEER_LIMIT,
+                        TR_MSG_INF, /* message level */
+                        FALSE, /* is message queueing enabled? */
+                        FALSE, /* is the blocklist enabled? */
+                        TR_DEFAULT_PEER_SOCKET_TOS );
 }
 
 /***
@@ -381,7 +268,7 @@ tr_setBindPortImpl( void * vdata )
 }
 
 void
-tr_sessionSetPeerPort( tr_handle * handle, int port )
+tr_setBindPort( tr_handle * handle, int port )
 {
     struct bind_port_data * data = tr_new( struct bind_port_data, 1 );
     data->handle = handle;
@@ -390,16 +277,35 @@ tr_sessionSetPeerPort( tr_handle * handle, int port )
 }
 
 int
-tr_sessionGetPeerPort( const tr_handle * h )
+tr_getPublicPort( const tr_handle * h )
 {
-    assert( h );
-    return tr_sharedGetPeerPort( h->shared );
+    assert( h != NULL );
+    return tr_sharedGetPublicPort( h->shared );
 }
 
-tr_port_forwarding
-tr_sessionGetPortForwarding( const tr_handle * h )
+void tr_natTraversalEnable( tr_handle * h, int enable )
 {
-    return tr_sharedTraversalStatus( h->shared );
+    tr_globalLock( h );
+    tr_sharedTraversalEnable( h->shared, enable );
+    tr_globalUnlock( h );
+}
+
+const tr_handle_status *
+tr_handleStatus( tr_handle * h )
+{
+    tr_handle_status * s;
+
+    h->statCur = ( h->statCur + 1 ) % 2;
+    s = &h->stats[h->statCur];
+
+    tr_globalLock( h );
+
+    s->natTraversalStatus = tr_sharedTraversalStatus( h->shared );
+    s->publicPort = tr_sharedGetPublicPort( h->shared );
+
+    tr_globalUnlock( h );
+
+    return s;
 }
 
 /***
@@ -407,9 +313,9 @@ tr_sessionGetPortForwarding( const tr_handle * h )
 ***/
 
 void
-tr_sessionSetSpeedLimitEnabled( tr_handle  * h,
-                                int          up_or_down,
-                                int          use_flag )
+tr_setUseGlobalSpeedLimit( tr_handle  * h,
+                           int          up_or_down,
+                           int          use_flag )
 {
     if( up_or_down == TR_UP )
         h->useUploadLimit = use_flag ? 1 : 0;
@@ -417,16 +323,10 @@ tr_sessionSetSpeedLimitEnabled( tr_handle  * h,
         h->useDownloadLimit = use_flag ? 1 : 0;
 }
 
-int
-tr_sessionIsSpeedLimitEnabled( const tr_handle * h, int up_or_down )
-{
-       return up_or_down==TR_UP ? h->useUploadLimit : h->useDownloadLimit;
-}
-
 void
-tr_sessionSetSpeedLimit( tr_handle  * h,
-                         int          up_or_down,
-                         int          KiB_sec )
+tr_setGlobalSpeedLimit( tr_handle  * h,
+                        int          up_or_down,
+                        int          KiB_sec )
 {
     if( up_or_down == TR_DOWN )
         tr_rcSetLimit( h->download, KiB_sec );
@@ -434,95 +334,77 @@ tr_sessionSetSpeedLimit( tr_handle  * h,
         tr_rcSetLimit( h->upload, KiB_sec );
 }
 
-int
-tr_sessionGetSpeedLimit( const tr_handle * h, int up_or_down )
+void
+tr_getGlobalSpeedLimit( tr_handle  * h,
+                        int          up_or_down,
+                        int        * setme_enabled,
+                        int          * setme_KiBsec )
 {
-    return tr_rcGetLimit( up_or_down==TR_UP ? h->upload : h->download );
+    if( setme_enabled != NULL )
+       *setme_enabled = up_or_down==TR_UP ? h->useUploadLimit
+                                          : h->useDownloadLimit;
+    if( setme_KiBsec != NULL )
+       *setme_KiBsec = tr_rcGetLimit( up_or_down==TR_UP ? h->upload
+                                                        : h->download );
 }
 
-/***
-****
-***/
 
 void
-tr_sessionSetPeerLimit( tr_handle * handle UNUSED,
-                        uint16_t    maxGlobalPeers )
+tr_setGlobalPeerLimit( tr_handle * handle UNUSED,
+                       uint16_t    maxGlobalPeers )
 {
     tr_fdSetPeerLimit( maxGlobalPeers );
 }
 
 uint16_t
-tr_sessionGetPeerLimit( const tr_handle * handle UNUSED )
+tr_getGlobalPeerLimit( const tr_handle * handle UNUSED )
 {
     return tr_fdGetPeerLimit( );
 }
 
-/***
-****
-***/
-
 void
-tr_sessionGetSpeed( const tr_handle  * session,
-                    float            * toClient,
-                    float            * toPeer )
+tr_torrentRates( tr_handle * h, float * toClient, float * toPeer )
 {
-    if( session && toClient )
-        *toClient = tr_rcRate( session->download );
-    if( session && toPeer )
-        *toPeer = tr_rcRate( session->upload );
+    if( h )
+    {
+        tr_globalLock( h );
+
+        if( toClient )
+            *toClient = tr_rcRate( h->download );
+        if( toPeer )
+            *toPeer = tr_rcRate( h->upload );
+
+        tr_globalUnlock( h );
+    }
 }
 
 int
-tr_sessionCountTorrents( const tr_handle * h )
+tr_torrentCount( const tr_handle * h )
 {
     return h->torrentCount;
 }
 
-/* close the biggest torrents first */
-static int
-compareTorrentByCur( const void * va, const void * vb )
-{
-    const tr_torrent * a = *(const tr_torrent**)va;
-    const tr_torrent * b = *(const tr_torrent**)vb;
-    return -tr_compareUint64( a->downloadedCur + a->uploadedCur,
-                              b->downloadedCur + b->uploadedCur );
-}
-
 static void
-tr_closeAllConnections( void * vsession )
+tr_closeAllConnections( void * vh )
 {
-    tr_handle * session = vsession;
-    tr_torrent * tor;
-    int i, n;
-    tr_torrent ** torrents;
+    tr_handle * h = vh;
+    tr_torrent * t;
 
-    tr_statsClose( session );
-    tr_sharedShuttingDown( session->shared );
-    tr_rpcClose( &session->rpcServer );
+    tr_sharedShuttingDown( h->shared );
+    tr_trackerShuttingDown( h );
 
-    /* close the torrents.  get the most active ones first so that
-     * if we can't get them all closed in a reasonable amount of time,
-     * at least we get the most important ones first. */
-    tor = NULL;
-    n = session->torrentCount;
-    torrents = tr_new( tr_torrent*, session->torrentCount );
-    for( i=0; i<n; ++i )
-        torrents[i] = tor = tr_torrentNext( session, tor );
-    qsort( torrents, n, sizeof(tr_torrent*), compareTorrentByCur );
-    for( i=0; i<n; ++i )
-        tr_torrentFree( torrents[i] );
-    tr_free( torrents );
+    for( t=h->torrentList; t!=NULL; ) {
+        tr_torrent * tmp = t;
+        t = t->next;
+        tr_torrentClose( tmp );
+    }
 
-    tr_peerMgrFree( session->peerMgr );
+    tr_peerMgrFree( h->peerMgr );
 
-    tr_rcClose( session->upload );
-    tr_rcClose( session->download );
-
-    tr_trackerSessionClose( session );
-    tr_list_free( &session->blocklists, (TrListForeachFunc)_tr_blocklistFree );
-    tr_webClose( &session->web );
+    tr_rcClose( h->upload );
+    tr_rcClose( h->download );
     
-    session->isClosed = TRUE;
+    h->isClosed = TRUE;
 }
 
 static int
@@ -533,62 +415,44 @@ deadlineReached( const uint64_t deadline )
 
 #define SHUTDOWN_MAX_SECONDS 30
 
-#define dbgmsg(fmt...) tr_deepLog( __FILE__, __LINE__, NULL, ##fmt )
-
 void
-tr_sessionClose( tr_handle * session )
+tr_close( tr_handle * h )
 {
     int i;
     const int maxwait_msec = SHUTDOWN_MAX_SECONDS * 1000;
     const uint64_t deadline = tr_date( ) + maxwait_msec;
 
-    dbgmsg( "shutting down transmission session %p", session );
+    tr_deepLog( __FILE__, __LINE__, NULL, "shutting down transmission session %p", h );
+    tr_statsClose( h );
 
-    /* close the session */
-    tr_runInEventThread( session, tr_closeAllConnections, session );
-    while( !session->isClosed && !deadlineReached( deadline ) ) {
-        dbgmsg( "waiting for the shutdown commands to run in the main thread" );
+    tr_runInEventThread( h, tr_closeAllConnections, h );
+    while( !h->isClosed && !deadlineReached( deadline ) )
         tr_wait( 100 );
-    }
 
-    /* "shared" and "tracker" have live sockets,
-     * so we need to keep the transmission thread alive
-     * for a bit while they tell the router & tracker
-     * that we're closing now */
-    while( ( session->shared || session->tracker ) && !deadlineReached( deadline ) ) {
-        dbgmsg( "waiting on port unmap (%p) or tracker (%p)",
-                session->shared, session->tracker );
+    _tr_blocklistFree( h->blocklist );
+    h->blocklist = NULL;
+    tr_webClose( &h->web );
+
+    tr_eventClose( h );
+    while( h->events && !deadlineReached( deadline ) )
         tr_wait( 100 );
-    }
+
     tr_fdClose( );
-
-    /* close the libtransmission thread */
-    tr_eventClose( session );
-    while( session->events && !deadlineReached( deadline ) ) {
-        dbgmsg( "waiting for the libevent thread to shutdown cleanly" );
-        tr_wait( 100 );
-    }
-
-    /* free the session memory */
-    tr_lockFree( session->lock );
-    for( i=0; i<session->metainfoLookupCount; ++i )
-        tr_free( session->metainfoLookup[i].filename );
-    tr_free( session->metainfoLookup );
-    tr_free( session->tag );
-    tr_free( session->configDir );
-    tr_free( session->resumeDir );
-    tr_free( session->torrentDir );
-    tr_free( session->downloadDir );
-    tr_free( session->proxy );
-    tr_free( session->proxyUsername );
-    tr_free( session->proxyPassword );
-    tr_free( session );
+    tr_lockFree( h->lock );
+    for( i=0; i<h->metainfoLookupCount; ++i )
+        tr_free( h->metainfoLookup[i].filename );
+    tr_free( h->metainfoLookup );
+    tr_free( h->tag );
+    tr_free( h->configDir );
+    tr_free( h->resumeDir );
+    tr_free( h->torrentDir );
+    free( h );
 }
 
 tr_torrent **
-tr_sessionLoadTorrents ( tr_handle   * h,
-                         tr_ctor     * ctor,
-                         int         * setmeCount )
+tr_loadTorrents ( tr_handle   * h,
+                  tr_ctor     * ctor,
+                  int         * setmeCount )
 {
     int i, n = 0;
     struct stat sb;
@@ -611,12 +475,11 @@ tr_sessionLoadTorrents ( tr_handle   * h,
                 tr_torrent * tor;
                 char filename[MAX_PATH_LENGTH];
                 tr_buildPath( filename, sizeof(filename), dirname, d->d_name, NULL );
-
                 tr_ctorSetMetainfoFromFile( ctor, filename );
                 tor = tr_torrentNew( h, ctor, NULL );
                 if( tor ) {
                     tr_list_append( &list, tor );
-                    ++n;
+                    n++;
                 }
             }
         }
@@ -633,8 +496,7 @@ tr_sessionLoadTorrents ( tr_handle   * h,
     if( n )
         tr_inf( _( "Loaded %d torrents" ), n );
 
-    if( setmeCount )
-        *setmeCount = n;
+    *setmeCount = n;
     return torrents;
 }
 
@@ -643,13 +505,13 @@ tr_sessionLoadTorrents ( tr_handle   * h,
 ***/
 
 void
-tr_sessionSetPexEnabled( tr_handle * handle, int isPexEnabled )
+tr_setPexEnabled( tr_handle * handle, int isPexEnabled )
 {
     handle->isPexEnabled = isPexEnabled ? 1 : 0;
 }
 
 int
-tr_sessionIsPexEnabled( const tr_handle * handle )
+tr_isPexEnabled( const tr_handle * handle )
 {
     return handle->isPexEnabled;
 }
@@ -658,85 +520,40 @@ tr_sessionIsPexEnabled( const tr_handle * handle )
 ****
 ***/
 
-void
-tr_sessionSetPortForwardingEnabled( tr_handle * h, int enable )
+int
+tr_blocklistGetRuleCount( tr_handle * handle )
 {
-    tr_globalLock( h );
-    tr_sharedTraversalEnable( h->shared, enable );
-    tr_globalUnlock( h );
+    return _tr_blocklistGetRuleCount( handle->blocklist );
 }
 
 int
-tr_sessionIsPortForwardingEnabled( const tr_handle * h )
+tr_blocklistIsEnabled( const tr_handle * handle )
 {
-    return tr_sharedTraversalIsEnabled( h->shared );
-}
-
-/***
-****
-***/
-
-int
-tr_blocklistGetRuleCount( const tr_session * session )
-{
-    int n = 0;
-    tr_list * l;
-    for( l=session->blocklists; l; l=l->next )
-        n += _tr_blocklistGetRuleCount( l->data );
-    return n;
-}
-
-int
-tr_blocklistIsEnabled( const tr_session * session )
-{
-    return session->isBlocklistEnabled;
+    return _tr_blocklistIsEnabled( handle->blocklist );
 }
 
 void
-tr_blocklistSetEnabled( tr_session * session, int isEnabled )
+tr_blocklistSetEnabled( tr_handle * handle, int isEnabled )
 {
-    tr_list * l;
-    session->isBlocklistEnabled = isEnabled ? 1 : 0;
-    for( l=session->blocklists; l; l=l->next )
-        _tr_blocklistSetEnabled( l->data, isEnabled );
+    _tr_blocklistSetEnabled( handle->blocklist, isEnabled );
 }
 
 int
-tr_blocklistExists( const tr_session * session )
+tr_blocklistExists( const tr_handle * handle )
 {
-    return session->blocklists != NULL;
+    return _tr_blocklistExists( handle->blocklist );
 }
 
 int
-tr_blocklistSetContent( tr_session  * session, const char * contentFilename )
+tr_blocklistSetContent( tr_handle  * handle, const char * filename )
 {
-    tr_list * l;
-    tr_blocklist * b;
-    const char * defaultName = "level1.bin";
-
-    for( b=NULL, l=session->blocklists; !b && l; l=l->next )
-        if( tr_stringEndsWith( _tr_blocklistGetFilename( l->data ), defaultName ) )
-            b = l->data;
-
-    if( !b ) {
-        char filename[MAX_PATH_LENGTH];
-        tr_buildPath( filename, sizeof( filename ), session->configDir, "blocklists", defaultName, NULL );
-        b = _tr_blocklistNew( filename, session->isBlocklistEnabled );
-        tr_list_append( &session->blocklists, b );
-    }
-
-    return _tr_blocklistSetContent( b, contentFilename );
+    return _tr_blocklistSetContent( handle->blocklist, filename );
 }
 
 int
-tr_sessionIsAddressBlocked( const tr_session      * session,
-                            const struct in_addr  * addr )
+tr_blocklistHasAddress( tr_handle * handle, const struct in_addr * addr )
 {
-    tr_list * l;
-    for( l=session->blocklists; l; l=l->next )
-        if( _tr_blocklistHasAddress( l->data, addr ) )
-            return TRUE;
-    return FALSE;
+    return _tr_blocklistHasAddress( handle->blocklist, addr );
 }
 
 /***
@@ -844,7 +661,7 @@ tr_sessionSetTorrentFile( tr_handle    * h,
                                              h->metainfoLookupCount,
                                              sizeof( struct tr_metainfo_lookup ),
                                              compareHashStringToLookupEntry );
-    if( l )
+    if( l != NULL )
     {
         if( l->filename != filename )
         {
@@ -863,180 +680,5 @@ tr_sessionSetTorrentFile( tr_handle    * h,
         memcpy( node->hashString, hashString, 2*SHA_DIGEST_LENGTH+1 );
         node->filename = tr_strdup( filename );
         metainfoLookupResort( h );
-    }
-}
-
-tr_torrent*
-tr_torrentNext( tr_handle * session, tr_torrent * tor )
-{
-    return tor ? tor->next : session->torrentList;
-}
-
-/***
-****
-***/
-
-void
-tr_sessionSetRPCEnabled( tr_session * session, int isEnabled )
-{
-    tr_rpcSetEnabled( session->rpcServer, isEnabled );
-}
-int
-tr_sessionIsRPCEnabled( const tr_session * session )
-{
-    return tr_rpcIsEnabled( session->rpcServer );
-}
-void
-tr_sessionSetRPCPort( tr_session * session, int port )
-{
-    tr_rpcSetPort( session->rpcServer, port );
-}
-int
-tr_sessionGetRPCPort( const tr_session * session )
-{
-    return tr_rpcGetPort( session->rpcServer );
-}
-void
-tr_sessionSetRPCCallback( tr_session    * session,
-                          tr_rpc_func    func,
-                          void         * user_data )
-{
-    session->rpc_func = func;
-    session->rpc_func_user_data = user_data;
-}
-int
-tr_sessionTestRPCACL( const tr_session  * session,
-                      const char       * acl,
-                      char            ** allocme_errmsg )
-{
-    return tr_rpcTestACL( session->rpcServer, acl, allocme_errmsg );
-}
-int
-tr_sessionSetRPCACL( tr_session    * session,
-                     const char   * acl,
-                     char        ** allocme_errmsg )
-{
-    return tr_rpcSetACL( session->rpcServer, acl, allocme_errmsg );
-}
-char*
-tr_sessionGetRPCACL( const tr_session * session )
-{
-    return tr_rpcGetACL( session->rpcServer );
-}
-void
-tr_sessionSetRPCPassword( tr_session * session, const char * password )
-{
-    tr_rpcSetPassword( session->rpcServer, password );
-}
-char*
-tr_sessionGetRPCPassword( const tr_session * session )
-{
-    return tr_rpcGetPassword( session->rpcServer );
-}
-void
-tr_sessionSetRPCUsername( tr_session * session, const char * username )
-{
-    tr_rpcSetUsername( session->rpcServer, username );
-}
-char*
-tr_sessionGetRPCUsername( const tr_session * session )
-{
-    return tr_rpcGetUsername( session->rpcServer );
-}
-void
-tr_sessionSetRPCPasswordEnabled( tr_session * session, int isEnabled )
-{
-    tr_rpcSetPasswordEnabled( session->rpcServer, isEnabled );
-}
-int
-tr_sessionIsRPCPasswordEnabled( const tr_session * session )
-{
-    return tr_rpcIsPasswordEnabled( session->rpcServer );
-}
-
-/***
-****
-***/
-
-int
-tr_sessionIsProxyEnabled( const tr_session * session )
-{
-    return session->isProxyEnabled;
-}
-void
-tr_sessionSetProxyEnabled( tr_session * session, int isEnabled )
-{
-    session->isProxyEnabled = isEnabled ? 1 : 0;
-}
-tr_proxy_type
-tr_sessionGetProxyType( const tr_session * session )
-{
-    return session->proxyType;
-}
-void
-tr_sessionSetProxyType( tr_session * session, tr_proxy_type type )
-{
-    session->proxyType = type;
-}
-const char*
-tr_sessionGetProxy( const tr_session * session )
-{
-    return session->proxy;
-}
-int
-tr_sessionGetProxyPort( const tr_session * session )
-{
-    return session->proxyPort;
-}
-void
-tr_sessionSetProxy( tr_session * session, const char * proxy )
-{
-    if( proxy != session->proxy )
-    {
-        tr_free( session->proxy );
-        session->proxy = tr_strdup( proxy );
-    }
-}
-void
-tr_sessionSetProxyPort( tr_session * session, int port )
-{
-    session->proxyPort = port;
-}
-int
-tr_sessionIsProxyAuthEnabled( const tr_session * session )
-{
-    return session->isProxyAuthEnabled;
-}
-void
-tr_sessionSetProxyAuthEnabled( tr_session * session, int isEnabled )
-{
-    session->isProxyAuthEnabled = isEnabled ? 1 : 0;
-}
-const char*
-tr_sessionGetProxyUsername( const tr_session * session )
-{
-    return session->proxyUsername;
-}
-void
-tr_sessionSetProxyUsername( tr_session * session, const char * username )
-{
-    if( username != session->proxyUsername )
-    {
-        tr_free( session->proxyUsername );
-        session->proxyUsername = tr_strdup( username );
-    }
-}
-const char*
-tr_sessionGetProxyPassword( const tr_session * session )
-{
-    return session->proxyPassword;
-}
-void
-tr_sessionSetProxyPassword( tr_session * session, const char * password )
-{
-    if( password != session->proxyPassword )
-    {
-        tr_free( session->proxyPassword );
-        session->proxyPassword = tr_strdup( password );
     }
 }

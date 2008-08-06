@@ -33,6 +33,7 @@
 #import "StatusBarView.h"
 #import "FilterButton.h"
 #import "MenuLabel.h"
+#import "IPCController.h"
 
 #import <Growl/Growl.h>
 
@@ -40,8 +41,7 @@
 
 typedef enum
 {
-    ADD_MANUAL,
-    ADD_AUTO,
+    ADD_NORMAL,
     ADD_SHOW_OPTIONS,
     ADD_URL,
     ADD_CREATED
@@ -56,20 +56,20 @@ typedef enum
     PrefsController                 * fPrefsController;
     InfoWindowController            * fInfoController;
     MessageWindowController         * fMessageController;
+    IPCController                   * fIPCController;
     
     NSUserDefaults                  * fDefaults;
     
     IBOutlet NSWindow               * fWindow;
     DragOverlayWindow               * fOverlayWindow;
     IBOutlet TorrentTableView       * fTableView;
-
-    io_connect_t                    fRootPort;
-    NSTimer                         * fTimer;
     
     IBOutlet NSMenuItem             * fOpenIgnoreDownloadFolder;
     
+    IBOutlet StatusBarView          * fBottomTigerBar;
     IBOutlet NSBox                  * fBottomTigerLine;
     IBOutlet NSButton               * fActionButton, * fSpeedLimitButton;
+    NSTimer                         * fSpeedLimitTimer;
     IBOutlet NSTextField            * fTotalTorrentsField;
     
     IBOutlet StatusBarView          * fStatusBar;
@@ -100,6 +100,9 @@ typedef enum
     IBOutlet NSWindow               * fURLSheetWindow;
     IBOutlet NSTextField            * fURLSheetTextField;
     IBOutlet NSButton               * fURLSheetOpenButton;
+
+    io_connect_t                    fRootPort;
+    NSTimer                         * fTimer;
     
     IBOutlet SUUpdater              * fUpdater;
     BOOL                            fUpdateInProgress;
@@ -107,14 +110,15 @@ typedef enum
     Badger                          * fBadger;
     IBOutlet NSMenu                 * fDockMenu;
     
-    NSTimer                         * fSpeedLimitTimer;
-    
     NSMutableArray                  * fAutoImportedNames;
     NSTimer                         * fAutoImportTimer;
     
     NSMutableDictionary             * fPendingTorrentDownloads;
+    NSMutableArray                  * fTempTorrentFiles;
     
     BOOL                            fSoundPlaying;
+    
+    BOOL                            fRemoteQuit;
 }
 
 - (void) openFiles:             (NSArray *) filenames addType: (addType) type forcePath: (NSString *) path;
@@ -123,7 +127,6 @@ typedef enum
 - (void) openFilesWithDict:     (NSDictionary *) dictionary;
 - (void) openShowSheet:         (id) sender;
 
-- (void) invalidOpenAlert: (NSString *) filename;
 - (void) duplicateOpenAlert: (NSString *) name;
 
 - (void) openURL:               (NSURL *) torrentURL;
@@ -151,8 +154,8 @@ typedef enum
         deleteData: (BOOL) deleteData deleteTorrent: (BOOL) deleteData;
 - (void) removeSheetDidEnd: (NSWindow *) sheet returnCode: (int) returnCode
                         contextInfo: (NSDictionary *) dict;
-- (void) confirmRemoveTorrents: (NSArray *) torrents deleteData: (BOOL) deleteData deleteTorrent: (BOOL) deleteTorrent
-        fromRPC: (BOOL) rpc;
+- (void) confirmRemoveTorrents: (NSArray *) torrents
+        deleteData: (BOOL) deleteData deleteTorrent: (BOOL) deleteTorrent;
 - (void) removeNoDelete:                (id) sender;
 - (void) removeDeleteData:              (id) sender;
 - (void) removeDeleteTorrent:           (id) sender;
@@ -177,7 +180,6 @@ typedef enum
 - (void) showAboutWindow: (id) sender;
 
 - (void) showInfo: (id) sender;
-- (void) resetInfo;
 - (void) setInfoTab: (id) sender;
 
 - (void) showMessageWindow: (id) sender;
@@ -219,8 +221,7 @@ typedef enum
 
 - (void) toggleSpeedLimit: (id) sender;
 - (void) autoSpeedLimitChange: (NSNotification *) notification;
-- (void) autoSpeedLimit: (NSTimer *) timer;
-- (void) setAutoSpeedLimitTimer: (BOOL) nextIsLimit;
+- (void) autoSpeedLimit;
 
 - (void) setLimitGlobalEnabled: (id) sender;
 - (void) setQuickLimitGlobal: (id) sender;
@@ -233,14 +234,13 @@ typedef enum
 
 - (void) beginCreateFile: (NSNotification *) notification;
 
-- (void) sleepCallback: (natural_t) messageType argument: (void *) messageArgument;
+- (void) sleepCallBack: (natural_t) messageType argument: (void *) messageArgument;
 
 - (void) torrentTableViewSelectionDidChange: (NSNotification *) notification;
 
 - (void) toggleSmallView: (id) sender;
 - (void) togglePiecesBar: (id) sender;
 - (void) toggleAvailabilityBar: (id) sender;
-- (void) toggleStatusString: (id) sender;
 
 - (void) toggleStatusBar: (id) sender;
 - (void) showStatusBar: (BOOL) show animate: (BOOL) animate;
@@ -258,22 +258,10 @@ typedef enum
 
 - (void) showMainWindow: (id) sender;
 
-- (NSArray *) quickLookURLs;
-- (BOOL) canQuickLook;
-- (BOOL) canQuickLookTorrent: (Torrent *) torrent;
-- (NSRect) quickLookFrameWithURL: (NSURL*) url;
-- (void) toggleQuickLook: (id) sender;
-
 - (void) linkHomepage: (id) sender;
 - (void) linkForums: (id) sender;
 - (void) linkDonate: (id) sender;
 
 - (void) prepareForUpdate:  (NSNotification *) notification;
-
-- (void) rpcCallback: (tr_rpc_callback_type) type forTorrentStruct: (struct tr_torrent *) torrentStruct;
-- (void) rpcAddTorrentStruct: (NSValue *) torrentStructPtr;
-- (void) rpcRemoveTorrent: (Torrent *) torrent;
-- (void) rpcStartedStoppedTorrent: (Torrent *) torrent;
-- (void) rpcChangedTorrent: (Torrent *) torrent;
 
 @end

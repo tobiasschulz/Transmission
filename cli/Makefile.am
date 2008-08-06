@@ -5,14 +5,13 @@ bin_PROGRAMS = transmissioncli
 
 dist_man_MANS = transmissioncli.1
 
-transmissioncli_SOURCES = cli.c
+transmissioncli_SOURCES = transmissioncli.c
 
 transmissioncli_LDADD = \
   $(top_builddir)/libtransmission/libtransmission.a \
   $(top_builddir)/third-party/libevent/libevent_core.la \
   $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
   $(top_builddir)/third-party/miniupnp/libminiupnp.a \
-  $(top_builddir)/third-party/shttpd/libshttpd.a \
   $(INTLLIBS) \
   $(OPENSSL_LIBS) \
   $(LIBCURL_LIBS) \

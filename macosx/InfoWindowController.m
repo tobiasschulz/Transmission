@@ -24,10 +24,6 @@
 
 #import "InfoWindowController.h"
 #import "InfoTabButtonCell.h"
-#import "FileOutlineView.h"
-#import "FileListNode.h"
-#import "TrackerTableView.h"
-#import "QuickLookController.h"
 #import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 
@@ -49,9 +45,6 @@
 
 #define INVALID -99
 
-#define TRACKER_ADD_TAG 0
-#define TRACKER_REMOVE_TAG 1
-
 typedef enum
 {
     TAB_INFO_TAG = 0,
@@ -71,13 +64,7 @@ typedef enum
 - (void) updateInfoFiles;
 
 - (NSView *) tabViewForTag: (int) tag;
-- (void) setWebSeedTableHidden: (BOOL) hide animate: (BOOL) animate;
 - (NSArray *) peerSortDescriptors;
-
-- (BOOL) canQuickLookFile: (FileListNode *) item;
-
-- (void) addTrackers;
-- (void) removeTrackers;
 
 @end
 
@@ -156,11 +143,6 @@ typedef enum
         [fPeerTable setSortDescriptors: [NSArray arrayWithObject: [[fPeerTable tableColumnWithIdentifier: @"IP"]
                                             sortDescriptorPrototype]]];
     
-    //initially sort webseed table by address
-    if ([[fWebSeedTable sortDescriptors] count] == 0)
-        [fWebSeedTable setSortDescriptors: [NSArray arrayWithObject: [[fWebSeedTable tableColumnWithIdentifier: @"Address"]
-                                            sortDescriptorPrototype]]];
-    
     //set table header tool tips
     if ([NSApp isOnLeopardOrBetter])
     {
@@ -171,24 +153,8 @@ typedef enum
         [[fPeerTable tableColumnWithIdentifier: @"UL To"] setHeaderToolTip: NSLocalizedString(@"Uploading To Peer",
                                                                             "inspector -> peer table -> header tool tip")];
         [[fPeerTable tableColumnWithIdentifier: @"DL From"] setHeaderToolTip: NSLocalizedString(@"Downloading From Peer",
-                                                                            "inspector -> peer table -> header tool tip")];
-        
-        [[fWebSeedTable tableColumnWithIdentifier: @"DL From"] setHeaderToolTip: NSLocalizedString(@"Downloading From Web Seed",
-                                                                            "inspector -> web seed table -> header tool tip")];
+                                                                            "inspector -> peer table -> header tool tip")];                                                             
     }
-    else
-    {
-        [fTrackerAddRemoveControl sizeToFit];
-        [fTrackerAddRemoveControl setLabel: @"+" forSegment: TRACKER_ADD_TAG];
-        [fTrackerAddRemoveControl setLabel: @"-" forSegment: TRACKER_REMOVE_TAG];
-    }
-    
-    //prepare for animating peer table and web seed table
-    NSRect webSeedTableFrame = [[fWebSeedTable enclosingScrollView] frame];
-    fWebSeedTableHeight = webSeedTableFrame.size.height;
-    fSpaceBetweenWebSeedAndPeer = webSeedTableFrame.origin.y - NSMaxY([[fPeerTable enclosingScrollView] frame]);
-    
-    [self setWebSeedTableHidden: YES animate: NO];
     
     //set blank inspector
     [self setInfoForTorrents: [NSArray array]];
@@ -222,10 +188,7 @@ typedef enum
     
     [fTorrents release];
     [fPeers release];
-    [fWebSeeds release];
     [fTrackers release];
-    
-    [fWebSeedTableAnimation release];
     
     [super dealloc];
 }
@@ -263,7 +226,7 @@ typedef enum
                 [NSString stringWithFormat: NSLocalizedString(@"%d files", "Inspector -> selected torrents"), fileCount],
                 [NSString stringWithFormat: NSLocalizedString(@"%@ total", "Inspector -> selected torrents"),
                 [NSString stringForFileSize: size]]]];
-            [fBasicInfoField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%llu bytes", "Inspector -> selected torrents"),
+            [fBasicInfoField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%u bytes", "Inspector -> selected torrents"),
                                             size]];
         }
         else
@@ -300,7 +263,6 @@ typedef enum
             
             [fPeersConnectField setEnabled: NO];
             [fPeersConnectField setStringValue: @""];
-            [fPeersConnectLabel setEnabled: NO];
         }
         
         [fFileController setTorrent: nil];
@@ -377,21 +339,12 @@ typedef enum
         
         [fPeers release];
         fPeers = nil;
-        [fPeerTable reloadData];
-        
-        [fWebSeeds release];
-        fWebSeeds = nil;
-        [fWebSeedTable reloadData];
-        [self setWebSeedTableHidden: YES animate: YES];
         
         [fTrackers release];
         fTrackers = nil;
-        
-        [fTrackerAddRemoveControl setEnabled: NO forSegment: TRACKER_ADD_TAG];
-        [fTrackerAddRemoveControl setEnabled: NO forSegment: TRACKER_REMOVE_TAG];
     }
     else
-    {
+    {    
         Torrent * torrent = [fTorrents objectAtIndex: 0];
         
         [fFileController setTorrent: torrent];
@@ -406,7 +359,7 @@ typedef enum
         [fNameField setToolTip: name];
         
         NSString * basicString = [NSString stringForFileSize: [torrent size]];
-        if ([torrent isFolder])
+        if ([torrent folder])
         {
             NSString * fileString;
             int fileCount = [torrent fileCount];
@@ -417,7 +370,7 @@ typedef enum
             basicString = [NSString stringWithFormat: @"%@, %@", fileString, basicString];
         }
         [fBasicInfoField setStringValue: basicString];
-        [fBasicInfoField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%llu bytes", "Inspector -> selected torrents"),
+        [fBasicInfoField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%u bytes", "Inspector -> selected torrents"),
                                         [torrent size]]];
         
         NSString * hashString = [torrent hashString];
@@ -436,17 +389,15 @@ typedef enum
         [fCreatorField setStringValue: creatorString];
         [fDateCreatedField setObjectValue: [torrent dateCreated]];
         
-        if ([torrent publicTorrent])
-        {
-            NSString * location = [torrent publicTorrentLocation];
-            [fTorrentLocationField setStringValue: [location stringByAbbreviatingWithTildeInPath]];
-            [fTorrentLocationField setToolTip: [location stringByAppendingFormat: @"\n\n%@", [torrent torrentLocation]]];
-        }
+        BOOL publicTorrent = [torrent publicTorrent];
+        [fTorrentLocationField setStringValue: publicTorrent
+                    ? [[torrent publicTorrentLocation] stringByAbbreviatingWithTildeInPath]
+                    : NSLocalizedString(@"Transmission Support Folder", "Torrent -> location when deleting original")];
+        if (publicTorrent)
+            [fTorrentLocationField setToolTip: [[torrent publicTorrentLocation] stringByAppendingFormat: @"\n\n%@",
+                                                [torrent torrentLocation]]];
         else
-        {
-            [fTorrentLocationField setStringValue: NSLocalizedString(@"Transmission Support Folder", "Inspector -> torrent location")];
             [fTorrentLocationField setToolTip: [torrent torrentLocation]];
-        }
         
         [fDateAddedField setObjectValue: [torrent dateAdded]];
         
@@ -470,32 +421,17 @@ typedef enum
         [fPiecesControl setEnabled: YES];
         [fPiecesView setTorrent: torrent];
         
-        //get webseeds for table - if no webseeds for this torrent, clear the table
-        BOOL hasWebSeeds = [torrent webSeedCount] > 0;
-        [self setWebSeedTableHidden: !hasWebSeeds animate: YES];
-        if (!hasWebSeeds)
-        {
-            [fWebSeeds release];
-            fWebSeeds = nil;
-            [fWebSeedTable reloadData];
-        }
-        
         //get trackers for table
         [fTrackers release];
         fTrackers = [[torrent allTrackers: YES] retain];
-        [fTrackerTable deselectAll: self];
-        
-        [fTrackerAddRemoveControl setEnabled: YES forSegment: TRACKER_ADD_TAG];
-        [fTrackerAddRemoveControl setEnabled: NO forSegment: TRACKER_REMOVE_TAG];
     }
     
     //update stats and settings
     [self updateInfoStats];
     [self updateOptions];
     
-    //reload tables that won't change every update
-    [fTrackerTable setTrackers: fTrackers];
     [fTrackerTable reloadData];
+    [fPeerTable reloadData];
 }
 
 - (void) updateInfoStats
@@ -641,7 +577,6 @@ typedef enum
     
     //set peer view
     [fPeersConnectField setEnabled: YES];
-    [fPeersConnectLabel setEnabled: YES];
     if (maxPeers != INVALID)
         [fPeersConnectField setIntValue: maxPeers];
     else
@@ -653,28 +588,6 @@ typedef enum
     NSRect windowRect = [window frame];
     windowRect.size.width = [window minSize].width;
     return windowRect;
-}
-
-- (void) animationDidEnd: (NSAnimation *) animation
-{
-    if (animation == fWebSeedTableAnimation)
-    {
-        [fWebSeedTableAnimation release];
-        fWebSeedTableAnimation = nil;
-    }
-}
-
-- (NSSize) windowWillResize: (NSWindow *) window toSize: (NSSize) proposedFrameSize
-{
-    //this is an edge-case - just stop the animation (stopAnimation jumps to end frame)
-    if (fWebSeedTableAnimation)
-    {
-        [fWebSeedTableAnimation stopAnimation];
-        [fWebSeedTableAnimation release];
-        fWebSeedTableAnimation = nil;
-    }
-    
-    return proposedFrameSize;
 }
 
 - (void) setTab: (id) sender
@@ -696,30 +609,16 @@ typedef enum
         
         switch (oldTabTag)
         {
-            case TAB_ACTIVITY_TAG:
-                [fPiecesView clearView];
-                break;
-            
             case TAB_TRACKER_TAG:
                 oldResizeSaveKey = @"InspectorContentHeightTracker";
                 break;
-            
             case TAB_PEERS_TAG:
-                //if in the middle of animating, just stop and resize immediately
-                if (fWebSeedTableAnimation)
-                    [self setWebSeedTableHidden: !fWebSeeds animate: NO];
-                
                 [fPeers release];
                 fPeers = nil;
-                [fWebSeeds release];
-                fWebSeeds = nil;
                 
                 oldResizeSaveKey = @"InspectorContentHeightPeers";
                 break;
-            
             case TAB_FILES_TAG:
-                [[QuickLookController quickLook] updateQuickLook];
-                
                 oldResizeSaveKey = @"InspectorContentHeightFiles";
                 break;
         }
@@ -748,6 +647,8 @@ typedef enum
         case TAB_ACTIVITY_TAG:
             identifier = TAB_ACTIVITY_IDENT;
             title = NSLocalizedString(@"Activity", "Inspector -> title");
+            
+            [fPiecesView updateView: YES];
             break;
         case TAB_TRACKER_TAG:
             identifier = TAB_TRACKER_IDENT;
@@ -814,9 +715,6 @@ typedef enum
     [window setFrame: windowRect display: YES animate: oldTabTag != INVALID];
     [[window contentView] addSubview: view];
     [view setHidden: NO];
-    
-    if (fCurrentTabTag == TAB_FILES_TAG)
-        [[QuickLookController quickLook] updateQuickLook];
 }
 
 - (void) setNextTab
@@ -843,8 +741,6 @@ typedef enum
 {
     if (tableView == fPeerTable)
         return fPeers ? [fPeers count] : 0;
-    else if (tableView == fWebSeedTable)
-        return fWebSeeds ? [fWebSeeds count] : 0;
     else if (tableView == fTrackerTable)
         return fTrackers ? [fTrackers count] : 0;
     return 0;
@@ -876,30 +772,11 @@ typedef enum
         else
             return [peer objectForKey: @"IP"];
     }
-    else if (tableView == fWebSeedTable)
-    {
-        NSString * ident = [column identifier];
-        NSDictionary * webSeed = [fWebSeeds objectAtIndex: row];
-        
-        if ([ident isEqualToString: @"DL From"])
-        {
-            NSNumber * rate;
-            return (rate = [webSeed objectForKey: @"DL From Rate"]) ? [NSString stringForSpeedAbbrev: [rate floatValue]] : @"";
-        }
-        else
-            return [webSeed objectForKey: @"Address"];
-    }
     else if (tableView == fTrackerTable)
     {
         id item = [fTrackers objectAtIndex: row];
         if ([item isKindOfClass: [NSNumber class]])
-        {
-            int tier = [item intValue];
-            if (tier == 0)
-                return NSLocalizedString(@"User-Added", "Inspector -> tracker table");
-            else
-                return [NSString stringWithFormat: NSLocalizedString(@"Tier %d", "Inspector -> tracker table"), tier];
-        }
+            return [NSString stringWithFormat: NSLocalizedString(@"Tier %d", "Inspector -> tracker table"), [item intValue]+1];
         else
             return item;
     }
@@ -918,31 +795,11 @@ typedef enum
             [tableView reloadData];
         }
     }
-    else if (tableView == fWebSeedTable)
-    {
-        if (fWebSeeds)
-        {
-            NSArray * oldWebSeeds = fWebSeeds;
-            fWebSeeds = [[fWebSeeds sortedArrayUsingDescriptors: [fWebSeedTable sortDescriptors]] retain];
-            [oldWebSeeds release];
-            [tableView reloadData];
-        }
-    }
-    else;
 }
 
 - (BOOL) tableView: (NSTableView *) tableView shouldSelectRow: (int) row
 {
-    return tableView == fTrackerTable;
-}
-
-- (void) tableViewSelectionDidChange: (NSNotification *) notification
-{
-    if ([notification object] == fTrackerTable)
-    {
-        int numSelected = [fTrackerTable numberOfSelectedRows];
-        [fTrackerAddRemoveControl setEnabled: numSelected > 0 forSegment: TRACKER_REMOVE_TAG];
-    }
+    return NO;
 }
 
 - (BOOL) tableView: (NSTableView *) tableView isGroupRow: (NSInteger) row
@@ -1027,116 +884,6 @@ typedef enum
     return nil;
 }
 
-- (void) tableView: (NSTableView *) tableView setObjectValue: (id) object forTableColumn: (NSTableColumn *) tableColumn
-    row: (NSInteger) row
-{
-    if (tableView != fTrackerTable)
-        return;
-    
-    [fTrackers replaceObjectAtIndex: row withObject: object];
-    
-    Torrent * torrent= [fTorrents objectAtIndex: 0];
-    if (![torrent updateAllTrackersForAdd: fTrackers])
-        NSBeep();
-    
-    //reset table with either new or old value
-    [fTrackers release];
-    fTrackers = [[torrent allTrackers: YES] retain];
-    [fTrackerTable deselectAll: self];
-    
-    [fTrackerTable setTrackers: fTrackers];
-    [fTrackerTable reloadData];
-}
-
-- (void) addRemoveTracker: (id) sender
-{
-    //don't allow add/remove when currently adding - it leads to weird results
-    if ([fTrackerTable editedRow] != -1)
-        return;
-    
-    if ([[sender cell] tagForSegment: [sender selectedSegment]] == TRACKER_REMOVE_TAG)
-        [self removeTrackers];
-    else
-        [self addTrackers];
-}
-
-- (BOOL) tableView: (NSTableView *) tableView shouldEditTableColumn: (NSTableColumn *) tableColumn row: (NSInteger) row
-{
-    if (tableView != fTrackerTable)
-        return NO;
-    
-    //only allow modification of custom-added trackers
-    if ([[fTrackers objectAtIndex: row] isKindOfClass: [NSNumber class]] || ![[fTorrents objectAtIndex: 0] hasAddedTrackers])
-        return NO;
-    
-    NSUInteger i;
-    for (i = row-1; ![[fTrackers objectAtIndex: i] isKindOfClass: [NSNumber class]]; i--);
-    
-    return [[fTrackers objectAtIndex: i] intValue] == 0;
-}
-
-- (BOOL) shouldQuickLookFileView
-{
-    return [[self window] isVisible] && fCurrentTabTag == TAB_FILES_TAG && [[fFileController outlineView] numberOfSelectedRows] > 0;
-}
-
-- (NSArray *) quickLookURLs
-{
-    FileOutlineView * fileOutlineView = [fFileController outlineView];
-    Torrent * torrent = [fTorrents objectAtIndex: 0];
-    NSString * folder = [torrent downloadFolder];
-    NSIndexSet * indexes = [fileOutlineView selectedRowIndexes];
-    NSMutableArray * urlArray = [NSMutableArray arrayWithCapacity: [indexes count]];
-
-    int i;
-    for (i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
-    {
-        FileListNode * item = [fileOutlineView itemAtRow: i];
-        if ([self canQuickLookFile: item])
-            [urlArray addObject: [NSURL fileURLWithPath: [folder stringByAppendingPathComponent: [item fullPath]]]];
-    }
-    
-    return urlArray;
-}
-
-- (BOOL) canQuickLook
-{
-    FileOutlineView * fileOutlineView = [fFileController outlineView];
-    NSIndexSet * indexes = [fileOutlineView selectedRowIndexes];
-    
-    int i;
-    for (i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
-        if ([self canQuickLookFile: [fileOutlineView itemAtRow: i]])
-            return YES;
-    
-    return NO;
-}
-
-- (NSRect) quickLookFrameWithURL: (NSURL *) url
-{
-    FileOutlineView * fileOutlineView = [fFileController outlineView];
-    
-    NSString * fullPath = [url path];
-    NSString * folder = [[fTorrents objectAtIndex: 0] downloadFolder];
-    NSRange visibleRows = [fileOutlineView rowsInRect: [fileOutlineView bounds]];
-    
-    int row;
-    for (row = visibleRows.location; row < NSMaxRange(visibleRows); row++)
-    {
-        FileListNode * rowItem = [fileOutlineView itemAtRow: row];
-        if ([[folder stringByAppendingPathComponent: [rowItem fullPath]] isEqualToString: fullPath])
-        {
-            NSRect frame = [fileOutlineView iconRectForRow: row];
-            frame.origin = [fileOutlineView convertPoint: frame.origin toView: nil];
-            frame.origin = [[self window] convertBaseToScreen: frame.origin];
-            frame.origin.y -= frame.size.height;
-            return frame;
-        }
-    }
-    
-    return NSZeroRect;
-}
-
 - (void) setPiecesView: (id) sender
 {
     [self setPiecesViewForAvailable: [sender selectedSegment] == PIECES_CONTROL_AVAILABLE];
@@ -1148,7 +895,7 @@ typedef enum
     [fPiecesControl setSelected: !available forSegment: PIECES_CONTROL_PROGRESS];
     
     [[NSUserDefaults standardUserDefaults] setBool: available forKey: @"PiecesViewShowAvailability"];
-    [fPiecesView updateView];
+    [fPiecesView updateView: YES];
 }
 
 - (void) revealTorrentFile: (id) sender
@@ -1353,7 +1100,7 @@ typedef enum
         
         [fStateField setStringValue: [torrent stateString]];
         
-        if ([torrent isFolder])
+        if ([torrent folder])
             [fProgressField setStringValue: [NSString localizedStringWithFormat: NSLocalizedString(@"%.2f%% (%.2f%% selected)",
                 "Inspector -> Activity tab -> progress"), 100.0 * [torrent progress], 100.0 * [torrent progressDone]]];
         else
@@ -1371,7 +1118,7 @@ typedef enum
         
         [fDateCompletedField setObjectValue: [torrent dateCompleted]];
         
-        [fPiecesView updateView];
+        [fPiecesView updateView: NO];
     }
 }
 
@@ -1395,19 +1142,7 @@ typedef enum
     [fAnnounceResponseField setSelectable: ![announceResponse isEqualToString: @""]];
     
     int announceNext = [torrent nextAnnounceTime];
-    NSString * announceNextString;
-    switch (announceNext)
-    {
-        case STAT_TIME_NOW:
-            announceNextString = [NSLocalizedString(@"In progress", "Inspector -> tracker tab") stringByAppendingEllipsis];
-            break;
-        case STAT_TIME_NONE:
-            announceNextString = @"";
-            break;
-        default:
-            announceNextString = [NSString timeString: announceNext showSeconds: YES];
-    }
-    [fAnnounceNextField setStringValue: announceNextString];
+    [fAnnounceNextField setStringValue: announceNext > 0 ? [NSString timeString: announceNext showSeconds: YES] : @""];
     
     //scrape fields
     NSString * scrapeAddress;
@@ -1430,19 +1165,7 @@ typedef enum
     [fScrapeResponseField setSelectable: ![scrapeResponse isEqualToString: @""]];
     
     int scrapeNext = [torrent nextScrapeTime];
-    NSString * scrapeNextString;
-    switch (scrapeNext)
-    {
-        case STAT_TIME_NOW:
-            scrapeNextString = [NSLocalizedString(@"In progress", "Inspector -> tracker tab") stringByAppendingEllipsis];
-            break;
-        case STAT_TIME_NONE:
-            scrapeNextString = @"";
-            break;
-        default:
-            scrapeNextString = [NSString timeString: scrapeNext showSeconds: YES];
-    }
-    [fScrapeNextField setStringValue: scrapeNextString];
+    [fScrapeNextField setStringValue: scrapeNext > 0 ? [NSString timeString: scrapeNext showSeconds: YES] : @""];
 }
 
 - (void) updateInfoPeers
@@ -1500,14 +1223,8 @@ typedef enum
     
     [fPeers release];
     fPeers = [[[torrent peers] sortedArrayUsingDescriptors: [self peerSortDescriptors]] retain];
-    [fPeerTable reloadData];
     
-    if ([torrent webSeedCount] > 0)
-    {
-        [fWebSeeds release];
-        fWebSeeds = [[[torrent webSeeds] sortedArrayUsingDescriptors: [fWebSeedTable sortDescriptors]] retain];
-        [fWebSeedTable reloadData];
-    }
+    [fPeerTable reloadData];
 }
 
 - (void) updateInfoFiles
@@ -1537,66 +1254,6 @@ typedef enum
     }
 }
 
-- (void) setWebSeedTableHidden: (BOOL) hide animate: (BOOL) animate
-{
-    if (fCurrentTabTag != TAB_PEERS_TAG || ![[self window] isVisible])
-        animate = NO;
-    
-    if (fWebSeedTableAnimation)
-    {
-        [fWebSeedTableAnimation stopAnimation];
-        [fWebSeedTableAnimation release];
-        fWebSeedTableAnimation = nil;
-    }
-    
-    NSRect webSeedFrame = [[fWebSeedTable enclosingScrollView] frame];
-    NSRect peerFrame = [[fPeerTable enclosingScrollView] frame];
-    
-    if (hide)
-    {
-        float webSeedFrameMaxY = NSMaxY(webSeedFrame);
-        webSeedFrame.size.height = 0;
-        webSeedFrame.origin.y = webSeedFrameMaxY;
-        
-        peerFrame.size.height = webSeedFrameMaxY - peerFrame.origin.y;
-    }
-    else
-    {
-        webSeedFrame.origin.y -= fWebSeedTableHeight - webSeedFrame.size.height;
-        webSeedFrame.size.height = fWebSeedTableHeight;
-        
-        peerFrame.size.height = (webSeedFrame.origin.y - fSpaceBetweenWebSeedAndPeer) - peerFrame.origin.y;
-    }
-    
-    [[fWebSeedTable enclosingScrollView] setHidden: NO]; //this is needed for some reason
-    
-    //actually resize tables
-    if (animate)
-    {
-        NSDictionary * webSeedDict = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    [fWebSeedTable enclosingScrollView], NSViewAnimationTargetKey,
-                                    [NSValue valueWithRect: [[fWebSeedTable enclosingScrollView] frame]], NSViewAnimationStartFrameKey,
-                                    [NSValue valueWithRect: webSeedFrame], NSViewAnimationEndFrameKey, nil],
-                    * peerDict = [NSDictionary dictionaryWithObjectsAndKeys:
-                                    [fPeerTable enclosingScrollView], NSViewAnimationTargetKey,
-                                    [NSValue valueWithRect: [[fPeerTable enclosingScrollView] frame]], NSViewAnimationStartFrameKey,
-                                    [NSValue valueWithRect: peerFrame], NSViewAnimationEndFrameKey, nil];
-        
-        fWebSeedTableAnimation = [[NSViewAnimation alloc] initWithViewAnimations:
-                                        [NSArray arrayWithObjects: webSeedDict, peerDict, nil]];
-        [fWebSeedTableAnimation setDuration: 0.125];
-        [fWebSeedTableAnimation setAnimationBlockingMode: NSAnimationNonblocking];
-        [fWebSeedTableAnimation setDelegate: self];
-        
-        [fWebSeedTableAnimation startAnimation];
-    }
-    else
-    {
-        [[fWebSeedTable enclosingScrollView] setFrame: webSeedFrame];
-        [[fPeerTable enclosingScrollView] setFrame: peerFrame];
-    }
-}
-
 - (NSArray *) peerSortDescriptors
 {
     NSMutableArray * descriptors = [NSMutableArray arrayWithCapacity: 2];
@@ -1616,146 +1273,12 @@ typedef enum
     if (useSecond)
     {
         NSSortDescriptor * secondDescriptor = [[NSSortDescriptor alloc] initWithKey: @"IP" ascending: asc
-                                                                        selector: @selector(compareNumeric:)];
+                                                                        selector: @selector(compareIP:)];
         [descriptors addObject: secondDescriptor];
         [secondDescriptor release];
     }
     
     return descriptors;
-}
-
-- (BOOL) canQuickLookFile: (FileListNode *) item
-{
-    Torrent * torrent = [fTorrents objectAtIndex: 0];
-    
-    if (![[NSFileManager defaultManager] fileExistsAtPath: [[torrent downloadFolder] stringByAppendingPathComponent: [item fullPath]]])
-        return NO;
-    
-    return [item isFolder] || [torrent fileProgress: [[item indexes] firstIndex]] == 1.0;
-}
-
-- (void) addTrackers
-{
-    [[self window] makeKeyWindow];
-    
-    int i;
-    if ([[fTorrents objectAtIndex: 0] hasAddedTrackers])
-    {
-        for (i = 1; i < [fTrackers count]; i++)
-            if ([[fTrackers objectAtIndex: i] isKindOfClass: [NSNumber class]])
-                break;
-    }
-    else
-    {
-        [fTrackers insertObject: [NSNumber numberWithInt: 0] atIndex: 0];
-        i = 1;
-    }
-    
-    [fTrackers insertObject: @"" atIndex: i];
-    [fTrackerTable reloadData];
-    [fTrackerTable selectRow: i byExtendingSelection: NO];
-    [fTrackerTable editColumn: 0 row: i withEvent: nil select: YES];
-}
-
-- (void) removeTrackers
-{
-    NSMutableIndexSet * indexes = [[[fTrackerTable selectedRowIndexes] mutableCopy] autorelease];
-    
-    //get all rows to remove and determine if any built-in trackers are being remove
-    NSUInteger i = 0, numberBuiltIn = 0;
-    while (i < [fTrackers count])
-    {
-        BOOL builtIn = i != 0 || [[fTrackers objectAtIndex: i] intValue] != 0;
-        
-        //if a group is selected, remove all trackers in the group
-        if ([indexes containsIndex: i])
-        {
-            for (i = i+1; i < [fTrackers count] && ![[fTrackers objectAtIndex: i] isKindOfClass: [NSNumber class]]; i++)
-            {
-                [indexes addIndex: i];
-                if (builtIn)
-                    numberBuiltIn++;
-            }
-        }
-        //remove empty groups
-        else
-        {
-            BOOL allSelected = YES;
-            NSUInteger j;
-            for (j = i+1; j < [fTrackers count] && ![[fTrackers objectAtIndex: j] isKindOfClass: [NSNumber class]]; j++)
-            {
-                if (![indexes containsIndex: j])
-                    allSelected = NO;
-                else if (builtIn)
-                    numberBuiltIn++;
-                else;
-            }
-            
-            if (allSelected)
-                [indexes addIndex: i];
-            
-            i = j;
-        }
-    }
-    
-    if ([fTrackers count] == [indexes count])
-    {
-        NSBeep();
-        return;
-    }
-    
-    Torrent * torrent = [fTorrents objectAtIndex: 0];
-    
-    //determine if removing trackers built into the torrent
-    if (numberBuiltIn > 0 && [[NSUserDefaults standardUserDefaults] boolForKey: @"WarningRemoveBuiltInTracker"])
-    {
-        NSAlert * alert = [[NSAlert alloc] init];
-        
-        if (numberBuiltIn > 1)
-        {
-            [alert setMessageText: [NSString stringWithFormat:
-                                    NSLocalizedString(@"Are you sure you want to remove %d built-in trackers?",
-                                    "Remove built-in tracker alert -> title"), numberBuiltIn]];
-            [alert setInformativeText: NSLocalizedString(@"These tracker addresses are part of the torrent file."
-                " Once removed, Transmission will no longer attempt to contact them.", "Remove built-in tracker alert -> message")];
-        }
-        else
-        {
-            [alert setMessageText: NSLocalizedString(@"Are you sure you want to remove a built-in tracker?",
-                                    "Remove built-in tracker alert -> title")];
-            [alert setInformativeText: NSLocalizedString(@"The tracker address is part of the torrent file."
-                " Once removed, Transmission will no longer attempt to contact it.", "Remove built-in tracker alert -> message")];
-        }
-        
-        [alert addButtonWithTitle: NSLocalizedString(@"Remove", "Remove built-in tracker alert -> button")];
-        [alert addButtonWithTitle: NSLocalizedString(@"Cancel", "Remove built-in tracker alert -> button")];
-        
-        BOOL onLeopard = [NSApp isOnLeopardOrBetter];
-        if (onLeopard)
-            [alert setShowsSuppressionButton: YES];
-        else
-            [alert addButtonWithTitle: NSLocalizedString(@"Don't Alert Again", "Remove built-in tracker alert -> button")];
-
-        NSInteger result = [alert runModal];
-        if ((onLeopard ? [[alert suppressionButton] state] == NSOnState : result == NSAlertThirdButtonReturn))
-            [[NSUserDefaults standardUserDefaults] setBool: NO forKey: @"WarningRemoveBuiltInTracker"];
-        [alert release];
-        
-        if (result != NSAlertFirstButtonReturn)
-            return;
-    }
-    
-    [fTrackers removeObjectsAtIndexes: indexes];
-    
-    [torrent updateAllTrackersForRemove: fTrackers];
-    [fTrackerTable deselectAll: self];
-    
-    //reset table with either new or old value
-    [fTrackers release];
-    fTrackers = [[torrent allTrackers: YES] retain];
-    
-    [fTrackerTable setTrackers: fTrackers];
-    [fTrackerTable reloadData];
 }
 
 @end

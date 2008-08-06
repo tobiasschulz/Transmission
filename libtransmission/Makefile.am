@@ -1,5 +1,5 @@
 AM_CPPFLAGS = -I. -I$(top_srcdir) -I$(top_srcdir)/third-party/ -D__TRANSMISSION__ $(LIBEVENT_CPPFLAGS)
-AM_CFLAGS = $(LIBCURL_CFLAGS) $(OPENSSL_CFLAGS) $(PTHREAD_CFLAGS)
+AM_CFLAGS = $(OPENSSL_CFLAGS) $(LIBCURL_CFLAGS) $(PTHREAD_CFLAGS)
 
 noinst_LIBRARIES = libtransmission.a
 
@@ -8,15 +8,13 @@ libtransmission_a_SOURCES = \
     blocklist.c \
     clients.c \
     completion.c \
-    ConvertUTF.c \
     crypto.c \
     fastresume.c \
     fdlimit.c \
     ggets.c \
     handshake.c \
     inout.c \
-    json.c \
-    JSON_parser.c \
+    ipcparse.c \
     list.c \
     makemeta.c \
     metainfo.c \
@@ -31,26 +29,21 @@ libtransmission_a_SOURCES = \
     publish.c \
     ratecontrol.c \
     resume.c \
-    rpc.c \
-    rpc-server.c \
     session.c \
     stats.c \
     torrent.c \
     torrent-ctor.c \
-    tr-getopt.c \
     tracker.c \
     trevent.c \
     upnp.c \
     utils.c \
     verify.c \
-    web.c \
-    webseed.c
+    web.c
 
 noinst_HEADERS = \
     bencode.h \
     blocklist.h \
     clients.h \
-    ConvertUTF.h \
     crypto.h \
     completion.h \
     fastresume.h \
@@ -58,14 +51,12 @@ noinst_HEADERS = \
     ggets.h \
     handshake.h \
     inout.h \
-    json.h \
-    JSON_parser.h \
+    ipcparse.h \
     list.h \
     makemeta.h \
     metainfo.h \
     natpmp.h \
     net.h \
-    peer-common.h \
     peer-io.h \
     peer-mgr.h \
     peer-mgr-private.h \
@@ -76,61 +67,52 @@ noinst_HEADERS = \
     publish.h \
     ratecontrol.h \
     resume.h \
-    rpc.h \
-    rpc-server.h \
     session.h \
     stats.h \
     torrent.h \
     tracker.h \
-    tr-getopt.h \
     transmission.h \
+    trcompat.h \
     trevent.h \
     upnp.h \
     utils.h \
     verify.h \
-    web.h \
-    webseed.h
+    web.h
+
+bin_PROGRAMS = benc2php
 
 TESTS = \
     blocklist-test \
     bencode-test \
     clients-test \
-    json-test \
-    rpc-test \
     test-fastset \
-    test-peer-id \
-    utils-test
+    test-peer-id
 
 noinst_PROGRAMS = $(TESTS)
 
 APPS_LDADD = \
     ./libtransmission.a  \
-    $(top_builddir)/third-party/shttpd/libshttpd.a \
     $(top_builddir)/third-party/miniupnp/libminiupnp.a \
     $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
     $(top_builddir)/third-party/libevent/libevent.la \
     $(INTLLIBS) \
-    $(LIBCURL_LIBS) \
     $(OPENSSL_LIBS) \
+    $(LIBCURL_LIBS) \
     $(PTHREAD_LIBS) \
     -lm
 
+benc2php_SOURCES = benc2php.c
+benc2php_LDADD = $(APPS_LDADD)
 bencode_test_SOURCES = bencode-test.c
 bencode_test_LDADD = $(APPS_LDADD)
 blocklist_test_SOURCES = blocklist-test.c
 blocklist_test_LDADD = $(APPS_LDADD)
 clients_test_SOURCES = clients-test.c
 clients_test_LDADD = $(APPS_LDADD)
-json_test_SOURCES = json-test.c
-json_test_LDADD = $(APPS_LDADD)
-rpc_test_SOURCES = rpc-test.c
-rpc_test_LDADD = $(APPS_LDADD)
 test_fastset_SOURCES = test-fastset.c
 test_fastset_LDADD = $(APPS_LDADD)
 test_peer_id_SOURCES = test-peer-id.c
 test_peer_id_LDADD = $(APPS_LDADD)
-utils_test_SOURCES = utils-test.c
-utils_test_LDADD = $(APPS_LDADD)
 
 
 clean-local:

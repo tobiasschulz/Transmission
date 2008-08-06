@@ -12,7 +12,7 @@
 
 #include <assert.h>
 #include <errno.h>
-#include <stdio.h> /* FILE, stderr */
+#include <stdio.h> /* FILE, snprintf, stderr */
 #include <stdlib.h> /* qsort */
 
 #include <sys/types.h>
@@ -22,6 +22,7 @@
 #include <dirent.h>
 
 #include "crypto.h" /* tr_sha1 */
+#include "trcompat.h" /* strlcpy */
 #include "transmission.h"
 #include "bencode.h"
 #include "makemeta.h"
@@ -125,8 +126,8 @@ tr_metaInfoBuilderCreate( tr_handle * handle, const char * topFile )
         char *dir, *base;
         char dirbuf[MAX_PATH_LENGTH];
         char basebuf[MAX_PATH_LENGTH];
-        tr_strlcpy( dirbuf, topFile, sizeof( dirbuf ) );
-        tr_strlcpy( basebuf, topFile, sizeof( basebuf ) );
+        strlcpy( dirbuf, topFile, sizeof( dirbuf ) );
+        strlcpy( basebuf, topFile, sizeof( basebuf ) );
         dir = dirname( dirbuf );
         base = basename( basebuf );
         files = getFiles( dir, base, NULL );
@@ -168,16 +169,13 @@ tr_metaInfoBuilderFree( tr_metainfo_builder * builder )
 {
     if( builder )
     {
-        tr_file_index_t t;
-        int i;
-        for( t=0; t<builder->fileCount; ++t )
-            tr_free( builder->files[t].filename );
+        uint32_t i;
+        for( i=0; i<builder->fileCount; ++i )
+            tr_free( builder->files[i].filename );
         tr_free( builder->files );
         tr_free( builder->top );
         tr_free( builder->comment );
-        for( i=0; i<builder->trackerCount; ++i )
-            tr_free( builder->trackers[i].announce );
-        tr_free( builder->trackers );
+        tr_free( builder->announce );
         tr_free( builder->outputFile );
         tr_free( builder );
     }
@@ -207,7 +205,7 @@ getHashInfo ( tr_metainfo_builder * b )
     fp = fopen( b->files[fileIndex].filename, "rb" );
     if( !fp ) {
         b->my_errno = errno;
-        tr_snprintf( b->errfile, sizeof( b->errfile ), b->files[fileIndex].filename );
+        snprintf( b->errfile, sizeof( b->errfile ), b->files[fileIndex].filename );
         b->result = TR_MAKEMETA_IO_READ;
         tr_free( ret );
         return NULL;
@@ -237,7 +235,7 @@ getHashInfo ( tr_metainfo_builder * b )
                     fp = fopen( b->files[fileIndex].filename, "rb" );
                     if( !fp ) {
                         b->my_errno = errno;
-                        tr_snprintf( b->errfile, sizeof( b->errfile ), b->files[fileIndex].filename );
+                        snprintf( b->errfile, sizeof( b->errfile ), b->files[fileIndex].filename );
                         b->result = TR_MAKEMETA_IO_READ;
                         tr_free( ret );
                         return NULL;
@@ -262,7 +260,7 @@ getHashInfo ( tr_metainfo_builder * b )
     assert( b->abortFlag || (walk-ret == (int)(SHA_DIGEST_LENGTH*b->pieceCount)) );
     assert( b->abortFlag || !totalRemain );
 
-    if( fp )
+    if( fp != NULL )
         fclose( fp );
 
     tr_free( buf );
@@ -328,7 +326,7 @@ makeInfoDict ( tr_benc              * dict,
         }
     }
 
-    tr_strlcpy( base, builder->top, sizeof( base ) );
+    strlcpy( base, builder->top, sizeof( base ) );
     tr_bencDictAddStr( dict, "name", basename( base ) );
 
     tr_bencDictAddInt( dict, "piece length", builder->pieceSize );
@@ -344,33 +342,16 @@ makeInfoDict ( tr_benc              * dict,
 static void
 tr_realMakeMetaInfo ( tr_metainfo_builder * builder )
 {
-    int i;
+    int n = 5;
     tr_benc top;
 
-    /* allow an empty set, but if URLs *are* listed, verify them. #814, #971 */
-    for( i=0; i<builder->trackerCount && !builder->result; ++i )
-        if( !tr_httpIsValidURL( builder->trackers[i].announce ) )
-            builder->result = TR_MAKEMETA_URL;
+    if ( builder->comment && *builder->comment ) ++n;
+    tr_bencInitDict( &top, n );
 
-    tr_bencInitDict( &top, 6 );
+    tr_bencDictAddStr( &top, "announce", builder->announce );
 
-    if( !builder->result && builder->trackerCount )
-    {
-        int prevTier = -1;
-        tr_benc * tier = NULL;
-        tr_benc * announceList;
-
-        announceList = tr_bencDictAddList( &top, "announce-list", 0 );
-        for( i=0; i<builder->trackerCount; ++i ) {
-            if( prevTier != builder->trackers[i].tier ) {
-                prevTier = builder->trackers[i].tier;
-                tier = tr_bencListAddList( announceList, 0 );
-            }
-            tr_bencListAddStr( tier, builder->trackers[i].announce );
-        }
-
-        tr_bencDictAddStr( &top, "announce", builder->trackers[0].announce );
-    }
+    if( tr_httpParseURL( builder->announce, -1, NULL, NULL, NULL ) )
+        builder->result = TR_MAKEMETA_URL;
     
     if( !builder->result && !builder->abortFlag )
     {
@@ -386,13 +367,13 @@ tr_realMakeMetaInfo ( tr_metainfo_builder * builder )
     if ( !builder->result && !builder->abortFlag ) {
         if( tr_bencSaveFile( builder->outputFile, &top ) ) {
             builder->my_errno = errno;
-            tr_strlcpy( builder->errfile, builder->outputFile, sizeof( builder->errfile ) );
+            strlcpy( builder->errfile, builder->outputFile, sizeof( builder->errfile ) );
             builder->result = TR_MAKEMETA_IO_WRITE;
         }
     }
 
     /* cleanup */
-    tr_bencFree( &top );
+    tr_bencFree( & top );
     if( builder->abortFlag )
         builder->result = TR_MAKEMETA_CANCELLED;
     builder->isDone = 1;
@@ -431,7 +412,7 @@ static void workerFunc( void * user_data )
         /* find the next builder to process */
         tr_lock * lock = getQueueLock ( handle );
         tr_lockLock( lock );
-        if( queue ) {
+        if( queue != NULL ) {
             builder = queue;
             queue = queue->nextBuilder;
         }
@@ -448,39 +429,30 @@ static void workerFunc( void * user_data )
 }
 
 void
-tr_makeMetaInfo( tr_metainfo_builder    * builder,
-                 const char             * outputFile,
-                 const tr_tracker_info  * trackers,
-                 int                      trackerCount,
-                 const char             * comment,
-                 int                      isPrivate )
+tr_makeMetaInfo( tr_metainfo_builder  * builder,
+                 const char           * outputFile,
+                 const char           * announce,
+                 const char           * comment,
+                 int                    isPrivate )
 {
-    int i;
     tr_lock * lock;
 
     /* free any variables from a previous run */
-    for( i=0; i<builder->trackerCount; ++i )
-        tr_free( builder->trackers[i].announce );
-    tr_free( builder->trackers );
+    tr_free( builder->announce );
     tr_free( builder->comment );
     tr_free( builder->outputFile );
 
     /* initialize the builder variables */
     builder->abortFlag = 0;
     builder->isDone = 0;
-    builder->trackerCount = trackerCount;
-    builder->trackers = tr_new0( tr_tracker_info, builder->trackerCount );
-    for( i=0; i<builder->trackerCount; ++i ) {
-        builder->trackers[i].tier = trackers[i].tier;
-        builder->trackers[i].announce = tr_strdup( trackers[i].announce );
-    }
+    builder->announce = tr_strdup( announce );
     builder->comment = tr_strdup( comment );
     builder->isPrivate = isPrivate;
     if( outputFile && *outputFile )
         builder->outputFile = tr_strdup( outputFile );
     else {
         char out[MAX_PATH_LENGTH];
-        tr_snprintf( out, sizeof(out), "%s.torrent", builder->top);
+        snprintf( out, sizeof(out), "%s.torrent", builder->top);
         builder->outputFile = tr_strdup( out );
     }
 

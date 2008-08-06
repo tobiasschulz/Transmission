@@ -34,7 +34,7 @@
     NSUserDefaults * fDefaults;
     BOOL fHasLoaded;
     
-    IBOutlet NSView * fGeneralView, * fTransfersView, * fBandwidthView, * fPeersView, * fNetworkView, * fRemoteView;
+    IBOutlet NSView * fGeneralView, * fTransfersView, * fBandwidthView, * fPeersView, * fNetworkView;
     
     NSString * fInitialString;
     
@@ -55,15 +55,7 @@
     IBOutlet NSImageView * fPortStatusImage;
     IBOutlet NSProgressIndicator * fPortStatusProgress;
     NSTimer * fPortStatusTimer;
-    int fPeerPort, fNatStatus;
-    
-    IBOutlet NSTextField * fProxyAddressField, * fProxyPortField, * fProxyPasswordField;
-    IBOutlet NSPopUpButton * fProxyTypePopUp;
-    
-    IBOutlet NSTextField * fRPCPortField, * fRPCPasswordField;
-    IBOutlet NSTableView * fRPCAccessTable;
-    IBOutlet NSSegmentedControl * fRPCAddRemoveControl;
-    NSMutableArray * fRPCAccessArray;
+    int fPublicPort, fNatStatus;
 }
 
 - (id) initWithHandle: (tr_handle *) handle;
@@ -121,30 +113,7 @@
 
 - (void) setAutoSize: (id) sender;
 
-- (void) setProxyEnabled: (id) sender;
-- (void) setProxyAddress: (id) sender;
-- (void) setProxyPort: (id) sender;
-- (void) setProxyType: (id) sender;
-- (void) updateProxyType;
-- (void) setProxyAuthorize: (id) sender;
-- (void) setProxyUsername: (id) sender;
-- (void) setProxyPassword: (id) sender;
-- (void) updateProxyPassword;
-
-- (void) setRPCEnabled: (id) sender;
-- (void) linkWebUI: (id) sender;
-- (void) setRPCAuthorize: (id) sender;
-- (void) setRPCUsername: (id) sender;
-- (void) setRPCPassword: (id) sender;
-- (void) updateRPCPassword;
-- (void) setRPCPort: (id) sender;
-- (void) updateRPCAccessList;
-- (void) addRemoveRPCIP: (id) sender;
-
 - (void) helpForPeers: (id) sender;
 - (void) helpForNetwork: (id) sender;
-- (void) helpForRemote: (id) sender;
-
-- (void) rpcUpdatePrefs;
 
 @end

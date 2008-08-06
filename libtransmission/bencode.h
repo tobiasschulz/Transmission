@@ -79,11 +79,18 @@ tr_benc * tr_bencDictFindFirst( tr_benc * dict, ... );
 
 /* convenience functions for building tr_benc    structures */
 
+static inline void tr_bencInit( tr_benc    * val, int type )
+{
+    memset( val, 0, sizeof( *val ) );
+    val->type = type;
+}
+
 #define tr_bencInitStr( a, b, c, d ) \
     _tr_bencInitStr( (a), ( char * )(b), (c), (d) )
 void   _tr_bencInitStr( tr_benc * val, char * str, int len, int nofree );
 int    tr_bencInitStrDup( tr_benc * val, const char * str );
 void   tr_bencInitRaw( tr_benc * val, const void * src, size_t byteCount );
+int    tr_bencInitStrDupLen( tr_benc * val, const char * str, int len );
 void   tr_bencInitInt( tr_benc * val, int64_t num );
 int   tr_bencInitDict( tr_benc * val, int reserveCount );
 int   tr_bencInitList( tr_benc * val, int reserveCount );
@@ -95,6 +102,7 @@ tr_benc    * tr_bencListAddInt( tr_benc  * list, int64_t val );
 tr_benc    * tr_bencListAddStr( tr_benc  * list, const char * val );
 tr_benc    * tr_bencListAddList( tr_benc  * list, int reserveCount );
 tr_benc    * tr_bencListAddDict( tr_benc  * list, int reserveCount );
+/* note: key must not be freed or modified while val is in use */
 tr_benc    * tr_bencDictAdd( tr_benc * dict, const char * key );
 tr_benc    * tr_bencDictAddDouble( tr_benc * dict, const char * key, double d );
 tr_benc    * tr_bencDictAddInt( tr_benc * dict, const char * key, int64_t val );
@@ -102,14 +110,11 @@ tr_benc    * tr_bencDictAddStr( tr_benc * dict, const char * key, const char * v
 tr_benc    * tr_bencDictAddList( tr_benc * dict, const char * key, int reserveCount );
 tr_benc    * tr_bencDictAddDict( tr_benc * dict, const char * key, int reserveCount );
 tr_benc    * tr_bencDictAddRaw( tr_benc * dict, const char * key, const void *, size_t len );
-int          tr_bencDictRemove( tr_benc * dict, const char * key );
 
-char*  tr_bencSave         ( const tr_benc * val, int * len );
-char*  tr_bencSaveAsJSON   ( const tr_benc * top, int * len );
-int    tr_bencSaveFile     ( const char * filename, const tr_benc * );
-int    tr_bencSaveJSONFile ( const char * filename, const tr_benc * );
-int    tr_bencLoadFile     ( const char * filename, tr_benc * );
-int    tr_bencLoadJSONFile ( const char * filename, tr_benc * );
+char*  tr_bencSave( const tr_benc * val, int * len );
+char*  tr_bencSaveAsSerializedPHP( const tr_benc * top, int * len );
+int    tr_bencSaveFile( const char * filename, const tr_benc * );
+int    tr_bencLoadFile( const char * filename, tr_benc * );
 
 int tr_bencGetInt( const tr_benc * val, int64_t * setme );
 int tr_bencGetStr( const tr_benc * val, const char ** setme );

@@ -7,7 +7,7 @@
  * This exemption does not extend to derived works not owned by
  * the Transmission project.
  *
- * $Id$
+ * $Id:$
  */
 
 #include <unistd.h> /* unlink */
@@ -24,20 +24,17 @@
 #include "torrent.h"
 #include "utils.h" /* tr_buildPath */
 
-#define KEY_ACTIVITY_DATE   "activity-date"
-#define KEY_ADDED_DATE      "added-date"
-#define KEY_CORRUPT         "corrupt"
-#define KEY_DONE_DATE       "done-date"
-#define KEY_DOWNLOAD_DIR    "destination"
-#define KEY_DND             "dnd"
-#define KEY_DOWNLOADED      "downloaded"
-#define KEY_MAX_PEERS       "max-peers"
-#define KEY_PAUSED          "paused"
-#define KEY_PEERS           "peers"
-#define KEY_PRIORITY        "priority"
-#define KEY_PROGRESS        "progress"
-#define KEY_SPEEDLIMIT      "speed-limit"
-#define KEY_UPLOADED        "uploaded"
+#define KEY_CORRUPT     "corrupt"
+#define KEY_DESTINATION "destination"
+#define KEY_DND         "dnd"
+#define KEY_DOWNLOADED  "downloaded"
+#define KEY_MAX_PEERS   "max-peers"
+#define KEY_PAUSED      "paused"
+#define KEY_PEERS       "peers"
+#define KEY_PRIORITY    "priority"
+#define KEY_PROGRESS    "progress"
+#define KEY_SPEEDLIMIT  "speed-limit"
+#define KEY_UPLOADED    "uploaded"
 
 #define KEY_SPEEDLIMIT_DOWN_SPEED "down-speed"
 #define KEY_SPEEDLIMIT_DOWN_MODE  "down-mode"
@@ -52,9 +49,9 @@ getResumeFilename( char * buf, size_t buflen, const tr_torrent * tor )
 {
     const char * dir = tr_getResumeDir( tor->handle );
     char base[MAX_PATH_LENGTH];
-    tr_snprintf( base, sizeof( base ), "%s.%16.16s.resume",
-                 tor->info.name,
-                 tor->info.hashString );
+    snprintf( base, sizeof( base ), "%s.%16.16s.resume",
+              tor->info.name,
+              tor->info.hashString );
     tr_buildPath( buf, buflen, dir, base, NULL );
 }
 
@@ -269,7 +266,7 @@ saveProgress( tr_benc * dict, const tr_torrent * tor )
     /* add the bitfield */
     bitfield = tr_cpBlockBitfield( tor->completion );
     tr_bencDictAddRaw( p, KEY_PROGRESS_BITFIELD,
-                       bitfield->bits, bitfield->byteCount );
+                       bitfield->bits, bitfield->len );
 
     /* cleanup */
     tr_free( mtimes );
@@ -319,8 +316,7 @@ loadProgress( tr_benc * dict, tr_torrent * tor )
         if(( b = tr_bencDictFindType( p, KEY_PROGRESS_BITFIELD, TYPE_STR )))
         {
             tr_bitfield tmp;
-            tmp.byteCount = b->val.s.i;
-            tmp.bitCount = tmp.byteCount * 8;
+            tmp.len = b->val.s.i;
             tmp.bits = (uint8_t*) b->val.s.s;
             if( tr_cpBlockBitfieldSet( tor->completion, &tmp ) ) {
                 tr_torrentUncheck( tor );
@@ -350,20 +346,11 @@ tr_torrentSaveResume( const tr_torrent * tor )
     tr_benc top;
     char filename[MAX_PATH_LENGTH];
 
-    if( !tor )
-        return;
-
-    tr_bencInitDict( &top, 14 );
-    tr_bencDictAddInt( &top, KEY_ACTIVITY_DATE,
-                             tor->activityDate );
-    tr_bencDictAddInt( &top, KEY_ADDED_DATE,
-                             tor->addedDate );
+    tr_bencInitDict( &top, 12 );
     tr_bencDictAddInt( &top, KEY_CORRUPT,
                              tor->corruptPrev + tor->corruptCur );
-    tr_bencDictAddInt( &top, KEY_DONE_DATE,
-                             tor->doneDate );
-    tr_bencDictAddStr( &top, KEY_DOWNLOAD_DIR,
-                             tor->downloadDir );
+    tr_bencDictAddStr( &top, KEY_DESTINATION,
+                             tor->destination );
     tr_bencDictAddInt( &top, KEY_DOWNLOADED,
                              tor->downloadedPrev + tor->downloadedCur );
     tr_bencDictAddInt( &top, KEY_UPLOADED,
@@ -419,11 +406,11 @@ loadFromFile( tr_torrent    * tor,
         fieldsLoaded |= TR_FR_CORRUPT;
     }
 
-    if( ( fieldsToLoad & ( TR_FR_PROGRESS | TR_FR_DOWNLOAD_DIR ) )
-            && tr_bencDictFindStr( &top, KEY_DOWNLOAD_DIR, &str ) ) {
-        tr_free( tor->downloadDir );
-        tor->downloadDir = tr_strdup( str );
-        fieldsLoaded |= TR_FR_DOWNLOAD_DIR;
+    if( ( fieldsToLoad & ( TR_FR_PROGRESS | TR_FR_DESTINATION ) )
+            && tr_bencDictFindStr( &top, KEY_DESTINATION, &str ) ) {
+        tr_free( tor->destination );
+        tor->destination = tr_strdup( str );
+        fieldsLoaded |= TR_FR_DESTINATION;
     }
 
     if( ( fieldsToLoad & TR_FR_DOWNLOADED )
@@ -448,24 +435,6 @@ loadFromFile( tr_torrent    * tor,
             && tr_bencDictFindInt( &top, KEY_PAUSED, &i ) ) {
         tor->isRunning = i ? 0 : 1;
         fieldsLoaded |= TR_FR_RUN;
-    }
-
-    if( ( fieldsToLoad & TR_FR_ADDED_DATE )
-        && tr_bencDictFindInt( &top, KEY_ADDED_DATE, &i ) ) {
-        tor->addedDate = i;
-        fieldsLoaded |= TR_FR_ADDED_DATE;
-    }
-
-    if( ( fieldsToLoad & TR_FR_DONE_DATE )
-        && tr_bencDictFindInt( &top, KEY_DONE_DATE, &i ) ) {
-        tor->doneDate = i;
-        fieldsLoaded |= TR_FR_DONE_DATE;
-    }
-
-    if( ( fieldsToLoad & TR_FR_ACTIVITY_DATE )
-        && tr_bencDictFindInt( &top, KEY_ACTIVITY_DATE, &i ) ) {
-        tor->activityDate = i;
-        fieldsLoaded |= TR_FR_ACTIVITY_DATE;
     }
 
     if( fieldsToLoad & TR_FR_PEERS )
@@ -501,15 +470,15 @@ setFromCtor( tr_torrent * tor, uint64_t fields, const tr_ctor * ctor, int mode )
     }
 
     if( fields & TR_FR_MAX_PEERS ) 
-        if( !tr_ctorGetPeerLimit( ctor, mode, &tor->maxConnectedPeers ) )
+        if( !tr_ctorGetMaxConnectedPeers( ctor, mode, &tor->maxConnectedPeers ) )
             ret |= TR_FR_MAX_PEERS;
 
-    if( fields & TR_FR_DOWNLOAD_DIR ) {
-        const char * downloadDir;
-        if( !tr_ctorGetDownloadDir( ctor, mode, &downloadDir ) ) {
-            ret |= TR_FR_DOWNLOAD_DIR;
-            tr_free( tor->downloadDir );
-            tor->downloadDir = tr_strdup( downloadDir );
+    if( fields & TR_FR_DESTINATION ) {
+        const char * destination;
+        if( !tr_ctorGetDestination( ctor, mode, &destination ) ) {
+            ret |= TR_FR_DESTINATION;
+            tr_free( tor->destination );
+            tor->destination = tr_strdup( destination );
         }
     }
 

@@ -105,8 +105,6 @@ void tr_peerMgrTorrentStats( const tr_peerMgr * manager,
                              const uint8_t    * torrentHash,
                              int              * setmePeersKnown,
                              int              * setmePeersConnected,
-                             int              * setmeSeedsConnected,
-                             int              * setmeWebseedsSendingToUs,
                              int              * setmePeersSendingToUs,
                              int              * setmePeersGettingFromUs,
                              int              * setmePeersFrom ); /* <-- array of TR_PEER_FROM__MAX */
@@ -114,9 +112,6 @@ void tr_peerMgrTorrentStats( const tr_peerMgr * manager,
 struct tr_peer_stat * tr_peerMgrPeerStats( const tr_peerMgr  * manager,
                                            const uint8_t     * torrentHash,
                                            int               * setmeCount );
-
-float* tr_peerMgrWebSpeeds( const tr_peerMgr * manager,
-                            const uint8_t    * torrentHash );
 
                              
 struct tr_bitfield *

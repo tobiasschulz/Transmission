@@ -12,6 +12,7 @@
 
 #include <assert.h>
 #include <errno.h>
+#include <stdio.h> /* snprintf */
 
 #include <miniupnp/miniupnpc.h>
 #include <miniupnp/upnpcommands.h>
@@ -111,7 +112,7 @@ tr_upnpPulse( tr_upnp * handle, int port, int isEnabled )
     if( handle->state == TR_UPNP_UNMAP )
     {
         char portStr[16];
-        tr_snprintf( portStr, sizeof(portStr), "%d", handle->port );
+        snprintf( portStr, sizeof(portStr), "%d", handle->port );
         UPNP_DeletePortMapping( handle->urls.controlURL,
                                 handle->data.servicetype,
                                 portStr, "TCP" );
@@ -132,7 +133,7 @@ tr_upnpPulse( tr_upnp * handle, int port, int isEnabled )
     {
         int err = -1;
         char portStr[16];
-        tr_snprintf( portStr, sizeof(portStr), "%d", port );
+        snprintf( portStr, sizeof(portStr), "%d", port );
         errno = 0;
 
         if( !handle->urls.controlURL || !handle->data.servicetype )
@@ -160,12 +161,12 @@ tr_upnpPulse( tr_upnp * handle, int port, int isEnabled )
 
     switch( handle->state )
     {
-        case TR_UPNP_DISCOVER: ret = TR_PORT_UNMAPPED; break;
-        case TR_UPNP_MAP:      ret = TR_PORT_MAPPING; break;
-        case TR_UPNP_UNMAP:    ret = TR_PORT_UNMAPPING; break;
-        case TR_UPNP_IDLE:     ret = handle->isMapped ? TR_PORT_MAPPED
-                                                      : TR_PORT_UNMAPPED; break;
-        default:               ret = TR_PORT_ERROR; break;
+        case TR_UPNP_DISCOVER: ret = TR_NAT_TRAVERSAL_UNMAPPED; break;
+        case TR_UPNP_MAP:      ret = TR_NAT_TRAVERSAL_MAPPING; break;
+        case TR_UPNP_UNMAP:    ret = TR_NAT_TRAVERSAL_UNMAPPING; break;
+        case TR_UPNP_IDLE:     ret = handle->isMapped ? TR_NAT_TRAVERSAL_MAPPED
+                                                      : TR_NAT_TRAVERSAL_UNMAPPED; break;
+        default:               ret = TR_NAT_TRAVERSAL_ERROR; break;
     }
 
     return ret;

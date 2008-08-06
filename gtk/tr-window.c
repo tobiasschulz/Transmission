@@ -412,7 +412,8 @@ GtkWidget *
 tr_window_new( GtkUIManager * ui_manager, TrCore * core )
 {
     int i, n;
-    const char * pch;
+    int status_stats_mode;
+    char * pch;
     PrivateData * p;
     GtkWidget *vbox, *w, *self, *h, *c, *s, *image, *menu;
     GtkWindow *win;
@@ -495,6 +496,7 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
 
     /* status menu */
     menu = p->status_menu = gtk_menu_new( );
+    status_stats_mode = 0;
     l = NULL;
     pch = pref_string_get( PREF_KEY_STATUSBAR_STATS );
     for( i=0, n=G_N_ELEMENTS(stats_modes); i<n; ++i )
@@ -508,6 +510,7 @@ tr_window_new( GtkUIManager * ui_manager, TrCore * core )
         gtk_menu_shell_append( GTK_MENU_SHELL(menu), w );
         gtk_widget_show( w );
     }
+    g_free( pch );
 
     /* status */
     h = p->status = gtk_hbox_new( FALSE, GUI_PAD );
@@ -603,7 +606,7 @@ updateTorrentCount( PrivateData * p )
 static void
 updateStats( PrivateData * p )
 {
-    const char * pch;
+    char * pch;
     char up[32], down[32], ratio[32], buf[128];
     struct tr_session_stats stats;
     tr_handle * handle = tr_core_handle( p->core );
@@ -611,11 +614,11 @@ updateStats( PrivateData * p )
     /* update the stats */
     pch = pref_string_get( PREF_KEY_STATUSBAR_STATS );
     if( !strcmp( pch, "session-ratio" ) ) {
-        tr_sessionGetStats( handle, &stats );
+        tr_getSessionStats( handle, &stats );
         tr_strlratio( ratio, stats.ratio, sizeof( ratio ) );
         g_snprintf( buf, sizeof(buf), _("Ratio: %s"), ratio );
     } else if( !strcmp( pch, "session-transfer" ) ) {
-        tr_sessionGetStats( handle, &stats );
+        tr_getSessionStats( handle, &stats );
         tr_strlsize( up, stats.uploadedBytes, sizeof( up ) );
         tr_strlsize( down, stats.downloadedBytes, sizeof( down ) );
         /* Translators: do not translate the "size|" disambiguation prefix.
@@ -623,7 +626,7 @@ updateStats( PrivateData * p )
            %2$s is the size of the data we've uploaded */
         g_snprintf( buf, sizeof( buf ), Q_( "size|Down: %1$s, Up: %2$s" ), down, up );
     } else if( !strcmp( pch, "total-transfer" ) ) { 
-        tr_sessionGetCumulativeStats( handle, &stats );
+        tr_getCumulativeSessionStats( handle, &stats );
         tr_strlsize( up, stats.uploadedBytes, sizeof( up ) );
         tr_strlsize( down, stats.downloadedBytes, sizeof( down ) );
         /* Translators: do not translate the "size|" disambiguation prefix.
@@ -631,10 +634,11 @@ updateStats( PrivateData * p )
            %2$s is the size of the data we've uploaded */
         g_snprintf( buf, sizeof( buf ), Q_( "size|Down: %1$s, Up: %2$s" ), down, up );
     } else { /* default is total-ratio */
-        tr_sessionGetCumulativeStats( handle, &stats );
+        tr_getCumulativeSessionStats( handle, &stats );
         tr_strlratio( ratio, stats.ratio, sizeof( ratio ) );
         g_snprintf( buf, sizeof(buf), _("Ratio: %s"), ratio );
     }
+    g_free( pch );
     gtk_label_set_text( GTK_LABEL( p->stats_lb ), buf );
 }
 
@@ -645,7 +649,7 @@ updateSpeeds( PrivateData * p )
     float u, d;
     tr_handle * handle = tr_core_handle( p->core );
 
-    tr_sessionGetSpeed( handle, &d, &u );
+    tr_torrentRates( handle, &d, &u );
     tr_strlspeed( buf, d, sizeof( buf ) );
     gtk_label_set_text( GTK_LABEL( p->dl_lb ), buf );
     tr_strlspeed( buf, u, sizeof( buf ) );

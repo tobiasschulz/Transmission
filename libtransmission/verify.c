@@ -36,8 +36,8 @@ static void
 fireCheckDone( tr_torrent          * torrent,
                tr_verify_done_cb     verify_done_cb )
 {
-    if( verify_done_cb )
-        verify_done_cb( torrent );
+    if( verify_done_cb != NULL )
+        (*verify_done_cb)( torrent );
 }
 
 static struct verify_node currentNode;
@@ -68,7 +68,7 @@ checkFile( tr_torrent       * tor,
     char path[MAX_PATH_LENGTH];
     const tr_file * file = &tor->info.files[fileIndex];
 
-    tr_buildPath ( path, sizeof(path), tor->downloadDir, file->name, NULL );
+    tr_buildPath ( path, sizeof(path), tor->destination, file->name, NULL );
     nofile = stat( path, &sb ) || !S_ISREG( sb.st_mode );
 
     for( i=file->firstPiece; i<=file->lastPiece && i<tor->info.pieceCount && (!*abortFlag); ++i )

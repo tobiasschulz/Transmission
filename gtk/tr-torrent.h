@@ -58,9 +58,6 @@ TrTorrentClass;
 GType
 tr_torrent_get_type(void);
 
-void
-tr_torrent_clear( TrTorrent * tor );
-
 tr_torrent *
 tr_torrent_handle(TrTorrent *tor);
 
@@ -69,6 +66,12 @@ tr_torrent_stat(TrTorrent *tor);
 
 const tr_info *
 tr_torrent_info(TrTorrent *tor);
+
+void
+tr_torrent_start( TrTorrent * tor );
+
+void
+tr_torrent_stop( TrTorrent * tor );
 
 char*
 tr_torrent_status_str ( TrTorrent * tor );
@@ -79,6 +82,13 @@ tr_torrent_delete_files( TrTorrent * tor );
 void
 tr_torrent_open_folder( TrTorrent * tor );
 
+void
+tr_torrent_check_seeding_cap ( TrTorrent* );
+void
+tr_torrent_set_seeding_cap_ratio ( TrTorrent*, gdouble ratio );
+void
+tr_torrent_set_seeding_cap_enabled ( TrTorrent*, gboolean );
+
 TrTorrent *
 tr_torrent_new_preexisting( tr_torrent * tor );
 
@@ -86,6 +96,6 @@ TrTorrent *
 tr_torrent_new_ctor( tr_handle * handle, tr_ctor * ctor, char ** err );
 
 void
-tr_torrent_set_remove_flag( TrTorrent *, gboolean );
+tr_torrent_set_delete_flag( TrTorrent *, gboolean );
 
 #endif

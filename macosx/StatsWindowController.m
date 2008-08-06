@@ -163,23 +163,23 @@ tr_handle * fLib;
 - (void) updateStats
 {
     tr_session_stats statsAll, statsSession;
-    tr_sessionGetCumulativeStats(fLib, &statsAll);
-    tr_sessionGetStats(fLib, &statsSession);
+    tr_getCumulativeSessionStats(fLib, &statsAll);
+    tr_getSessionStats(fLib, &statsSession);
     
     [fUploadedField setStringValue: [NSString stringForFileSize: statsSession.uploadedBytes]];
-    [fUploadedField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%llu bytes", "stats -> bytes"),
+    [fUploadedField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%u bytes", "stats -> bytes"),
                                     statsSession.uploadedBytes]];
     [fUploadedAllField setStringValue: [NSString stringWithFormat: NSLocalizedString(@"%@ total", "stats total"),
                                         [NSString stringForFileSize: statsAll.uploadedBytes]]];
-    [fUploadedAllField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%llu bytes", "stats -> bytes"),
+    [fUploadedAllField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%u bytes", "stats -> bytes"),
                                     statsAll.uploadedBytes]];
     
     [fDownloadedField setStringValue: [NSString stringForFileSize: statsSession.downloadedBytes]];
-    [fDownloadedField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%llu bytes", "stats -> bytes"),
+    [fDownloadedField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%u bytes", "stats -> bytes"),
                                     statsSession.downloadedBytes]];
     [fDownloadedAllField setStringValue: [NSString stringWithFormat: NSLocalizedString(@"%@ total", "stats total"),
                                         [NSString stringForFileSize: statsAll.downloadedBytes]]];
-    [fDownloadedAllField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%llu bytes", "stats -> bytes"),
+    [fDownloadedAllField setToolTip: [NSString stringWithFormat: NSLocalizedString(@"%u bytes", "stats -> bytes"),
                                         statsAll.downloadedBytes]];
     
     [fRatioField setStringValue: [NSString stringForRatio: statsSession.ratio]];
@@ -196,13 +196,13 @@ tr_handle * fLib;
     if (statsAll.sessionCount == 1)
         [fNumOpenedField setStringValue: NSLocalizedString(@"1 time", "stats window -> times opened")];
     else
-        [fNumOpenedField setStringValue: [NSString stringWithFormat: NSLocalizedString(@"%llu times", "stats window -> times opened"),
-                                            statsAll.sessionCount]];
+        [fNumOpenedField setStringValue: [NSString stringWithFormat: NSLocalizedString(@"%d times", "stats window -> times opened"),
+                                        statsAll.sessionCount]];
 }
 
 - (void) performResetStats
 {
-    tr_sessionClearStats(fLib);
+    tr_clearSessionStats(fLib);
     [self updateStats];
 }
 

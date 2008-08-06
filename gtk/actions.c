@@ -49,8 +49,7 @@ static GtkRadioActionEntry sort_radio_entries[] =
   { "sort-by-progress",   NULL, N_("Sort by _Progress"),   NULL, NULL, 2 },
   { "sort-by-ratio",      NULL, N_("Sort by _Ratio"),      NULL, NULL, 3 },
   { "sort-by-state",      NULL, N_("Sort by _State"),      NULL, NULL, 4 },
-  { "sort-by-tracker",    NULL, N_("Sort by _Tracker"),    NULL, NULL, 5 },
-  { "sort-by-age",        NULL, N_("Sort by A_ge"),        NULL, NULL, 6 }
+  { "sort-by-tracker",    NULL, N_("Sort by _Tracker"),    NULL, NULL, 5 }
 };
 
 static void
@@ -91,9 +90,7 @@ static GtkToggleActionEntry pref_toggle_entries[] =
   { "show-statusbar", NULL,
     N_("_Statusbar"), NULL, NULL, G_CALLBACK(toggle_pref_cb), FALSE },
   { "show-toolbar", NULL,
-    N_("_Toolbar"), NULL, NULL, G_CALLBACK(toggle_pref_cb), FALSE },
-  { PREF_KEY_SHOW_TRAY_ICON, NULL,
-    N_("Tray _Icon" ), NULL, NULL, G_CALLBACK(toggle_pref_cb), FALSE }
+    N_("_Toolbar"), NULL, NULL, G_CALLBACK(toggle_pref_cb), FALSE }
 };
 
 static GtkActionEntry entries[] =
@@ -113,9 +110,12 @@ static GtkActionEntry entries[] =
   { "pause-torrent", GTK_STOCK_MEDIA_PAUSE,
     N_("_Pause"), "<control>P", N_("Pause torrent"), G_CALLBACK(action_cb) },
   { "remove-torrent", GTK_STOCK_REMOVE, NULL, "Delete", N_("Remove torrent"), G_CALLBACK(action_cb) },
-  { "delete-torrent", GTK_STOCK_DELETE, N_("_Delete Files and Remove"), "<shift>Delete", NULL, G_CALLBACK(action_cb) },
+  { "delete-torrent", GTK_STOCK_DELETE, N_("_Delete Files and Remove"), "<control>Delete", NULL, G_CALLBACK(action_cb) },
   { "new-torrent", GTK_STOCK_NEW, N_("_New..."), NULL,
     N_("Create a torrent"),
+    G_CALLBACK(action_cb) },
+  { "close", GTK_STOCK_CLOSE, N_("Close _Window"), "<control>W",
+    N_("Close main window"),
     G_CALLBACK(action_cb) },
   { "quit", GTK_STOCK_QUIT, N_("_Quit"), NULL, NULL, G_CALLBACK(action_cb) },
   { "select-all", GTK_STOCK_SELECT_ALL,
@@ -128,10 +128,25 @@ static GtkActionEntry entries[] =
   { "open-torrent-folder", GTK_STOCK_OPEN,
     N_("_Open Folder"), NULL, NULL, G_CALLBACK(action_cb) },
   { "show-about-dialog", GTK_STOCK_ABOUT, NULL, NULL, NULL, G_CALLBACK(action_cb) },
-  { "help", GTK_STOCK_HELP, N_("_Contents"), "F1", NULL, G_CALLBACK(action_cb) },
+  { "help", GTK_STOCK_HELP, NULL, NULL, NULL, G_CALLBACK(action_cb) },
   { "update-tracker", GTK_STOCK_NETWORK,
     N_("Ask Tracker for _More Peers"), NULL, NULL, G_CALLBACK(action_cb) }
 };
+
+static void
+ensure_tooltip (GtkActionEntry * e)
+{
+    if( !e->tooltip && e->label )
+    {
+        const char * src;
+        char *tgt;
+        e->tooltip = g_malloc( strlen( e->label ) + 1 );
+        for( src=e->label, tgt=(char*)e->tooltip; *src; ++src )
+            if( *src != '_' )
+                *tgt++ = *src;
+        *tgt++ = '\0';
+    }
+}
 
 typedef struct
 {
@@ -192,13 +207,16 @@ actions_init( GtkUIManager * ui_manager, gpointer callback_user_data )
 {
   int i, n;
   int active;
-  const char * match;
+  char * match;
   const int n_entries = G_N_ELEMENTS( entries );
   GtkActionGroup * action_group;
 
   myUIManager = ui_manager;
 
-  register_my_icons( );
+  register_my_icons ();
+
+  for( i=0; i<n_entries; ++i )
+    ensure_tooltip (&entries[i]);
 
   action_group = myGroup = gtk_action_group_new( "Actions" );
   gtk_action_group_set_translation_domain( action_group, NULL );
@@ -236,6 +254,7 @@ actions_init( GtkUIManager * ui_manager, gpointer callback_user_data )
 
   gtk_ui_manager_insert_action_group( ui_manager, action_group, 0 );
   g_object_unref (G_OBJECT(action_group));
+  g_free( match );
 }
 
 /****

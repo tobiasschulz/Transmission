@@ -48,10 +48,8 @@ int  tr_torrentIsSeed  ( const tr_torrent * );
 
 void tr_torrentChangeMyPort  ( tr_torrent * );
 
-int tr_torrentExists( const tr_handle *, const uint8_t * );
-tr_torrent* tr_torrentFindFromId( tr_handle *, int id );
+int tr_torrentExists( tr_handle *, const uint8_t * );
 tr_torrent* tr_torrentFindFromHash( tr_handle *, const uint8_t * );
-tr_torrent* tr_torrentFindFromHashString( tr_handle *, const char * );
 tr_torrent* tr_torrentFindFromObfuscatedHash( tr_handle *, const uint8_t* );
 
 void tr_torrentGetRates( const tr_torrent *, float * toClient, float * toPeer );
@@ -124,7 +122,7 @@ struct tr_torrent
     tr_speedlimit              downloadLimitMode;
     struct tr_ratecontrol    * upload;
     struct tr_ratecontrol    * download;
-    struct tr_ratecontrol    * swarmSpeed;
+    struct tr_ratecontrol    * swarmspeed;
 
     int                        error;
     char                       errorString[128];
@@ -132,7 +130,7 @@ struct tr_torrent
     uint8_t                    obfuscatedHash[SHA_DIGEST_LENGTH];
 
     /* Where to download */
-    char                     * downloadDir;
+    char                     * destination;
     
     /* How many bytes we ask for per request */
     uint32_t                   blockSize;
@@ -159,13 +157,15 @@ struct tr_torrent
     uint64_t                   corruptCur;
     uint64_t                   corruptPrev;
 
-    time_t                     addedDate;
-    time_t                     activityDate;
-    time_t                     doneDate;
-    time_t                     startDate;
+    uint64_t                   startDate;
+    uint64_t                   stopDate;
+    uint64_t                   activityDate;
 
     tr_torrent_status_func   * status_func;
     void                     * status_func_user_data;
+
+    tr_torrent_active_func   * active_func;
+    void                     * active_func_user_data;
 
     unsigned int               isRunning : 1;
     unsigned int               isDeleting : 1;
@@ -178,8 +178,6 @@ struct tr_torrent
     tr_stat                    stats;
 
     tr_torrent               * next;
-
-    int                        uniqueId;
 };
 
 #endif

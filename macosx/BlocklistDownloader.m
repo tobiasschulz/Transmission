@@ -34,7 +34,6 @@
 
 - (id) initWithPrefsController: (PrefsController *) prefsController;
 - (void) startDownload;
-- (void) finishDownloadSuccess;
 - (void) updateProcessString;
 - (void) failureSheetClosed: (NSAlert *) alert returnCode: (int) code contextInfo: (void *) info;
 
@@ -42,7 +41,7 @@
 
 @implementation BlocklistDownloader
 
-+ (void) downloadWithPrefsController: (PrefsController *) prefsController
++ (id) downloadWithPrefsController: (PrefsController *) prefsController
 {
     BlocklistDownloader * downloader = [[BlocklistDownloader alloc] initWithPrefsController: prefsController];
     [downloader startDownload];
@@ -51,13 +50,6 @@
 - (void) awakeFromNib
 {
     [fButton setTitle: NSLocalizedString(@"Cancel", "Blocklist -> cancel button")];
-    
-    float oldWidth = [fButton frame].size.width;
-    [fButton sizeToFit];
-    NSRect buttonFrame = [fButton frame];
-    buttonFrame.origin.x -= buttonFrame.size.width - oldWidth;
-    [fButton setFrame: buttonFrame];
-    
     [fTextField setStringValue: [NSLocalizedString(@"Connecting to site", "Blocklist -> message") stringByAppendingEllipsis]];
     
     [fProgressBar setUsesThreadedAnimation: YES];
@@ -116,10 +108,28 @@
 
 - (void) downloadDidFinish: (NSURLDownload *) download
 {
+    //change to indeterminate while processing
+    [fProgressBar setIndeterminate: YES];
+    [fProgressBar startAnimation: self];
+    
+    [fTextField setStringValue: [NSLocalizedString(@"Processing blocklist", "Blocklist -> message") stringByAppendingEllipsis]];
+    [fButton setEnabled: NO];
+    [fStatusWindow display]; //force window to be updated
+    
+    //process data
+    tr_blocklistSetContent([fPrefsController handle], [DESTINATION UTF8String]);
+    
+    //delete downloaded file
     if ([NSApp isOnLeopardOrBetter])
-        [self performSelectorInBackground: @selector(finishDownloadSuccess) withObject: nil];
+        [[NSFileManager defaultManager] removeItemAtPath: DESTINATION error: NULL];
     else
-        [self finishDownloadSuccess];
+        [[NSFileManager defaultManager] removeFileAtPath: DESTINATION handler: nil];
+    
+    [fPrefsController updateBlocklistFields];
+    
+    [NSApp endSheet: fStatusWindow];
+    [fStatusWindow orderOut: self];
+    [self release];
 }
 
 @end
@@ -147,32 +157,6 @@
     
     fDownload = [[NSURLDownload alloc] initWithRequest: request delegate: self];
     [fDownload setDestination: DESTINATION allowOverwrite: YES];
-}
-
-- (void) finishDownloadSuccess
-{
-    //change to indeterminate while processing
-    [fProgressBar setIndeterminate: YES];
-    [fProgressBar startAnimation: self];
-    
-    [fTextField setStringValue: [NSLocalizedString(@"Processing blocklist", "Blocklist -> message") stringByAppendingEllipsis]];
-    [fButton setEnabled: NO];
-    [fStatusWindow display]; //force window to be updated
-    
-    //process data
-    tr_blocklistSetContent([fPrefsController handle], [DESTINATION UTF8String]);
-    
-    //delete downloaded file
-    if ([NSApp isOnLeopardOrBetter])
-        [[NSFileManager defaultManager] removeItemAtPath: DESTINATION error: NULL];
-    else
-        [[NSFileManager defaultManager] removeFileAtPath: DESTINATION handler: nil];
-    
-    [fPrefsController updateBlocklistFields];
-    
-    [NSApp endSheet: fStatusWindow];
-    [fStatusWindow orderOut: self];
-    [self release];
 }
 
 - (void) updateProcessString

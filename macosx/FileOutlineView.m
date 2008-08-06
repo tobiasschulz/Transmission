@@ -26,8 +26,6 @@
 #import "FileNameCell.h"
 #import "FilePriorityCell.h"
 #import "Torrent.h"
-#import "FileListNode.h"
-#import "QuickLookController.h"
 #import "CTGradient.h"
 
 @implementation FileOutlineView
@@ -85,20 +83,6 @@
     [super mouseDown: event];
 }
 
-- (void) keyDown: (NSEvent *) event
-{
-    unichar firstChar = [[event charactersIgnoringModifiers] characterAtIndex: 0];
-    if (firstChar == ' ')
-        [[QuickLookController quickLook] toggleQuickLook];
-    else if (firstChar == NSRightArrowFunctionKey)
-        [[QuickLookController quickLook] pressRight];
-    else if (firstChar == NSLeftArrowFunctionKey)
-        [[QuickLookController quickLook] pressLeft];
-    else;
-    
-    [super keyDown: event];  
-}
-
 - (NSMenu *) menuForEvent: (NSEvent *) event
 {
     int row = [self rowAtPoint: [self convertPoint: [event locationInWindow] fromView: nil]];
@@ -112,15 +96,6 @@
         [self deselectAll: self];
     
     return [self menu];
-}
-
-- (NSRect) iconRectForRow: (int) row
-{
-    FileNameCell * cell = (FileNameCell *)[self preparedCellAtColumn: [self columnWithIdentifier: @"Name"] row: row];
-    NSRect iconRect = [cell imageRectForBounds: [self rectOfRow: row]];
-    
-    iconRect.origin.x += [self indentationPerLevel] * (float)([self levelForRow: row] + 1);
-    return iconRect;
 }
 
 - (void) updateTrackingAreas
@@ -183,7 +158,7 @@
     if (![self isRowSelected: row])
     {
         NSDictionary * item = [self itemAtRow: row]; 
-        NSIndexSet * indexes = [(FileListNode *)item indexes];
+        NSIndexSet * indexes = [item objectForKey: @"Indexes"];
         
         if ([fTorrent checkForFiles: indexes] != NSOffState)
         {

@@ -327,8 +327,10 @@ MyFrame :: OnRemoveUpdate( wxUpdateUIEvent& event )
 void
 MyFrame :: OnRemove( wxCommandEvent& WXUNUSED(unused) )
 {
-    foreach( torrents_v, mySelectedTorrents, it )
-        tr_torrentRemove( *it );
+    foreach( torrents_v, mySelectedTorrents, it ) {
+        tr_torrentRemoveSaved( *it );
+        tr_torrentClose( *it );
+    }
 }
 
 /**
@@ -389,7 +391,7 @@ void MyFrame :: OnOpen( wxCommandEvent& WXUNUSED(event) )
 bool
 MyApp :: OnInit( )
 {
-    handle = tr_sessionInit( "wx" );
+    handle = tr_init( "wx" );
 
     wxCmdLineParser cmdParser( cmdLineDesc, argc, argv );
     if( cmdParser.Parse ( ) )
@@ -455,7 +457,7 @@ void
 MyFrame :: OnPulse(wxTimerEvent& WXUNUSED(event) )
 {
     if( myExitTime ) {
-        if ( !tr_sessionCountTorrents(handle) ||  myExitTime<time(0) ) {
+        if ( !tr_torrentCount(handle) ||  myExitTime<time(0) ) {
             delete myTrayIcon;
             myTrayIcon = 0;
             Destroy( );
@@ -469,7 +471,7 @@ MyFrame :: OnPulse(wxTimerEvent& WXUNUSED(event) )
     mySpeedStats->Pulse( handle );
 
     float down, up;
-    tr_sessionGetSpeed( handle, &down, &up );
+    tr_torrentRates( handle, &down, &up );
     wxString xstr = _("Total DL: ");
     xstr += getReadableSpeed( down );
     SetStatusText( xstr, 1 );
@@ -698,7 +700,7 @@ MyFrame :: OnExit( wxCommandEvent& WXUNUSED( event ) )
     mySelectedTorrents.clear( );
     ApplyCurrentFilter( );
 
-    tr_sessionClose( handle );
+    tr_close( handle );
 
     /* give the connections a max of 10 seconds to shut themselves down */
     myExitTime = time(0) + 10;

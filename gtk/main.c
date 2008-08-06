@@ -22,7 +22,6 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#include <locale.h>
 #include <sys/param.h>
 #include <signal.h>
 #include <string.h>
@@ -49,6 +48,7 @@
 #include "details.h"
 #include "dialogs.h"
 #include "hig.h"
+#include "ipc.h"
 #include "makemeta-ui.h"
 #include "msgwin.h"
 #include "notify.h"
@@ -115,7 +115,6 @@ struct cbdata
     GtkWidget    * msgwin;
     GtkWidget    * prefs;
     GSList       * errqueue;
-    GSList       * dupqueue;
     GHashTable   * tor2details;
     GHashTable   * details2tor;
 };
@@ -124,6 +123,8 @@ struct cbdata
 
 static GtkUIManager * myUIManager = NULL;
 
+static gboolean
+sendremote( GSList * files, gboolean sendquit );
 static void
 appsetup( TrWindow * wind, GSList * args,
           struct cbdata *,
@@ -281,67 +282,18 @@ setupsighandlers( void )
       signal( sigs[i], fatalsig );
 }
 
-struct rpc_data
-{
-    int type;
-    int torrentId;
-    tr_torrent * tor;
-    struct cbdata * cbdata;
-};
-
-static int
-onRPCIdle( void * vdata )
-{
-    struct rpc_data * data = vdata;
-    switch( data->type )
-    {
-        case TR_RPC_TORRENT_ADDED:
-            tr_core_add_torrent( data->cbdata->core, tr_torrent_new_preexisting( data->tor ) );
-            break;
-        case TR_RPC_TORRENT_STARTED:
-            /* this should be automatic */
-            break;
-        case TR_RPC_TORRENT_STOPPED:
-            /* this should be automatic */
-            break;
-        case TR_RPC_TORRENT_REMOVING:
-            tr_core_torrent_destroyed( data->cbdata->core, data->torrentId );
-            break;
-        case TR_RPC_TORRENT_CHANGED:
-        case TR_RPC_SESSION_CHANGED:
-            /* nothing interesting to do here */
-            break;
-    }
-    g_free( data );
-    return FALSE;
-}
-
-static void
-onRPCChanged( tr_handle            * handle UNUSED,
-              tr_rpc_callback_type   type,
-              struct tr_torrent    * tor,
-              void                 * cbdata )
-{
-    /* this callback is being invoked from the libtransmission thread,
-     * so let's push the information over to the gtk+ thread where
-     * it's safe to update the gui */
-    struct rpc_data * data = g_new0( struct rpc_data, 1 );
-    data->type = type;
-    data->torrentId = tor ? tr_torrentId( tor ) : -1;
-    data->tor = type == TR_RPC_TORRENT_REMOVING ? NULL : tor;
-    data->cbdata = cbdata;
-    g_idle_add( onRPCIdle, data );
-}
-
 int
 main( int argc, char ** argv )
 {
+    gboolean do_inhibit;
+    guint inhibit_cookie;
     char * err = NULL;
     struct cbdata * cbdata;
     GSList * argfiles;
     GError * gerr;
     gboolean didinit = FALSE;
     gboolean didlock = FALSE;
+    gboolean sendquit = FALSE;
     gboolean startpaused = FALSE;
     gboolean startminimized = FALSE;
     char * domain = "transmission";
@@ -350,6 +302,8 @@ main( int argc, char ** argv )
     GOptionEntry entries[] = {
         { "paused", 'p', 0, G_OPTION_ARG_NONE, &startpaused,
           _("Start with all torrents paused"), NULL },
+        { "quit", 'q', 0, G_OPTION_ARG_NONE, &sendquit,
+          _( "Ask the running instance to quit"), NULL },
 #ifdef STATUS_ICON_SUPPORTED
         { "minimized", 'm', 0, G_OPTION_ARG_NONE, &startminimized,
           _( "Start minimized in system tray"), NULL },
@@ -364,7 +318,6 @@ main( int argc, char ** argv )
     cbdata->details2tor = g_hash_table_new( g_direct_hash, g_direct_equal );
 
     /* bind the gettext domain */
-    setlocale( LC_ALL, "" );
     bindtextdomain( domain, TRANSMISSIONLOCALEDIR );
     bind_textdomain_codeset( domain, "UTF-8" );
     textdomain( domain );
@@ -378,7 +331,7 @@ main( int argc, char ** argv )
         g_clear_error( &gerr );
         return 0;
     }
-    if( configDir == NULL )
+    if( !configDir )
         configDir = (char*) tr_getDefaultConfigDir( );
 
     tr_notify_init( );
@@ -391,56 +344,30 @@ main( int argc, char ** argv )
     gtk_ui_manager_ensure_update (myUIManager);
     gtk_window_set_default_icon_name ( "transmission" );
 
+    argfiles = checkfilenames( argc-1, argv+1 );
+    didlock = didinit && sendremote( argfiles, sendquit );
     setupsighandlers( ); /* set up handlers for fatal signals */
 
-    /* either get a lockfile s.t. this is the one instance of
-     * transmission that's running, OR if there are files to
-     * be added, delegate that to the running instance via dbus */
-    didlock = cf_lock( &err );
-    argfiles = checkfilenames( argc-1, argv+1 );
-    if( !didlock && argfiles )
+    if( ( didinit || cf_init( configDir, &err ) ) &&
+        ( didlock || cf_lock( &err ) ) )
     {
-        GSList * l;
-        gboolean delegated = FALSE;
-        for( l=argfiles; l; l=l->next )
-            delegated |= gtr_dbus_add_torrent( l->data );
-        if( delegated )
-            err = NULL;
-    }
-
-    if( didlock && ( didinit || cf_init( configDir, &err ) ) )
-    {
-        tr_handle * h = tr_sessionInitFull(
-                            configDir,
-                            "gtk",
-                            pref_string_get( PREF_KEY_DOWNLOAD_DIR ),
-                            pref_flag_get( PREF_KEY_PEX ),
-                            pref_flag_get( PREF_KEY_PORT_FORWARDING ),
-                            pref_int_get( PREF_KEY_PORT ),
-                            pref_int_get( PREF_KEY_ENCRYPTION ),
-                            pref_flag_get( PREF_KEY_UL_LIMIT_ENABLED ),
-                            pref_int_get( PREF_KEY_UL_LIMIT ),
-                            pref_flag_get( PREF_KEY_DL_LIMIT_ENABLED ),
-                            pref_int_get( PREF_KEY_DL_LIMIT ),
-                            pref_int_get( PREF_KEY_MAX_PEERS_GLOBAL ),
-                            pref_int_get( PREF_KEY_MSGLEVEL ),
-                            TRUE, /* message queueing */
-                            pref_flag_get( PREF_KEY_BLOCKLIST_ENABLED ),
-                            pref_int_get( PREF_KEY_PEER_SOCKET_TOS ),
-                            pref_flag_get( PREF_KEY_RPC_ENABLED ),
-                            pref_int_get( PREF_KEY_RPC_PORT ),
-                            pref_string_get( PREF_KEY_RPC_ACL ),
-                            pref_flag_get( PREF_KEY_RPC_AUTH_ENABLED ),
-                            pref_string_get( PREF_KEY_RPC_USERNAME ),
-                            pref_string_get( PREF_KEY_RPC_PASSWORD ),
-                            pref_flag_get( PREF_KEY_PROXY_SERVER_ENABLED ),
-                            pref_string_get( PREF_KEY_PROXY_SERVER ),
-                            pref_int_get( PREF_KEY_PROXY_PORT ),
-                            pref_int_get( PREF_KEY_PROXY_TYPE ),
-                            pref_flag_get( PREF_KEY_PROXY_AUTH_ENABLED ),
-                            pref_string_get( PREF_KEY_PROXY_USERNAME ),
-                            pref_string_get( PREF_KEY_PROXY_PASSWORD ) );
-
+        tr_handle * h = tr_initFull( configDir,
+                                     "gtk",
+                                     pref_flag_get( PREF_KEY_PEX ),
+                                     pref_flag_get( PREF_KEY_NAT ),
+                                     pref_int_get( PREF_KEY_PORT ),
+                                     pref_flag_get( PREF_KEY_ENCRYPTED_ONLY )
+                                         ? TR_ENCRYPTION_REQUIRED
+                                         : TR_ENCRYPTION_PREFERRED,
+                                     pref_flag_get( PREF_KEY_UL_LIMIT_ENABLED ),
+                                     pref_int_get( PREF_KEY_UL_LIMIT ),
+                                     pref_flag_get( PREF_KEY_DL_LIMIT_ENABLED ),
+                                     pref_int_get( PREF_KEY_DL_LIMIT ),
+                                     pref_int_get( PREF_KEY_MAX_PEERS_GLOBAL ),
+                                     pref_int_get( PREF_KEY_MSGLEVEL ),
+                                     TRUE, /* message queueing */
+                                     pref_flag_get( PREF_KEY_BLOCKLIST_ENABLED ),
+                                     pref_int_get( PREF_KEY_PEER_SOCKET_TOS ) );
         cbdata->core = tr_core_new( h );
 
         /* create main window now to be a parent to any error dialogs */
@@ -449,19 +376,40 @@ main( int argc, char ** argv )
         g_signal_connect( win, "size-allocate", G_CALLBACK(onMainWindowSizeAllocated), cbdata );
 
         appsetup( win, argfiles, cbdata, startpaused, startminimized );
-        tr_sessionSetRPCCallback( h, onRPCChanged, cbdata );
-
-        gtk_main();
     }
-    else if( err )
+    else
     {
         gtk_widget_show( errmsg_full( NULL, (callbackfunc_t)gtk_main_quit,
                                       NULL, "%s", err ) );
         g_free( err );
-        gtk_main();
     }
 
+    do_inhibit = pref_flag_get( PREF_KEY_INHIBIT_HIBERNATION );
+    if( do_inhibit ) 
+        inhibit_cookie = gtr_inhibit_hibernation( );
+
+    gtk_main();
+
+    if( do_inhibit && inhibit_cookie ) 
+        gtr_uninhibit_hibernation( inhibit_cookie );
+
     return 0;
+}
+
+static gboolean
+sendremote( GSList * files, gboolean sendquit )
+{
+    const gboolean didlock = cf_lock( NULL );
+
+    /* send files if there's another instance, otherwise start normally */
+    if( !didlock && files )
+        exit( ipc_sendfiles_blocking( files ) ? 0 : 1 );
+
+    /* either send a quit message or exit if no other instance */
+    if( sendquit )
+        exit( didlock ? 0 : !ipc_sendquit_blocking() );
+
+    return didlock;
 }
 
 static void
@@ -480,11 +428,7 @@ appsetup( TrWindow * wind, GSList * torrentFiles,
     cbdata->timer      = 0;
     cbdata->closing    = FALSE;
     cbdata->errqueue   = NULL;
-    cbdata->dupqueue   = NULL;
     cbdata->minimized  = minimized;
-
-    if( minimized )
-        pref_flag_set( PREF_KEY_SHOW_TRAY_ICON, TRUE );
 
     actions_set_core( cbdata->core );
 
@@ -503,11 +447,14 @@ appsetup( TrWindow * wind, GSList * torrentFiles,
     torrentFiles = NULL;
     tr_core_torrents_added( cbdata->core );
 
+    /* set up the ipc socket */
+    ipc_socket_setup( GTK_WINDOW( wind ), cbdata->core );
+
     /* set up main window */
     winsetup( cbdata, wind );
 
-    /* set up the icon */
-    prefschanged( cbdata->core, PREF_KEY_SHOW_TRAY_ICON, cbdata );
+    /* set up the system tray */
+    cbdata->icon = tr_icon_new( cbdata->core );
 
     /* start model update timer */
     cbdata->timer = g_timeout_add( UPDATE_INTERVAL, updatemodel, cbdata );
@@ -661,10 +608,6 @@ quitThreadFunc( gpointer gdata )
         g_slist_foreach( cbdata->errqueue, (GFunc)g_free, NULL );
         g_slist_free( cbdata->errqueue );
     }
-    if( cbdata->dupqueue ) {
-        g_slist_foreach( cbdata->dupqueue, (GFunc)g_free, NULL );
-        g_slist_free( cbdata->dupqueue );
-    }
 
     g_hash_table_destroy( cbdata->details2tor );
     g_hash_table_destroy( cbdata->tor2details );
@@ -673,6 +616,18 @@ quitThreadFunc( gpointer gdata )
     /* exit the gtk main loop */
     gtk_main_quit( );
     return NULL;
+}
+
+/* since there are no buttons in the dialog, gtk tries to
+ * select one of the labels, which looks ugly... so force
+ * the dialog's primary and secondary labels to be unselectable */
+static void
+deselectLabels( GtkWidget * w, gpointer unused UNUSED )
+{
+    if( GTK_IS_LABEL( w ) )
+        gtk_label_set_selectable( GTK_LABEL(w), FALSE );
+    else if( GTK_IS_CONTAINER( w ) )
+        gtk_container_foreach( GTK_CONTAINER(w), deselectLabels, NULL );
 }
 
 static void
@@ -716,7 +671,8 @@ wannaquit( void * vdata )
     gtk_table_attach_defaults( GTK_TABLE( p ), w, 1, 2, 1, 2 );
 
     b = gtk_alignment_new(0.0, 1.0, 0.01, 0.01);
-    w = tr_button_new_from_stock( GTK_STOCK_QUIT, _( "_Quit Now" ) );
+    w = gtk_button_new_with_label( _( "_Quit Immediately" ) );
+    gtk_button_set_image( GTK_BUTTON(w), gtk_image_new_from_stock( GTK_STOCK_QUIT, GTK_ICON_SIZE_BUTTON ) );
     g_signal_connect(w, "clicked", G_CALLBACK(do_exit_cb), NULL);
     gtk_container_add(GTK_CONTAINER(b), w);
     gtk_table_attach(GTK_TABLE(p), b, 1, 2, 2, 3, GTK_FILL, GTK_FILL, 0, 10 );
@@ -831,76 +787,39 @@ setupdrag(GtkWidget *widget, struct cbdata *data) {
 }
 
 static void
-flushAddTorrentErrors( GtkWindow * window, const char * primary, GSList ** files )
-{
-    GString * s = g_string_new( NULL );
-    GSList * l;
-    GtkWidget * w;
-    for( l=*files; l; l=l->next )
-        g_string_append_printf( s, "%s\n", (const char*)l->data );
-    w = gtk_message_dialog_new( window,
-                                GTK_DIALOG_DESTROY_WITH_PARENT,
-                                GTK_MESSAGE_ERROR,
-                                GTK_BUTTONS_CLOSE,
-                                primary );
-    gtk_message_dialog_format_secondary_text( GTK_MESSAGE_DIALOG( w ), s->str );
-    g_signal_connect_swapped( w, "response",
-                              G_CALLBACK( gtk_widget_destroy ), w );
-    gtk_widget_show_all( w );
-    g_string_free( s, TRUE );
-
-    g_slist_foreach( *files, (GFunc)g_free, NULL );
-    g_slist_free( *files );
-    *files = NULL;
-}
-
-static void
-showTorrentErrors( struct cbdata * cbdata )
-{
-    if( cbdata->errqueue )
-        flushAddTorrentErrors( GTK_WINDOW( cbdata->wind ),
-                               ngettext( "Couldn't add corrupt torrent",
-                                         "Couldn't add corrupt torrents",
-                                         g_slist_length( cbdata->errqueue ) ),
-                               &cbdata->errqueue );
-
-    if( cbdata->dupqueue )
-        flushAddTorrentErrors( GTK_WINDOW( cbdata->wind ),
-                               ngettext( "Couldn't add duplicate torrent",
-                                         "Couldn't add duplicate torrents",
-                                         g_slist_length( cbdata->dupqueue ) ),
-                               &cbdata->dupqueue );
-}
-
-static void
 coreerr( TrCore * core UNUSED, enum tr_core_err code, const char * msg,
          gpointer gdata )
 {
-    struct cbdata * c = gdata;
+    struct cbdata * cbdata = gdata;
+    char          * joined;
 
     switch( code )
     {
-        case TR_EINVALID:
-            c->errqueue = g_slist_append( c->errqueue, g_path_get_basename( msg ) );
-            break;
-
-        case TR_EDUPLICATE:
-            c->dupqueue = g_slist_append( c->dupqueue, g_path_get_basename( msg ) );
-            break;
-
+        case TR_CORE_ERR_ADD_TORRENT:
+            cbdata->errqueue = g_slist_append( cbdata->errqueue,
+                                               g_strdup( msg ) );
+            return;
         case TR_CORE_ERR_NO_MORE_TORRENTS:
-            showTorrentErrors( c );
-            break;
-
+            if( cbdata->errqueue )
+            {
+                joined = joinstrlist( cbdata->errqueue, "\n" );
+                errmsg( cbdata->wind,
+                        ngettext( "Failed to load torrent file: %s",
+                                  "Failed to load torrent files: %s",
+                                  g_slist_length( cbdata->errqueue ) ),
+                        joined );
+                g_slist_foreach( cbdata->errqueue, (GFunc) g_free, NULL );
+                g_slist_free( cbdata->errqueue );
+                cbdata->errqueue = NULL;
+                g_free( joined );
+            }
+            return;
         case TR_CORE_ERR_SAVE_STATE:
-            errmsg( c->wind, "%s", msg );
-            break;
-
-        default:
-            g_assert_not_reached();
-            break;
+            errmsg( cbdata->wind, "%s", msg );
+            return;
     }
 
+    g_assert_not_reached();
 }
 
 #if GTK_CHECK_VERSION(2,8,0)
@@ -931,150 +850,67 @@ prefschanged( TrCore * core UNUSED, const char * key, gpointer data )
     struct cbdata * cbdata = data;
     tr_handle     * tr     = tr_core_handle( cbdata->core );
 
-    if( !strcmp( key, PREF_KEY_ENCRYPTION ) )
+    if( !strcmp( key, PREF_KEY_ENCRYPTED_ONLY ) )
     {
-        const int encryption = pref_int_get( key );
-g_message( "setting encryption to %d", encryption );
-        tr_sessionSetEncryption( tr, encryption );
+        const gboolean crypto_only = pref_flag_get( key );
+        tr_setEncryptionMode( tr, crypto_only ? TR_ENCRYPTION_REQUIRED
+                                              : TR_ENCRYPTION_PREFERRED );
     }
     else if( !strcmp( key, PREF_KEY_PORT ) )
     {
         const int port = pref_int_get( key );
-        tr_sessionSetPeerPort( tr, port );
-    }
-    else if( !strcmp( key, PREF_KEY_SHOW_TRAY_ICON ) )
-    {
-        const int show = pref_flag_get( key );
-        if( show && !cbdata->icon )
-            cbdata->icon = tr_icon_new( cbdata->core );
-        else if( !show && cbdata->icon ) {
-            g_object_unref( cbdata->icon );
-            cbdata->icon = NULL;
-        }
+        tr_setBindPort( tr, port );
     }
     else if( !strcmp( key, PREF_KEY_DL_LIMIT_ENABLED ) )
     {
         const gboolean b = pref_flag_get( key );
-        tr_sessionSetSpeedLimitEnabled( tr, TR_DOWN, b );
+        tr_setUseGlobalSpeedLimit( tr, TR_DOWN, b );
     }
     else if( !strcmp( key, PREF_KEY_DL_LIMIT ) )
     {
         const int limit = pref_int_get( key );
-        tr_sessionSetSpeedLimit( tr, TR_DOWN, limit );
+        tr_setGlobalSpeedLimit( tr, TR_DOWN, limit );
     }
     else if( !strcmp( key, PREF_KEY_UL_LIMIT_ENABLED ) )
     {
         const gboolean b = pref_flag_get( key );
-        tr_sessionSetSpeedLimitEnabled( tr, TR_UP, b );
+        tr_setUseGlobalSpeedLimit( tr, TR_UP, b );
     }
     else if( !strcmp( key, PREF_KEY_UL_LIMIT ) )
     {
         const int limit = pref_int_get( key );
-        tr_sessionSetSpeedLimit( tr, TR_UP, limit );
+        tr_setGlobalSpeedLimit( tr, TR_UP, limit );
     }
-    else if( !strcmp( key, PREF_KEY_PORT_FORWARDING ) )
+    else if( !strcmp( key, PREF_KEY_NAT ) )
     {
         const gboolean enabled = pref_flag_get( key );
-        tr_sessionSetPortForwardingEnabled( tr, enabled );
+        tr_natTraversalEnable( tr, enabled );
     }
     else if( !strcmp( key, PREF_KEY_PEX ) )
     {
-        const gboolean b = pref_flag_get( key );
-        tr_sessionSetPortForwardingEnabled( tr, b );
-    }
-    else if( !strcmp( key, PREF_KEY_RPC_ENABLED ) )
-    {
-        tr_sessionSetRPCEnabled( tr, pref_flag_get( key ) );
-    }
-    else if( !strcmp( key, PREF_KEY_RPC_PORT ) )
-    {
-        tr_sessionSetRPCPort( tr, pref_int_get( key ) );
-    }
-    else if( !strcmp( key, PREF_KEY_RPC_ENABLED ) )
-    {
-        tr_sessionSetRPCEnabled( tr, pref_flag_get( key ) );
-    }
-    else if( !strcmp( key, PREF_KEY_RPC_ACL ) )
-    {
-        char * err = NULL;
-        const char * s = pref_string_get( key );
-        tr_sessionSetRPCACL( tr, s, &err );
-    }
-    else if( !strcmp( key, PREF_KEY_RPC_USERNAME ) )
-    {
-        const char * s = pref_string_get( key );
-        tr_sessionSetRPCUsername( tr, s );
-    }
-    else if( !strcmp( key, PREF_KEY_RPC_PASSWORD ) )
-    {
-        const char * s = pref_string_get( key );
-        tr_sessionSetRPCPassword( tr, s );
-    }
-    else if( !strcmp( key, PREF_KEY_RPC_AUTH_ENABLED ) )
-    {
         const gboolean enabled = pref_flag_get( key );
-        tr_sessionSetRPCPasswordEnabled( tr, enabled );
-    }
-    else if( !strcmp( key, PREF_KEY_PROXY_SERVER ) )
-    {
-        const char * s = pref_string_get( key );
-        tr_sessionSetProxy( tr, s );
-    }
-    else if( !strcmp( key, PREF_KEY_PROXY_TYPE ) )
-    {
-        const int i = pref_int_get( key );
-        tr_sessionSetProxyType( tr, i );
-    }
-    else if( !strcmp( key, PREF_KEY_PROXY_SERVER_ENABLED ) )
-    {
-        const gboolean enabled = pref_flag_get( key );
-        tr_sessionSetProxyEnabled( tr, enabled );
-    }
-    else if( !strcmp( key, PREF_KEY_PROXY_AUTH_ENABLED ) )
-    {
-        const gboolean enabled = pref_flag_get( key );
-        tr_sessionSetProxyAuthEnabled( tr, enabled );
-    }
-    else if( !strcmp( key, PREF_KEY_PROXY_USERNAME ) )
-    {
-        const char * s = pref_string_get( key );
-        tr_sessionSetProxyUsername( tr, s );
-    }
-    else if( !strcmp( key, PREF_KEY_PROXY_PASSWORD ) )
-    {
-        const char * s = pref_string_get( key );
-        tr_sessionSetProxyPassword( tr, s );
+        tr_setPexEnabled( tr_core_handle( cbdata->core ), enabled );
     }
 }
 
 gboolean
-updatemodel( gpointer gdata )
-{
-    struct cbdata *data = gdata;
-    const gboolean done = data->closing || global_sigcount;
+updatemodel(gpointer gdata) {
+  struct cbdata *data = gdata;
 
-    if( !done )
-    {
-        /* update the torrent data in the model */
-        tr_core_update( data->core );
+  if( !data->closing && 0 < global_sigcount )
+  {
+      wannaquit( data );
+      return FALSE;
+  }
 
-        /* update the main window's statusbar and toolbar buttons */
-        if( data->wind )
-            tr_window_update( data->wind );
+  /* update the torrent data in the model */
+  tr_core_update( data->core );
 
-        /* update the actions */
-        refreshTorrentActions( tr_window_get_selection( data->wind ) );
-    }
+  /* update the main window's statusbar and toolbar buttons */
+  if( data->wind )
+      tr_window_update( data->wind );
 
-    return !done;
-}
-
-static void
-aboutDialogActivateLink( GtkAboutDialog * dialog UNUSED,
-                         const gchar    * link_,
-                         gpointer         user_data UNUSED )
-{
-    gtr_open_file( link_ );
+  return TRUE;
 }
 
 static void
@@ -1089,8 +925,6 @@ about ( GtkWindow * parent )
         "Bryan Varner (BeOS)", 
         NULL
     };
-
-    gtk_about_dialog_set_url_hook( aboutDialogActivateLink, NULL, NULL );
 
     gtk_show_about_dialog( parent,
         "name", g_get_application_name(),
@@ -1116,9 +950,10 @@ startTorrentForeach (GtkTreeModel * model,
                      GtkTreeIter  * iter,
                      gpointer       data UNUSED)
 {
-    tr_torrent * tor = NULL;
-    gtk_tree_model_get( model, iter, MC_TORRENT_RAW, &tor, -1 );
-    tr_torrentStart( tor );
+    TrTorrent * tor = NULL;
+    gtk_tree_model_get( model, iter, MC_TORRENT, &tor, -1 );
+    tr_torrent_start( tor );
+    g_object_unref( G_OBJECT( tor ) );
 }
 
 static void
@@ -1127,9 +962,10 @@ stopTorrentForeach (GtkTreeModel * model,
                     GtkTreeIter  * iter,
                     gpointer       data UNUSED)
 {
-    tr_torrent * tor = NULL;
-    gtk_tree_model_get( model, iter, MC_TORRENT_RAW, &tor, -1 );
-    tr_torrentStop( tor );
+    TrTorrent * tor = NULL;
+    gtk_tree_model_get( model, iter, MC_TORRENT, &tor, -1 );
+    tr_torrent_stop( tor );
+    g_object_unref( G_OBJECT( tor ) );
 }
 
 static void
@@ -1138,9 +974,10 @@ updateTrackerForeach (GtkTreeModel * model,
                       GtkTreeIter  * iter,
                       gpointer       data UNUSED)
 {
-    tr_torrent * tor = NULL;
-    gtk_tree_model_get( model, iter, MC_TORRENT_RAW, &tor, -1 );
-    tr_torrentManualUpdate( tor );
+    TrTorrent * tor = NULL;
+    gtk_tree_model_get( model, iter, MC_TORRENT, &tor, -1 );
+    tr_manualUpdate( tr_torrent_handle( tor ) );
+    g_object_unref( G_OBJECT( tor ) );
 }
 
 static void
@@ -1299,6 +1136,11 @@ doAction ( const char * action_name, gpointer user_data )
     {
         removeSelected( data, TRUE );
     }
+    else if (!strcmp (action_name, "close"))
+    {
+        if( data->wind != NULL )
+            winclose( NULL, NULL, data );
+    }
     else if (!strcmp (action_name, "quit"))
     {
         askquit( data->core, data->wind, wannaquit, data );
@@ -1345,9 +1187,8 @@ doAction ( const char * action_name, gpointer user_data )
     }
     else if (!strcmp (action_name, "help"))
     {
-        char * url = gtr_get_help_url( );
-        gtr_open_file( url );
-        g_free( url );
+        gtr_open_file( "http://www.transmissionbt.com/help/gtk/"
+                       SHORT_VERSION_STRING );
     }
     else if (!strcmp (action_name, "toggle-main-window"))
     {

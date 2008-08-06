@@ -6,6 +6,7 @@ gtk/details.c
 gtk/dialogs.c
 gtk/file-list.c
 gtk/hig.c
+gtk/ipc.c
 gtk/main.c
 gtk/makemeta-ui.c
 gtk/msgwin.c
@@ -13,7 +14,6 @@ gtk/notify.c
 gtk/sexy-icon-entry.c
 gtk/stats.c
 gtk/torrent-cell-renderer.c
-gtk/tracker-list.c
 gtk/transmission.desktop.in
 gtk/tr-core.c
 gtk/tr-icon.c

@@ -60,7 +60,7 @@ readOrWriteBytes( const tr_torrent  * tor,
     assert( !file->length || (fileOffset < file->length));
     assert( fileOffset + buflen <= file->length );
 
-    tr_buildPath ( path, sizeof(path), tor->downloadDir, file->name, NULL );
+    tr_buildPath ( path, sizeof(path), tor->destination, file->name, NULL );
     fileExists = !stat( path, &sb );
 
     if( !file->length )
@@ -68,7 +68,7 @@ readOrWriteBytes( const tr_torrent  * tor,
 
     if ((ioMode==TR_IO_READ) && !fileExists ) /* does file exist? */
         err = tr_ioErrorFromErrno( errno );
-    else if ((fd = tr_fdFileCheckout ( tor->downloadDir,
+    else if ((fd = tr_fdFileCheckout ( tor->destination,
                                        file->name,
                                        ioMode==TR_IO_WRITE )) < 0)
         err = fd;
@@ -99,12 +99,12 @@ compareOffsetToFile( const void * a, const void * b )
     return 0;
 }
 
-void
-tr_ioFindFileLocation( const tr_torrent * tor,
-                       tr_piece_index_t   pieceIndex,
-                       uint32_t           pieceOffset,
-                       tr_file_index_t  * fileIndex,
-                       uint64_t         * fileOffset )
+static void
+findFileLocation( const tr_torrent * tor,
+                  tr_piece_index_t   pieceIndex,
+                  uint32_t           pieceOffset,
+                  tr_file_index_t  * fileIndex,
+                  uint64_t         * fileOffset )
 {
     const uint64_t offset = tr_pieceOffset( tor, pieceIndex, pieceOffset, 0 );
     const tr_file * file;
@@ -135,7 +135,7 @@ ensureMinimumFileSize( const tr_torrent  * tor,
     assert( 0<=fileIndex && fileIndex<tor->info.fileCount );
     assert( minBytes <= file->length );
 
-    fd = tr_fdFileCheckout( tor->downloadDir, file->name, TRUE );
+    fd = tr_fdFileCheckout( tor->destination, file->name, TRUE );
     if( fd < 0 ) /* bad fd */
         err = fd;
     else if (fstat (fd, &sb) ) /* how big is the file? */
@@ -172,8 +172,8 @@ readOrWritePiece( const tr_torrent        * tor,
     if( pieceOffset + buflen > tr_torPieceCountBytes( tor, pieceIndex ) )
         return TR_ERROR_ASSERT;
 
-    tr_ioFindFileLocation( tor, pieceIndex, pieceOffset,
-                           &fileIndex, &fileOffset );
+    findFileLocation ( tor, pieceIndex, pieceOffset,
+                            &fileIndex, &fileOffset );
 
     while( buflen && !err )
     {
@@ -232,6 +232,7 @@ recalculateHash( const tr_torrent  * tor,
 
     int n;
     tr_errno err;
+    const tr_info * info;
 
     /* only check one block at a time to prevent disk thrashing.
      * this also lets us reuse the same buffer each time. */
@@ -240,10 +241,11 @@ recalculateHash( const tr_torrent  * tor,
 
     tr_lockLock( lock );
 
-    assert( tor );
-    assert( setme );
+    assert( tor != NULL );
+    assert( setme != NULL );
     assert( pieceIndex < tor->info.pieceCount );
 
+    info = &tor->info;
     n = tr_torPieceCountBytes( tor, pieceIndex );
 
     if( buflen < n ) {
