@@ -13,13 +13,11 @@ EXTRA_DIST = \
     Applescript \
     Images \
     Growl.framework \
-    en.lproj \
+    English.lproj \
     es.lproj \
     fr.lproj \
-    it.lproj \
     nl.lproj \
     ru.lproj \
-    zh_TW.lproj \
     AboutWindowController.h \
     AboutWindowController.m \
     ActionPopUpButton.h \

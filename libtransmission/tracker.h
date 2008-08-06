@@ -27,7 +27,7 @@ tr_tracker * tr_trackerNew( const tr_torrent * );
 
 void  tr_trackerFree ( tr_tracker * );
 
-void  tr_trackerSessionClose( tr_handle * );
+void  tr_trackerShuttingDown( tr_handle * );
 
 /**
 ***  Tracker Publish / Subscribe
@@ -60,19 +60,19 @@ typedef struct
 }
 tr_tracker_event;
 
-tr_publisher_tag  tr_trackerSubscribe       ( struct tr_tracker      * tag,
-                                              tr_delivery_func         func,
-                                              void                   * user );
+tr_publisher_tag  tr_trackerSubscribe       ( struct tr_tracker * tag,
+                                              tr_delivery_func      func,
+                                              void                * user );
 
-void              tr_trackerUnsubscribe     ( struct tr_tracker      * tracker,
-                                              tr_publisher_tag         tag );
+void              tr_trackerUnsubscribe     ( struct tr_tracker * tracker,
+                                              tr_publisher_tag      tag );
 
 /***
 ****
 ***/
 
 void tr_trackerStat                         ( const tr_tracker       * tracker,
-                                              struct tr_stat         * setme);
+                                              struct tr_tracker_stat * setme);
 
 void tr_trackerStart                        ( struct tr_tracker * );
 
@@ -84,7 +84,7 @@ void tr_trackerReannounce                   ( struct tr_tracker * );
 
 void tr_trackerChangeMyPort                 ( struct tr_tracker * );
 
-const tr_tracker_info * tr_trackerGetAddress( struct tr_tracker * );
+const tr_tracker_info * tr_trackerGetAddress( const struct tr_tracker * );
 
 int  tr_trackerCanManualAnnounce            ( const struct tr_tracker * );
 

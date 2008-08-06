@@ -17,19 +17,27 @@
 #include <curl/curl.h>
 
 #include "transmission.h"
-#include "list.h"
 #include "trevent.h"
 #include "utils.h"
 #include "web.h"
+
+#define CURL_CHECK_VERSION(major,minor,micro)    \
+    (LIBCURL_VERSION_MAJOR > (major) || \
+     (LIBCURL_VERSION_MAJOR == (major) && LIBCURL_VERSION_MINOR > (minor)) || \
+     (LIBCURL_VERSION_MAJOR == (major) && LIBCURL_VERSION_MINOR == (minor) && \
+      LIBCURL_VERSION_PATCH >= (micro)))
+
+#define PULSE_MSEC 500
 
 #define dbgmsg(fmt...) tr_deepLog( __FILE__, __LINE__, "web", ##fmt )
 
 struct tr_web
 {
+    unsigned int dying     : 1;
+    unsigned int running   : 1;
     int remain;
     CURLM * cm;
     tr_session * session;
-    tr_list * socket_events;
     struct event timer;
 };
 
@@ -38,7 +46,6 @@ struct tr_web_task
     unsigned long tag;
     struct evbuffer * response;
     char * url;
-    char * range;
     tr_session * session;
     tr_web_done_func * done_func;
     void * done_func_user_data;
@@ -49,6 +56,7 @@ processCompletedTasks( tr_web * web )
 {
     CURL * easy;
     CURLMsg * msg;
+    CURLcode res;
 
     do {
         /* this convoluted loop is from the "hiperinfo.c" sample which
@@ -59,6 +67,7 @@ processCompletedTasks( tr_web * web )
         while(( msg = curl_multi_info_read( web->cm, &more ))) {
             if( msg->msg == CURLMSG_DONE ) {
                 easy = msg->easy_handle;
+                res = msg->data.result;
                 break;
             }
         }
@@ -77,11 +86,24 @@ processCompletedTasks( tr_web * web )
             curl_multi_remove_handle( web->cm, easy );
             curl_easy_cleanup( easy );
             evbuffer_free( task->response );
-            tr_free( task->range );
             tr_free( task->url );
             tr_free( task );
         }
     } while( easy );
+}
+
+static void
+pump( tr_web * web )
+{
+    int unused;
+    CURLMcode rc;
+    do {
+        rc = curl_multi_perform( web->cm, &unused );
+    } while( rc == CURLM_CALL_MULTI_PERFORM );
+    if ( rc == CURLM_OK  )
+        processCompletedTasks( web );
+    else
+        tr_err( "%s", curl_multi_strerror(rc) );
 }
 
 static size_t
@@ -92,66 +114,46 @@ writeFunc( void * ptr, size_t size, size_t nmemb, void * task )
     return byteCount;
 }
 
-static int
-getCurlProxyType( tr_proxy_type t )
+static void
+ensureTimerIsRunning( tr_web * web )
 {
-    switch( t )
+    if( !web->running )
     {
-        case TR_PROXY_SOCKS4: return CURLPROXY_SOCKS4;
-        case TR_PROXY_SOCKS5: return CURLPROXY_SOCKS5;
-        default:              return CURLPROXY_HTTP;
+        struct timeval tv = tr_timevalMsec( PULSE_MSEC );
+        dbgmsg( "starting web timer" );
+        web->running = 1;
+        evtimer_add( &web->timer, &tv );
     }
 }
-
-
 
 static void
 addTask( void * vtask )
 {
     struct tr_web_task * task = vtask;
-    const tr_handle * session = task->session;
 
-    if( session && session->web )
+    if( task->session && task->session->web )
     {
-        struct tr_web * web = session->web;
+        struct tr_web * web = task->session->web;
         CURL * ch;
+
+        ensureTimerIsRunning( web );
 
         ++web->remain;
         dbgmsg( "adding task #%lu [%s] (%d remain)", task->tag, task->url, web->remain );
 
         ch = curl_easy_init( );
-
-        if( getenv( "TRANSMISSION_LIBCURL_VERBOSE" ) != 0 )
-            curl_easy_setopt( ch, CURLOPT_VERBOSE, 1 );
-
-        if( !task->range && session->isProxyEnabled ) {
-            curl_easy_setopt( ch, CURLOPT_PROXY, session->proxy );
-            curl_easy_setopt( ch, CURLOPT_PROXYPORT, session->proxyPort );
-            curl_easy_setopt( ch, CURLOPT_PROXYTYPE, getCurlProxyType( session->proxyType ) );
-            curl_easy_setopt( ch, CURLOPT_PROXYAUTH, CURLAUTH_ANY );
-        }
-        if( !task->range && session->isProxyAuthEnabled ) {
-            char * str = tr_strdup_printf( "%s:%s", session->proxyUsername, session->proxyPassword );
-            curl_easy_setopt( ch, CURLOPT_PROXYUSERPWD, str );
-            tr_free( str );
-        }
-
         curl_easy_setopt( ch, CURLOPT_PRIVATE, task );
         curl_easy_setopt( ch, CURLOPT_URL, task->url );
         curl_easy_setopt( ch, CURLOPT_WRITEFUNCTION, writeFunc );
         curl_easy_setopt( ch, CURLOPT_WRITEDATA, task );
         curl_easy_setopt( ch, CURLOPT_USERAGENT, TR_NAME "/" LONG_VERSION_STRING );
-        curl_easy_setopt( ch, CURLOPT_SSL_VERIFYHOST, 0 );
         curl_easy_setopt( ch, CURLOPT_SSL_VERIFYPEER, 0 );
         curl_easy_setopt( ch, CURLOPT_FORBID_REUSE, 1 );
         curl_easy_setopt( ch, CURLOPT_NOSIGNAL, 1 );
         curl_easy_setopt( ch, CURLOPT_FOLLOWLOCATION, 1 );
         curl_easy_setopt( ch, CURLOPT_MAXREDIRS, 5 );
         curl_easy_setopt( ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4 );
-        if( task->range )
-            curl_easy_setopt( ch, CURLOPT_RANGE, task->range );
-        else /* don't set encoding if range is sent; it messes up binary data */
-            curl_easy_setopt( ch, CURLOPT_ENCODING, "" );
+        curl_easy_setopt( ch, CURLOPT_ENCODING, "" );
         curl_multi_add_handle( web->cm, ch );
     }
 }
@@ -159,7 +161,6 @@ addTask( void * vtask )
 void
 tr_webRun( tr_session         * session,
            const char         * url,
-           const char         * range,
            tr_web_done_func   * done_func,
            void               * done_func_user_data )
 {
@@ -171,7 +172,6 @@ tr_webRun( tr_session         * session,
         task = tr_new0( struct tr_web_task, 1 );
         task->session = session;
         task->url = tr_strdup( url );
-        task->range = tr_strdup( range );
         task->done_func = done_func;
         task->done_func_user_data = done_func_user_data;
         task->tag = ++tag;
@@ -181,106 +181,36 @@ tr_webRun( tr_session         * session,
     }
 }
 
-/* libevent says that sock is ready to be processed, so wake up libcurl */
 static void
-event_callback( int sock, short action, void * vweb )
+webDestroy( tr_web * web )
 {
-    tr_web * web = vweb;
-    CURLMcode rc;
-    int mask;
-
-#if 0
-    static const char *strings[] = {
-        "NONE","TIMEOUT","READ","TIMEOUT|READ","WRITE","TIMEOUT|WRITE",
-        "READ|WRITE","TIMEOUT|READ|WRITE","SIGNAL" };
-     fprintf( stderr, "%s:%d (%s) event on socket %d (%s)\n",
-              __FILE__, __LINE__, __FUNCTION__,
-              sock, strings[action] );
-#endif
-
-    mask = 0;
-    if( action & EV_READ  ) mask |= CURL_CSELECT_IN;
-    if( action & EV_WRITE ) mask |= CURL_CSELECT_OUT;
-
-    do
-        rc = curl_multi_socket_action( web->cm, sock, mask, &web->remain );
-    while( rc == CURLM_CALL_MULTI_PERFORM );
-
-    if ( rc != CURLM_OK  )
-        tr_err( "%s (%d)", curl_multi_strerror(rc), (int)sock );
-
-    processCompletedTasks( web );
+    dbgmsg( "deleting web timer" );
+    assert( !web->running );
+    evtimer_del( &web->timer );
+    curl_multi_cleanup( web->cm );
+    tr_free( web );
 }
 
-/* libcurl wants us to tell it when sock is ready to be processed */
-static int
-socket_callback( CURL            * easy UNUSED,
-                 curl_socket_t     sock,
-                 int               action,
-                 void            * vweb,
-                 void            * assigndata )
-{
-    tr_web * web = vweb;
-    int events = EV_PERSIST;
-    struct event * ev = assigndata;
-
-    if( ev )
-        event_del( ev );
-    else {
-        ev = tr_new0( struct event, 1 );
-        tr_list_prepend( &web->socket_events, ev );
-        curl_multi_assign( web->cm, sock, ev );
-    }
-
-#if 0
-    {
-        static const char *actions[] = {"NONE", "IN", "OUT", "INOUT", "REMOVE"};
-        fprintf( stderr, "%s:%d (%s) callback on socket %d (%s)\n",
-                 __FILE__, __LINE__, __FUNCTION__,
-                 (int)sock, actions[action]);
-    }
-#endif
-
-    switch (action) {
-        case CURL_POLL_IN: events |= EV_READ; break;
-        case CURL_POLL_OUT: events |= EV_WRITE; break;
-        case CURL_POLL_INOUT: events |= EV_READ|EV_WRITE; break;
-        case CURL_POLL_REMOVE: tr_list_remove_data( &web->socket_events, ev );
-                               tr_free( ev );
-                               /* fallthrough */
-        case CURL_POLL_NONE: return 0;
-        default: tr_err( "Unknown socket action %d", action ); return -1;
-    }
-
-    event_set( ev, sock, events, event_callback, web );
-    event_add( ev, NULL );
-    return 0;
-}
-
-/* libevent says that timeout_ms have passed, so wake up libcurl */
 static void
-timeout_callback( int socket UNUSED, short action UNUSED, void * vweb )
-{
-    CURLMcode rc;
-    tr_web * web = vweb;
-
-    do
-        rc = curl_multi_socket( web->cm, CURL_SOCKET_TIMEOUT, &web->remain );
-    while( rc == CURLM_CALL_MULTI_PERFORM );
-
-    if( rc != CURLM_OK )
-        tr_err( "%s", curl_multi_strerror( rc ) );
-
-    processCompletedTasks( web );
-}
-
-/* libcurl wants us to tell it when timeout_ms have passed */
-static void
-timer_callback( CURLM *multi UNUSED, long timeout_ms, void * vweb )
+pulse( int socket UNUSED, short action UNUSED, void * vweb )
 {
     tr_web * web = vweb;
-    struct timeval timeout = tr_timevalMsec( timeout_ms );
-    timeout_add( &web->timer, &timeout );
+    assert( web->running );
+
+    pump( web );
+
+    evtimer_del( &web->timer );
+
+    web->running = web->remain > 0;
+
+    if( web->running ) {
+        struct timeval tv = tr_timevalMsec( PULSE_MSEC );
+        evtimer_add( &web->timer, &tv );
+    } else if( web->dying ) {
+        webDestroy( web );
+    } else {
+        dbgmsg( "stopping web timer" );
+    }
 }
 
 tr_web*
@@ -302,20 +232,13 @@ tr_webInit( tr_session * session )
     web->cm = curl_multi_init( );
     web->session = session;
 
-    timeout_set( &web->timer, timeout_callback, web );
-    curl_multi_setopt( web->cm, CURLMOPT_SOCKETDATA, web );
-    curl_multi_setopt( web->cm, CURLMOPT_SOCKETFUNCTION, socket_callback );
-    curl_multi_setopt( web->cm, CURLMOPT_TIMERDATA, web );
-    curl_multi_setopt( web->cm, CURLMOPT_TIMERFUNCTION, timer_callback );
+    evtimer_set( &web->timer, pulse, web );
+#if CURL_CHECK_VERSION(7,16,3)
+    curl_multi_setopt( web->cm, CURLMOPT_MAXCONNECTS, 10 );
+#endif
+    pump( web );
 
     return web;
-}
-
-static void
-event_del_and_free( void * e )
-{
-    event_del( e );
-    tr_free( e );
 }
 
 void
@@ -324,10 +247,10 @@ tr_webClose( tr_web ** web_in )
     tr_web * web = *web_in;
     *web_in = NULL;
 
-    timeout_del( &web->timer );
-    tr_list_free( &web->socket_events, event_del_and_free );
-    curl_multi_cleanup( web->cm );
-    tr_free( web );
+    if( !web->running )
+        webDestroy( web );
+    else
+        web->dying = 1;
 }
 
 /***

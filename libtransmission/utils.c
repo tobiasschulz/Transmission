@@ -23,7 +23,7 @@
  *****************************************************************************/
 
 #include <assert.h>
-#include <ctype.h> /* isalpha, tolower */
+#include <ctype.h> /* isalpha */
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -167,7 +167,7 @@ tr_getLogTimeStr( char * buf, int buflen )
 #endif
     strftime( tmp, sizeof(tmp), "%H:%M:%S", &now_tm );
     milliseconds = (int)(tv.tv_usec / 1000);
-    tr_snprintf( buf, buflen, "%s.%03d", tmp, milliseconds );
+    snprintf( buf, buflen, "%s.%03d", tmp, milliseconds );
 
     return buf;
 }
@@ -176,7 +176,7 @@ void
 tr_deepLog( const char * file, int line, const char * name, const char * fmt, ... )
 {
     FILE * fp = tr_getLog( );
-    if( fp )
+    if( fp != NULL )
     {
         va_list args;
         char timestr[64];
@@ -238,7 +238,7 @@ tr_msg( const char * file, int line, int level,
                 newmsg = tr_new0( tr_msg_list, 1 );
                 newmsg->level = level;
                 newmsg->when = time( NULL );
-                newmsg->message = tr_strdup( EVBUFFER_DATA( buf ) );
+                newmsg->message = tr_strdup( (char*)EVBUFFER_DATA( buf ) );
                 newmsg->file = file;
                 newmsg->line = line;
                 newmsg->name = tr_strdup( name );
@@ -353,55 +353,6 @@ tr_compareUint32( uint32_t a, uint32_t b )
     if( a > b ) return 1;
     return 0;
 }
-
-int
-tr_compareUint64( uint64_t a, uint64_t b )
-{
-    if( a < b ) return -1;
-    if( a > b ) return 1;
-    return 0;
-}
-
-int
-tr_compareDouble( double a, double b )
-{
-    if( a < b ) return -1;
-    if( a > b ) return 1;
-    return 0;
-}
-
-int
-tr_compareTime( time_t a, time_t b )
-{
-    if( a < b ) return -1;
-    if( a > b ) return 1;
-    return 0;
-}
-
-int
-tr_strcmp( const void * a, const void * b )
-{
-    if( a && b ) return strcmp( a, b );
-    if( a ) return 1;
-    if( b ) return -1;
-    return 0;
-}
-
-int
-tr_strcasecmp( const char * a, const char * b )
-{
-    if( !a && !b ) return 0;
-    if( !a ) return -1;
-    if( !b ) return 1;
-#ifdef HAVE_STRCASECMP
-    return strcasecmp( a, b );
-#else
-    while( *a && ( tolower( *(uint8_t*)a ) == tolower( *(uint8_t*)b ) ) )
-        ++a, ++b;
-    return tolower( *(uint8_t*)a) - tolower(*(uint8_t*)b );
-#endif
-}
-
 
 /**
 ***
@@ -521,7 +472,7 @@ tr_mkdirp( const char * path_in, int permissions )
         {
             /* Node exists but isn't a folder */
             char buf[MAX_PATH_LENGTH];
-            tr_snprintf( buf, sizeof( buf ), _( "File \"%s\" is in the way" ), path );
+            snprintf( buf, sizeof( buf ), _( "File \"%s\" is in the way" ), path );
             tr_err( _( "Couldn't create \"%1$s\": %2$s" ), path_in, buf );
             tr_free( path );
             errno = ENOTDIR;
@@ -577,7 +528,7 @@ tr_ioErrorFromErrno( int err )
         case EFBIG:
             return TR_ERROR_IO_FILE_TOO_BIG;
         default:
-            tr_err( "generic i/o errno from errno: %s", tr_strerror( errno ) );
+            tr_dbg( "generic i/o errno from errno: %s", tr_strerror( errno ) );
             return TR_ERROR_IO_OTHER;
     }
 }
@@ -629,22 +580,14 @@ tr_errorString( int code )
 *****
 ****/
 
-void*
-tr_memdup( const void * in, int byteCount )
-{
-    void * out = tr_new( uint8_t, byteCount );
-    memcpy( out, in, byteCount );
-    return out;
-}
-    
 char*
-tr_strdup( const void * in )
+tr_strdup( const char * in )
 {
-    return tr_strndup( in, in ? strlen((const char*)in) : 0 );
+    return tr_strndup( in, in ? strlen(in) : 0 );
 }
 
 char*
-tr_strndup( const void * in, int len )
+tr_strndup( const char * in, int len )
 {
     char * out = NULL;
 
@@ -652,7 +595,7 @@ tr_strndup( const void * in, int len )
     {
         out = tr_strdup( in );
     }
-    else if( in )
+    else if( in != NULL )
     {
         out = tr_malloc( len+1 );
         memcpy( out, in, len );
@@ -718,13 +661,21 @@ tr_strerror( int i )
 *****
 ****/
 
+/* note that the argument is how many bits are needed, not bytes */
 tr_bitfield*
-tr_bitfieldNew( size_t bitCount )
+tr_bitfieldNew( size_t bitcount )
 {
-    tr_bitfield * ret = tr_new0( tr_bitfield, 1 );
-    ret->bitCount = bitCount;
-    ret->byteCount = (bitCount+7u) / 8u;
-    ret->bits = tr_new0( uint8_t, ret->byteCount );
+    tr_bitfield * ret = calloc( 1, sizeof(tr_bitfield) );
+    if( NULL == ret )
+        return NULL;
+
+    ret->len = (bitcount+7u) / 8u;
+    ret->bits = calloc( ret->len, 1 );
+    if( NULL == ret->bits ) {
+        free( ret );
+        return NULL;
+    }
+
     return ret;
 }
 
@@ -732,26 +683,25 @@ tr_bitfield*
 tr_bitfieldDup( const tr_bitfield * in )
 {
     tr_bitfield * ret = calloc( 1, sizeof(tr_bitfield) );
-    ret->bitCount = in->bitCount;
-    ret->byteCount = in->byteCount;
-    ret->bits = tr_memdup( in->bits, in->byteCount );
+    ret->len = in->len;
+    ret->bits = malloc( ret->len );
+    memcpy( ret->bits, in->bits, ret->len );
     return ret;
 }
 
-void
-tr_bitfieldFree( tr_bitfield * bitfield )
+void tr_bitfieldFree( tr_bitfield * bitfield )
 {
     if( bitfield )
     {
-        tr_free( bitfield->bits );
-        tr_free( bitfield );
+        free( bitfield->bits );
+        free( bitfield );
     }
 }
 
 void
 tr_bitfieldClear( tr_bitfield * bitfield )
 {
-    memset( bitfield->bits, 0, bitfield->byteCount );
+    memset( bitfield->bits, 0, bitfield->len );
 }
 
 int
@@ -759,7 +709,7 @@ tr_bitfieldIsEmpty( const tr_bitfield * bitfield )
 {
     size_t i;
 
-    for( i=0; i<bitfield->byteCount; ++i )
+    for( i=0; i<bitfield->len; ++i )
         if( bitfield->bits[i] )
             return 0;
 
@@ -769,67 +719,28 @@ tr_bitfieldIsEmpty( const tr_bitfield * bitfield )
 int
 tr_bitfieldHas( const tr_bitfield * bitfield, size_t nth )
 {
-    return ( tr_bitfieldTestFast( bitfield, nth ) )
-        && ( tr_bitfieldHasFast( bitfield, nth ) );
+    static const uint8_t ands[8] = { 128, 64, 32, 16, 8, 4, 2, 1 };
+    const size_t i = nth >> 3u;
+    return ( bitfield != NULL )
+        && ( bitfield->bits != NULL )
+        && ( i < bitfield->len )
+        && ( ( bitfield->bits[i] & ands[nth&7u] ) != 0 );
 }
-
-#if 0
-static int
-find_top_bit( uint8_t val )
-{
-    int pos = 0;
-    if ( val & 0xF0U ) pos |= 4, val >>= 4;
-    if ( val & 0xCU )  pos |= 2, val >>= 2;
-    if ( val & 0x2 )   pos |= 1;
-    return 7 - pos;
-}
-
-int
-tr_bitfieldFindTrue( const tr_bitfield  * bitfield,
-                     size_t               startBit,
-                     size_t             * setmePos )
-{
-    if( bitfield && bitfield->bits && startBit < bitfield->bitCount )
-    {
-        const uint8_t * b   = bitfield->bits + startBit/8;
-        const uint8_t * end = bitfield->bits + bitfield->byteCount;
-
-        /* If first byte already contains a set bit after startBit*/
-        if( *b & ( 0xff >> (startBit&7) ) ) {
-            *setmePos  = 8 * ( b - bitfield->bits );
-            *setmePos += find_top_bit( *b & ( 0xff >> (startBit&7) ) );
-            return 1;
-        }
-
-        /* Test bitfield for first non zero byte */
-        ++b;
-        while( (b < end) && !*b )
-            ++b;
-
-        /* If we hit the end of our bitfield, no set bit was found */
-        if( b == end )
-            return 0;
-
-        /* New bitposition is byteoff*8 */
-        *setmePos = 8 * ( b - bitfield->bits ) + find_top_bit( *b );
-
-        return 1;
-    }
-
-    return 0;
-}
-#endif
 
 int
 tr_bitfieldAdd( tr_bitfield  * bitfield, size_t nth )
 {
-    assert( bitfield );
-    assert( bitfield->bits );
+    static const uint8_t ands[8] = { 128, 64, 32, 16, 8, 4, 2, 1 };
+    const size_t i = nth >> 3u;
 
-    if( nth >= bitfield->bitCount )
+    assert( bitfield != NULL );
+    assert( bitfield->bits != NULL );
+
+    if( i >= bitfield->len )
         return -1;
 
-    bitfield->bits[nth>>3u] |= (0x80 >> (nth&7u));
+    bitfield->bits[i] |= ands[nth&7u];
+    assert( tr_bitfieldHas( bitfield, nth ) );
     return 0;
 }
 
@@ -850,13 +761,17 @@ int
 tr_bitfieldRem( tr_bitfield   * bitfield,
                 size_t          nth )
 {
-    assert( bitfield );
-    assert( bitfield->bits );
+    static const uint8_t rems[8] = { 127, 191, 223, 239, 247, 251, 253, 254 };
+    const size_t i = nth >> 3u;
 
-    if( nth >= bitfield->bitCount )
+    assert( bitfield != NULL );
+    assert( bitfield->bits != NULL );
+
+    if( i >= bitfield->len )
         return -1;
 
-    bitfield->bits[nth>>3u] &= (0xff7f >> (nth&7u));
+    bitfield->bits[i] &= rems[nth&7u];
+    assert( !tr_bitfieldHas( bitfield, nth ) );
     return 0;
 }
 
@@ -879,9 +794,9 @@ tr_bitfieldOr( tr_bitfield * a, const tr_bitfield * b )
     uint8_t *ait;
     const uint8_t *aend, *bit;
 
-    assert( a->bitCount == b->bitCount );
+    assert( a->len == b->len );
 
-    for( ait=a->bits, bit=b->bits, aend=ait+a->byteCount; ait!=aend; )
+    for( ait=a->bits, bit=b->bits, aend=ait+a->len; ait!=aend; )
         *ait++ |= *bit++;
 
     return a;
@@ -894,9 +809,9 @@ tr_bitfieldDifference( tr_bitfield * a, const tr_bitfield * b )
     uint8_t *ait;
     const uint8_t *aend, *bit;
 
-    assert( a->bitCount == b->bitCount );
+    assert( a->len == b->len );
 
-    for( ait=a->bits, bit=b->bits, aend=ait+a->byteCount; ait!=aend; )
+    for( ait=a->bits, bit=b->bits, aend=ait+a->len; ait!=aend; )
         *ait++ &= ~(*bit++);
 }
 
@@ -928,7 +843,7 @@ tr_bitfieldCountTrueBits( const tr_bitfield* b )
     if( !b )
         return 0;
 
-    for( it=b->bits, end=it+b->byteCount; it!=end; ++it )
+    for( it=b->bits, end=it+b->len; it!=end; ++it )
         ret += trueBitCount[*it];
 
     return ret;
@@ -962,26 +877,6 @@ tr_wait( uint64_t delay_milliseconds )
 ****
 ***/
 
-int
-tr_stringEndsWith( const char * str, const char * end )
-{
-    const size_t slen = strlen( str );
-    const size_t elen = strlen( end );
-    return slen>=elen && !memcmp( &str[slen-elen], end, elen );
-}
-
-int
-tr_snprintf( char * buf, size_t buflen, const char * fmt, ... )
-{
-    int len;
-    va_list args;
-    va_start( args, fmt );
-    len = evutil_vsnprintf( buf, buflen, fmt, args );
-    va_end( args );
-    return len;
-}
-
-
 /*
  * Copy src to string dst of size siz.  At most siz-1 characters
  * will be copied.  Always NUL terminates (unless siz == 0).
@@ -997,8 +892,8 @@ tr_strlcpy(char *dst, const char *src, size_t siz)
     const char *s = src;
     size_t n = siz;
 
-    assert( s );
-    assert( d );
+    assert( s != NULL );
+    assert( d != NULL );
 
     /* Copy as many bytes as will fit */
     if (n != 0) {
@@ -1183,17 +1078,6 @@ tr_base64_decode( const void * input, int length, int * setme_len )
     bmem = BIO_new_mem_buf( (unsigned char*)input, length );
     bmem = BIO_push( b64, bmem );
     retlen = BIO_read( bmem, ret, length );
-    if( !retlen )
-    {
-        /* try again, but with the BIO_FLAGS_BASE64_NO_NL flag */
-        BIO_free_all( bmem );
-        b64 = BIO_new( BIO_f_base64( ) );
-        BIO_set_flags( b64, BIO_FLAGS_BASE64_NO_NL );
-        bmem = BIO_new_mem_buf( (unsigned char*)input, length );
-        bmem = BIO_push( b64, bmem );
-        retlen = BIO_read( bmem, ret, length );
-    }
-
     if( setme_len )
         *setme_len = retlen;
 

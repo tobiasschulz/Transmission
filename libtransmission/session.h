@@ -49,20 +49,16 @@ struct tr_metainfo_lookup
 
 struct tr_handle
 {
-    unsigned int                 isPortSet          : 1;
-    unsigned int                 isPexEnabled       : 1;
-    unsigned int                 isBlocklistEnabled : 1;
-    unsigned int                 isProxyEnabled     : 1;
-    unsigned int                 isProxyAuthEnabled : 1;
-    unsigned int                 isClosed           : 1;
-    unsigned int                 useUploadLimit     : 1;
-    unsigned int                 useDownloadLimit   : 1;
+    unsigned int                 isPortSet        : 1;
+    unsigned int                 isPexEnabled     : 1;
+    unsigned int                 isClosed         : 1;
+    unsigned int                 useUploadLimit   : 1;
+    unsigned int                 useDownloadLimit : 1;
 
     tr_encryption_mode           encryptionMode;
 
     struct tr_event_handle     * events;
 
-    int                          proxyPort;
     int                          peerSocketTOS;
 
     int                          torrentCount;
@@ -75,15 +71,10 @@ struct tr_handle
     char                       * resumeDir;
     char                       * torrentDir;
 
-    tr_proxy_type                proxyType;
-    char                       * proxy;
-    char                       * proxyUsername;
-    char                       * proxyPassword;
-
     struct tr_ratecontrol      * upload;
     struct tr_ratecontrol      * download;
 
-    struct tr_list             * blocklists;
+    struct tr_blocklist        * blocklist;
     struct tr_peerMgr          * peerMgr;
     struct tr_shared           * shared;
 
@@ -95,12 +86,17 @@ struct tr_handle
     tr_rpc_func                  rpc_func;
     void                       * rpc_func_user_data;
 
+    tr_handle_status             stats[2];
+    int                          statCur;
+
     struct tr_stats_handle     * sessionStats;
     struct tr_tracker_handle   * tracker;
 
     struct tr_metainfo_lookup  * metainfoLookup;
     int                          metainfoLookupCount;
 };
+
+typedef struct tr_handle tr_session;
 
 const char * tr_sessionFindTorrentFile( const tr_session * session,
                                         const char       * hashString );
@@ -109,19 +105,8 @@ void tr_sessionSetTorrentFile( tr_session   * session,
                                const char   * hashString,
                                const char   * filename );
 
-struct in_addr;
-
-int tr_sessionIsAddressBlocked( const tr_session     * session,
-                                const struct in_addr * addr );
-
-
 void tr_globalLock       ( tr_session * );
 void tr_globalUnlock     ( tr_session * );
 int  tr_globalIsLocked   ( const tr_session * );
-
-
-#define TR_ERROR_IS_IO(e) (TR_ERROR_IO_PARENT<=(e) && (e)<=TR_ERROR_IO_OTHER)
-#define TR_ERROR_IS_TC(e) (TR_ERROR_TC_ERROR<=(e) && (e)<=TR_ERROR_TC_WARNING)
-
 
 #endif

@@ -7,7 +7,7 @@
  * This exemption does not extend to derived works not owned by
  * the Transmission project.
  *
- * $Id$
+ * $Id:$
  */
 
 #include <assert.h>
@@ -56,7 +56,7 @@ getNode( struct json_benc_data * data )
 }
 
 static int
-callback( void * vdata, int type, const JSON_value * value )
+callback( void * vdata, int type, const struct JSON_value_struct * value )
 {
     struct json_benc_data * data = vdata;
     tr_benc * node;
@@ -85,7 +85,7 @@ callback( void * vdata, int type, const JSON_value * value )
 
         case JSON_T_FLOAT: {
             char buf[128];
-            tr_snprintf( buf, sizeof( buf ), "%f", (double)value->vu.float_value );
+            snprintf( buf, sizeof( buf ), "%f", (double)value->float_value );
             tr_bencInitStrDup( getNode( data ), buf );
             break;
         }
@@ -94,7 +94,7 @@ callback( void * vdata, int type, const JSON_value * value )
             break;
 
         case JSON_T_INTEGER:
-            tr_bencInitInt( getNode( data ), value->vu.integer_value );
+            tr_bencInitInt( getNode( data ), value->integer_value );
             break;
 
         case JSON_T_TRUE:
@@ -106,12 +106,12 @@ callback( void * vdata, int type, const JSON_value * value )
             break;
 
         case JSON_T_STRING:
-            tr_bencInitStrDup( getNode( data ), value->vu.str.value );
+            tr_bencInitStrDup( getNode( data ), value->string_value );
             break;
 
         case JSON_T_KEY:
             assert( !data->key );
-            data->key = tr_strdup( value->vu.str.value );
+            data->key = tr_strdup( value->string_value );
             break;
     }
 

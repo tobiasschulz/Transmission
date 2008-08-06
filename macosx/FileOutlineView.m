@@ -26,7 +26,6 @@
 #import "FileNameCell.h"
 #import "FilePriorityCell.h"
 #import "Torrent.h"
-#import "FileListNode.h"
 #import "QuickLookController.h"
 #import "CTGradient.h"
 
@@ -116,11 +115,8 @@
 
 - (NSRect) iconRectForRow: (int) row
 {
-    FileNameCell * cell = (FileNameCell *)[self preparedCellAtColumn: [self columnWithIdentifier: @"Name"] row: row];
-    NSRect iconRect = [cell imageRectForBounds: [self rectOfRow: row]];
-    
-    iconRect.origin.x += [self indentationPerLevel] * (float)([self levelForRow: row] + 1);
-    return iconRect;
+    FileNameCell * cell = (FileNameCell *)[[self tableColumnWithIdentifier: @"Name"] dataCell];
+    return [cell imageRectForBounds: [self rectOfRow: row]];
 }
 
 - (void) updateTrackingAreas
@@ -183,7 +179,7 @@
     if (![self isRowSelected: row])
     {
         NSDictionary * item = [self itemAtRow: row]; 
-        NSIndexSet * indexes = [(FileListNode *)item indexes];
+        NSIndexSet * indexes = [item objectForKey: @"Indexes"];
         
         if ([fTorrent checkForFiles: indexes] != NSOffState)
         {

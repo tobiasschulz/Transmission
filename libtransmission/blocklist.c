@@ -7,14 +7,13 @@
  * This exemption does not extend to derived works not owned by
  * the Transmission project.
  *
- * $Id$
+ * $Id:$
  */
 
 #include <stdio.h>
 #include <stdlib.h> /* free */
 #include <string.h>
 
-#include <libgen.h> /* basename */
 #include <sys/mman.h>
 #include <sys/types.h>
 #include <sys/stat.h>
@@ -90,14 +89,7 @@ blocklistLoad( tr_blocklist * b )
     b->byteCount = st.st_size;
     b->ruleCount = st.st_size / sizeof( struct tr_ip_range );
     b->fd = fd;
-
-    {
-        char * name;
-        char buf[MAX_PATH_LENGTH];
-        tr_strlcpy( buf, b->filename, sizeof( buf ) );
-        name = basename( buf );
-        tr_inf( _( "Blocklist \"%s\" contains %'u entries" ), name, (unsigned int)b->ruleCount );
-    }
+    tr_inf( _( "Blocklist contains %'u entries" ), (unsigned int)b->ruleCount );
 }
 
 static void
@@ -141,12 +133,6 @@ _tr_blocklistNew( const char * filename, int isEnabled )
     return b;
 }
 
-const char*
-_tr_blocklistGetFilename( const tr_blocklist * b )
-{
-    return b->filename;
-}
-
 void
 _tr_blocklistFree( tr_blocklist * b )
 {
@@ -156,16 +142,9 @@ _tr_blocklistFree( tr_blocklist * b )
 }
 
 int
-_tr_blocklistExists( const tr_blocklist * b )
+_tr_blocklistGetRuleCount( tr_blocklist * b )
 {
-    struct stat st;
-    return !stat( b->filename, &st );
-}
-
-int
-_tr_blocklistGetRuleCount( const tr_blocklist * b )
-{
-    blocklistEnsureLoaded( (tr_blocklist*)b );
+    blocklistEnsureLoaded( b );
 
     return b->ruleCount;
 }
@@ -204,6 +183,13 @@ _tr_blocklistHasAddress( tr_blocklist * b, const struct in_addr * addr )
                      compareAddressToRange );
 
     return range != NULL;
+}
+
+int
+_tr_blocklistExists( const tr_blocklist * b )
+{
+    struct stat st;
+    return !stat( b->filename, &st );
 }
 
 int
@@ -269,14 +255,7 @@ _tr_blocklistSetContent( tr_blocklist * b,
         ++lineCount;
     }
 
-    {
-        char * name;
-        char buf[MAX_PATH_LENGTH];
-        tr_strlcpy( buf, b->filename, sizeof( buf ) );
-        name = basename( buf );
-        tr_inf( _( "Blocklist \"%1$s\" updated with %2$'d entries" ), name, lineCount );
-    }
-
+    tr_inf( _( "Blocklist updated with %'d entries" ), lineCount );
 
     fclose( out );
     fclose( in );

@@ -33,7 +33,7 @@
 
 - (void) saveGroups;
 
-- (NSImage *) imageForGroup: (NSMutableDictionary *) dict;
+- (NSImage *) imageForGroup: (NSDictionary *) dict isSmall: (BOOL) small;
 
 @end
 
@@ -143,11 +143,10 @@ GroupsController * fGroupsInstance = nil;
     [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateGroups" object: self];
 }
 
-- (NSImage *) imageForIndex: (int) index
+- (NSImage *) imageForIndex: (int) index isSmall: (BOOL) small
 {
     int orderIndex = [self rowValueForIndex: index];
-    return orderIndex != -1 ? [self imageForGroup: [fGroups objectAtIndex: orderIndex]]
-                            : [NSImage imageNamed: @"GroupsNoneTemplate.png"];
+    return orderIndex != -1 ? [self imageForGroup: [fGroups objectAtIndex: orderIndex] isSmall: small] : nil;
 }
 
 - (NSColor *) colorForIndex: (int) index
@@ -156,12 +155,9 @@ GroupsController * fGroupsInstance = nil;
     return orderIndex != -1 ? [[fGroups objectAtIndex: orderIndex] objectForKey: @"Color"] : nil;
 }
 
-- (void) setColor: (NSColor *) color forIndex: (int) index
+- (NSColor *) setColor: (NSColor *) color forIndex: (int) index
 {
-    NSMutableDictionary * dict = [fGroups objectAtIndex: [self rowValueForIndex: index]];
-    [dict removeObjectForKey: @"Icon"];
-    
-    [dict setObject: color forKey: @"Color"];
+    [[fGroups objectAtIndex: [self rowValueForIndex: index]] setObject: color forKey: @"Color"];
     
     [[GroupsController groups] saveGroups];
     [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateGroups" object: self];
@@ -256,44 +252,18 @@ GroupsController * fGroupsInstance = nil;
                             keyEquivalent: @""];
     [item setTarget: target];
     [item setTag: -1];
-    
-    NSImage * icon = [NSImage imageNamed: @"GroupsNoneTemplate.png"];
-    if (small)
-    {
-        icon = [icon copy];
-        [icon setScalesWhenResized: YES];
-        [icon setSize: NSMakeSize(ICON_WIDTH_SMALL, ICON_WIDTH_SMALL)];
-        
-        [item setImage: icon];
-        [icon release];
-    }
-    else
-        [item setImage: icon];
-    
     [menu addItem: item];
     [item release];
     
     NSEnumerator * enumerator = [fGroups objectEnumerator];
-    NSMutableDictionary * dict;
+    NSDictionary * dict;
     while ((dict = [enumerator nextObject]))
     {
         item = [[NSMenuItem alloc] initWithTitle: [dict objectForKey: @"Name"] action: action keyEquivalent: @""];
         [item setTarget: target];
         
+        [item setImage: [self imageForGroup: dict isSmall: small]];
         [item setTag: [[dict objectForKey: @"Index"] intValue]];
-        
-        NSImage * icon = [self imageForGroup: dict];
-        if (small)
-        {
-            icon = [icon copy];
-            [icon setScalesWhenResized: YES];
-            [icon setSize: NSMakeSize(ICON_WIDTH_SMALL, ICON_WIDTH_SMALL)];
-            
-            [item setImage: icon];
-            [icon release];
-        }
-        else
-            [item setImage: icon];
         
         [menu addItem: item];
         [item release];
@@ -308,28 +278,13 @@ GroupsController * fGroupsInstance = nil;
 
 - (void) saveGroups
 {
-    //don't archive the icon
-    NSMutableArray * groups = [NSMutableArray arrayWithCapacity: [fGroups count]];
-    NSEnumerator * enumerator = [fGroups objectEnumerator];
-    NSDictionary * dict;
-    while ((dict = [enumerator nextObject]))
-    {
-        NSMutableDictionary * tempDict = [dict mutableCopy];
-        [tempDict removeObjectForKey: @"Icon"];
-        [groups addObject: tempDict];
-        [tempDict release];
-    }
-    
-    [[NSUserDefaults standardUserDefaults] setObject: [NSArchiver archivedDataWithRootObject: groups] forKey: @"Groups"];
+    [[NSUserDefaults standardUserDefaults] setObject: [NSArchiver archivedDataWithRootObject: fGroups] forKey: @"Groups"];
 }
 
-- (NSImage *) imageForGroup: (NSMutableDictionary *) dict
+- (NSImage *) imageForGroup: (NSDictionary *) dict isSmall: (BOOL) small
 {
-    NSImage * image;
-    if ((image = [dict objectForKey: @"Icon"]))
-        return image;
-    
-    NSRect rect = NSMakeRect(0.0, 0.0, ICON_WIDTH, ICON_WIDTH);
+    float width = small ? ICON_WIDTH_SMALL : ICON_WIDTH;
+    NSRect rect = NSMakeRect(0.0, 0.0, width, width);
     
     NSBezierPath * bp = [NSBezierPath bezierPathWithRoundedRect: rect radius: 3.0];
     NSImage * icon = [[NSImage alloc] initWithSize: rect.size];
@@ -351,10 +306,7 @@ GroupsController * fGroupsInstance = nil;
     
     [icon unlockFocus];
     
-    [dict setObject: icon forKey: @"Icon"];
-    [icon release];
-    
-    return icon;
+    return [icon autorelease];
 }
 
 @end

@@ -1,6 +1,6 @@
-AC_INIT([transmission],[1.31],[http://trac.transmissionbt.com/newticket])
-PEERID_PREFIX="-TR1310-"
-USERAGENT_PREFIX="1.31"
+AC_INIT([transmission],[1.21Z],[http://trac.transmissionbt.com/newticket])
+PEERID_PREFIX="-TR121Z-"
+USERAGENT_PREFIX="1.21+"
 AC_SUBST(PEERID_PREFIX,[$PEERID_PREFIX])
 AC_SUBST(USERAGENT_PREFIX,[$USERAGENT_PREFIX])
 
@@ -11,7 +11,7 @@ AM_INIT_AUTOMAKE([1.9 tar-ustar])
 AC_PROG_LIBTOOL
 
 OPENSSL_MINIMUM=0.9.4
-CURL_MINIMUM=7.16.3
+CURL_MINIMUM=7.15.0
 GIO_MINIMUM=2.15.5
 GLIB_MINIMUM=2.6.0
 GTK_MINIMUM=2.6.0
@@ -35,7 +35,7 @@ if test "x$GCC" = "xyes" ; then
 fi
 AC_HEADER_STDC
 AC_HEADER_TIME
-AC_CHECK_FUNCS([lrintf strlcpy daemon dirname basename daemon strcasecmp])
+AC_CHECK_FUNCS([lrintf strlcpy daemon dirname basename daemon])
 AC_CHECK_SIZEOF([void*])
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET

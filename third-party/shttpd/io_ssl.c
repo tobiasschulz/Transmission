@@ -33,21 +33,21 @@ ssl_handshake(struct stream *stream)
 {
 	int	n;
 
-	if ((n = SSL_accept(stream->chan.ssl.ssl)) == 1) {
-		DBG(("handshake: SSL accepted"));
-		stream->flags |= FLAG_SSL_ACCEPTED;
-	} else {
+	if ((n = SSL_accept(stream->chan.ssl.ssl)) == 0) {
 		n = SSL_get_error(stream->chan.ssl.ssl, n);
 		if (n != SSL_ERROR_WANT_READ && n != SSL_ERROR_WANT_WRITE)
 			stream->flags |= FLAG_CLOSED;
-		DBG(("SSL_accept error %d", n));
+		elog(E_LOG, stream->conn, "SSL_accept error %d", n);
+	} else {
+		DBG(("handshake: SSL accepted"));
+		stream->flags |= FLAG_SSL_ACCEPTED;
 	}
 }
 
 static int
 read_ssl(struct stream *stream, void *buf, size_t len)
 {
-	int	nread = -1;
+	int	nread = 0;
 
 	assert(stream->chan.ssl.ssl != NULL);
 

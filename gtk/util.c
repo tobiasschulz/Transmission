@@ -43,9 +43,17 @@
 #include <libtransmission/utils.h> /* tr_inf */
 
 #include "conf.h"
-#include "hig.h"
 #include "tr-prefs.h"
 #include "util.h"
+
+int
+tr_strcmp( const char * a, const char * b )
+{
+    if( a && b ) return strcmp( a, b );
+    if( a ) return 1;
+    if( b ) return -1;
+    return 0;
+}
 
 char*
 tr_strlratio( char * buf, double ratio, size_t buflen )
@@ -118,57 +126,59 @@ tr_strlspeed( char * buf, double kb_sec, size_t buflen )
 char*
 tr_strltime( char * buf, int seconds, size_t buflen )
 {
-    int days, hours, minutes;
-    char d[128], h[128], m[128], s[128];
+    int hours;
+    int days;
 
     if( seconds < 0 )
         seconds = 0;
 
-    days = seconds / 86400;
-    hours = (seconds % 86400) / 3600;
-    minutes = (seconds % 3600) / 60;
-    seconds = (seconds % 3600) % 60;
-
-    g_snprintf( d, sizeof( d ), ngettext( "%'d day", "%'d days", days ), days );
-    g_snprintf( h, sizeof( h ), ngettext( "%'d hour", "%'d hours", hours ), hours );
-    g_snprintf( m, sizeof( m ), ngettext( "%'d minute", "%'d minutes", minutes ), minutes );
-    g_snprintf( s, sizeof( s ), ngettext( "%'d second", "%'d seconds", seconds ), seconds );
-
-    if( days ) {
-        if( days >= 4 || !hours ) {
-            g_strlcpy( buf, d, buflen );
-        } else {
-            g_snprintf( buf, buflen, "%s, %s", d, h );
-        }
-    } else if( hours ) {
-        if( hours >= 4 || !minutes ) {
-            g_strlcpy( buf, h, buflen );
-        } else {
-            g_snprintf( buf, buflen, "%s, %s", h, m );
-        }
-    } else if( minutes ) {
-        if( minutes >= 4 || !seconds ) {
-            g_strlcpy( buf, m, buflen );
-        } else {
-            g_snprintf( buf, buflen, "%s, %s", m, s );
-        }
-    } else {
-        g_strlcpy( buf, s, buflen );
+    if( seconds < 60 )
+    {
+        g_snprintf( buf, buflen, ngettext( "%'d second", "%'d seconds", (int)seconds ), (int) seconds );
+        return buf;
     }
 
+    if( seconds < ( 60 * 60 ) )
+    {
+        const int minutes = ( seconds + 30 ) / 60;
+        g_snprintf( buf, buflen, ngettext( "%'d minute", "%'d minutes", minutes ), minutes );
+        return buf;
+    }
+
+    hours = seconds / ( 60 * 60 );
+
+    if( seconds < ( 60 * 60 * 4 ) )
+    {
+        char h[64];
+        char m[64];
+
+        const int minutes = ( seconds - hours * 60 * 60 + 30 ) / 60;
+
+        g_snprintf( h, sizeof(h), ngettext( "%'d hour", "%'d hours", hours ), hours );
+        g_snprintf( m, sizeof(m), ngettext( "%'d minute", "%'d minutes", minutes ), minutes );
+        g_snprintf( buf, buflen, "%s, %s", h, m );
+        return buf;
+    }
+
+    if( hours < 24 )
+    {
+        g_snprintf( buf, buflen, ngettext( "%'d hour", "%'d hours", hours ), hours );
+        return buf;
+    }
+
+    days = seconds / ( 60 * 60 * 24 );
+    g_snprintf( buf, buflen, ngettext( "%'d day", "%'d days", days ), days );
     return buf;
 }
 
+
 char *
-gtr_localtime( time_t time )
+rfc822date (guint64 epoch_msec)
 {
-    const struct tm tm = *localtime( &time );
-    char buf[256], *eoln;
-
-    g_strlcpy( buf, asctime( &tm ), sizeof( buf ) );
-    if(( eoln = strchr( buf, '\n' )))
-        *eoln = '\0';
-
+    const time_t secs = epoch_msec / 1000;
+    const struct tm tm = *localtime (&secs);
+    char buf[128];
+    strftime( buf, sizeof(buf), "%a, %d %b %Y %T %Z", &tm );
     return g_locale_to_utf8( buf, -1, NULL, NULL, NULL );
 }
 
@@ -305,34 +315,6 @@ verrmsg_full( GtkWindow * wind, callbackfunc_t func, void * data,
 }
 
 void
-addTorrentErrorDialog( GtkWidget * child, int err, const char * filename )
-{
-    GtkWidget * w;
-    GtkWidget * win;
-    const char * fmt;
-    char * secondary;
-    switch( err ) {
-        case TR_EINVALID: fmt = _( "The torrent file \"%s\" contains invalid data." ); break;
-        case TR_EDUPLICATE: fmt = _( "The torrent file \"%s\" is already in use." ); break;
-        default: fmt = _( "The torrent file \"%s\" encountered an unknown error." ); break;
-    }
-    secondary = g_strdup_printf( fmt, filename );
-    win = ( !child || GTK_IS_WINDOW( child ) )
-        ? child
-        : gtk_widget_get_ancestor( child ? GTK_WIDGET( child ) : NULL, GTK_TYPE_WINDOW );
-    w = gtk_message_dialog_new( GTK_WINDOW( win ),
-                                GTK_DIALOG_DESTROY_WITH_PARENT,
-                                GTK_MESSAGE_ERROR,
-                                GTK_BUTTONS_CLOSE,
-                                _( "Error opening torrent" ) );
-    gtk_message_dialog_format_secondary_text( GTK_MESSAGE_DIALOG( w ), secondary );
-    g_signal_connect_swapped( w, "response",
-                              G_CALLBACK( gtk_widget_destroy ), w );
-    gtk_widget_show_all( w );
-    g_free( secondary );
-}
-
-void
 errmsg( GtkWindow * wind, const char * format, ... )
 {
     GtkWidget * dialog;
@@ -433,15 +415,6 @@ tr_file_trash_or_unlink( const char * filename )
     }
 }
 
-char*
-gtr_get_help_url( void )
-{
-    const char * fmt = "http://www.transmissionbt.com/help/gtk/%d.%dx";
-    int major, minor;
-    sscanf( SHORT_VERSION_STRING, "%d.%d", &major, &minor );
-    return g_strdup_printf( fmt, major, minor/10 );
-}
-
 void
 gtr_open_file( const char * path )
 {
@@ -465,6 +438,81 @@ gtr_open_file( const char * path )
                            NULL, NULL, NULL, NULL );
         }
     }
+}
+
+#ifdef HAVE_DBUS_GLIB
+
+static DBusGProxy*
+get_hibernation_inhibit_proxy( void )
+{
+    GError * error = NULL;
+    DBusGConnection * conn;
+
+    conn = dbus_g_bus_get( DBUS_BUS_SESSION, &error );
+    if( error )
+    {
+        g_warning ("DBUS cannot connect : %s", error->message);
+        g_error_free (error);
+        return NULL;
+    }
+
+    return dbus_g_proxy_new_for_name (conn,
+               "org.freedesktop.PowerManagement",
+               "/org/freedesktop/PowerManagement/Inhibit",
+               "org.freedesktop.PowerManagement.Inhibit" );
+}
+#endif
+
+guint
+gtr_inhibit_hibernation( void )
+{
+    guint inhibit_cookie = 0;
+#ifdef HAVE_DBUS_GLIB
+    DBusGProxy * proxy = get_hibernation_inhibit_proxy( );
+    if( proxy )
+    {
+        GError * error = NULL;
+        const char * application = _( "Transmission Bittorrent Client" );
+        const char * reason = _( "BitTorrent Activity" );
+        gboolean success = dbus_g_proxy_call( proxy, "Inhibit", &error,
+                                              G_TYPE_STRING, application,
+                                              G_TYPE_STRING, reason,
+                                              G_TYPE_INVALID,
+                                              G_TYPE_UINT, &inhibit_cookie,
+                                              G_TYPE_INVALID );
+        if( success )
+            tr_inf( _( "Desktop hibernation disabled while Transmission is running" ) );
+        else {
+            tr_err( _( "Couldn't disable desktop hibernation: %s" ), error->message );
+            g_error_free( error );
+        }
+
+        g_object_unref( G_OBJECT( proxy ) );
+    }
+#endif
+    return inhibit_cookie;
+}
+
+void
+gtr_uninhibit_hibernation( guint inhibit_cookie )
+{
+#ifdef HAVE_DBUS_GLIB
+    DBusGProxy * proxy = get_hibernation_inhibit_proxy( );
+    if( proxy )
+    {
+        GError * error = NULL;
+        gboolean success = dbus_g_proxy_call( proxy, "UnInhibit", &error,
+                                              G_TYPE_UINT, inhibit_cookie,
+                                              G_TYPE_INVALID,
+                                              G_TYPE_INVALID );
+        if( !success ) {
+            g_warning( "Couldn't uninhibit the system from suspending: %s.", error->message );
+            g_error_free( error );
+        }
+
+        g_object_unref( G_OBJECT( proxy ) );
+    }
+#endif
 }
 
 #define VALUE_SERVICE_NAME        "com.transmissionbt.Transmission"
@@ -495,14 +543,4 @@ gtr_dbus_add_torrent( const char * filename )
        g_message( "err: %s", err->message );
 #endif
     return success;
-}
-
-GtkWidget *
-tr_button_new_from_stock( const char * stock,
-                          const char * mnemonic )
-{
-    GtkWidget * image = gtk_image_new_from_stock( stock, GTK_ICON_SIZE_BUTTON );
-    GtkWidget * button = gtk_button_new_with_mnemonic( mnemonic );
-    gtk_button_set_image( GTK_BUTTON( button ), image );
-    return button;
 }

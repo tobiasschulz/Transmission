@@ -11,6 +11,7 @@
  */
 
 #include <assert.h>
+#include <stdio.h> /* snprintf */
 #include <stdlib.h>
 #include <string.h> /* strcmp, strchr */
 
@@ -20,8 +21,8 @@
 #include "bencode.h"
 #include "completion.h"
 #include "net.h"
+#include "port-forwarding.h"
 #include "publish.h"
-#include "resume.h"
 #include "torrent.h"
 #include "tracker.h"
 #include "trevent.h"
@@ -35,6 +36,14 @@ enum
     /* seconds between tracker pulses */
     PULSE_INTERVAL_MSEC = 1000,
 
+    /* maximum number of concurrent tracker socket connections */
+    MAX_TRACKER_SOCKETS = 16,
+
+    /* maximum number of concurrent tracker socket connections during shutdown.
+     * all the peer connections should be gone by now, so we can hog more 
+     * connections to send `stop' messages to the trackers */
+    MAX_TRACKER_SOCKETS_DURING_SHUTDOWN = 64,
+
     /* unless the tracker says otherwise, rescrape this frequently */
     DEFAULT_SCRAPE_INTERVAL_SEC = (60 * 15),
 
@@ -43,12 +52,6 @@ enum
 
     /* unless the tracker says otherwise, this is the announce min_interval */
     DEFAULT_ANNOUNCE_MIN_INTERVAL_SEC = (60 * 2),
-
-    /* how long to wait before a rescrape the first time we get an error */
-    FIRST_SCRAPE_RETRY_INTERVAL_SEC = 30,
-
-    /* how long to wait before a reannounce the first time we get an error */
-    FIRST_ANNOUNCE_RETRY_INTERVAL_SEC = 30,
 
     /* the value of the 'numwant' argument passed in tracker requests. */
     NUMWANT = 80,
@@ -67,22 +70,21 @@ struct tr_tracker
 
     uint8_t randOffset;
 
-    /* sent as the "key" argument in tracker requests
-       to verify us if our IP address changes.
-       This is immutable for the life of the tracker object. */
-    char key_param[KEYLEN+1];
+    tr_session * session;
 
     /* these are set from the latest scrape or tracker response */
     int announceIntervalSec;
     int announceMinIntervalSec;
     int scrapeIntervalSec;
     int retryScrapeIntervalSec;
-    int retryAnnounceIntervalSec;
 
     /* index into the torrent's tr_info.trackers array */
     int trackerIndex;
 
-    tr_session * session;
+    /* sent as the "key" argument in tracker requests
+       to verify us if our IP address changes.
+       This is immutable for the life of the tracker object. */
+    char key_param[KEYLEN+1];
 
     tr_publisher_t * publisher;
 
@@ -122,20 +124,15 @@ struct tr_tracker
 ***/
 
 static const tr_tracker_info *
-getCurrentAddressFromTorrent( tr_tracker * t, const tr_torrent * tor )
+getCurrentAddressFromTorrent( const tr_tracker * t, const tr_torrent * tor )
 {
-    /* user might have removed trackers,
-     * so check to make sure our current index is in-bounds */
-    if( t->trackerIndex >= tor->info.trackerCount )
-        t->trackerIndex = 0;
-
     assert( t->trackerIndex >= 0 );
     assert( t->trackerIndex < tor->info.trackerCount );
     return tor->info.trackers + t->trackerIndex;
 }
     
 static const tr_tracker_info *
-getCurrentAddress( tr_tracker * t )
+getCurrentAddress( const tr_tracker * t )
 {
     const tr_torrent * torrent;
     if(( torrent = tr_torrentFindFromHash( t->session, t->hash )))
@@ -144,7 +141,7 @@ getCurrentAddress( tr_tracker * t )
 }
 
 static int
-trackerSupportsScrape( tr_tracker * t, const tr_torrent * tor )
+trackerSupportsScrape( const tr_tracker * t, const tr_torrent * tor )
 {
     const tr_tracker_info * info = getCurrentAddressFromTorrent( t, tor );
     return info && info->scrape;
@@ -332,9 +329,9 @@ onTrackerResponse( tr_session    * session,
             const char * str;
 
             success = TRUE;
-            t->retryAnnounceIntervalSec = FIRST_SCRAPE_RETRY_INTERVAL_SEC;
 
             if(( tr_bencDictFindStr( &benc, "failure reason", &str ))) {
+               // publishErrorMessageAndStop( t, str );
                 publishMessage( t, str, TR_TRACKER_ERROR );
                 success = FALSE;
             }
@@ -400,10 +397,6 @@ onTrackerResponse( tr_session    * session,
         t->scrapeAt = now + t->scrapeIntervalSec + t->randOffset;
         t->reannounceAt = now + interval;
         t->manualAnnounceAllowedAt = now + t->announceMinIntervalSec;
-
-        /* #319: save the .resume file after an announce so that, in case
-         * of a crash, our stats still match up with the tracker's stats */
-        tr_torrentSaveResume( tr_torrentFindFromHash( t->session, t->hash ) );
     }
     else if( 300<=responseCode && responseCode<=399 )
     {
@@ -430,8 +423,7 @@ onTrackerResponse( tr_session    * session,
          * incapable of performing the request.  So we pause a bit and
          * try again. */
         t->manualAnnounceAllowedAt = ~(time_t)0;
-        t->reannounceAt = time( NULL ) + t->retryAnnounceIntervalSec;
-        t->retryAnnounceIntervalSec *= 2;
+        t->reannounceAt = time( NULL ) + 60;
     }
     else
     {
@@ -495,16 +487,12 @@ onScrapeResponse( tr_session   * session,
                     if(( tr_bencDictFindInt( flags, "min_request_interval", &itmp )))
                         t->scrapeIntervalSec = i;
 
-                /* as per ticket #1045, safeguard against trackers returning
-                 * a very low min_request_interval... */
-                if( t->scrapeIntervalSec < DEFAULT_SCRAPE_INTERVAL_SEC )
-                    t->scrapeIntervalSec = DEFAULT_SCRAPE_INTERVAL_SEC;
+                success = TRUE;
 
                 tr_ndbg( t->name, "Scrape successful.  Rescraping in %d seconds.",
                          t->scrapeIntervalSec );
 
-                success = TRUE;
-                t->retryScrapeIntervalSec = FIRST_SCRAPE_RETRY_INTERVAL_SEC;
+                t->retryScrapeIntervalSec = 30;
             }
         }
 
@@ -560,9 +548,9 @@ enum
 
 struct tr_tracker_request
 {
-    uint8_t torrent_hash[SHA_DIGEST_LENGTH];
-    int reqtype; /* TR_REQ_* */
     char * url;
+    int reqtype; /* TR_REQ_* */
+    uint8_t torrent_hash[SHA_DIGEST_LENGTH];
     tr_web_done_func * done_func;
     tr_session * session;
 };
@@ -575,7 +563,7 @@ freeRequest( struct tr_tracker_request * req )
 }
 
 static void
-buildTrackerRequestURI( tr_tracker        * t,
+buildTrackerRequestURI( const tr_tracker  * t,
                         const tr_torrent  * torrent,
                         const char        * eventName,
                         struct evbuffer   * buf )
@@ -599,7 +587,7 @@ buildTrackerRequestURI( tr_tracker        * t,
         strchr(ann, '?') ? '&' : '?',
         t->escaped,
         t->peer_id,
-        tr_sessionGetPeerPort( t->session ),
+        tr_sharedGetPublicPort( t->session->shared ),
         torrent->uploadedCur,
         torrent->downloadedCur,
         torrent->corruptCur,
@@ -613,7 +601,7 @@ buildTrackerRequestURI( tr_tracker        * t,
 }
 
 static struct tr_tracker_request*
-createRequest( tr_session * session, tr_tracker * tracker, int reqtype )
+createRequest( tr_session * session, const tr_tracker * tracker, int reqtype )
 {
     static const char* strings[] = { "started", "completed", "stopped", "", "err" };
     const tr_torrent * torrent = tr_torrentFindFromHash( session, tracker->hash );
@@ -638,7 +626,7 @@ createRequest( tr_session * session, tr_tracker * tracker, int reqtype )
 }
 
 static struct tr_tracker_request*
-createScrape( tr_session * session, tr_tracker * tracker )
+createScrape( tr_session * session, const tr_tracker * tracker )
 {
     const tr_tracker_info * a = getCurrentAddress( tracker );
     struct tr_tracker_request * req;
@@ -661,11 +649,12 @@ createScrape( tr_session * session, tr_tracker * tracker )
 
 struct tr_tracker_handle
 {
+    unsigned int isShuttingDown : 1;
     int runningCount;
     tr_timer * pulseTimer;
 };
 
-static int trackerPulse( void * vsession );
+static int pulse( void * vsession );
 
 static void
 ensureGlobalsExist( tr_session * session )
@@ -673,21 +662,35 @@ ensureGlobalsExist( tr_session * session )
     if( session->tracker == NULL )
     {
         session->tracker = tr_new0( struct tr_tracker_handle, 1 );
-        session->tracker->pulseTimer = tr_timerNew( session, trackerPulse, session, PULSE_INTERVAL_MSEC );
+        session->tracker->pulseTimer = tr_timerNew( session, pulse, session, PULSE_INTERVAL_MSEC );
         dbgmsg( NULL, "creating tracker timer" );
     }
 }
 
 void
-tr_trackerSessionClose( tr_session * session )
+tr_trackerShuttingDown( tr_session * session )
 {
-    if( session && session->tracker )
+    if( session->tracker )
+        session->tracker->isShuttingDown = 1;
+}
+
+static int
+maybeFreeGlobals( tr_session * session )
+{
+    int globalsExist = session->tracker != NULL;
+
+    if( globalsExist
+        && ( session->tracker->runningCount < 1 )
+        && ( session->torrentList== NULL ) )
     {
         dbgmsg( NULL, "freeing tracker timer" );
         tr_timerFree( &session->tracker->pulseTimer );
         tr_free( session->tracker );
         session->tracker = NULL;
+        globalsExist = FALSE;
     }
+
+    return globalsExist;
 }
 
 /***
@@ -698,6 +701,7 @@ static void
 invokeRequest( void * vreq )
 {
     struct tr_tracker_request * req = vreq;
+    uint8_t * hash;
     tr_tracker * t = findTracker( req->session, req->torrent_hash );
 
     if( t )
@@ -707,13 +711,12 @@ invokeRequest( void * vreq )
         if( req->reqtype == TR_REQ_SCRAPE )
         {
             t->lastScrapeTime = now;
-            t->scrapeAt = 1;
+            t->scrapeAt = 0;
         }
         else
         {
             t->lastAnnounceTime = now;
-            t->reannounceAt = 1;
-            t->manualAnnounceAllowedAt = 1;
+            t->reannounceAt = 0;
             t->scrapeAt = req->reqtype == TR_REQ_STOPPED
                         ? now + t->scrapeIntervalSec + t->randOffset
                         : 0;
@@ -722,8 +725,9 @@ invokeRequest( void * vreq )
 
     ++req->session->tracker->runningCount;
 
-    tr_webRun( req->session, req->url, NULL, req->done_func,
-               tr_memdup( req->torrent_hash, SHA_DIGEST_LENGTH ) );
+    hash = tr_new0( uint8_t, SHA_DIGEST_LENGTH );
+    memcpy( hash, req->torrent_hash, SHA_DIGEST_LENGTH );
+    tr_webRun( req->session, req->url, req->done_func, hash );
 
     freeRequest( req );
 }
@@ -731,7 +735,7 @@ invokeRequest( void * vreq )
 static void ensureGlobalsExist( tr_session * );
 
 static void
-enqueueScrape( tr_session * session, tr_tracker * tracker )
+enqueueScrape( tr_session * session, const tr_tracker * tracker )
 {
     struct tr_tracker_request * req;
     ensureGlobalsExist( session );
@@ -740,7 +744,7 @@ enqueueScrape( tr_session * session, tr_tracker * tracker )
 }
 
 static void
-enqueueRequest( tr_session * session, tr_tracker * tracker, int reqtype )
+enqueueRequest( tr_session * session, const tr_tracker * tracker, int reqtype )
 {
     struct tr_tracker_request * req;
     ensureGlobalsExist( session );
@@ -749,7 +753,7 @@ enqueueRequest( tr_session * session, tr_tracker * tracker, int reqtype )
 }
 
 static int
-trackerPulse( void * vsession )
+pulse( void * vsession )
 {
     tr_session * session = vsession;
     struct tr_tracker_handle * th = session->tracker;
@@ -767,20 +771,13 @@ trackerPulse( void * vsession )
     {
         tr_tracker * t = tor->tracker;
 
-        if( ( t->scrapeAt > 1 ) &&
-            ( t->scrapeAt <= now ) &&
-            ( trackerSupportsScrape( t, tor ) ) )
-        {
-            t->scrapeAt = 1;
+        if( t->scrapeAt && trackerSupportsScrape( t, tor ) && ( now >= t->scrapeAt ) ) {
+            t->scrapeAt = 0;
             enqueueScrape( session, t );
         }
 
-        if( ( t->reannounceAt > 1 ) && 
-            ( t->reannounceAt <= now ) &&
-            ( t->isRunning ) )
-        {
-            t->reannounceAt = 1;
-            t->manualAnnounceAllowedAt = 1;
+        if( t->reannounceAt && t->isRunning && ( now >= t->reannounceAt ) ) {
+            t->reannounceAt = 0;
             enqueueRequest( session, t, TR_REQ_REANNOUNCE );
         }
     }
@@ -788,18 +785,7 @@ trackerPulse( void * vsession )
     if( th->runningCount )
         dbgmsg( NULL, "tracker pulse after upkeep... %d running", th->runningCount );
 
-    /* free the tracker manager if no torrents are left */
-    if(    ( session->tracker )
-        && ( session->tracker->runningCount < 1 )
-        && ( session->torrentList == NULL ) )
-    {
-        tr_trackerSessionClose( session );
-    }
-
-    /* if there are still running torrents (as indicated by
-     * the existence of the tracker manager) then keep the
-     * trackerPulse() timer alive */
-    return session->tracker != NULL;
+    return maybeFreeGlobals( session );
 }
 
 static void
@@ -809,7 +795,7 @@ onReqDone( tr_session * session )
     {
         --session->tracker->runningCount;
         dbgmsg( NULL, "decrementing runningCount to %d", session->tracker->runningCount );
-        trackerPulse( session );
+        pulse( session );
     }
 }
 
@@ -844,7 +830,7 @@ escape( char * out, const uint8_t * in, int in_len ) /* rfc2396 */
         if( is_rfc2396_alnum(*in) )
             *out++ = (char) *in++;
         else 
-            out += tr_snprintf( out, 4, "%%%02X", (unsigned int)*in++ );
+            out += snprintf( out, 4, "%%%02X", (unsigned int)*in++ );
     *out = '\0';
 }
 
@@ -858,8 +844,7 @@ tr_trackerNew( const tr_torrent * torrent )
     t->publisher = tr_publisherNew( );
     t->session                  = torrent->handle;
     t->scrapeIntervalSec        = DEFAULT_SCRAPE_INTERVAL_SEC;
-    t->retryScrapeIntervalSec   = FIRST_SCRAPE_RETRY_INTERVAL_SEC;
-    t->retryAnnounceIntervalSec = FIRST_ANNOUNCE_RETRY_INTERVAL_SEC;
+    t->retryScrapeIntervalSec   = 60;
     t->announceIntervalSec      = DEFAULT_ANNOUNCE_INTERVAL_SEC;
     t->announceMinIntervalSec   = DEFAULT_ANNOUNCE_MIN_INTERVAL_SEC;
     t->timesDownloaded          = -1;
@@ -923,7 +908,7 @@ tr_trackerUnsubscribe( tr_tracker        * t,
 }
 
 const tr_tracker_info *
-tr_trackerGetAddress( tr_tracker   * t )
+tr_trackerGetAddress( const tr_tracker   * t )
 {
     return getCurrentAddress( t );
 }
@@ -1001,8 +986,8 @@ tr_trackerChangeMyPort( tr_tracker * t )
 }
 
 void
-tr_trackerStat( const tr_tracker * t,
-                struct tr_stat   * setme)
+tr_trackerStat( const tr_tracker       * t,
+                struct tr_tracker_stat * setme)
 {
     assert( t );
     assert( setme );
@@ -1011,23 +996,23 @@ tr_trackerStat( const tr_tracker * t,
     setme->nextScrapeTime = t->scrapeAt;
     setme->lastAnnounceTime = t->lastAnnounceTime;
     setme->nextAnnounceTime = t->reannounceAt;
-    setme->manualAnnounceTime = t->manualAnnounceAllowedAt;
+    setme->nextManualAnnounceTime = t->manualAnnounceAllowedAt;
 
     if( t->lastScrapeResponse == -1 ) /* never been scraped */
         *setme->scrapeResponse = '\0';
     else
-        tr_snprintf( setme->scrapeResponse,
-                     sizeof( setme->scrapeResponse ),
-                     "%s (%ld)",
-                     tr_webGetResponseStr( t->lastScrapeResponse ),
-                     t->lastScrapeResponse );
+        snprintf( setme->scrapeResponse,
+                  sizeof( setme->scrapeResponse ),
+                  "%s (%ld)",
+                  tr_webGetResponseStr( t->lastScrapeResponse ),
+                  t->lastScrapeResponse );
 
     if( t->lastAnnounceResponse == -1 ) /* never been announced */
         *setme->announceResponse = '\0';
     else
-        tr_snprintf( setme->announceResponse,
-                     sizeof( setme->announceResponse ),
-                     "%s (%ld)",
-                     tr_webGetResponseStr( t->lastAnnounceResponse ),
-                     t->lastAnnounceResponse );
+        snprintf( setme->announceResponse,
+                  sizeof( setme->announceResponse ),
+                  "%s (%ld)",
+                  tr_webGetResponseStr( t->lastAnnounceResponse ),
+                  t->lastAnnounceResponse );
 }

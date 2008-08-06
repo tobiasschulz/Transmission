@@ -84,7 +84,7 @@ getProgressString( const tr_info * info, const tr_stat * torStat )
         GString * gstr = g_string_new( str );
         g_string_append( gstr, " - " );
         if( eta == TR_ETA_NOT_AVAIL )
-            g_string_append( gstr, _( "Data not fully available" ) );
+            g_string_append( gstr, _( "Not available" ) );
          else if( eta == TR_ETA_UNKNOWN )
             g_string_append( gstr, _( "Stalled" ) );
         else {
@@ -199,8 +199,8 @@ getStatusString( const tr_stat * torStat )
                 ngettext( "Downloading from %1$'d of %2$'d connected peer",
                           "Downloading from %1$'d of %2$'d connected peers",
                           torStat->peersConnected ),
-                torStat->peersSendingToUs + torStat->webseedsSendingToUs,
-                torStat->peersConnected + torStat->webseedsSendingToUs );
+                torStat->peersSendingToUs,
+                torStat->peersConnected );
             break;
 
         case TR_STATUS_SEED:
@@ -453,7 +453,9 @@ torrent_cell_renderer_render( GtkCellRenderer      * cell,
         my_cell.height = p->bar_height;
         if( 1 )
         {
-            g_object_set( p->progress_renderer, "value", (int)(torStat->percentDone*100.0), 
+            const double havePercent = ( torStat->haveValid + torStat->haveUnchecked )
+                                                              / (double)info->totalSize;
+            g_object_set( p->progress_renderer, "value", (int)(havePercent*100.0), 
                                                 "text", "",
                                                 NULL );
             gtk_cell_renderer_render( p->progress_renderer,

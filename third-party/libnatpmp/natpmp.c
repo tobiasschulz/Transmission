@@ -1,4 +1,4 @@
-/* $Id: natpmp.c,v 1.8 2008/07/02 22:33:06 nanard Exp $ */
+/* $Id: natpmp.c,v 1.6 2008/04/28 02:58:34 nanard Exp $ */
 /* libnatpmp
  * Copyright (c) 2007-2008, Thomas BERNARD <miniupnp@free.fr>
  * http://miniupnp.free.fr/libnatpmp.html
@@ -21,26 +21,19 @@
 #include <winsock2.h>
 #include <Ws2tcpip.h>
 #include <io.h>
-#define EWOULDBLOCK WSAEWOULDBLOCK
-#define ECONNREFUSED WSAECONNREFUSED
 #else
 #include <errno.h>
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#define closesocket close
 #endif
 #include "natpmp.h"
 #include "getgateway.h"
 
 int initnatpmp(natpmp_t * p)
 {
-#ifdef WIN32
-	u_long ioctlArg = 1;
-#else
 	int flags; 
-#endif
 	struct sockaddr_in addr;
 	if(!p)
 		return NATPMP_ERR_INVALIDARGS;
@@ -48,15 +41,10 @@ int initnatpmp(natpmp_t * p)
 	p->s = socket(PF_INET, SOCK_DGRAM, 0);
 	if(p->s < 0)
 		return NATPMP_ERR_SOCKETERROR;
-#ifdef WIN32
-	if(ioctlsocket(p->s, FIONBIO, &ioctlArg) == SOCKET_ERROR)
-		return NATPMP_ERR_FCNTLERROR;
-#else
 	if((flags = fcntl(p->s, F_GETFL, 0)) < 0)
 		return NATPMP_ERR_FCNTLERROR;
 	if(fcntl(p->s, F_SETFL, flags | O_NONBLOCK) < 0)
 		return NATPMP_ERR_FCNTLERROR;
-#endif
 
 	if(getdefaultgateway(&(p->gateway)) < 0)
 		return NATPMP_ERR_CANNOTGETGATEWAY;
@@ -74,7 +62,7 @@ int closenatpmp(natpmp_t * p)
 {
 	if(!p)
 		return NATPMP_ERR_INVALIDARGS;
-	if(closesocket(p->s) < 0)
+	if(close(p->s) < 0)
 		return NATPMP_ERR_CLOSEERR;
 	return 0;
 }
@@ -172,8 +160,7 @@ int readnatpmpresponse(natpmp_t * p, natpmpresp_t * response)
 	             (struct sockaddr *)&addr, &addrlen);
 	if(n<0)
 		switch(errno) {
-		/*case EAGAIN:*/
-		case EWOULDBLOCK:
+		case EAGAIN:
 			n = NATPMP_TRYAGAIN;
 			break;
 		case ECONNREFUSED:
@@ -216,11 +203,11 @@ int readnatpmpresponse(natpmp_t * p, natpmpresp_t * response)
 			response->type = buf[1] & 0x7f;
 			if(buf[1] == 128)
 				//response->publicaddress.addr = *((uint32_t *)(buf + 8));
-				response->pnu.publicaddress.addr.s_addr = *((uint32_t *)(buf + 8));
+				response->publicaddress.addr.s_addr = *((uint32_t *)(buf + 8));
 			else {
-				response->pnu.newportmapping.privateport = ntohs(*((uint16_t *)(buf + 8)));
-				response->pnu.newportmapping.mappedpublicport = ntohs(*((uint16_t *)(buf + 10)));
-				response->pnu.newportmapping.lifetime = ntohl(*((uint32_t *)(buf + 12)));
+				response->newportmapping.privateport = ntohs(*((uint16_t *)(buf + 8)));
+				response->newportmapping.mappedpublicport = ntohs(*((uint16_t *)(buf + 10)));
+				response->newportmapping.lifetime = ntohl(*((uint32_t *)(buf + 12)));
 			}
 			n = 0;
 		}
@@ -267,6 +254,7 @@ int readnatpmpresponseorretry(natpmp_t * p, natpmpresp_t * response)
 	return n;
 }
 
+#ifdef ENABLE_STRNATPMPERR
 const char * strnatpmperr(int r)
 {
 	const char * s;
@@ -281,11 +269,7 @@ const char * strnatpmperr(int r)
 		s = "cannot get default gateway ip address";
 		break;
 	case NATPMP_ERR_CLOSEERR:
-#ifdef WIN32
-		s = "closesocket() failed";
-#else
 		s = "close() failed";
-#endif
 		break;
 	case NATPMP_ERR_RECVFROM:
 		s = "recvfrom() failed";
@@ -334,4 +318,5 @@ const char * strnatpmperr(int r)
 	}
 	return s;
 }
+#endif
 

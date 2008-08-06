@@ -1,4 +1,4 @@
-.Dd July 21, 2008
+.Dd May 20, 2008
 .Dt TRANSMISSION-REMOTE 1
 .Os
 .Sh NAME
@@ -9,31 +9,36 @@ and
 .Xr transmission 1
 .Sh SYNOPSIS
 .Bk -words
+.Nm transmission-remote
+.Fl h
 .Nm
 .Op Ar host:port | host | port
-.Op Fl a Ar torrent-files
-.Op Fl b
-.Op Fl d Ar number | Fl D
-.Op Fl er | ep | et
-.Op Fl f
-.Op Fl g Ar files
-.Op Fl G Ar files
-.Op Fl h
+.Op Fl a Ar torrent-file
+.Op Fl d Ar download-rate
+.Op Fl D
+.Op Fl e
+.Op Fl E
+.Op Fl f Ar directory
 .Op Fl i
 .Op Fl l
-.Op Fl m | M
-.Op Fl n Ar user:pass
+.Op Fl m
+.Op Fl M
 .Op Fl p Ar port
-.Op Fl ph Ar files
-.Op Fl pl Ar files
-.Op Fl pn Ar files
-.Op Fl r
-.Op Fl s | S
-.Op Fl t Ar all | Ar id | Ar hash
-.Op Fl u Ar number | Fl U
-.Op Fl v
-.Op Fl w Ar download-dir
-.Op Fl x | X
+.Op Fl q
+.Oo
+.Fl r Ar all | Ar id | Ar hash
+.Oc
+.Oo
+.Fl s Ar all | Ar id | Ar hash
+.Oc
+.Oo
+.Fl S Ar all | Ar id | Ar hash
+.Oc
+.Op Fl u Ar upload-rate
+.Op Fl U
+.Oo
+.Fl v Ar all | Ar id | Ar hash
+.Oc
 .Ek
 .Sh DESCRIPTION
 .Nm
@@ -46,187 +51,89 @@ By default,
 .Nm
 connects to the transmission session at localhost:9091.
 Other sessions can be controlled by specifying a different host and/or port.
-
-.Sh OPTIONS
+.Pp
+The options are as follows:
 .Bl -tag -width Ds
-.It Fl a Fl -add Ar torrent-file(s)
-Add
-.Ar torrent-file(s)
-into transmission.
-
-.It Fl b Fl -debug
-Enable debugging mode.
-
-.It Fl d Fl -downlimit Ar limit
-Limit the download speed to
-.Ar limit
-kilobytes per second.
-
-.It Fl D Fl -no-downlimit
+.It Fl a Fl -add Ar torrent-file
+Add the torrent metainfo file
+.Ar torrent-file .
+.It Fl d Fl -download-limit Ar download-rate
+Set maximum download rate to
+.Ar download-rate
+in kilobytes per second.
+.It Fl D Fl -download-unlimited
 Remove the download limit.
-
-.It Fl er Fl -encryption-required
-Encrypt all peer connections.
-.It Fl ep Fl -encryption-preferred
-Prefer encrypted peer connections.
-.It Fl et Fl -encryption-tolerated
-Prefer unencrypted peer connections.
-
-.It Fl f Fl -files
-Get a file list for the current torrent(s)
-
-.It Fl g Fl -get Ar all | file-index | files
-Mark file(s) for download.
-.Ar all
-marks all all of the torrent's files for downloading,
-.Ar file-index
-adds a single file to the download list, and
-.Ar files
-adds multiple files to the download list,
-such as "-g1,3-5" to add files #1, #3, #4, and #5 to the download list.
-
-.It Fl G Fl -no-get Ar all | file-index | files
-Mark file(s) for not downloading.
-
-.It Fl h Fl -help
-Print command-line option descriptions.
-
-.It Fl i Fl -info Ar id | torrent-hash
-Show details of the current torrent(s)
-
-.It Fl l Fl -list
-List all torrents
-
-.It Fl m Fl -portmap
-Enable portmapping via NAT-PMP or UPnP
-.It Fl M Fl -no-portmap
-Disable portmapping
-
-.It Fl n Fl -auth Ar username:password
-Set the
-.Ar username
-and
-.Ar password
-for authentication
-
-.It Fl p Fl -port Ar port
-Set the
-.Ar port
-for use when listening for incoming peer connections
-
-.It Fl pn Fl -priority-normal Ar all | file-index | files
-Mark file(s) as normal priority.
-.Ar all
-marks all of the torrent's files as normal priority,
-.Ar file-index
-sets a single file's priority as normal, and
-.Ar files
-sets multiple files' priorities as normal,
-such as "-pn1,3-5" to normalize files #1, #3, #4, and #5.
-
-.It Fl ph Fl -priority-high Ar all | file-index | files
-Mark file(s) as high priority.
-
-.It Fl pl Fl -priority-low Ar all | file-index | files
-Mark file(s) as low priority.
-
-.It Fl r Fl -remove
-Remove the current torrent(s).  This does not delete the downloaded data.
-
-.It Fl s Fl -start
-Start the current torrent(s)
-
-.It Fl S Fl -stop
-Stop the current torrent(s) from downloading or seeding
-
-.It Fl t Fl -torrent Ar all | id | torrent-hash
-Set the current torrent(s) for use by subsequent options.
-.Ar all
-will apply following requests to all torrents, while specific torrents can be chosen by
-.Ar id
-or
-.Ar hash .
-To set more than one current torrent, join their ids or hashes together in a list,
-such as "-t2,4,6-8" to operate on the torrents whose IDs are 2, 4, 6, 7, and 8.
-
-.It Fl u Fl -uplimit Ar limit
-Limit the upload speed to
-.Ar limit
-kilobytes per second.
-.It Fl U Fl -no-uplimit
-Remove the upload limit.
-
-.It Fl v Fl -verify
-Verify the current torrent(s)
-
-.It Fl w Fl -download-dir Ar directory
+.It Fl e
+Enable peer exchange.
+.It Fl E
+Disable peer exchange.
+.It Fl f Fl -folder Ar directory
 Use
 .Ar directory
 as the default location for newly added torrents to download files to.
+.It Fl h Fl -help
+Print command-line option descriptions.
+.It Fl l Fl -list
+Print a listing of all torrents, their Id numbers, and current status.
+.It Fl m Fl -port-mapping
+Enable automatic port mapping via NAT-PMP or UPnP IGD.
+.It Fl M Fl -no-port-mapping
+Disable automatic port mapping.
+.It Fl p Fl -port Ar port
+Attempt to bind to
+.Ar port
+for use as a listening port to accept incoming peer connections.
 
-.It Fl x Fl -pex
-Enable peer exchange (PEX).
-.It Fl X Fl -no-pex
-Disable peer exchange (PEX).
+.It Fl r Fl -remove Ar all | id | torrent-hash
+Remove all torrents, or the torrent matching the specified
+.Ar id
+or
+.Ar hash .
+This does not delete the downloaded data.
+
+.It Fl S Fl -stop Ar all | id | torrent-hash
+Stop all torrents from downloading or seeding, or the torrent matching the specified
+.Ar id
+or
+.Ar hash .
+
+.It Fl s Fl -start Ar all | id | torrent-hash
+Start all torrents downloading or seeding, or the torrent matching the specified
+.Ar id
+or
+.Ar hash .
+
+.It Fl u Fl -upload-limit Ar upload-rate
+Set maximum upload rate to
+.Ar upload-rate
+in kilobytes per second.
+
+.It Fl U Fl -upload-unlimited
+Remove the upload limit.
+
+.It Fl v Fl -verify Ar all | id | torrent-hash
+Queue all the torrents for verification, or the torrent matching the specified
+.Ar id
+or
+.Ar hash .
 
 .El
 .Sh EXAMPLES
-
+Show all torrents, their ID numbers, and their status:
+.Pp
+.Dl transmission-remote -l
+.Pp
+Pause torrent #12:
+.Pp
+.Dl transmission-remote -S 12
+.Pp
 Set download and upload limits to 100 KiB/sec and 20 KiB/sec:
-.Bd -literal -offset indent
-$ transmission-remote -d100 -u20
-$ transmission-remote --downlimit=100 --uplimit=20
-.Ed
-
-List all torrents' IDs and states:
-.Bd -literal -offset indent
-$ transmission-remote -l
-.Ed
-
-List all torrents from a remote session that requires authentication:
-.Bd -literal -offset indent
-$ transmission-remote host:9091 --auth=username:password -l
-.Ed
-
-Start all torrents:
-.Bd -literal -offset indent
-$ transmission-remote -tall --start
-.Ed
-
+.Pp
+.Dl transmission-remote -d 100 -u 20
+.Pp
 Add two torrents:
-.Bd -literal -offset indent
-$ transmission-remote -a one.torrent two.torrent
-.Ed
-
-Add all torrents in ~/Desktop:
-.Bd -literal -offset indent
-$ transmission-remote -a ~/Desktop/*torrent
-.Ed
-
-Get detailed information on the torrent whose ID is '1':
-.Bd -literal -offset indent
-$ transmission-remote -t1 -i"
-.Ed
-
-Get a list of a torrent's files:
-.Bd -literal -offset indent
-$ transmission-remote -t1 -l"
-.Ed
-
-Download only its second and fourth files:
-.Bd -literal -offset indent
-$ transmission-remote -t1 -Gall -g2,4"
-.Ed
-
-Set all torrents' first two files' priorities to high:
-.Bd -literal -offset indent
-$ transmission-remote -tall -ph1,2"
-.Ed
-
-Set all torrents' files' priorities to normal:
-.Bd -literal -offset indent
-$ transmission-remote -tall -pnall"
-.Ed
+.Pp
+.Dl transmission-remote -a foo.torrent -a bar.torrent
 
 .Sh AUTHORS
 .An -nosplit

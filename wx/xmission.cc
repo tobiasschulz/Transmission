@@ -455,7 +455,7 @@ void
 MyFrame :: OnPulse(wxTimerEvent& WXUNUSED(event) )
 {
     if( myExitTime ) {
-        if ( !tr_sessionCountTorrents(handle) ||  myExitTime<time(0) ) {
+        if ( !tr_torrentCount(handle) ||  myExitTime<time(0) ) {
             delete myTrayIcon;
             myTrayIcon = 0;
             Destroy( );
@@ -469,7 +469,7 @@ MyFrame :: OnPulse(wxTimerEvent& WXUNUSED(event) )
     mySpeedStats->Pulse( handle );
 
     float down, up;
-    tr_sessionGetSpeed( handle, &down, &up );
+    tr_torrentRates( handle, &down, &up );
     wxString xstr = _("Total DL: ");
     xstr += getReadableSpeed( down );
     SetStatusText( xstr, 1 );

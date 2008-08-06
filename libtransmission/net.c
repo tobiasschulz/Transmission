@@ -76,7 +76,7 @@ int tr_netResolve( const char * address, struct in_addr * addr )
 
 
 /***********************************************************************
- * TCP sockets
+ * TCP/UDP sockets
  **********************************************************************/
 
 int
@@ -115,27 +115,15 @@ makeSocketNonBlocking( int fd )
 static int
 createSocket( int type, int priority )
 {
-    int fd;
-
-    fd = tr_fdSocketCreate( type, priority );
-
-    if( fd >= 0 )
-        fd = makeSocketNonBlocking( fd );
-
-    if( fd >= 0 ) {
-        const int buffsize = 1500*2; /* 2x MTU for most ethernet/wireless */
-        setsockopt( fd, SOL_SOCKET, SO_SNDBUF, &buffsize, sizeof( buffsize ) );
-    }
-
-    return fd;
+    return makeSocketNonBlocking( tr_fdSocketCreate( type, priority ) );
 }
 
-int
-tr_netOpenTCP( const struct in_addr * addr, tr_port_t port, int priority )
+static int
+tr_netOpen( const struct in_addr * addr, tr_port_t port,
+            int type, int priority )
 {
     int s;
     struct sockaddr_in sock;
-    const int type = SOCK_STREAM;
 
     if( ( s = createSocket( type, priority ) ) < 0 )
     {
@@ -163,13 +151,18 @@ tr_netOpenTCP( const struct in_addr * addr, tr_port_t port, int priority )
 
     return s;
 }
-
+  
 int
-tr_netBindTCP( int port )
+tr_netOpenTCP( const struct in_addr * addr, tr_port_t port, int priority )
+{
+    return tr_netOpen( addr, port, SOCK_STREAM, priority );
+}
+
+static int
+tr_netBind( int port, int type )
 {
     int s;
     struct sockaddr_in sock;
-    const int type = SOCK_STREAM;
 #if defined( SO_REUSEADDR ) || defined( SO_REUSEPORT )
     int optval;
 #endif
@@ -200,9 +193,54 @@ tr_netBindTCP( int port )
 }
 
 int
+tr_netBindTCP( int port )
+{
+    return tr_netBind( port, SOCK_STREAM );
+}
+
+int
 tr_netAccept( int b, struct in_addr * addr, tr_port_t * port )
 {
     return makeSocketNonBlocking( tr_fdSocketAccept( b, addr, port ) );
+}
+
+int
+tr_netSend( int s, const void * buf, int size )
+{
+    const int ret = send( s, buf, size, 0 );
+    if( ret >= 0 )
+        return ret;
+
+    if( sockerrno == ENOTCONN || sockerrno == EAGAIN || sockerrno == EWOULDBLOCK )
+        return TR_NET_BLOCK;
+
+    return TR_NET_CLOSE;
+}
+
+int tr_netRecvFrom( int s, uint8_t * buf, int size, struct sockaddr_in * addr )
+{
+    socklen_t len;
+    int       ret;
+
+    len = ( NULL == addr ? 0 : sizeof( *addr ) );
+    ret = recvfrom( s, buf, size, 0, ( struct sockaddr * ) addr, &len );
+    if( ret < 0 )
+    {
+        if( sockerrno == EAGAIN || sockerrno == EWOULDBLOCK )
+        {
+            ret = TR_NET_BLOCK;
+        }
+        else
+        {
+            ret = TR_NET_CLOSE;
+        }
+    }
+    if( !ret )
+    {
+        ret = TR_NET_CLOSE;
+    }
+
+    return ret;
 }
 
 void
@@ -217,6 +255,6 @@ tr_netNtop( const struct in_addr * addr, char * buf, int len )
     const uint8_t * cast;
 
     cast = (const uint8_t *)addr;
-    tr_snprintf( buf, len, "%hhu.%hhu.%hhu.%hhu",
-                cast[0], cast[1], cast[2], cast[3] );
+    snprintf( buf, len, "%hhu.%hhu.%hhu.%hhu",
+              cast[0], cast[1], cast[2], cast[3] );
 }

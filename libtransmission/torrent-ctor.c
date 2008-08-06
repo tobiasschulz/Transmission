@@ -30,8 +30,6 @@ struct optional_args
     char downloadDir[MAX_PATH_LENGTH];
 };
 
-/** Opaque class used when instantiating torrents.
-  * @ingroup tr_ctor */
 struct tr_ctor
 {
     const tr_handle * handle;
@@ -107,7 +105,7 @@ tr_ctorSetMetainfoFromFile( tr_ctor        * ctor,
     /* if no `name' field was set, then set it from the filename */
     if( ctor->isSet_metainfo ) {
         tr_benc * info = tr_bencDictFindType( &ctor->metainfo, "info", TYPE_DICT );
-        if( info ) {
+        if( info != NULL ) {
             tr_benc * name = tr_bencDictFindFirst( info, "name.utf-8", "name", NULL );
             if( name == NULL )
                 name = tr_bencDictAdd( info, "name" );
@@ -207,13 +205,8 @@ tr_ctorSetDownloadDir( tr_ctor        * ctor,
                        const char     * directory )
 {
     struct optional_args * args = &ctor->optionalArgs[mode];
-    if( directory ) {
-        args->isSet_downloadDir = 1;
-        tr_strlcpy( args->downloadDir, directory, sizeof( args->downloadDir ) );
-    } else {
-        args->isSet_downloadDir = 0;
-        *args->downloadDir = '\0';
-    }
+    args->isSet_downloadDir = 1;
+    tr_strlcpy( args->downloadDir, directory, sizeof( args->downloadDir ) );
 }
 
 int

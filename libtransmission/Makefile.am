@@ -1,5 +1,5 @@
 AM_CPPFLAGS = -I. -I$(top_srcdir) -I$(top_srcdir)/third-party/ -D__TRANSMISSION__ $(LIBEVENT_CPPFLAGS)
-AM_CFLAGS = $(LIBCURL_CFLAGS) $(OPENSSL_CFLAGS) $(PTHREAD_CFLAGS)
+AM_CFLAGS = $(OPENSSL_CFLAGS) $(LIBCURL_CFLAGS) $(PTHREAD_CFLAGS)
 
 noinst_LIBRARIES = libtransmission.a
 
@@ -37,14 +37,12 @@ libtransmission_a_SOURCES = \
     stats.c \
     torrent.c \
     torrent-ctor.c \
-    tr-getopt.c \
     tracker.c \
     trevent.c \
     upnp.c \
     utils.c \
     verify.c \
-    web.c \
-    webseed.c
+    web.c
 
 noinst_HEADERS = \
     bencode.h \
@@ -65,7 +63,6 @@ noinst_HEADERS = \
     metainfo.h \
     natpmp.h \
     net.h \
-    peer-common.h \
     peer-io.h \
     peer-mgr.h \
     peer-mgr-private.h \
@@ -82,21 +79,18 @@ noinst_HEADERS = \
     stats.h \
     torrent.h \
     tracker.h \
-    tr-getopt.h \
     transmission.h \
     trevent.h \
     upnp.h \
     utils.h \
     verify.h \
-    web.h \
-    webseed.h
+    web.h
 
 TESTS = \
     blocklist-test \
     bencode-test \
     clients-test \
     json-test \
-    rpc-test \
     test-fastset \
     test-peer-id \
     utils-test
@@ -110,8 +104,8 @@ APPS_LDADD = \
     $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
     $(top_builddir)/third-party/libevent/libevent.la \
     $(INTLLIBS) \
-    $(LIBCURL_LIBS) \
     $(OPENSSL_LIBS) \
+    $(LIBCURL_LIBS) \
     $(PTHREAD_LIBS) \
     -lm
 
@@ -123,8 +117,6 @@ clients_test_SOURCES = clients-test.c
 clients_test_LDADD = $(APPS_LDADD)
 json_test_SOURCES = json-test.c
 json_test_LDADD = $(APPS_LDADD)
-rpc_test_SOURCES = rpc-test.c
-rpc_test_LDADD = $(APPS_LDADD)
 test_fastset_SOURCES = test-fastset.c
 test_fastset_LDADD = $(APPS_LDADD)
 test_peer_id_SOURCES = test-peer-id.c

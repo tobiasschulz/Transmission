@@ -1,17 +1,29 @@
-/*
- * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
- *
- * This file is licensed by the GPL version 2.  Works owned by the
- * Transmission project are granted a special exemption to clause 2(b)
- * so that the bulk of its code can remain under the MIT license. 
- * This exemption does not extend to derived works not owned by
- * the Transmission project.
- *
+/******************************************************************************
  * $Id$
- */
+ *
+ * Copyright (c) 2005-2008 Transmission authors and contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *****************************************************************************/
 
 #include <assert.h>
-#include <ctype.h> /* isdigit, isprint, isspace */
+#include <ctype.h> /* isdigit, isprint */
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -21,7 +33,6 @@
 
 #include "transmission.h"
 #include "bencode.h"
-#include "json.h"
 #include "list.h"
 #include "ptrarray.h"
 #include "utils.h" /* tr_new(), tr_free() */
@@ -33,7 +44,7 @@
 int
 tr_bencIsType( const tr_benc * val, int type )
 {
-    return ( ( val ) && ( val->type == type ) );
+    return ( ( val != NULL ) && ( val->type == type ) );
 }
 
 static int
@@ -46,14 +57,6 @@ isSomething( const tr_benc * val )
 {
     return isContainer(val) || tr_bencIsInt(val) || tr_bencIsString(val);
 }
-
-static void
-tr_bencInit( tr_benc * val, int type )
-{
-    memset( val, 0, sizeof( *val ) );
-    val->type = type;
-}
-
 
 /***
 ****  tr_bencParse()
@@ -176,14 +179,14 @@ getNode( tr_benc * top, tr_ptrArray * parentStack, int type )
 {
     tr_benc * parent;
 
-    assert( top );
-    assert( parentStack );
+    assert( top != NULL );
+    assert( parentStack != NULL );
 
     if( tr_ptrArrayEmpty( parentStack ) )
         return top;
 
     parent = tr_ptrArrayBack( parentStack );
-    assert( parent );
+    assert( parent != NULL );
 
     /* dictionary keys must be strings */
     if( ( parent->type == TYPE_DICT )
@@ -300,7 +303,7 @@ tr_bencParse( const void     * buf_in,
 
     err = !isSomething( top ) || !tr_ptrArrayEmpty( parentStack );
 
-    if( !err && setme_end )
+    if( !err && ( setme_end != NULL ) )
         *setme_end = buf;
 
     tr_ptrArrayFree( parentStack, NULL );
@@ -325,13 +328,13 @@ tr_bencLoad( const void  * buf_in,
 ****
 ***/
 
-static int
-dictIndexOf( tr_benc * val, const char * key )
+tr_benc *
+tr_bencDictFind( tr_benc * val, const char * key )
 {
     int len, ii;
 
     if( !tr_bencIsDict( val ) )
-        return -1;
+        return NULL;
 
     len = strlen( key );
     
@@ -343,17 +346,10 @@ dictIndexOf( tr_benc * val, const char * key )
         {
             continue;
         }
-        return ii;
+        return &val->val.l.vals[ii+1];
     }
 
-    return -1;
-}
-
-tr_benc *
-tr_bencDictFind( tr_benc * val, const char * key )
-{
-    const int i = dictIndexOf( val, key );
-    return i<0 ? NULL : &val->val.l.vals[i+1];
+    return NULL;
 }
 
 tr_benc*
@@ -491,8 +487,9 @@ tr_bencInitRaw( tr_benc * val, const void * src, size_t byteCount )
 {
     tr_bencInit( val, TYPE_STR );
     val->val.s.i = byteCount;
-    val->val.s.s = tr_memdup( src, byteCount );
+    val->val.s.s = tr_new( char, byteCount );
     val->val.s.nofree = 0;
+    memcpy( val->val.s.s, src, byteCount );
 }
 
 int
@@ -624,7 +621,7 @@ tr_benc*
 tr_bencDictAddDouble( tr_benc * dict, const char * key, double d )
 {
     char buf[128];
-    tr_snprintf( buf, sizeof( buf ), "%f", d );
+    snprintf( buf, sizeof( buf ), "%f", d );
     return tr_bencDictAddStr( dict, key, buf );
 }
 tr_benc*
@@ -648,26 +645,6 @@ tr_bencDictAddRaw( tr_benc * dict, const char * key, const void * src, size_t le
     tr_bencInitRaw( child, src, len );
     return child;
 }
-
-int
-tr_bencDictRemove( tr_benc * dict, const char * key )
-{
-    int i = dictIndexOf( dict, key );
-    if( i >= 0 )
-    {
-        const int n = dict->val.l.count;
-        tr_bencFree( &dict->val.l.vals[i] );
-        tr_bencFree( &dict->val.l.vals[i+1] );
-        if( i + 2 < n )
-        {
-            dict->val.l.vals[i]   = dict->val.l.vals[n-2];
-            dict->val.l.vals[i+1] = dict->val.l.vals[n-1];
-        }
-        dict->val.l.count -= 2;
-    }
-    return i >= 0; /* return true if found */
-}
-
 
 /***
 ****  BENC WALKING
@@ -792,7 +769,7 @@ struct WalkFuncs
  * attack via maliciously-crafted bencoded data. (#667)
  */
 static void
-bencWalk( const tr_benc      * top,
+bencWalk( const tr_benc   * top,
           struct WalkFuncs   * walkFuncs,
           void               * user_data )
 {
@@ -824,7 +801,7 @@ bencWalk( const tr_benc      * top,
             continue;
         }
 
-        if( val ) switch( val->type )
+        switch( val->type )
         {
             case TYPE_INT:
                 walkFuncs->intFunc( val, user_data );
@@ -903,7 +880,7 @@ tr_bencSave( const tr_benc * top, int * len )
     walkFuncs.containerEndFunc = saveContainerEndFunc;
     bencWalk( top, &walkFuncs, out );
     
-    if( len )
+    if( len != NULL )
         *len = EVBUFFER_LENGTH( out );
     ret = tr_strndup( (char*) EVBUFFER_DATA( out ), EVBUFFER_LENGTH( out ) );
     evbuffer_free( out );
@@ -932,7 +909,7 @@ freeContainerBeginFunc( const tr_benc * val, void * freeme )
 void
 tr_bencFree( tr_benc * val )
 {
-    if( val && val->type )
+    if( val != NULL )
     {
         tr_ptrArray * freeme = tr_ptrArrayNew( );
         struct WalkFuncs walkFuncs;
@@ -1047,13 +1024,6 @@ struct jsonWalk
 };
 
 static void
-jsonIndent( struct jsonWalk * data )
-{
-    const int width = tr_list_size( data->parents ) * 4;
-    evbuffer_add_printf( data->out, "\n%*.*s", width, width, " " );
-}
-
-static void
 jsonChildFunc( struct jsonWalk * data )
 {
     if( data->parents )
@@ -1066,17 +1036,14 @@ jsonChildFunc( struct jsonWalk * data )
                 const int i = parentState->childIndex++;
                 if( ! ( i % 2 ) )
                     evbuffer_add_printf( data->out, ": " );
-                else {
+                else
                     evbuffer_add_printf( data->out, ", " );
-                    jsonIndent( data );
-                }
                 break;
             }
 
             case TYPE_LIST: {
                 ++parentState->childIndex;
                 evbuffer_add_printf( data->out, ", " );
-                jsonIndent( data );
                 break;
             }
 
@@ -1118,13 +1085,13 @@ jsonStringFunc( const tr_benc * val, void * vdata )
     for( it=val->val.s.s, end=it+val->val.s.i; it!=end; ++it )
     {
         switch( *it ) {
+            case '"' : evbuffer_add_printf( data->out, "\\\"" ); break;
             case '/' : evbuffer_add_printf( data->out, "\\/" ); break;
             case '\b': evbuffer_add_printf( data->out, "\\b" ); break;
             case '\f': evbuffer_add_printf( data->out, "\\f" ); break;
             case '\n': evbuffer_add_printf( data->out, "\\n" ); break;
-            case '\r': evbuffer_add_printf( data->out, "\\r" ); break;
-            case '\t': evbuffer_add_printf( data->out, "\\t" ); break;
-            case '"' : evbuffer_add_printf( data->out, "\\\"" ); break;
+            case '\r': evbuffer_add_printf( data->out, "\\n" ); break;
+            case '\t': evbuffer_add_printf( data->out, "\\n" ); break;
             case '\\': evbuffer_add_printf( data->out, "\\\\" ); break;
             default: {
                 if( isascii( *it ) )
@@ -1143,46 +1110,29 @@ jsonDictBeginFunc( const tr_benc * val, void * vdata )
 {
     struct jsonWalk * data = vdata;
     jsonPushParent( data, val );
-    evbuffer_add_printf( data->out, "{" );
-    if( val->val.l.count )
-        jsonIndent( data );
+    evbuffer_add_printf( data->out, "{ " );
+    if( !val->val.l.count )
+        evbuffer_add_printf( data->out, "  " );
 }
 static void
 jsonListBeginFunc( const tr_benc * val, void * vdata )
 {
-    const int nChildren = tr_bencListSize( val );
     struct jsonWalk * data = vdata;
     jsonPushParent( data, val );
-    evbuffer_add_printf( data->out, "[" );
-    if( nChildren )
-        jsonIndent( data );
+    evbuffer_add_printf( data->out, "[ " );
+    if( !val->val.l.count )
+        evbuffer_add_printf( data->out, "  " );
 }
 static void
 jsonContainerEndFunc( const tr_benc * val, void * vdata )
 {
-    size_t i;
     struct jsonWalk * data = vdata;
-    char * str;
-    int emptyContainer = FALSE;
-
-    /* trim out the trailing comma, if any */
-    str = (char*) EVBUFFER_DATA( data->out );
-    for( i=EVBUFFER_LENGTH( data->out )-1; i>0; --i ) {
-        if( isspace( str[i] ) ) continue;
-        if( str[i]==',' )
-            EVBUFFER_LENGTH( data->out ) = i;
-        if( str[i]=='{' || str[i]=='[' )
-            emptyContainer = TRUE;
-        break;
-    }
-
-    jsonPopParent( data );
-    if( !emptyContainer )
-        jsonIndent( data );
+    EVBUFFER_LENGTH( data->out ) -= 2;
     if( tr_bencIsDict( val ) )
-        evbuffer_add_printf( data->out, "}" );
+        evbuffer_add_printf( data->out, " }" );
     else /* list */
-        evbuffer_add_printf( data->out, "]" );
+        evbuffer_add_printf( data->out, " ]" );
+    jsonPopParent( data );
     jsonChildFunc( data );
 }
 char*
@@ -1203,9 +1153,7 @@ tr_bencSaveAsJSON( const tr_benc * top, int * len )
 
     bencWalk( top, &walkFuncs, &data );
     
-    if( EVBUFFER_LENGTH( data.out ) )
-        evbuffer_add_printf( data.out, "\n" );
-    if( len )
+    if( len != NULL )
         *len = EVBUFFER_LENGTH( data.out );
     ret = tr_strndup( (char*) EVBUFFER_DATA( data.out ), EVBUFFER_LENGTH( data.out ) );
     evbuffer_free( data.out );
@@ -1216,10 +1164,12 @@ tr_bencSaveAsJSON( const tr_benc * top, int * len )
 ****
 ***/
 
-static int
-saveFile( const char * filename, const char * content, size_t len )
+int
+tr_bencSaveFile( const char * filename,  const tr_benc * b )
 {
     int err = TR_OK;
+    int len;
+    char * content = tr_bencSave( b, &len );
     FILE * out = NULL;
 
     out = fopen( filename, "wb+" );
@@ -1238,18 +1188,9 @@ saveFile( const char * filename, const char * content, size_t len )
 
     if( !err )
         tr_dbg( "tr_bencSaveFile saved \"%s\"", filename );
+    tr_free( content );
     if( out )
         fclose( out );
-    return err;
-}
-
-int
-tr_bencSaveFile( const char * filename,  const tr_benc * b )
-{
-    int len;
-    char * content = tr_bencSave( b, &len );
-    const int err = saveFile( filename, content, len );
-    tr_free( content );
     return err;
 }
 
@@ -1260,28 +1201,6 @@ tr_bencLoadFile( const char * filename, tr_benc * b )
     size_t contentLen;
     uint8_t * content = tr_loadFile( filename, &contentLen );
     ret = content ? tr_bencLoad( content, contentLen, b, NULL )
-                  : TR_ERROR_IO_OTHER;
-    tr_free( content );
-    return ret;
-}
-
-int
-tr_bencSaveJSONFile( const char * filename, const tr_benc * b )
-{
-    int len;
-    char * content = tr_bencSaveAsJSON( b, &len );
-    const int err = saveFile( filename, content, len );
-    tr_free( content );
-    return err;
-}
-
-int
-tr_bencLoadJSONFile( const char * filename, tr_benc * b )
-{
-    int ret;
-    size_t contentLen;
-    uint8_t * content = tr_loadFile( filename, &contentLen );
-    ret = content ? tr_jsonParse( content, contentLen, b, NULL )
                   : TR_ERROR_IO_OTHER;
     tr_free( content );
     return ret;

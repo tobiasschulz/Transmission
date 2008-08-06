@@ -30,15 +30,15 @@
     int8_t  * fPieces;
     
     NSImage * fBack;
-    NSColor * fGreenAvailabilityColor, * fBluePieceColor;
+    NSColor * fWhiteColor, * fBlueColor, * fOrangeColor,
+            * fGreen1Color, * fGreen2Color, * fGreen3Color,
+            * fBlue1Color, * fBlue2Color, * fBlue3Color, * fBlue4Color;
     
     Torrent * fTorrent;
     int fNumPieces, fAcross, fWidth, fExtraBorder;
 }
 
 - (void) setTorrent: (Torrent *) torrent;
-
-- (void) clearView;
-- (void) updateView;
+- (void) updateView: (BOOL) first;
 
 @end

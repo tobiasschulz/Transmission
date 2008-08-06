@@ -23,6 +23,7 @@ struct bufferevent;
 struct tr_handle;
 struct tr_crypto;
 typedef struct tr_peerIo tr_peerIo;
+typedef struct tr_extensions tr_extensions;
 
 /**
 ***
@@ -178,6 +179,5 @@ void tr_peerIoDrain       ( tr_peerIo        * io,
                             struct evbuffer  * inbuf,
                             size_t             byteCount );
 
-int64_t tr_peerIoCountBytesFromPeer( const tr_peerIo * io );
 
 #endif

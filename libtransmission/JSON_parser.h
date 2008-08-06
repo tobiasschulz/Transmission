@@ -17,10 +17,16 @@
 #	define JSON_PARSER_DLL_API 
 #endif
 
-#include <inttypes.h>
-typedef int64_t JSON_int_t;
-#define JSON_PARSER_INTEGER_SSCANF_TOKEN "%"PRId64
-#define JSON_PARSER_INTEGER_SPRINTF_TOKEN "%"PRId64
+/* Determine the integer type use to parse non-floating point numbers */
+#if __STDC_VERSION__ >= 199901L || HAVE_LONG_LONG == 1
+typedef long long JSON_int_t;
+#define JSON_PARSER_INTEGER_SSCANF_TOKEN "%lld"
+#define JSON_PARSER_INTEGER_SPRINTF_TOKEN "%lld"
+#else 
+typedef long JSON_int_t;
+#define JSON_PARSER_INTEGER_SSCANF_TOKEN "%ld"
+#define JSON_PARSER_INTEGER_SPRINTF_TOKEN "%ld"
+#endif
 
 
 #ifdef __cplusplus
@@ -51,10 +57,10 @@ typedef struct JSON_value_struct {
         long double float_value;
         
         struct {
-            const char* value;
-            size_t length;
-        } str;
-    } vu;
+            const char* string_value;
+            size_t string_length;
+        };
+    };
 } JSON_value;
 
 /*! \brief JSON parser callback 
@@ -77,7 +83,7 @@ typedef int (*JSON_parser_callback)(void* ctx, int type, const struct JSON_value
         the depth is the limit
     \param Pointer to a callback. This parameter may be NULL. In this case the input is merely checked for validity.
     \param Callback context. This parameter may be NULL.
-    \param depth. Specifies the levels of nested JSON to allow. Negative numbers yield unlimited nesting.
+    \param allowComments. To allow C style comments in JSON, set to non-zero.
     \param allowComments. To allow C style comments in JSON, set to non-zero.
     \param handleFloatsManually. To decode floating point numbers manually set this parameter to non-zero.
     

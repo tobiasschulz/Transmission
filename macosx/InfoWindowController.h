@@ -28,12 +28,9 @@
 #import "PiecesView.h"
 #import <transmission.h>
 
-@class TrackerTableView;
-
 @interface InfoWindowController : NSWindowController
 {
-    NSArray * fTorrents;
-    NSMutableArray * fTrackers;
+    NSArray * fTorrents, * fPeers, * fTrackers;
     
     IBOutlet NSView * fInfoView, * fActivityView, * fTrackerView, * fPeersView, * fFilesView, * fOptionsView;
     int fCurrentTabTag;
@@ -52,26 +49,22 @@
     IBOutlet NSTextView * fCommentView;
     IBOutlet NSButton * fRevealDataButton, * fRevealTorrentButton;
     
-    IBOutlet TrackerTableView * fTrackerTable;
-    IBOutlet NSSegmentedControl * fTrackerAddRemoveControl;
+    IBOutlet NSTableView * fTrackerTable;
     IBOutlet NSTextField * fAnnounceAddressField, * fAnnounceLastField, * fAnnounceResponseField, * fAnnounceNextField,
                             * fScrapeAddressField, * fScrapeLastField, * fScrapeResponseField, * fScrapeNextField;
-    
-    NSArray * fPeers, * fWebSeeds;
-    IBOutlet NSTableView * fPeerTable, * fWebSeedTable;
+
+    IBOutlet NSTableView * fPeerTable;
     IBOutlet NSTextField * fConnectedPeersField, * fDownloadingFromField, * fUploadingToField, * fKnownField,
                             * fSeedersField, * fLeechersField, * fCompletedFromTrackerField;
     IBOutlet NSTextView * fErrorMessageView;
     IBOutlet PiecesView * fPiecesView;
     IBOutlet NSSegmentedControl * fPiecesControl;
-    float fWebSeedTableHeight, fSpaceBetweenWebSeedAndPeer;
-    NSViewAnimation * fWebSeedTableAnimation;
     
     IBOutlet FileOutlineController * fFileController;
     
     IBOutlet NSPopUpButton * fRatioPopUp, * fUploadLimitPopUp, * fDownloadLimitPopUp;
     IBOutlet NSTextField * fUploadLimitField, * fDownloadLimitField, * fRatioLimitField, * fPeersConnectField,
-                        * fUploadLimitLabel, * fDownloadLimitLabel, * fPeersConnectLabel;
+                        * fUploadLimitLabel, * fDownloadLimitLabel;
     
     NSString * fInitialString;
 }
@@ -84,8 +77,6 @@
 
 - (void) setNextTab;
 - (void) setPreviousTab;
-
-- (void) addRemoveTracker: (id) sender;
 
 - (BOOL) shouldQuickLookFileView;
 - (NSArray *) quickLookURLs;

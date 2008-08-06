@@ -29,7 +29,6 @@
 #include <stdarg.h>
 #include <stddef.h> /* for size_t */
 #include <stdio.h> /* FILE* */
-#include <time.h> /* time_t* */
 
 /***
 ****
@@ -83,7 +82,7 @@
 #if !defined(_)
 #if defined(SYS_DARWIN)
   #define _(a) (a)
-#elif defined(HAVE_LIBINTL_H)
+#elif HAVE_LIBINTL
   #include <libintl.h>
   #define _(a) gettext (a)
 #else
@@ -189,17 +188,15 @@ void* tr_malloc0 ( size_t ) TR_GNUC_MALLOC;
 void* tr_calloc  ( size_t nmemb, size_t size ) TR_GNUC_MALLOC;
 void  tr_free    ( void* );
 
-char* tr_strdup( const void * str ) TR_GNUC_MALLOC;
-char* tr_strndup( const void * str, int len ) TR_GNUC_MALLOC;
-void* tr_memdup( const void * src, int byteCount ) TR_GNUC_MALLOC;
+char* tr_strdup( const char * str ) TR_GNUC_MALLOC;
+char* tr_strndup( const char * str, int len ) TR_GNUC_MALLOC;
 char* tr_strdup_printf( const char * fmt, ... )  TR_GNUC_PRINTF( 1, 2 ) TR_GNUC_MALLOC;
 char* tr_base64_encode( const void * input, int inlen, int *outlen ) TR_GNUC_MALLOC;
 char* tr_base64_decode( const void * input, int inlen, int *outlen ) TR_GNUC_MALLOC;
 
 size_t tr_strlcpy( char * dst, const char * src, size_t siz );
-int tr_snprintf( char * buf, size_t buflen, const char * fmt, ... );
 
-int   tr_stringEndsWith( const char * string, const char * end );
+
 
 const char* tr_strerror( int );
 
@@ -220,12 +217,6 @@ void tr_set_compare( const void * a, size_t aCount,
                     
 int tr_compareUint16( uint16_t a, uint16_t b );
 int tr_compareUint32( uint32_t a, uint32_t b );
-int tr_compareUint64( uint64_t a, uint64_t b );
-int tr_compareDouble( double a, double b );
-int tr_compareTime( time_t a, time_t b );
-
-int tr_strcmp( const void * a, const void * b );
-int tr_strcasecmp( const char * a, const char * b );
 
 void tr_sha1_to_hex( char * out, const uint8_t * sha1 );
 
@@ -246,8 +237,7 @@ int tr_httpParseURL( const char * url,
 struct tr_bitfield
 {
     uint8_t * bits;
-    size_t bitCount;
-    size_t byteCount;
+    size_t len;
 };
 
 typedef struct tr_bitfield tr_bitfield;
@@ -269,28 +259,6 @@ int    tr_bitfieldIsEmpty( const tr_bitfield* );
 size_t tr_bitfieldCountTrueBits( const tr_bitfield* );
 
 tr_bitfield* tr_bitfieldOr( tr_bitfield*, const tr_bitfield* );
-
-#if 0
-/** @brief finds the first true bit in the bitfield, starting at `startPos'
-    @param setmePos the position of the true bit, if found, is set here.
-    @return nonzero if a true bit was found */
-int tr_bitfieldFindTrue( const tr_bitfield  * bitfield,
-                         size_t               startPos,
-                         size_t             * setmePos );
-#endif
-
-
-/** A stripped-down version of bitfieldHas to be used
-    for speed when you're looping quickly.  This version
-    has none of tr_bitfieldHas()'s safety checks, so you
-    need to call tr_bitfieldTestFast() first before you
-    start looping. */
-#define tr_bitfieldHasFast(bitfield,nth) \
-    (( bitfield->bits[(nth)>>3u] << ((nth)&7u) & 0x80) != 0 )
-
-/** @param high the highest nth bit you're going to access */
-#define tr_bitfieldTestFast(bitfield,high) \
-    ( (bitfield) && ((bitfield)->bits) && ((high)<(bitfield)->bitCount ) )
 
 double tr_getRatio( double numerator, double denominator );
 

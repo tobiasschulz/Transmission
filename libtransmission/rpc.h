@@ -7,7 +7,7 @@
  * This exemption does not extend to derived works not owned by
  * the Transmission project.
  *
- * $Id$
+ * $Id:$
  */
 
 #ifndef TR_RPC_H
@@ -17,7 +17,6 @@
 ****  RPC processing
 ***/
 
-struct tr_benc;
 struct tr_handle;
 
 /* http://www.json.org/ */
@@ -33,11 +32,5 @@ tr_rpc_request_exec_uri( struct tr_handle  * handle,
                          const void        * request_uri,
                          int                 request_len,
                          int               * response_len );
-
-void
-tr_rpc_parse_list_str( struct tr_benc  * setme,
-                       const char      * list_str,
-                       size_t            list_str_len );
-
 
 #endif

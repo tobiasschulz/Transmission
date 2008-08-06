@@ -24,116 +24,145 @@
 
 #import "PiecesView.h"
 #import "InfoWindowController.h"
-#import "CTGradient.h"
 
 #define MAX_ACROSS 18
 #define BETWEEN 1.0
 
-#define HIGH_PEERS 30
-
-#define PIECE_NONE 0
-#define PIECE_SOME 1
-#define PIECE_HIGH_PEERS 2
-#define PIECE_FINISHED 3
-#define PIECE_FLASHING 4
-
 @implementation PiecesView
+
+- (id) initWithCoder: (NSCoder *) decoder
+{
+    if ((self = [super initWithCoder: decoder]))
+    {
+        fPieces = malloc(MAX_ACROSS * MAX_ACROSS);
+    }
+    
+    return self;
+}
 
 - (void) awakeFromNib
 {
-    //back image
-    fBack = [[NSImage alloc] initWithSize: [self bounds].size];
-    
-    [fBack lockFocus];
-    CTGradient * gradient = [CTGradient gradientWithBeginningColor: [NSColor colorWithCalibratedWhite: 0.0 alpha: 0.4]
-                                endingColor: [NSColor colorWithCalibratedWhite: 0.2 alpha: 0.4]];
-    [gradient fillRect: [self bounds] angle: 90.0];
-    [fBack unlockFocus];
-    
-    //store box colors
-    fGreenAvailabilityColor = [[NSColor colorWithCalibratedRed: 0.0 green: 1.0 blue: 0.4 alpha: 1.0] retain];
-    fBluePieceColor = [[NSColor colorWithCalibratedRed: 0.0 green: 0.4 blue: 0.8 alpha: 1.0] retain];
-            
-    //actually draw the box
-    [self setTorrent: nil];
+        NSBezierPath * bp = [NSBezierPath bezierPathWithRect: [self bounds]];
+        
+        //back image
+        fBack = [[NSImage alloc] initWithSize: [self bounds].size];
+        
+        [fBack lockFocus];
+        [[NSColor colorWithCalibratedWhite: 0.0 alpha: 0.4] set];
+        [bp fill];
+        [fBack unlockFocus];
+        
+        //store box colors
+        fWhiteColor = [[NSColor whiteColor] retain];
+        fOrangeColor = [[NSColor orangeColor] retain];
+        fGreen1Color = [[NSColor colorWithCalibratedRed: 0.6 green: 1.0 blue: 0.8 alpha: 1.0] retain];
+        fGreen2Color = [[NSColor colorWithCalibratedRed: 0.4 green: 1.0 blue: 0.6 alpha: 1.0] retain];
+        fGreen3Color = [[NSColor colorWithCalibratedRed: 0.0 green: 1.0 blue: 0.4 alpha: 1.0] retain];
+        fBlue1Color = [[NSColor colorWithCalibratedRed: 0.8 green: 1.0 blue: 1.0 alpha: 1.0] retain];
+        fBlue2Color = [[NSColor colorWithCalibratedRed: 0.6 green: 1.0 blue: 1.0 alpha: 1.0] retain];
+        fBlue3Color = [[NSColor colorWithCalibratedRed: 0.6 green: 0.8 blue: 1.0 alpha: 1.0] retain];
+        fBlue4Color = [[NSColor colorWithCalibratedRed: 0.4 green: 0.6 blue: 1.0 alpha: 1.0] retain];
+        fBlueColor = [[NSColor colorWithCalibratedRed: 0.0 green: 0.4 blue: 0.8 alpha: 1.0] retain];
+        
+        //actually draw the box
+        [self setTorrent: nil];
 }
 
 - (void) dealloc
 {
-    tr_free(fPieces);
+    free(fPieces);
     
     [fBack release];
     
-    [fGreenAvailabilityColor release];
-    [fBluePieceColor release];
+    [fWhiteColor release];
+    [fOrangeColor release];
+    [fGreen1Color release];
+    [fGreen2Color release];
+    [fGreen3Color release];
+    [fBlue1Color release];
+    [fBlue2Color release];
+    [fBlue3Color release];
+    [fBlue4Color release];
+    [fBlueColor release];
     
+    [fTorrent release];
     [super dealloc];
 }
 
 - (void) setTorrent: (Torrent *) torrent
 {
-    [self clearView];
+    [fTorrent release];
     
-    fTorrent = torrent;
-    if (fTorrent)
+    if (torrent)
     {
+        fTorrent = [torrent retain];
+        
         //determine relevant values
-        fNumPieces = MIN([fTorrent pieceCount], MAX_ACROSS * MAX_ACROSS);
-        fAcross = ceil(sqrt(fNumPieces));
+        fNumPieces = MAX_ACROSS * MAX_ACROSS;
+        int pieceCount = [fTorrent pieceCount];
+        if (pieceCount < fNumPieces)
+        {
+            fNumPieces = pieceCount;
+            
+            fAcross = sqrt(fNumPieces);
+            if (fAcross * fAcross < fNumPieces)
+                fAcross++;
+        }
+        else
+            fAcross = MAX_ACROSS;
         
         float width = [self bounds].size.width;
         fWidth = (width - (fAcross + 1) * BETWEEN) / fAcross;
         fExtraBorder = (width - ((fWidth + BETWEEN) * fAcross + BETWEEN)) / 2;
+        
+        [self updateView: YES];
     }
-    
-    //reset the view to blank
-    NSImage * newBack = [fBack copy];
-    [self setImage: newBack];
-    [newBack release];
-    
-    [self setNeedsDisplay];
+    else
+    {
+        fTorrent = nil;
+        
+        NSImage * newBack = [fBack copy];
+        [self setImage: newBack];
+        [newBack release];
+        
+        [self setNeedsDisplay];
+    }
 }
 
-- (void) clearView
-{
-    tr_free(fPieces);
-    fPieces = NULL;
-}
-
-- (void) updateView
+- (void) updateView: (BOOL) first
 {
     if (!fTorrent)
         return;
     
-    //determine if first time
-    BOOL first = NO;
-    if (!fPieces)
+    if (first)
     {
-        fPieces = (int8_t *)tr_malloc(fNumPieces * sizeof(int8_t));
-        first = YES;
+        NSImage * newBack = [fBack copy];
+        [self setImage: newBack];
+        [newBack release];
     }
+    NSImage * image = [self image];
 
-    int8_t * pieces = NULL;
-    float * piecesPercent = NULL;
+    int8_t * pieces;
+    float * piecesPercent;
     
     BOOL showAvailablity = [[NSUserDefaults standardUserDefaults] boolForKey: @"PiecesViewShowAvailability"];
     if (showAvailablity)
     {   
-        pieces = (int8_t *)tr_malloc(fNumPieces * sizeof(int8_t));
+        pieces = malloc(fNumPieces * sizeof(int8_t));
         [fTorrent getAvailability: pieces size: fNumPieces];
     }
     else
     {   
-        piecesPercent = (float *)tr_malloc(fNumPieces * sizeof(float));
+        piecesPercent = malloc(fNumPieces * sizeof(float));
         [fTorrent getAmountFinished: piecesPercent size: fNumPieces];
     }
     
-    NSImage * image = [self image];
-    
-    int i, j, index = -1;
+    int i, j, piece, index = -1;
+    float piecePercent;
     NSRect rect = NSMakeRect(0, 0, fWidth, fWidth);
+    NSColor * pieceColor;
     BOOL change = NO;
-    
+        
     for (i = 0; i < fAcross; i++)
         for (j = 0; j < fAcross; j++)
         {
@@ -144,62 +173,130 @@
                 break;
             }
             
-            NSColor * pieceColor = nil;
+            pieceColor = nil;
             
-            if (showAvailablity ? pieces[index] == -1 : piecesPercent[index] == 1.0)
+            if (showAvailablity)
             {
-                if (first || fPieces[index] != PIECE_FINISHED)
+                piece = pieces[index];
+                if (piece < 0)
                 {
-                    if (!first && fPieces[index] != PIECE_FLASHING)
+                    if (first || fPieces[index] == -2)
                     {
-                        pieceColor = [NSColor orangeColor];
-                        fPieces[index] = PIECE_FLASHING;
+                        fPieces[index] = -1;
+                        pieceColor = fBlueColor;
                     }
-                    else
+                    else if (fPieces[index] != -1)
                     {
-                        pieceColor = fBluePieceColor;
-                        fPieces[index] = PIECE_FINISHED;
+                        fPieces[index] = -2;
+                        pieceColor = fOrangeColor;
+                    }
+                    else;
+                }
+                else if (piece == 0)
+                {
+                    if (first || fPieces[index] != 0)
+                    {
+                        fPieces[index] = 0;
+                        pieceColor = fWhiteColor;
                     }
                 }
-            }
-            else if (showAvailablity ? pieces[index] == 0 : piecesPercent[index] == 0.0)
-            {
-                if (first || fPieces[index] != PIECE_NONE)
+                else if (piece <= 4)
                 {
-                    pieceColor = [NSColor whiteColor];
-                    fPieces[index] = PIECE_NONE;
+                    if (first || fPieces[index] != 1)
+                    {
+                        fPieces[index] = 1;
+                        pieceColor = fGreen1Color;
+                    }
                 }
-            }
-            else if (showAvailablity && pieces[index] >= HIGH_PEERS)
-            {
-                if (first || fPieces[index] != PIECE_HIGH_PEERS)
+                else if (piece <= 8)
                 {
-                    pieceColor = fGreenAvailabilityColor;
-                    fPieces[index] = PIECE_HIGH_PEERS;
+                    if (first || fPieces[index] != 2)
+                    {
+                        fPieces[index] = 2;
+                        pieceColor = fGreen2Color;
+                    }
+                }
+                else
+                {
+                    if (first || fPieces[index] != 3)
+                    {
+                        fPieces[index] = 3;
+                        pieceColor = fGreen3Color;
+                    }
                 }
             }
             else
             {
-                //always redraw "mixed"
-                float percent = showAvailablity ? (float)pieces[index]/HIGH_PEERS : piecesPercent[index];
-                NSColor * fullColor = showAvailablity ? fGreenAvailabilityColor : fBluePieceColor;
-                pieceColor = [[NSColor whiteColor] blendedColorWithFraction: percent ofColor: fullColor];
-                fPieces[index] = PIECE_SOME;
+                piecePercent = piecesPercent[index];
+                if (piecePercent >= 1.0)
+                {
+                    if (first || fPieces[index] == -2)
+                    {
+                        fPieces[index] = -1;
+                        pieceColor = fBlueColor;
+                    }
+                    else if (fPieces[index] != -1)
+                    {
+                        fPieces[index] = -2;
+                        pieceColor = fOrangeColor;
+                    }
+                    else;
+                }
+                else if (piecePercent <= 0.0)
+                {
+                    if (first || fPieces[index] != 0)
+                    {
+                        fPieces[index] = 0;
+                        pieceColor = fWhiteColor;
+                    }
+                }
+                else if (piecePercent < 0.25)
+                {
+                    if (first || fPieces[index] != 1)
+                    {
+                        fPieces[index] = 1;
+                        pieceColor = fBlue1Color;
+                    }
+                }
+                else if (piecePercent < 0.5)
+                {
+                    if (first || fPieces[index] != 2)
+                    {
+                        fPieces[index] = 2;
+                        pieceColor = fBlue2Color;
+                    }
+                }
+                else if (piecePercent < 0.75)
+                {
+                    if (first || fPieces[index] != 3)
+                    {
+                        fPieces[index] = 3;
+                        pieceColor = fBlue3Color;
+                    }
+                }
+                else
+                {
+                    if (first || fPieces[index] != 4)
+                    {
+                        fPieces[index] = 4;
+                        pieceColor = fBlue4Color;
+                    }
+                }
             }
             
             if (pieceColor)
             {
-                //avoid unneeded memory usage by only locking focus if drawing will occur
+                //drawing actually will occur
                 if (!change)
                 {
-                    change = YES;
                     [image lockFocus];
+                    change = YES;
                 }
                 
-                rect.origin = NSMakePoint(j * (fWidth + BETWEEN) + BETWEEN + fExtraBorder,
-                                        [image size].width - (i + 1) * (fWidth + BETWEEN) - fExtraBorder);
-                
                 [pieceColor set];
+                
+                rect.origin = NSMakePoint(j * (fWidth + BETWEEN) + BETWEEN + fExtraBorder,
+                                    [image size].width - (i + 1) * (fWidth + BETWEEN) - fExtraBorder);
                 NSRectFill(rect);
             }
         }
@@ -210,8 +307,10 @@
         [self setNeedsDisplay];
     }
     
-    tr_free(pieces);
-    tr_free(piecesPercent);
+    if (showAvailablity)
+        free(pieces);
+    else
+        free(piecesPercent);
 }
 
 - (BOOL) acceptsFirstMouse: (NSEvent *) event

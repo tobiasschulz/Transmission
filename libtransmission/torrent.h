@@ -159,13 +159,15 @@ struct tr_torrent
     uint64_t                   corruptCur;
     uint64_t                   corruptPrev;
 
-    time_t                     addedDate;
-    time_t                     activityDate;
-    time_t                     doneDate;
-    time_t                     startDate;
+    uint64_t                   startDate;
+    uint64_t                   stopDate;
+    uint64_t                   activityDate;
 
     tr_torrent_status_func   * status_func;
     void                     * status_func_user_data;
+
+    tr_torrent_active_func   * active_func;
+    void                     * active_func_user_data;
 
     unsigned int               isRunning : 1;
     unsigned int               isDeleting : 1;

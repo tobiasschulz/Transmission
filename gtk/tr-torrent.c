@@ -40,6 +40,8 @@ struct TrTorrentPrivate
 {
    tr_torrent * handle;
    gboolean do_remove;
+   gboolean seeding_cap_enabled;
+   gdouble seeding_cap; /* ratio to stop seeding at */
 };
 
 
@@ -53,6 +55,7 @@ tr_torrent_init(GTypeInstance *instance, gpointer g_class UNUSED )
                                                   TR_TORRENT_TYPE,
                                                   struct TrTorrentPrivate );
     p->handle = NULL;
+    p->seeding_cap = 2.0;
 
 #ifdef REFDBG
     g_message( "torrent %p init", self );
@@ -60,9 +63,9 @@ tr_torrent_init(GTypeInstance *instance, gpointer g_class UNUSED )
 }
 
 static int
-isDisposed( const TrTorrent * tor )
+isDisposed( const TrTorrent * self )
 {
-    return !tor || !TR_IS_TORRENT( tor ) || !tor->priv;
+    return !self || !self->priv;
 }
 
 static void
@@ -86,15 +89,6 @@ tr_torrent_dispose( GObject * o )
 
     parent = g_type_class_peek(g_type_parent(TR_TORRENT_TYPE));
     parent->dispose( o );
-}
-
-void
-tr_torrent_clear( TrTorrent * tor )
-{
-    g_return_if_fail( tor );
-    g_return_if_fail( tor->priv );
-
-    tor->priv->handle = NULL;
 }
 
 static void
@@ -132,6 +126,8 @@ tr_torrent_get_type( void )
 tr_torrent *
 tr_torrent_handle(TrTorrent *tor)
 {
+    g_assert( TR_IS_TORRENT(tor) );
+
     return isDisposed( tor ) ? NULL : tor->priv->handle;
 }
 
@@ -148,6 +144,23 @@ tr_torrent_info( TrTorrent * tor )
     tr_torrent * handle = tr_torrent_handle( tor );
     return handle ? tr_torrentInfo( handle ) : NULL;
 }
+
+void
+tr_torrent_start( TrTorrent * self )
+{
+    tr_torrent * handle = tr_torrent_handle( self );
+    if( handle )
+        tr_torrentStart( handle );
+}
+
+void
+tr_torrent_stop( TrTorrent * self )
+{
+    tr_torrent * handle = tr_torrent_handle( self );
+    if( handle )
+        tr_torrentStop( handle );
+}
+
 
 static gboolean
 notifyInMainThread( gpointer user_data )
@@ -185,19 +198,20 @@ tr_torrent_new_ctor( tr_handle  * handle,
 {
     tr_torrent * tor;
     int errcode;
-    uint8_t doTrash = FALSE;
 
     errcode = -1;
     *err = NULL;
 
-    /* let the gtk client handle the removal, since libT
-     * doesn't have any concept of the glib trash API */
-    tr_ctorGetDeleteSource( ctor, &doTrash );
     tr_ctorSetDeleteSource( ctor, FALSE );
     tor = tr_torrentNew( handle, ctor, &errcode );
 
-    if( tor && doTrash )
-        tr_file_trash_or_unlink( tr_ctorGetSourceFile( ctor ) );
+    if( tor )
+    {
+        uint8_t doTrash = FALSE;
+        tr_ctorGetDeleteSource( ctor, &doTrash );
+        if( doTrash )
+            tr_file_trash_or_unlink( tr_ctorGetSourceFile( ctor ) );
+    }
   
     if( !tor )
     {
@@ -222,6 +236,26 @@ tr_torrent_new_ctor( tr_handle  * handle,
     }
 
     return maketorrent( tor );
+}
+
+void
+tr_torrent_check_seeding_cap ( TrTorrent *gtor)
+{
+  const tr_stat * st = tr_torrent_stat( gtor );
+  if ((gtor->priv->seeding_cap_enabled) && (st->ratio >= gtor->priv->seeding_cap))
+    tr_torrent_stop (gtor);
+}
+void
+tr_torrent_set_seeding_cap_ratio ( TrTorrent *gtor, gdouble ratio )
+{
+  gtor->priv->seeding_cap = ratio;
+  tr_torrent_check_seeding_cap (gtor);
+}
+void
+tr_torrent_set_seeding_cap_enabled ( TrTorrent *gtor, gboolean b )
+{
+  if ((gtor->priv->seeding_cap_enabled = b))
+    tr_torrent_check_seeding_cap (gtor);
 }
 
 char *
@@ -251,7 +285,7 @@ tr_torrent_status_str ( TrTorrent * gtor )
         case TR_STATUS_DOWNLOAD:
 
             if( eta == TR_ETA_NOT_AVAIL )
-                top = g_strdup_printf( _("Data not fully available (%.1f%%)" ), prog );
+                top = g_strdup_printf( _("Not available (%.1f%%)" ), prog );
             else if( eta == TR_ETA_UNKNOWN )
                 top = g_strdup_printf( _( "Stalled (%.1f%%)" ), prog );
             else {

@@ -31,7 +31,6 @@ noinst_HEADERS = \
     stats.h \
     sexy-icon-entry.h \
     torrent-cell-renderer.h \
-    tracker-list.h \
     tr-core.h \
     tr-core-dbus.h \
     tr-icon.h \
@@ -59,7 +58,6 @@ transmission_SOURCES = \
     sexy-icon-entry.c \
     stats.c \
     torrent-cell-renderer.c \
-    tracker-list.c \
     tr-core.c \
     tr-icon.c \
     tr-io.c \

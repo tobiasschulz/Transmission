@@ -25,8 +25,6 @@
 #import "TorrentTableView.h"
 #import "TorrentCell.h"
 #import "Torrent.h"
-#import "TorrentGroup.h"
-#import "FileListNode.h"
 #import "QuickLookController.h"
 #import "NSApplicationAdditions.h"
 
@@ -36,10 +34,11 @@
 #define ACTION_MENU_UNLIMITED_TAG 102
 #define ACTION_MENU_LIMIT_TAG 103
 
+#define PIECE_CHANGE 0.1
+#define PIECE_TIME 0.005
+
 #define GROUP_SPEED_IMAGE_COLUMN_WIDTH 8.0
 #define GROUP_RATIO_IMAGE_COLUMN_WIDTH 10.0
-
-#define TOGGLE_PROGRESS_SECONDS 0.175
 
 @interface TorrentTableView (Private)
 
@@ -52,6 +51,8 @@
 - (void) setGroupStatusColumns;
 
 - (void) createFileMenu: (NSMenu *) menu forFiles: (NSArray *) files;
+
+- (void) resizePiecesBarIncrement;
 
 @end
 
@@ -107,7 +108,7 @@
 {
     [fCollapsedGroups release];
     
-    [fPiecesBarAnimation release];
+    [fPiecesBarTimer invalidate];
     [fMenuTorrent release];
     
     [fSelectedValues release];
@@ -125,7 +126,7 @@
 
 - (BOOL) isGroupCollapsed: (int) value
 {
-    if (value == -1)
+    if (value < 0)
         value = MAX_GROUP;
     
     return [fCollapsedGroups containsIndex: value];
@@ -133,7 +134,7 @@
 
 - (void) removeCollapsedGroup: (int) value
 {
-    if (value == -1)
+    if (value < 0)
         value = MAX_GROUP;
     
     [fCollapsedGroups removeIndex: value];
@@ -186,8 +187,7 @@
     }
     else
     {
-        NSString * ident = [tableColumn identifier];
-        if ([ident isEqualToString: @"UL Image"] || [ident isEqualToString: @"DL Image"])
+        if ([[tableColumn identifier] isEqualToString: @"UL Image"] || [[tableColumn identifier] isEqualToString: @"DL Image"])
         {
             //ensure arrows are white only when selected
             NSImage * image = [cell image];
@@ -235,7 +235,7 @@
                 : NSLocalizedString(@"Upload speed", "Torrent table -> group row -> tooltip");
     else if (ident)
     {
-        int count = [[item torrents] count];
+        int count = [[item objectForKey: @"Torrents"] count];
         if (count == 1)
             return NSLocalizedString(@"1 transfer", "Torrent table -> group row -> tooltip");
         else
@@ -264,7 +264,8 @@
         
         NSDictionary * userInfo = [NSDictionary dictionaryWithObject: [NSNumber numberWithInt: row] forKey: @"Row"];
         TorrentCell * cell = (TorrentCell *)[self preparedCellAtColumn: -1 row: row];
-        [cell addTrackingAreasForView: self inRect: [self rectOfRow: row] withUserInfo: userInfo mouseLocation: mouseLocation];
+        [cell addTrackingAreasForView: self inRect: [self rectOfRow: row] withUserInfo: userInfo
+                mouseLocation: mouseLocation];
     }
 }
 
@@ -307,7 +308,6 @@
         [self setNeedsDisplayInRect: [self rectOfRow: row]];
 }
 
-//when Leopard-only, use these variables instead of pointInActionRect:, etc.
 - (void) mouseEntered: (NSEvent *) event
 {
     NSDictionary * dict = (NSDictionary *)[event userData];
@@ -355,7 +355,7 @@
 
 - (void) outlineViewItemDidExpand: (NSNotification *) notification
 {
-    int value = [[[notification userInfo] objectForKey: @"NSObject"] groupIndex];
+    int value = [[[[notification userInfo] objectForKey: @"NSObject"] objectForKey: @"Group"] intValue];
     if (value < 0)
         value = MAX_GROUP;
     
@@ -368,7 +368,7 @@
 
 - (void) outlineViewItemDidCollapse: (NSNotification *) notification
 {
-    int value = [[[notification userInfo] objectForKey: @"NSObject"] groupIndex];
+    int value = [[[[notification userInfo] objectForKey: @"NSObject"] objectForKey: @"Group"] intValue];
     if (value < 0)
         value = MAX_GROUP;
     
@@ -443,20 +443,18 @@
     {
         if ([item isKindOfClass: [Torrent class]])
         {
-            NSInteger index = [self rowForItem: item];
+            NSUInteger index = [self rowForItem: item];
             if (index != -1)
                 [indexSet addIndex: index];
         }
         else
         {
-            int i, group = [item groupIndex];
+            NSNumber * group = [item objectForKey: @"Group"];
+            int i;
             for (i = 0; i < [self numberOfRows]; i++)
             {
-                if ([indexSet containsIndex: i])
-                    continue;
-                
                 id tableItem = [self itemAtRow: i];
-                if (![tableItem isKindOfClass: [Torrent class]] && group == [tableItem groupIndex])
+                if (![tableItem isKindOfClass: [Torrent class]] && [group isEqualToNumber: [tableItem objectForKey: @"Group"]])
                 {
                     [indexSet addIndex: i];
                     break;
@@ -483,20 +481,19 @@
 - (NSArray *) selectedTorrents
 {
     NSIndexSet * selectedIndexes = [self selectedRowIndexes];
-    NSMutableArray * torrents = [NSMutableArray arrayWithCapacity: [selectedIndexes count]]; //take a shot at guessing capacity
+    NSMutableArray * torrents = [NSMutableArray array];
     
     NSUInteger i;
     for (i = [selectedIndexes firstIndex]; i != NSNotFound; i = [selectedIndexes indexGreaterThanIndex: i])
     {
         id item = [self itemAtRow: i];
         if ([item isKindOfClass: [Torrent class]])
-            [torrents addObject: item];
-        else
         {
-            NSArray * groupTorrents = [item torrents];
-            [torrents addObjectsFromArray: groupTorrents];
-            i += [groupTorrents count];
+            if (![torrents containsObject: item])
+                [torrents addObject: item];
         }
+        else
+            [torrents addObjectsFromArray: [item objectForKey: @"Torrents"]];
     }
     
     return torrents;
@@ -530,7 +527,8 @@
 {
     unichar firstChar = [[event charactersIgnoringModifiers] characterAtIndex: 0];
     
-    if (firstChar == 'f' && [event modifierFlags] & NSAlternateKeyMask && [event modifierFlags] & NSCommandKeyMask)
+    if (firstChar == 'f' && [event modifierFlags] & NSAlternateKeyMask
+        && [event modifierFlags] & NSCommandKeyMask)
         [fController focusFilterField];
     else
     {
@@ -688,80 +686,15 @@
         item = [menu itemWithTag: ACTION_MENU_GLOBAL_TAG];
         [item setState: mode == NSMixedState ? NSOnState : NSOffState];
     }
-    else //assume the menu is part of the file list
+    else  //assume the menu is part of the file list
     {
         if ([menu numberOfItems] > 0)
             return;
         
         NSMenu * supermenu = [menu supermenu];
-        [self createFileMenu: menu forFiles: [(FileListNode *)[[supermenu itemAtIndex: [supermenu indexOfItemWithSubmenu: menu]]
-                                                representedObject] children]];
+        [self createFileMenu: menu forFiles: [[[supermenu itemAtIndex: [supermenu indexOfItemWithSubmenu: menu]]
+                                                    representedObject] objectForKey: @"Children"]];
     }
-}
-
-//alternating rows - first row after group row is white
-- (void) highlightSelectionInClipRect: (NSRect) clipRect
-{
-    NSColor * altColor = [[NSColor controlAlternatingRowBackgroundColors] objectAtIndex: 1];
-    [altColor set];
-    
-    NSRect visibleRect = clipRect;
-    NSRange rows = [self rowsInRect: visibleRect];
-    BOOL start = YES;
-    int i;
-    
-    if (rows.length > 0)
-    {
-        //determine what the first row color should be
-        if ([[self itemAtRow: rows.location] isKindOfClass: [Torrent class]])
-        {
-            for (i = rows.location-1; i>=0; i--)
-            {
-                if (![[self itemAtRow: i] isKindOfClass: [Torrent class]])
-                    break;
-                start = !start;
-            }
-        }
-        else
-        {
-            rows.location++;
-            rows.length--;
-        }
-        
-        for (i = rows.location; i < NSMaxRange(rows); i++)
-        {
-            if (![[self itemAtRow: i] isKindOfClass: [Torrent class]])
-            {
-                start = YES;
-                continue;
-            }
-            
-            if (!start && ![self isRowSelected: i])
-                NSRectFill([self rectOfRow: i]);
-            
-            start = !start;
-        }
-        
-        float newY = NSMaxY([self rectOfRow: i-1]);
-        visibleRect.size.height -= newY - visibleRect.origin.y;
-        visibleRect.origin.y = newY;
-    }
-    
-    //remaining visible rows continue alternating
-    float height = [self rowHeight] + [self intercellSpacing].height;
-    int numberOfRects = ceil(visibleRect.size.height / height);
-    visibleRect.size.height = height;
-    
-    for (i=0; i<numberOfRects; i++)
-    {
-        if (!start)
-            NSRectFill(visibleRect);
-        
-        start = !start;
-        visibleRect.origin.y += height;
-    }
-    
-    [super highlightSelectionInClipRect: clipRect];
 }
 
 - (void) setQuickLimitMode: (id) sender
@@ -829,7 +762,7 @@
 
 - (void) checkFile: (id) sender
 {
-    NSIndexSet * indexSet = [(FileListNode *)[sender representedObject] indexes];
+    NSIndexSet * indexSet = [[sender representedObject] objectForKey: @"Indexes"];
     [fMenuTorrent setFileCheckState: [sender state] != NSOnState ? NSOnState : NSOffState forIndexes: indexSet];
     
     [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateStats" object: nil];
@@ -842,42 +775,14 @@
 
 - (void) togglePiecesBar
 {
-    //stop previous animation
-    if (fPiecesBarAnimation)
-        [fPiecesBarAnimation release];
+    [self resizePiecesBarIncrement];
     
-    NSMutableArray * progressMarks = [NSMutableArray arrayWithCapacity: 16];
-    NSAnimationProgress i;
-    for (i = 0.0625; i <= 1.0; i += 0.0625)
-        [progressMarks addObject: [NSNumber numberWithFloat: i]];
-    
-    fPiecesBarAnimation = [[NSAnimation alloc] initWithDuration: TOGGLE_PROGRESS_SECONDS animationCurve: NSAnimationEaseIn];
-    [fPiecesBarAnimation setAnimationBlockingMode: NSAnimationNonblocking];
-    [fPiecesBarAnimation setProgressMarks: progressMarks];
-    [fPiecesBarAnimation setDelegate: self];
-    
-    [fPiecesBarAnimation startAnimation];
-}
-
-- (void) animationDidEnd: (NSAnimation *) animation
-{
-    if (animation == fPiecesBarAnimation)
+    if (!fPiecesBarTimer)
     {
-        [fPiecesBarAnimation release];
-        fPiecesBarAnimation = nil;
-    }
-}
-
-- (void) animation: (NSAnimation *) animation didReachProgressMark: (NSAnimationProgress) progress
-{
-    if (animation == fPiecesBarAnimation)
-    {
-        if ([fDefaults boolForKey: @"PiecesBar"])
-            fPiecesBarPercent = progress;
-        else
-            fPiecesBarPercent = 1.0 - progress;
-        
-        [self reloadData];
+        fPiecesBarTimer = [NSTimer scheduledTimerWithTimeInterval: PIECE_TIME target: self
+                            selector: @selector(resizePiecesBarIncrement) userInfo: nil repeats: YES];
+        [[NSRunLoop currentRunLoop] addTimer: fPiecesBarTimer forMode: NSModalPanelRunLoopMode];
+        [[NSRunLoop currentRunLoop] addTimer: fPiecesBarTimer forMode: NSEventTrackingRunLoopMode];
     }
 }
 
@@ -950,15 +855,15 @@
 - (void) createFileMenu: (NSMenu *) menu forFiles: (NSArray *) files
 {
     NSEnumerator * enumerator = [files objectEnumerator];
-    FileListNode * node;
-    while ((node = [enumerator nextObject]))
+    NSDictionary * dict;
+    while ((dict = [enumerator nextObject]))
     {
-        NSString * name = [node name];
+        NSString * name = [dict objectForKey: @"Name"];
         
         NSMenuItem * item = [[NSMenuItem alloc] initWithTitle: name action: @selector(checkFile:) keyEquivalent: @""];
         
         NSImage * icon;
-        if (![node isFolder])
+        if (![[dict objectForKey: @"IsFolder"] boolValue])
             icon = [[NSWorkspace sharedWorkspace] iconForFileType: [name pathExtension]];
         else
         {
@@ -971,19 +876,42 @@
             icon = [[NSWorkspace sharedWorkspace] iconForFileType: NSFileTypeForHFSTypeCode('fldr')];
         }
         
-        [item setRepresentedObject: node];
+        [item setRepresentedObject: dict];
         
         [icon setScalesWhenResized: YES];
         [icon setSize: NSMakeSize(16.0, 16.0)];
         [item setImage: icon];
         
-        NSIndexSet * indexSet = [node indexes];
+        NSIndexSet * indexSet = [dict objectForKey: @"Indexes"];
         [item setState: [fMenuTorrent checkForFiles: indexSet]];
         [item setEnabled: [fMenuTorrent canChangeDownloadCheckForFiles: indexSet]];
         
         [menu addItem: item];
         [item release];
     }
+}
+
+- (void) resizePiecesBarIncrement
+{
+    BOOL done;
+    if ([fDefaults boolForKey: @"PiecesBar"])
+    {
+        fPiecesBarPercent = MIN(fPiecesBarPercent + PIECE_CHANGE, 1.0);
+        done = fPiecesBarPercent == 1.0;
+    }
+    else
+    {
+        fPiecesBarPercent = MAX(fPiecesBarPercent - PIECE_CHANGE, 0.0);
+        done = fPiecesBarPercent == 0.0;
+    }
+    
+    if (done)
+    {
+        [fPiecesBarTimer invalidate];
+        fPiecesBarTimer = nil;
+    }
+    
+    [self reloadData];
 }
 
 @end

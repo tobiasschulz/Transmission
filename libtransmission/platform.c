@@ -1,14 +1,26 @@
-/*
- * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
- *
- * This file is licensed by the GPL version 2.  Works owned by the
- * Transmission project are granted a special exemption to clause 2(b)
- * so that the bulk of its code can remain under the MIT license. 
- * This exemption does not extend to derived works not owned by
- * the Transmission project.
- *
+/******************************************************************************
  * $Id$
- */
+ *
+ * Copyright (c) 2005-2008 Transmission authors and contributors
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ *****************************************************************************/
 
 #ifdef __BEOS__
   #include <signal.h> 
@@ -20,10 +32,6 @@
   #include <windows.h>
   #include <shlobj.h> /* for CSIDL_APPDATA, CSIDL_PROFILE */
 #else
-  #ifdef SYS_DARWIN
-    #include <CoreFoundation/CoreFoundation.h>
-  #endif
-    
   #define _XOPEN_SOURCE 500 /* needed for recursive locks. */
   #ifndef __USE_UNIX98
   #define __USE_UNIX98 /* some older Linuxes need it spelt out for them */
@@ -36,14 +44,12 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <sys/stat.h>
 #include <sys/types.h>
 #include <dirent.h>
 #include <fcntl.h>
 #include <unistd.h> /* getuid getpid close */
 
 #include "transmission.h"
-#include "list.h"
 #include "platform.h"
 #include "utils.h"
 
@@ -469,7 +475,7 @@ tr_getDefaultConfigDir( void )
 
         if(( s = getenv( "TRANSMISSION_HOME" )))
         {
-            tr_snprintf( path, sizeof( path ), s );
+            snprintf( path, sizeof( path ), s );
         }
         else
         {
@@ -497,114 +503,6 @@ tr_getDefaultConfigDir( void )
 
     return s;
 }
-
-/***
-****
-***/
-
-static int
-isClutchDir( const char * path )
-{
-    struct stat sb;
-    char tmp[MAX_PATH_LENGTH];
-    tr_buildPath( tmp, sizeof( tmp ), path, "javascript", "transmission.js", NULL );
-    tr_inf( _( "Searching for web interface file \"%s\"" ), tmp );
-    return !stat( tmp, &sb );
-}
-
-const char *
-tr_getClutchDir( const tr_session * session UNUSED )
-{
-    static char * s = NULL;
-
-    if( !s )
-    {
-        char path[MAX_PATH_LENGTH] = { '\0' };
-
-        if(( s = getenv( "CLUTCH_HOME" )))
-        {
-            tr_snprintf( path, sizeof( path ), s );
-        }
-        else if(( s = getenv( "TRANSMISSION_WEB_HOME" )))
-        {
-            tr_snprintf( path, sizeof( path ), s );
-        }
-        else
-        {
-#ifdef SYS_DARWIN
-            
-            CFURLRef appURL = CFBundleCopyBundleURL( CFBundleGetMainBundle() );
-            CFStringRef appRef = CFURLCopyPath( appURL );
-            const char * appString = CFStringGetCStringPtr( appRef, CFStringGetFastestEncoding( appRef ) );
-            CFRelease(appURL);
-            CFRelease(appRef);
-            
-            /*CFURLRef resourcesDirURL = CFBundleCopyResourcesDirectoryURL( CFBundleGetMainBundle() );
-            CFStringRef resourcesDirRef = CFURLCopyPath( resourcesDirURL );
-            const char * resourcesDirString = CFStringGetCStringPtr( resourcesDirRef, CFStringGetFastestEncoding( resourcesDirRef ) );
-            CFRelease(resourcesDirURL);
-            CFRelease(resourcesDirRef);*/
-            
-            sprintf( path, "%s%s", appString, "Contents/Resources/web" );
-
-#elif defined(WIN32)
-
-            #warning hey win32 people is this good or is there a better implementation of the next four lines
-            char appdata[MAX_PATH_LENGTH];
-            SHGetFolderPath( NULL, CSIDL_APPDATA, NULL, 0, appdata );
-            tr_buildPath( path, sizeof( path ),
-                          appdata, "Transmission", NULL );
-#else
-            tr_list *candidates=NULL, *l;
-
-            /* XDG_DATA_HOME should be the first in the list of candidates */
-            s = getenv( "XDG_DATA_HOME" );
-            if( s && *s )
-                tr_list_append( &candidates, tr_strdup( s ) );
-            else {
-                char tmp[MAX_PATH_LENGTH];
-                tr_buildPath( tmp, sizeof( tmp ), getHomeDir(), ".local", "share", NULL );
-                tr_list_append( &candidates, tr_strdup( tmp ) );
-            }
-
-            /* XDG_DATA_DIRS are the backup directories */
-            s = getenv( "XDG_DATA_DIRS" );
-            if( !s || !*s )
-                s = "/usr/local/share/:/usr/share/";
-            while( s && *s ) {
-                char * end = strchr( s, ':' );
-                if( end ) {
-                    tr_list_append( &candidates, tr_strndup( s, end-s ) );
-                    s = end + 1;
-                } else {
-                    tr_list_append( &candidates, tr_strdup( s ) );
-                    break;
-                }
-            }
-
-            for( l=candidates; l; l=l->next ) {
-                tr_buildPath( path, sizeof( path ), l->data, "transmission", "web", NULL );
-                if( isClutchDir( path ) )
-                    break;
-                *path = '\0';
-            }
-
-            tr_list_free( &candidates, tr_free );
-#endif
-        }
-
-        if( !*path )
-        {
-            tr_strlcpy( path, "/dev/null", sizeof( path ) );
-            tr_err( _( "Couldn't find the web interface's files!  To customize this, set the CLUTCH_HOME environmental variable to the folder where index.html is located." ) );
-        }
-
-        s = tr_strdup( path );
-    }
-
-    return s;
-}
-
 
 /***
 ****
