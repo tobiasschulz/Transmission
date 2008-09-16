@@ -28,17 +28,9 @@
 #define CHECKER_URL @"http://portcheck.transmissionbt.com/%d"
 #define CHECK_FIRE  3.0
 
-@interface PortChecker (Private)
-
-- (void) startProbe;
-
-- (void) callBackWithStatus: (port_status_t) status;
-
-@end
-
 @implementation PortChecker
 
-- (id) initForPort: (NSInteger) portNumber delay: (BOOL) delay withDelegate: (id) delegate
+- (id) initForPort: (int) portNumber withDelegate: (id) delegate
 {
     if ((self = [super init]))
     {
@@ -47,11 +39,8 @@
         fPortNumber = portNumber;
         fStatus = PORT_STATUS_CHECKING;
         
-        if (delay)
-            fTimer = [NSTimer scheduledTimerWithTimeInterval: CHECK_FIRE target: self
-                        selector: @selector(startProbe) userInfo: nil repeats: NO];
-        else
-            [self startProbe];
+        fTimer = [NSTimer scheduledTimerWithTimeInterval: CHECK_FIRE target: self selector: @selector(startProbe)
+                    userInfo: nil repeats: NO];
     }
     
     return self;
@@ -71,6 +60,24 @@
     return fStatus;
 }
 
+- (void) startProbe
+{
+    fTimer = nil;
+    
+    NSURLRequest * portProbeRequest = [NSURLRequest requestWithURL: [NSURL URLWithString:
+                [NSString stringWithFormat: CHECKER_URL, fPortNumber]] cachePolicy:
+                [NSApp isOnLeopardOrBetter] ? NSURLRequestReloadIgnoringLocalCacheData : NSURLRequestReloadIgnoringCacheData
+                timeoutInterval: 15.0];
+    
+    if ((fConnection = [[NSURLConnection alloc] initWithRequest: portProbeRequest delegate: self]))
+        fPortProbeData = [[NSMutableData alloc] init];
+    else
+    {
+        NSLog(@"Unable to get port status: failed to initiate connection");
+        [self callBackWithStatus: PORT_STATUS_ERROR];
+    }
+}
+
 - (void) cancelProbe
 {
     [fTimer invalidate];
@@ -78,6 +85,16 @@
     
     [fConnection cancel];
 }
+
+- (void) callBackWithStatus: (port_status_t) status
+{
+    fStatus = status;
+    
+    if (fDelegate && [fDelegate respondsToSelector: @selector(portCheckerDidFinishProbing:)])
+        [fDelegate performSelectorOnMainThread: @selector(portCheckerDidFinishProbing:) withObject: self waitUntilDone: NO];
+}
+
+#pragma mark NSURLConnection delegate methods
 
 - (void) connection: (NSURLConnection *) connection didReceiveResponse: (NSURLResponse *) response
 {
@@ -122,34 +139,3 @@
 }
 
 @end
-
-@implementation PortChecker (Private)
-
-- (void) startProbe
-{
-    fTimer = nil;
-    
-    NSURLRequest * portProbeRequest = [NSURLRequest requestWithURL: [NSURL URLWithString:
-                [NSString stringWithFormat: CHECKER_URL, fPortNumber]] cachePolicy:
-                [NSApp isOnLeopardOrBetter] ? NSURLRequestReloadIgnoringLocalAndRemoteCacheData : NSURLRequestReloadIgnoringCacheData
-                timeoutInterval: 15.0];
-    
-    if ((fConnection = [[NSURLConnection alloc] initWithRequest: portProbeRequest delegate: self]))
-        fPortProbeData = [[NSMutableData alloc] init];
-    else
-    {
-        NSLog(@"Unable to get port status: failed to initiate connection");
-        [self callBackWithStatus: PORT_STATUS_ERROR];
-    }
-}
-
-- (void) callBackWithStatus: (port_status_t) status
-{
-    fStatus = status;
-    
-    if (fDelegate && [fDelegate respondsToSelector: @selector(portCheckerDidFinishProbing:)])
-        [fDelegate performSelectorOnMainThread: @selector(portCheckerDidFinishProbing:) withObject: self waitUntilDone: NO];
-}
-
-@end
-

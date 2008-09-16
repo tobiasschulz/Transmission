@@ -73,11 +73,11 @@ tr_strlratio( char * buf, double ratio, size_t buflen )
     else if( (int)ratio == TR_RATIO_INF )
         tr_strlcpy( buf, "Inf", buflen );
     else if( ratio < 10.0 )
-        tr_snprintf( buf, buflen, "%.2f", ratio );
+        tr_snprintf( buf, buflen, "%'.2f", ratio );
     else if( ratio < 100.0 )
-        tr_snprintf( buf, buflen, "%.1f", ratio );
+        tr_snprintf( buf, buflen, "%'.1f", ratio );
     else
-        tr_snprintf( buf, buflen, "%.0f", ratio );
+        tr_snprintf( buf, buflen, "%'.0f", ratio );
     return buf;
 }
 
@@ -134,7 +134,7 @@ scrapeDoneFunc( struct tr_handle    * session UNUSED,
         tr_bencFree( &top );
     }
     else
-        fprintf( stderr, "Unable to parse response (http code %lu) at %s", response_code, (char*)host );
+        printf( "unable to parse response (http code %lu) at %s", response_code, (char*)host );
 
     --leftToScrape;
 }
@@ -235,15 +235,15 @@ main( int argc, char ** argv )
 
     /* Check the options for validity */
     if( !torrentPath ) {
-        fprintf( stderr, "No torrent specified!\n" );
+        printf( "No torrent specified!\n" );
         return EXIT_FAILURE;
     }
     if( peerPort < 1 || peerPort > 65535 ) {
-        fprintf( stderr, "Error: Port must between 1 and 65535; got %d\n", peerPort );
+        printf( "Error: Port must between 1 and 65535; got %d\n", peerPort );
         return EXIT_FAILURE;
     }
     if( peerSocketTOS < 0 || peerSocketTOS > 255 ) {
-        fprintf( stderr, "Error: value must between 0 and 255; got %d\n", peerSocketTOS );
+        printf( "Error: value must between 0 and 255; got %d\n", peerSocketTOS );
         return EXIT_FAILURE;
     }
 
@@ -271,7 +271,6 @@ main( int argc, char ** argv )
             natTraversal,                  /* nat enabled */
             peerPort,
             encryptionMode,
-            TR_DEFAULT_LAZY_BITFIELD_ENABLED,
             uploadLimit >= 0,
             uploadLimit,
             downloadLimit >= 0,
@@ -369,15 +368,14 @@ main( int argc, char ** argv )
     tr_ctorFree( ctor );
     if( !tor )
     {
-        fprintf( stderr, "Failed opening torrent file `%s'\n", torrentPath );
+        printf( "Failed opening torrent file `%s'\n", torrentPath );
         tr_sessionClose( h );
         return EXIT_FAILURE;
     }
 
     signal( SIGINT, sigHandler );
-#ifndef WIN32
     signal( SIGHUP, sigHandler );
-#endif
+
     tr_torrentSetStatusCallback( tor, torrentStateChanged, NULL );
     tr_torrentStart( tor );
 
@@ -416,7 +414,7 @@ main( int argc, char ** argv )
         getStatusStr( st, line, sizeof( line ) );
         printf( "\r%-*s", LINEWIDTH, line );
         if( st->error )
-            fprintf( stderr, "\n%s\n", st->errorString );
+            printf( "\n%s\n", st->errorString );
     }
 
 cleanup:
@@ -523,7 +521,7 @@ parseCommandLine( int argc, const char ** argv )
             case 'v': verify = 1; break;
             case 'w': downloadDir = optarg; break;
             case 910: encryptionMode = TR_ENCRYPTION_REQUIRED; break;
-            case 911: encryptionMode = TR_CLEAR_PREFERRED; break;
+            case 911: encryptionMode = TR_PLAINTEXT_PREFERRED; break;
             case 912: encryptionMode = TR_ENCRYPTION_PREFERRED; break;
             case TR_OPT_UNK: torrentPath = optarg; break;
             default: return 1;
@@ -539,9 +537,7 @@ sigHandler( int signal )
     switch( signal )
     {
         case SIGINT: gotsig = 1; break;
-#ifndef WIN32
         case SIGHUP: manualUpdate = 1; break;
-#endif
         default: break;
     }
 }

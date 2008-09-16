@@ -27,7 +27,7 @@
      (LIBCURL_VERSION_MAJOR == (major) && LIBCURL_VERSION_MINOR == (minor) && \
       LIBCURL_VERSION_PATCH >= (micro)))
 
-#define PULSE_MSEC 100
+#define PULSE_MSEC 500
 
 #define dbgmsg(fmt...) tr_deepLog( __FILE__, __LINE__, "web", ##fmt )
 
@@ -73,7 +73,7 @@ processCompletedTasks( tr_web * web )
         if( easy ) {
             struct tr_web_task * task;
             long response_code;
-            curl_easy_getinfo( easy, CURLINFO_PRIVATE, (void*)&task );
+            curl_easy_getinfo( easy, CURLINFO_PRIVATE, &task );
             curl_easy_getinfo( easy, CURLINFO_RESPONSE_CODE, &response_code );
             --web->remain;
             dbgmsg( "task #%lu done (%d remain)", task->tag, web->remain );
@@ -181,7 +181,6 @@ addTask( void * vtask )
         curl_easy_setopt( ch, CURLOPT_FOLLOWLOCATION, 1 );
         curl_easy_setopt( ch, CURLOPT_MAXREDIRS, 5 );
         curl_easy_setopt( ch, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4 );
-        curl_easy_setopt( ch, CURLOPT_VERBOSE, getenv( "TR_CURL_VERBOSE" ) != NULL );
         if( task->range )
             curl_easy_setopt( ch, CURLOPT_RANGE, task->range );
         else /* don't set encoding if range is sent; it messes up binary data */

@@ -41,13 +41,10 @@
 #include <gdk/gdkx.h>
 #endif
 
-#include <libtransmission/transmission.h>
-#include <libtransmission/utils.h>
 #include <libtransmission/version.h>
 
 #include "actions.h"
 #include "add-dialog.h"
-#include "blocklist.h"
 #include "conf.h"
 #include "details.h"
 #include "dialogs.h"
@@ -319,7 +316,7 @@ onRPCIdle( void * vdata )
     return FALSE;
 }
 
-static tr_rpc_callback_status
+static void
 onRPCChanged( tr_handle            * handle UNUSED,
               tr_rpc_callback_type   type,
               struct tr_torrent    * tor,
@@ -334,7 +331,6 @@ onRPCChanged( tr_handle            * handle UNUSED,
     data->tor = type == TR_RPC_TORRENT_REMOVING ? NULL : tor;
     data->cbdata = cbdata;
     g_idle_add( onRPCIdle, data );
-    return TR_RPC_OK;
 }
 
 int
@@ -350,7 +346,6 @@ main( int argc, char ** argv )
     gboolean startminimized = FALSE;
     char * domain = "transmission";
     char * configDir = NULL;
-    tr_lockfile_state_t tr_state;
 
     GOptionEntry entries[] = {
         { "paused", 'p', 0, G_OPTION_ARG_NONE, &startpaused,
@@ -376,9 +371,7 @@ main( int argc, char ** argv )
     g_set_application_name( _( "Transmission" ) );
 
     /* initialize gtk */
-    if( !g_thread_supported() )
-        g_thread_init( NULL );
-
+    g_thread_init( NULL );
     gerr = NULL;
     if( !gtk_init_with_args( &argc, &argv, _("[torrent files]"), entries, domain, &gerr ) ) {
         g_message( "%s", gerr->message );
@@ -403,7 +396,7 @@ main( int argc, char ** argv )
     /* either get a lockfile s.t. this is the one instance of
      * transmission that's running, OR if there are files to
      * be added, delegate that to the running instance via dbus */
-    didlock = cf_lock( &tr_state, &err );
+    didlock = cf_lock( &err );
     argfiles = checkfilenames( argc-1, argv+1 );
     if( !didlock && argfiles )
     {
@@ -413,11 +406,6 @@ main( int argc, char ** argv )
             delegated |= gtr_dbus_add_torrent( l->data );
         if( delegated )
             err = NULL;
-    }
-    else if( (!didlock) && (tr_state == TR_LOCKFILE_ELOCK) )
-    {
-        gtr_dbus_present_window();
-        err = NULL;
     }
 
     if( didlock && ( didinit || cf_init( configDir, &err ) ) )
@@ -432,7 +420,6 @@ main( int argc, char ** argv )
                             pref_flag_get( PREF_KEY_PORT_FORWARDING ),
                             pref_int_get( PREF_KEY_PORT ),
                             pref_int_get( PREF_KEY_ENCRYPTION ),
-                            pref_flag_get( PREF_KEY_LAZY_BITFIELD ),
                             pref_flag_get( PREF_KEY_UL_LIMIT_ENABLED ),
                             pref_int_get( PREF_KEY_UL_LIMIT ),
                             pref_flag_get( PREF_KEY_DL_LIMIT_ENABLED ),
@@ -465,7 +452,6 @@ main( int argc, char ** argv )
 
         appsetup( win, argfiles, cbdata, startpaused, startminimized );
         tr_sessionSetRPCCallback( h, onRPCChanged, cbdata );
-        gtr_blocklist_maybe_autoupdate( cbdata->core );
 
         gtk_main();
     }
@@ -478,96 +464,6 @@ main( int argc, char ** argv )
     }
 
     return 0;
-}
-
-static gboolean
-updateScheduledLimits(gpointer data)
-{
-    tr_handle *tr = (tr_handle *) data;
-    static gboolean last_state = FALSE;
-    gboolean in_sched_state = FALSE;
-
-    if( !pref_flag_get( PREF_KEY_SCHED_LIMIT_ENABLED ) )
-    {
-        in_sched_state = FALSE;
-    }
-    else
-    {
-        const int begin_time = pref_int_get( PREF_KEY_SCHED_BEGIN );
-        const int end_time = pref_int_get( PREF_KEY_SCHED_END );
-        time_t t;
-        struct tm *tm;
-        int cur_time;
-
-        time( &t );
-        tm = localtime (&t);
-        cur_time = (tm->tm_hour * 60) + tm->tm_min;
-
-        if( end_time >= begin_time )
-        {
-            if( (cur_time >= begin_time) && (cur_time <= end_time) )
-                in_sched_state = TRUE;
-	}
-        else
-        {
-            if( (cur_time >= begin_time) || (cur_time <= end_time) )
-                in_sched_state = TRUE;
-        }
-    }
-
-    if( last_state != in_sched_state )
-    {
-        if( in_sched_state )
-        {
-            int limit;
-
-            tr_inf ( _( "Beginning to use scheduled bandwidth limits" ) );
-
-            tr_sessionSetSpeedLimitEnabled( tr, TR_DOWN, TRUE );
-            limit = pref_int_get( PREF_KEY_SCHED_DL_LIMIT );
-            tr_sessionSetSpeedLimit( tr, TR_DOWN, limit );
-            tr_sessionSetSpeedLimitEnabled( tr, TR_UP, TRUE );
-            limit = pref_int_get( PREF_KEY_SCHED_UL_LIMIT );
-            tr_sessionSetSpeedLimit( tr, TR_UP, limit );
-        }
-        else
-        {
-            gboolean b;
-            int limit;
-
-            tr_inf ( _( "Ending use of scheduled bandwidth limits" ) );
-
-            b = pref_flag_get( PREF_KEY_DL_LIMIT_ENABLED );
-            tr_sessionSetSpeedLimitEnabled( tr, TR_DOWN, b );
-            limit = pref_int_get( PREF_KEY_DL_LIMIT );
-            tr_sessionSetSpeedLimit( tr, TR_DOWN, limit );
-            b = pref_flag_get( PREF_KEY_UL_LIMIT_ENABLED );
-            tr_sessionSetSpeedLimitEnabled( tr, TR_UP, b );
-            limit = pref_int_get( PREF_KEY_UL_LIMIT );
-            tr_sessionSetSpeedLimit( tr, TR_UP, limit );
-        }
-
-        last_state = in_sched_state;
-    }
-    else if( in_sched_state )
-    {
-        static int old_dl_limit = 0, old_ul_limit = 0;
-        int dl_limit = pref_int_get( PREF_KEY_SCHED_DL_LIMIT );
-        int ul_limit = pref_int_get( PREF_KEY_SCHED_UL_LIMIT );
-
-        if( ( dl_limit != old_dl_limit ) || ( ul_limit != old_ul_limit ) )
-        {
-            tr_sessionSetSpeedLimitEnabled( tr, TR_DOWN, TRUE );
-            tr_sessionSetSpeedLimit( tr, TR_DOWN, dl_limit );
-            tr_sessionSetSpeedLimitEnabled( tr, TR_UP, TRUE );
-            tr_sessionSetSpeedLimit( tr, TR_UP, ul_limit );
-
-            old_dl_limit = dl_limit;
-            old_ul_limit = ul_limit;
-        }
-    }
-
-    return TRUE;
 }
 
 static void
@@ -618,10 +514,6 @@ appsetup( TrWindow * wind, GSList * torrentFiles,
     /* start model update timer */
     cbdata->timer = g_timeout_add( UPDATE_INTERVAL, updatemodel, cbdata );
     updatemodel( cbdata );
-
-    /* start scheduled rate timer */
-    updateScheduledLimits (tr_core_handle( cbdata->core ));
-    g_timeout_add( 60 * 1000, updateScheduledLimits, tr_core_handle( cbdata->core ) );
 
     /* either show the window or iconify it */
     if( !minimized )
@@ -682,13 +574,13 @@ clearTag( guint * tag )
 }
 
 static void
-toggleMainWindow( struct cbdata * cbdata, gboolean present )
+toggleMainWindow( struct cbdata * cbdata )
 {
     GtkWindow * window = GTK_WINDOW( cbdata->wind );
     const int hide = !cbdata->minimized;
     static int x=0, y=0;
 
-    if( (!present) && hide )
+    if( hide )
     {
         gtk_window_get_position( window, &x, &y );
         clearTag( &cbdata->idle_hide_mainwindow_tag );
@@ -698,8 +590,7 @@ toggleMainWindow( struct cbdata * cbdata, gboolean present )
     else
     {
         gtk_window_set_skip_taskbar_hint( window, FALSE );
-        if ( x != 0 && y != 0 )
-            gtk_window_move( window, x, y );
+        gtk_window_move( window, x, y );
         gtk_widget_show( GTK_WIDGET( window ) );
         gtk_window_deiconify( window );
 #if GTK_CHECK_VERSION(2,8,0)
@@ -827,7 +718,7 @@ wannaquit( void * vdata )
     gtk_table_attach_defaults( GTK_TABLE( p ), w, 1, 2, 1, 2 );
 
     b = gtk_alignment_new(0.0, 1.0, 0.01, 0.01);
-    w = gtr_button_new_from_stock( GTK_STOCK_QUIT, _( "_Quit Now" ) );
+    w = tr_button_new_from_stock( GTK_STOCK_QUIT, _( "_Quit Now" ) );
     g_signal_connect(w, "clicked", G_CALLBACK(do_exit_cb), NULL);
     gtk_container_add(GTK_CONTAINER(b), w);
     gtk_table_attach(GTK_TABLE(p), b, 1, 2, 2, 3, GTK_FILL, GTK_FILL, 0, 10 );
@@ -1082,10 +973,6 @@ g_message( "setting encryption to %d", encryption );
     {
         const int limit = pref_int_get( key );
         tr_sessionSetSpeedLimit( tr, TR_UP, limit );
-    }
-    else if ( !strncmp( key, "sched-", 6 ) )
-    {
-        updateScheduledLimits( tr );
     }
     else if( !strcmp( key, PREF_KEY_PORT_FORWARDING ) )
     {
@@ -1468,11 +1355,7 @@ doAction ( const char * action_name, gpointer user_data )
     }
     else if (!strcmp (action_name, "toggle-main-window"))
     {
-        toggleMainWindow( data, FALSE );
-    }
-    else if (!strcmp (action_name, "present-main-window"))
-    {
-        toggleMainWindow( data, TRUE );
+        toggleMainWindow( data );
     }
     else g_error ("Unhandled action: %s", action_name );
 

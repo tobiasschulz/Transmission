@@ -1,6 +1,5 @@
 #include <ctype.h>
 #include <stdio.h>
-#include <string.h>
 #include "transmission.h"
 #include "bencode.h"
 #include "json.h"
@@ -89,16 +88,17 @@ testStr( void )
     uint8_t buf[128];
     int err;
     const uint8_t * end;
-    const uint8_t * str;
+    uint8_t * str;
     size_t len;
 
     /* good string */
     tr_snprintf( (char*)buf, sizeof( buf ), "4:boat" );
     err = tr_bencParseStr( buf, buf+6, &end, &str, &len );
     check( err == TR_OK );
-    check( !strncmp( (char*)str, "boat", len ) );
+    check( !strcmp( (char*)str, "boat" ) );
     check( len == 4 );
     check( end == buf + 6 );
+    tr_free( str );
     str = NULL;
     end = NULL;
     len = 0;
@@ -117,6 +117,7 @@ testStr( void )
     check( !*str );
     check( !len );
     check( end == buf + 2 );
+    tr_free( str );
     str = NULL;
     end = NULL;
     len = 0;
@@ -125,9 +126,10 @@ testStr( void )
     tr_snprintf( (char*)buf, sizeof( buf ), "3:boat" );
     err = tr_bencParseStr( buf, buf+6, &end, &str, &len );
     check( err == TR_OK );
-    check( !strncmp( (char*)str, "boa", len ) );
+    check( !strcmp( (char*)str, "boa" ) );
     check( len == 3 );
     check( end == buf + 5 );
+    tr_free( str );
     str = NULL;
     end = NULL;
     len = 0;
@@ -340,16 +342,18 @@ testJSON( void )
 }
 
 static int
-testStackSmash( int depth )
+testStackSmash( void )
 {
     int i;
     int len;
+    int depth;
     int err;
     uint8_t * in;
     const uint8_t * end;
     tr_benc val;
     char * saved;
 
+    depth = 1000000;
     in = tr_new( uint8_t, depth*2 + 1 );
     for( i=0; i<depth; ++i ) {
         in[i] = 'l';
@@ -386,12 +390,7 @@ main( void )
     if(( i = testJSON( )))
         return i;
 
-#ifndef WIN32
-    i = testStackSmash( 1000000 );
-#else
-    i = testStackSmash( 100000 );
-#endif
-    if( i )
+    if(( i = testStackSmash( )))
         return i;
 
     return 0;

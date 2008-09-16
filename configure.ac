@@ -1,36 +1,14 @@
-AC_PREREQ(2.54)
-
-m4_define([tr_version_major], [1])
-m4_define([tr_version_minor], [33])
-m4_define([tr_version_suffix], [+])
-m4_define([tr_version], [tr_version_major.tr_version_minor])
-
-AC_INIT([Transmission], [tr_version], [http://trac.transmissionbt.com/newticket], [transmission])
-
-TR_VERSION_MAJOR=tr_version_major
-TR_VERSION_MINOR=tr_version_minor
-TR_VERSION_SUFFIX=tr_version_suffix
-TR_VERSION=tr_version
-
-dnl Someone still needs to hook this up to the system above
-PEERID_PREFIX="-TR133Z-"
-
-USERAGENT_PREFIX=$TR_VERSION$TR_VERSION_SUFFIX
-
+AC_INIT([transmission],[1.33],[http://trac.transmissionbt.com/newticket])
+PEERID_PREFIX="-TR1330-"
+USERAGENT_PREFIX="1.33"
 AC_SUBST(PEERID_PREFIX,[$PEERID_PREFIX])
 AC_SUBST(USERAGENT_PREFIX,[$USERAGENT_PREFIX])
 
+AC_PREREQ(2.54)
 dnl AM_CONFIG_HEADER(config.h)
 AC_CONFIG_SRCDIR(libtransmission/transmission.h)
 AM_INIT_AUTOMAKE([1.9 tar-ustar])
 AC_PROG_LIBTOOL
-
-if test "x$TR_VERSION_SUFFIX" = "x+"; then
-  AC_DEFINE(TR_UNSTABLE, 1,
-            [Define to 1 if this is an unstable version of Transmission])
-  TR_UNSTABLE=yes
-fi
-AM_CONDITIONAL(TR_UNSTABLE, test "x$TR_UNSTABLE" = "xyes")
 
 OPENSSL_MINIMUM=0.9.4
 CURL_MINIMUM=7.15.0
@@ -52,21 +30,21 @@ AC_SUBST(DBUS_GLIB_MINIMUM)
 AC_PROG_CC
 AC_PROG_CXX
 if test "x$GCC" = "xyes" ; then
-    CFLAGS="-g -Wall -W -Wmissing-prototypes -Wdeclaration-after-statement -O3 -funroll-loops"
+    CFLAGS="-g -Wall -W -O3 -funroll-loops"
     CXXFLAGS="-g -Wall -W -O3 -funroll-loops"
 fi
-
 AC_HEADER_STDC
 AC_HEADER_TIME
 AC_CHECK_FUNCS([lrintf strlcpy daemon dirname basename daemon strcasecmp])
 AC_CHECK_SIZEOF([void*])
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
+AC_PROG_RANLIB
 ACX_PTHREAD
 
 AC_SEARCH_LIBS([socket], [socket net])
 AC_SEARCH_LIBS([gethostbyname], [nsl bind])
-PKG_CHECK_MODULES(OPENSSL, [openssl >= $OPENSSL_MINIMUM], , [CHECK_SSL()])
+PKG_CHECK_MODULES(OPENSSL, [openssl >= $OPENSSL_MINIMUM])
 PKG_CHECK_MODULES(LIBCURL, [libcurl >= $CURL_MINIMUM])
 
 AC_SYS_LARGEFILE
@@ -166,13 +144,6 @@ if test "x$build_gtk" = "xyes"; then
     if test "x$use_dbus_glib" = "xyes"; then
         AC_DEFINE([HAVE_DBUS_GLIB], 1)
     fi
-    if test "x$use_dbus_glib" = "xyes"; then
-        AC_PATH_PROG(DBUS_BINDING_TOOL, dbus-binding-tool, no)
-        if test "x$DBUS_BINDING_TOOL" = xno; then
-          AC_MSG_WARN([Cannot find dbus-binding-tool])
-          use_dbus_glib="no (dbus-binding-tool not found)"
-        fi
-    fi
 fi
 
 AC_CHECK_HEADERS([libintl.h])
@@ -220,7 +191,7 @@ case $host_os in
    *cygwin|*mingw32*)
      have_msw="yes"
      CXXFLAGS="$CXXFLAGS -mms-bitfields -mwin32 -mwindows"
-     CPPFLAGS="$CPPFLAGS -DWIN32 -D_WIN32 -DWIN32_LEAN_AND_MEAN"
+     CPPFLAGS="$CPPFLAGS -DWIN32 -DWIN32_LEAN_AND_MEAN"
      LIBS="$LIBS -lshell32 -lws2_32"
      transmissionlocaledir="locale"
      if test -z "$host_alias"; then
@@ -228,7 +199,11 @@ case $host_os in
      else
        hostaliaswindres="$host_alias-windres";
      fi
-     AC_CHECK_TOOL(WINDRES, windres)
+     AC_PATH_PROGS([WINDRES], [windres $hostaliaswindres $host_os-windres])
+     if test "x$WINDRES" = "x"; then
+       AC_MSG_ERROR([windres could not be found within your path.])
+     fi
+     AC_SUBST(WINDRES)
      ;;
 
   *beos*)
@@ -287,11 +262,11 @@ AC_ARG_ENABLE([cli],
               [build_cli="yes"])
 AM_CONDITIONAL([BUILD_CLI],[test "x$build_cli" = "xyes"])
 
-AC_ARG_ENABLE([mac],
-              [AC_HELP_STRING([--enable-mac],[build OS X client])],
-              [build_mac=${enableval}],
-              [build_mac=${have_darwin}])
-AM_CONDITIONAL([BUILD_MAC],[test "x$build_mac" = "xyes"])
+AC_ARG_ENABLE([darwin],
+              [AC_HELP_STRING([--enable-darwin],[build OS X client])],
+              [build_darwin=${enableval}],
+              [build_darwin=${have_darwin}])
+AM_CONDITIONAL([BUILD_DARWIN],[test "x$build_darwin" = "xyes"])
 
 AC_ARG_ENABLE([daemon],
               [AC_HELP_STRING([--enable-daemon],[build daemon])],
@@ -309,7 +284,7 @@ fi
 if test "x$have_msw" = "xyes"; then
     AC_DEFINE([HAVE_MSW], 1)
 fi
-AM_CONDITIONAL(WIN32, test "x$have_msw" = "xyes")
+
 
 dnl ----------------------------------------------------------------------------
 dnl
@@ -349,7 +324,7 @@ Configuration:
           ... gio support:          ${use_gio}
           ... dbus-glib support:    ${use_dbus_glib}
           ... libnotify support:    ${use_libnotify}
-        Build OS X client:          ${build_mac}
+        Build OS X client:          ${build_darwin}
         Build wxWidgets client:     ${build_wx}
 
 "

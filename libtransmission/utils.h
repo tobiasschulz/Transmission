@@ -91,13 +91,6 @@
 #endif
 #endif
 
-/* #define DISABLE_GETTEXT */
-#ifdef DISABLE_GETTEXT
-const char* tr_strip_positional_args( const char* fmt );
-#undef _
-#define _(a) tr_strip_positional_args(a)
-#endif
-
 #define tr_nerr( n, a... ) tr_msg( __FILE__, __LINE__, TR_MSG_ERR, n, ## a )
 #define tr_ninf( n, a... ) tr_msg( __FILE__, __LINE__, TR_MSG_INF, n, ## a )
 #define tr_ndbg( n, a... ) tr_msg( __FILE__, __LINE__, TR_MSG_DBG, n, ## a )
@@ -123,6 +116,9 @@ void tr_deepLog( const char * file, int line,
                  const char * fmt, ... ) TR_GNUC_PRINTF( 4, 5 );
 
 char* tr_getLogTimeStr( char * buf, int buflen );
+
+/** Returns a random number in the range of [0...n) */
+int tr_rand ( int n );
 
 /**
  * a portability wrapper around mkdir().
@@ -190,6 +186,7 @@ void tr_wait( uint64_t delay_milliseconds );
 
 void* tr_malloc  ( size_t ) TR_GNUC_MALLOC;
 void* tr_malloc0 ( size_t ) TR_GNUC_MALLOC;
+void* tr_calloc  ( size_t nmemb, size_t size ) TR_GNUC_MALLOC;
 void  tr_free    ( void* );
 
 char* tr_strdup( const void * str ) TR_GNUC_MALLOC;
@@ -199,12 +196,12 @@ char* tr_strdup_printf( const char * fmt, ... )  TR_GNUC_PRINTF( 1, 2 ) TR_GNUC_
 char* tr_base64_encode( const void * input, int inlen, int *outlen ) TR_GNUC_MALLOC;
 char* tr_base64_decode( const void * input, int inlen, int *outlen ) TR_GNUC_MALLOC;
 
-size_t tr_strlcpy( char * dst, const void * src, size_t siz );
+size_t tr_strlcpy( char * dst, const char * src, size_t siz );
 int tr_snprintf( char * buf, size_t buflen, const char * fmt, ... );
 
-const char* tr_strerror( int );
+int   tr_stringEndsWith( const char * string, const char * end );
 
-char* tr_strstrip( char * str );
+const char* tr_strerror( int );
 
 /***
 ****
@@ -220,6 +217,15 @@ void tr_set_compare( const void * a, size_t aCount,
                      tr_set_func in_b_cb,
                      tr_set_func in_both_cb,
                      void * userData );
+                    
+int tr_compareUint16( uint16_t a, uint16_t b );
+int tr_compareUint32( uint32_t a, uint32_t b );
+int tr_compareUint64( uint64_t a, uint64_t b );
+int tr_compareDouble( double a, double b );
+int tr_compareTime( time_t a, time_t b );
+
+int tr_strcmp( const void * a, const void * b );
+int tr_strcasecmp( const char * a, const char * b );
 
 void tr_sha1_to_hex( char * out, const uint8_t * sha1 );
 
@@ -245,6 +251,7 @@ struct tr_bitfield
 };
 
 typedef struct tr_bitfield tr_bitfield;
+typedef struct tr_bitfield tr_bitfield_t;
 
 tr_bitfield* tr_bitfieldNew( size_t bitcount ) TR_GNUC_MALLOC;
 tr_bitfield* tr_bitfieldDup( const tr_bitfield* ) TR_GNUC_MALLOC;
@@ -257,10 +264,21 @@ int  tr_bitfieldAddRange( tr_bitfield *, size_t begin, size_t end );
 int  tr_bitfieldRemRange ( tr_bitfield*, size_t begin, size_t end );
 void tr_bitfieldDifference( tr_bitfield *, const tr_bitfield * );
 
+int    tr_bitfieldHas( const tr_bitfield*, size_t bit );
 int    tr_bitfieldIsEmpty( const tr_bitfield* );
 size_t tr_bitfieldCountTrueBits( const tr_bitfield* );
 
 tr_bitfield* tr_bitfieldOr( tr_bitfield*, const tr_bitfield* );
+
+#if 0
+/** @brief finds the first true bit in the bitfield, starting at `startPos'
+    @param setmePos the position of the true bit, if found, is set here.
+    @return nonzero if a true bit was found */
+int tr_bitfieldFindTrue( const tr_bitfield  * bitfield,
+                         size_t               startPos,
+                         size_t             * setmePos );
+#endif
+
 
 /** A stripped-down version of bitfieldHas to be used
     for speed when you're looping quickly.  This version
@@ -273,10 +291,6 @@ tr_bitfield* tr_bitfieldOr( tr_bitfield*, const tr_bitfield* );
 /** @param high the highest nth bit you're going to access */
 #define tr_bitfieldTestFast(bitfield,high) \
     ( (bitfield) && ((bitfield)->bits) && ((high)<(bitfield)->bitCount ) )
-
-#define tr_bitfieldHas(bitfield,nth) \
-    ( tr_bitfieldTestFast( bitfield, nth ) && \
-      tr_bitfieldHasFast( bitfield, nth ) )
 
 double tr_getRatio( double numerator, double denominator );
 

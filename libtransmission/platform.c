@@ -87,6 +87,7 @@ struct tr_thread
 {
     void          (* func ) ( void * );
     void           * arg;
+    const char     * name;
     tr_thread_id     thread;
 #ifdef WIN32
     HANDLE           thread_handle;
@@ -109,6 +110,7 @@ static ThreadFuncReturnType
 ThreadFunc( void * _t )
 {
     tr_thread * t = _t;
+    const char * name = t->name;
 
 #ifdef __BEOS__
     /* This is required because on BeOS, SIGINT is sent to each thread,
@@ -116,7 +118,9 @@ ThreadFunc( void * _t )
     signal( SIGINT, SIG_IGN );
 #endif
 
+    tr_dbg( "Thread '%s' started", name );
     t->func( t->arg );
+    tr_dbg( "Thread '%s' exited", name );
 
 #ifdef WIN32
     _endthreadex( 0 );
@@ -125,14 +129,17 @@ ThreadFunc( void * _t )
 }
 
 tr_thread *
-tr_threadNew( void (*func)(void *), void * arg )
+tr_threadNew( void (*func)(void *),
+              void * arg,
+              const char * name )
 {
     tr_thread * t = tr_new0( tr_thread, 1 );
     t->func = func;
     t->arg  = arg;
+    t->name = name;
 
 #ifdef __BEOS__
-    t->thread = spawn_thread( (void*)ThreadFunc, "beos thread", B_NORMAL_PRIORITY, t );
+    t->thread = spawn_thread( (void*)ThreadFunc, name, B_NORMAL_PRIORITY, t );
     resume_thread( t->thread );
 #elif defined(WIN32)
     {
@@ -525,13 +532,21 @@ tr_getClutchDir( const tr_session * session UNUSED )
         else
         {
 #ifdef SYS_DARWIN
-            CFURLRef appURL = CFBundleCopyBundleURL( CFBundleGetMainBundle() );
-            CFStringRef appRef = CFURLCopyFileSystemPath( appURL, kCFURLPOSIXPathStyle );
-            const char * appString = CFStringGetCStringPtr( appRef, CFStringGetFastestEncoding( appRef ) );
-            CFRelease( appURL );
-            CFRelease( appRef );
             
-            tr_buildPath( path, sizeof( path ), appString, "Contents", "Resources", "web", NULL );
+            CFURLRef appURL = CFBundleCopyBundleURL( CFBundleGetMainBundle() );
+            CFStringRef appRef = CFURLCopyPath( appURL );
+            const char * appString = CFStringGetCStringPtr( appRef, CFStringGetFastestEncoding( appRef ) );
+            CFRelease(appURL);
+            CFRelease(appRef);
+            
+            /*CFURLRef resourcesDirURL = CFBundleCopyResourcesDirectoryURL( CFBundleGetMainBundle() );
+            CFStringRef resourcesDirRef = CFURLCopyPath( resourcesDirURL );
+            const char * resourcesDirString = CFStringGetCStringPtr( resourcesDirRef, CFStringGetFastestEncoding( resourcesDirRef ) );
+            CFRelease(resourcesDirURL);
+            CFRelease(resourcesDirRef);*/
+            
+            sprintf( path, "%s%s", appString, "Contents/Resources/web" );
+
 #elif defined(WIN32)
 
             #warning hey win32 people is this good or is there a better implementation of the next four lines
@@ -555,7 +570,7 @@ tr_getClutchDir( const tr_session * session UNUSED )
             /* XDG_DATA_DIRS are the backup directories */
             s = getenv( "XDG_DATA_DIRS" );
             if( !s || !*s )
-                s =  PACKAGE_DATA_DIR ":/usr/local/share/:/usr/share/";
+                s = "/usr/local/share/:/usr/share/";
             while( s && *s ) {
                 char * end = strchr( s, ':' );
                 if( end ) {
@@ -595,10 +610,10 @@ tr_getClutchDir( const tr_session * session UNUSED )
 ****
 ***/
 
-tr_lockfile_state_t
+int
 tr_lockfile( const char * filename )
 {
-    tr_lockfile_state_t ret;
+    int ret;
 
 #ifdef WIN32
 
@@ -638,94 +653,3 @@ tr_lockfile( const char * filename )
 
     return ret;
 }
-
-
-#ifdef WIN32
-
-/* The following mmap functions are by Joerg Walter, and were taken from
- * his paper at: http://www.genesys-e.de/jwalter/mix4win.htm
- */
-
-static LONG volatile g_sl __attribute__ ((aligned (4)));
-
-/* Wait for spin lock */
-static int slwait (LONG volatile *sl) {
-    while (InterlockedCompareExchange (sl, 1, 0) != 0)
-	Sleep (0);
-    return 0;
-}
-
-/* Release spin lock */
-static int slrelease (LONG *sl) {
-    InterlockedExchange (sl, 0);
-    return 0;
-}
-
-/* getpagesize for windows */
-static long getpagesize (void) {
-    static long g_pagesize = 0;
-    if (! g_pagesize) {
-        SYSTEM_INFO system_info;
-        GetSystemInfo (&system_info);
-        g_pagesize = system_info.dwPageSize;
-    }
-    return g_pagesize;
-}
-
-static long getregionsize (void) {
-    static long g_regionsize = 0;
-    if (! g_regionsize) {
-        SYSTEM_INFO system_info;
-        GetSystemInfo (&system_info);
-        g_regionsize = system_info.dwAllocationGranularity;
-    }
-    return g_regionsize;
-}
-
-void *mmap (void *ptr, long size, long prot, long type, long handle, long arg) {
-    static long g_pagesize;
-    static long g_regionsize;
-    /* Wait for spin lock */
-    slwait (&g_sl);
-    /* First time initialization */
-    if (! g_pagesize) 
-        g_pagesize = getpagesize ();
-    if (! g_regionsize) 
-        g_regionsize = getregionsize ();
-    /* Allocate this */
-    ptr = VirtualAlloc (ptr, size,
-			MEM_RESERVE | MEM_COMMIT | MEM_TOP_DOWN, PAGE_READWRITE);
-    if (! ptr) {
-      ptr = (void *) -1;
-        goto mmap_exit;
-    }
-mmap_exit:
-    /* Release spin lock */
-    slrelease (&g_sl);
-    return ptr;
-}
-
-long munmap (void *ptr, long size) {
-    static long g_pagesize;
-    static long g_regionsize;
-    int rc = -1;
-    /* Wait for spin lock */
-    slwait (&g_sl);
-    /* First time initialization */
-    if (! g_pagesize) 
-        g_pagesize = getpagesize ();
-    if (! g_regionsize) 
-        g_regionsize = getregionsize ();
-    /* Free this */
-    if (! VirtualFree (ptr, 0, 
-                       MEM_RELEASE))
-        goto munmap_exit;
-    rc = 0;
-munmap_exit:
-    /* Release spin lock */
-    slrelease (&g_sl);
-    return rc;
-}
-
-#endif
-

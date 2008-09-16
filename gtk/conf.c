@@ -71,9 +71,9 @@ cf_init(const char *dir, char **errstr)
 
 /* errstr may be NULL, this might be called before GTK is initialized */
 static gboolean
-lockfile(const char * filename, tr_lockfile_state_t *tr_state, char **errstr)
+lockfile(const char * filename, char **errstr)
 {
-    const tr_lockfile_state_t state = tr_lockfile( filename );
+    const int state = tr_lockfile( filename );
     const gboolean success = state == TR_LOCKFILE_SUCCESS;
 
     if( errstr ) switch( state ) {
@@ -89,9 +89,6 @@ lockfile(const char * filename, tr_lockfile_state_t *tr_state, char **errstr)
             *errstr = NULL;
             break;
     }
-
-    if( tr_state != NULL)
-        *tr_state = state;
 
     return success;
 }
@@ -114,10 +111,10 @@ cf_removelocks( void )
 
 /* errstr may be NULL, this might be called before GTK is initialized */
 gboolean
-cf_lock( tr_lockfile_state_t *tr_state, char ** errstr )
+cf_lock( char ** errstr )
 {
     char * path = getLockFilename( );
-    const gboolean didLock = lockfile( path, tr_state, errstr );
+    const gboolean didLock = lockfile( path, errstr );
     if( didLock )
         gl_lockpath = g_strdup( path );
     g_atexit( cf_removelocks );
@@ -160,22 +157,22 @@ getPrefs( void )
 ****
 ***/
 
-int64_t
+int
 pref_int_get( const char * key )
 {
-    int64_t i = 0;
+    int64_t i;
     tr_bencDictFindInt( getPrefs( ), key, &i );
     return i;
 }
 void
-pref_int_set( const char * key, int64_t value )
+pref_int_set( const char * key, int value )
 {
     tr_benc * d = getPrefs( );
     tr_bencDictRemove( d, key );
     tr_bencDictAddInt( d, key, value );
 }
 void
-pref_int_set_default( const char * key, int64_t value )
+pref_int_set_default( const char * key, int value )
 {
     if( !tr_bencDictFind( getPrefs( ), key ) )
         pref_int_set( key, value );

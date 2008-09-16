@@ -379,7 +379,7 @@ randomizeTiers( tr_info * info )
     struct RandomTracker * r = tr_new0( struct RandomTracker, n );
     for( i=0; i<n; ++i ) {
         r[i].tracker = info->trackers[i];
-        r[i].random_value = tr_cryptoRandInt( INT_MAX );
+        r[i].random_value = tr_rand( INT_MAX );
     }
     qsort( r, n, sizeof( struct RandomTracker ), compareRandomTracker );
     for( i=0; i<n; ++i )
@@ -1534,10 +1534,10 @@ tr_torrentCountUncheckedPieces( const tr_torrent * tor )
 }
 
 time_t*
-tr_torrentGetMTimes( const tr_torrent * tor, size_t * setme_n )
+tr_torrentGetMTimes( const tr_torrent * tor, int * setme_n )
 {
-    size_t i;
-    const size_t n = tor->info.fileCount;
+    int i;
+    const int n = tor->info.fileCount;
     time_t * m = tr_new0( time_t, n );
 
     for( i=0; i<n; ++i ) {

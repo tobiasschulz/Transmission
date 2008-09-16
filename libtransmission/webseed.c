@@ -130,7 +130,6 @@ makeURL( tr_webseed * w, const tr_file * file )
                     evbuffer_add_printf( out, "%%%02X", *str );
                     break;
             }
-            str++;
         }
     }
 
@@ -231,7 +230,7 @@ requestNextChunk( tr_webseed * w )
     tr_free( url );
 }
 
-tr_addreq_t
+int
 tr_webseedAddRequest( tr_webseed        * w,
                       tr_piece_index_t    piece )
 {

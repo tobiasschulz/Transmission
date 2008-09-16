@@ -26,7 +26,7 @@
 
 @interface CTGradient (ProgressBar)
 
-+ (CTGradient *) progressGradientForRed: (CGFloat) redComponent green: (CGFloat) greenComponent blue: (CGFloat) blueComponent;
++ (CTGradient *) progressGradientForRed: (float) redComponent green: (float) greenComponent blue: (float) blueComponent;
 
 + (CTGradient *)progressWhiteGradient;
 + (CTGradient *)progressGrayGradient;

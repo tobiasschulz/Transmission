@@ -101,6 +101,7 @@ typedef enum
     IBOutlet NSTextField            * fURLSheetTextField;
     IBOutlet NSButton               * fURLSheetOpenButton;
     
+    IBOutlet SUUpdater              * fUpdater;
     BOOL                            fUpdateInProgress;
     
     Badger                          * fBadger;
@@ -150,7 +151,8 @@ typedef enum
         deleteData: (BOOL) deleteData deleteTorrent: (BOOL) deleteData;
 - (void) removeSheetDidEnd: (NSWindow *) sheet returnCode: (int) returnCode
                         contextInfo: (NSDictionary *) dict;
-- (void) confirmRemoveTorrents: (NSArray *) torrents deleteData: (BOOL) deleteData deleteTorrent: (BOOL) deleteTorrent;
+- (void) confirmRemoveTorrents: (NSArray *) torrents deleteData: (BOOL) deleteData deleteTorrent: (BOOL) deleteTorrent
+        fromRPC: (BOOL) rpc;
 - (void) removeNoDelete:                (id) sender;
 - (void) removeDeleteData:              (id) sender;
 - (void) removeDeleteTorrent:           (id) sender;
@@ -264,8 +266,9 @@ typedef enum
 
 - (void) linkHomepage: (id) sender;
 - (void) linkForums: (id) sender;
-- (void) linkTrac: (id) sender;
 - (void) linkDonate: (id) sender;
+
+- (void) prepareForUpdate:  (NSNotification *) notification;
 
 - (void) rpcCallback: (tr_rpc_callback_type) type forTorrentStruct: (struct tr_torrent *) torrentStruct;
 - (void) rpcAddTorrentStruct: (NSValue *) torrentStructPtr;

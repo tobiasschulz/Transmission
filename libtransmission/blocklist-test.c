@@ -41,13 +41,8 @@ createTestBlocklist( const char * tmpfile )
 int
 main( void )
 {
-#ifndef WIN32
     char * tmpfile_txt = "/tmp/transmission-blocklist-test.txt";
     char * tmpfile_bin = "/tmp/transmission-blocklist-test.bin";
-#else
-    char * tmpfile_txt = "transmission-blocklist-test.txt";
-    char * tmpfile_bin = "transmission-blocklist-test.bin";
-#endif
     struct in_addr addr;
     int test = 0;
     tr_blocklist * b;

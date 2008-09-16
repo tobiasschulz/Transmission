@@ -7,15 +7,13 @@ if BUILD_CLI
   CLI_DIR = cli
 endif
 if BUILD_DAEMON
-if !WIN32
   DAEMON_DIR = daemon
 endif
+if BUILD_DARWIN
+  MAC_DIR = macosx
 endif
 if BUILD_GTK
   GTK_DIR = gtk po
-endif
-if BUILD_MAC
-  MAC_DIR = macosx
 endif
 if BUILD_WX
   WX_DIR = wx
@@ -38,7 +36,6 @@ EXTRA_DIST = \
   AUTHORS \
   COPYING \
   README \
-  autogen.sh \
   Transmission.xcodeproj/project.pbxproj \
   intltool-extract.in \
   intltool-merge.in \
@@ -65,6 +62,7 @@ clutch_js_DATA = \
 
 clutch_jquerydir = $(clutch_jsdir)/jquery
 clutch_jquery_DATA = \
+  web/javascript/jquery \
   web/javascript/jquery/json.min.js \
   web/javascript/jquery/jquery.contextmenu.min.js \
   web/javascript/jquery/jquery.min.js \

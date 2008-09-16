@@ -155,7 +155,7 @@
     if (multifile)
     {
         NSString * fileString;
-        NSInteger count = fInfo->fileCount;
+        int count = fInfo->fileCount;
         if (count != 1)
             fileString = [NSString stringWithFormat: NSLocalizedString(@"%d files", "Create torrent -> info"), count];
         else
@@ -310,8 +310,6 @@
     row: (NSInteger) row
 {
     NSString * tracker = (NSString *)object;
-    
-    tracker = [tracker stringByTrimmingCharactersInSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]];
     
     if ([tracker rangeOfString: @"://"].location == NSNotFound)
         tracker = [@"http://" stringByAppendingString: tracker];
@@ -487,12 +485,12 @@
             NSWindow * window = [self window];
             
             NSRect windowRect = [window frame];
-            CGFloat difference = [fProgressView frame].size.height - [[window contentView] frame].size.height;
+            float difference = [fProgressView frame].size.height - [[window contentView] frame].size.height;
             windowRect.origin.y -= difference;
             windowRect.size.height += difference;
             
             //don't allow vertical resizing
-            CGFloat height = windowRect.size.height;
+            float height = windowRect.size.height;
             [window setMinSize: NSMakeSize([window minSize].width, height)];
             [window setMaxSize: NSMakeSize([window maxSize].width, height)];
             

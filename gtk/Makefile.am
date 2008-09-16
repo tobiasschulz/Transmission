@@ -1,15 +1,10 @@
 SUBDIRS = icons
 
-if TR_UNSTABLE
-GTK_EXTRA_CPPFLAGS="-DG_DISABLE_DEPRECATED -DGDK_PIXBUF_DISABLE_DEPRECATED -DGDK_DISABLE_DEPRECATED -DGTK_DISABLE_DEPRECATED -DPANGO_DISABLE_DEPRECATED"
-endif
-
 AM_CPPFLAGS = \
     -I$(top_srcdir) \
     -I$(top_srcdir)/third-party/ \
     $(LIBEVENT_CPPFLAGS) \
-    -DTRANSMISSIONLOCALEDIR=\""$(transmissionlocaledir)"\" \
-    $(GTK_EXTRA_CPPFLAGS)
+    -DTRANSMISSIONLOCALEDIR=\""$(transmissionlocaledir)"\"
 
 AM_CFLAGS = \
     $(GTK_CFLAGS) \
@@ -23,7 +18,6 @@ AM_CFLAGS = \
 noinst_HEADERS = \
     actions.h \
     add-dialog.h \
-    blocklist.h \
     conf.h \
     details.h \
     dialogs.h \
@@ -50,12 +44,9 @@ noinst_HEADERS = \
 
 bin_PROGRAMS = transmission
 
-dbus_generated_sources = tr-core-dbus.h
-
 transmission_SOURCES = \
     actions.c \
     add-dialog.c \
-    blocklist.c \
     conf.c \
     details.c \
     dialogs.c \
@@ -75,8 +66,7 @@ transmission_SOURCES = \
     tr-prefs.c \
     tr-torrent.c \
     tr-window.c \
-    util.c \
-    $(dbus_generated_sources)
+    util.c
 
 dist_man_MANS = transmission.1
 
@@ -106,33 +96,8 @@ icondir = $(datadir)/pixmaps
 
 EXTRA_DIST = \
     $(DESKTOP_IN_FILES) \
-    tr-core-dbus.xml \
     transmission.png
 
 DISTCLEANFILES = \
     transmission.desktop
-
-CLEANFILES = $(dbus_generated_sources)
-
-$(srcdir)/tr-core.c: tr-core-dbus.h
-
-tr-core-dbus.h: $(srcdir)/tr-core-dbus.xml
-	$(DBUS_BINDING_TOOL) --mode=glib-server --prefix=tr_core $< > $(@F)
-
-if WIN32
-transmission.res: transmission.rc
-	$(WINDRES) -J rc -i transmission.rc -O coff -o transmission.res
-
-BUILT_SOURCES = \
-	transmission.res
-
-CLEANFILES += \
-	transmission.res
-
-transmission_LDADD += \
-	transmission.res
-
-transmission_LDFLAGS = \
-	-mwindows
-endif
 

@@ -37,7 +37,6 @@
 #include "trevent.h"
 #include "utils.h"
 #include "web.h"
-#include "crypto.h"
 
 /* Generate a peer id : "-TRxyzb-" + 12 random alphanumeric
    characters, where x is the major version number, y is the
@@ -56,7 +55,7 @@ tr_peerIdNew( void )
     memcpy( buf, PEERID_PREFIX, 8 );
 
     for( i=8; i<19; ++i ) {
-        val = tr_cryptoRandInt( base );
+        val = tr_rand( base );
         total += val;
         buf[i] = pool[val];
     }
@@ -95,7 +94,7 @@ tr_sessionSetEncryption( tr_session * session, tr_encryption_mode mode )
     assert( session );
     assert( mode==TR_ENCRYPTION_PREFERRED
          || mode==TR_ENCRYPTION_REQUIRED
-         || mode==TR_CLEAR_PREFERRED );
+         || mode==TR_PLAINTEXT_PREFERRED );
 
     session->encryptionMode = mode;
 }
@@ -103,14 +102,6 @@ tr_sessionSetEncryption( tr_session * session, tr_encryption_mode mode )
 /***
 ****
 ***/
-
-static int
-tr_stringEndsWith( const char * str, const char * end )
-{
-    const size_t slen = strlen( str );
-    const size_t elen = strlen( end );
-    return slen>=elen && !memcmp( &str[slen-elen], end, elen );
-}
 
 static void
 loadBlocklists( tr_session * session )
@@ -180,36 +171,35 @@ loadBlocklists( tr_session * session )
 static void metainfoLookupRescan( tr_handle * h );
 
 tr_handle *
-tr_sessionInitFull( const char        * configDir,
-                    const char        * tag,
-                    const char        * downloadDir,
-                    int                 isPexEnabled,
-                    int                 isPortForwardingEnabled,
-                    int                 publicPort,
-                    tr_encryption_mode  encryptionMode,
-                    int                 useLazyBitfield,
-                    int                 useUploadLimit,
-                    int                 uploadLimit,
-                    int                 useDownloadLimit,
-                    int                 downloadLimit,
-                    int                 globalPeerLimit,
-                    int                 messageLevel,
-                    int                 isMessageQueueingEnabled,
-                    int                 isBlocklistEnabled,
-                    int                 peerSocketTOS,
-                    int                 rpcIsEnabled,
-                    int                 rpcPort,
-                    const char        * rpcACL,
-                    int                 rpcAuthIsEnabled,
-                    const char        * rpcUsername,
-                    const char        * rpcPassword,
-                    int                 proxyIsEnabled,
-                    const char        * proxy,
-                    int                 proxyPort,
-                    tr_proxy_type       proxyType,
-                    int                 proxyAuthIsEnabled,
-                    const char        * proxyUsername,
-                    const char        * proxyPassword )
+tr_sessionInitFull( const char    * configDir,
+                    const char    * tag,
+                    const char    * downloadDir,
+                    int             isPexEnabled,
+                    int             isPortForwardingEnabled,
+                    int             publicPort,
+                    int             encryptionMode,
+                    int             isUploadLimitEnabled,
+                    int             uploadLimit,
+                    int             isDownloadLimitEnabled,
+                    int             downloadLimit,
+                    int             globalPeerLimit,
+                    int             messageLevel,
+                    int             isMessageQueueingEnabled,
+                    int             isBlocklistEnabled,
+                    int             peerSocketTOS,
+                    int             rpcIsEnabled,
+                    int             rpcPort,
+                    const char    * rpcACL,
+                    int             rpcAuthIsEnabled,
+                    const char    * rpcUsername,
+                    const char    * rpcPassword,
+                    int             proxyIsEnabled,
+                    const char    * proxy,
+                    int             proxyPort,
+                    tr_proxy_type   proxyType,
+                    int             proxyAuthIsEnabled,
+                    const char    * proxyUsername,
+                    const char    * proxyPassword )
 {
     tr_handle * h;
     char filename[MAX_PATH_LENGTH];
@@ -218,6 +208,9 @@ tr_sessionInitFull( const char        * configDir,
     /* Don't exit when writing on a broken socket */
     signal( SIGPIPE, SIG_IGN );
 #endif
+
+    if( configDir == NULL )
+        configDir = tr_getDefaultConfigDir( );
 
     tr_msgInit( );
     tr_setMessageLevel( messageLevel );
@@ -233,12 +226,10 @@ tr_sessionInitFull( const char        * configDir,
     h->proxy = tr_strdup( proxy );
     h->proxyPort = proxyPort;
     h->proxyType = proxyType;
-    h->isProxyAuthEnabled = proxyAuthIsEnabled != 0;
+    h->isProxyAuthEnabled = proxyAuthIsEnabled ? 1 : 0;
     h->proxyUsername = tr_strdup( proxyUsername );
     h->proxyPassword = tr_strdup( proxyPassword );
 
-    if( configDir == NULL )
-        configDir = tr_getDefaultConfigDir( );
     tr_setConfigDir( h, configDir );
 
     tr_netInit(); /* must go before tr_eventInit */
@@ -250,17 +241,15 @@ tr_sessionInitFull( const char        * configDir,
     h->tag = tr_strdup( tag );
     h->peerMgr = tr_peerMgrNew( h );
 
-    h->useLazyBitfield = useLazyBitfield != 0;
-
     /* Initialize rate and file descripts controls */
 
     h->upload = tr_rcInit();
     tr_rcSetLimit( h->upload, uploadLimit );
-    h->useUploadLimit = useUploadLimit;
+    h->useUploadLimit = isUploadLimitEnabled;
 
     h->download = tr_rcInit();
     tr_rcSetLimit( h->download, downloadLimit );
-    h->useDownloadLimit = useDownloadLimit;
+    h->useDownloadLimit = isDownloadLimitEnabled;
 
     tr_fdInit( globalPeerLimit );
     h->shared = tr_sharedInit( h, isPortForwardingEnabled, publicPort );
@@ -299,7 +288,6 @@ tr_sessionInit( const char * configDir,
                                TR_DEFAULT_PORT_FORWARDING_ENABLED,
                                -1, /* public port */
                                TR_ENCRYPTION_PREFERRED, /* encryption mode */
-                               TR_DEFAULT_LAZY_BITFIELD_ENABLED,
                                FALSE, /* use upload speed limit? */ 
                                -1, /* upload speed limit */
                                FALSE, /* use download speed limit? */
@@ -490,18 +478,14 @@ tr_sessionCountTorrents( const tr_handle * h )
     return h->torrentCount;
 }
 
+/* close the biggest torrents first */
 static int
 compareTorrentByCur( const void * va, const void * vb )
 {
     const tr_torrent * a = *(const tr_torrent**)va;
     const tr_torrent * b = *(const tr_torrent**)vb;
-    const uint64_t aCur = a->downloadedCur + a->uploadedCur;
-    const uint64_t bCur = b->downloadedCur + b->uploadedCur;
-
-    if( aCur != bCur )
-        return aCur > bCur ? -1 : 1; /* close the biggest torrents first */
-
-    return 0;
+    return -tr_compareUint64( a->downloadedCur + a->uploadedCur,
+                              b->downloadedCur + b->uploadedCur );
 }
 
 static void
@@ -659,31 +643,15 @@ tr_sessionLoadTorrents ( tr_handle   * h,
 ***/
 
 void
-tr_sessionSetPexEnabled( tr_handle * handle, int enabled )
+tr_sessionSetPexEnabled( tr_handle * handle, int isPexEnabled )
 {
-    handle->isPexEnabled = enabled ? 1 : 0;
+    handle->isPexEnabled = isPexEnabled ? 1 : 0;
 }
 
 int
 tr_sessionIsPexEnabled( const tr_handle * handle )
 {
     return handle->isPexEnabled;
-}
-
-/***
-****
-***/
-
-void
-tr_sessionSetLazyBitfieldEnabled( tr_handle * handle, int enabled )
-{
-    handle->useLazyBitfield = enabled ? 1 : 0;
-}
-
-int
-tr_sessionIsLazyBitfieldEnabled( const tr_handle * handle )
-{
-    return handle->useLazyBitfield;
 }
 
 /***

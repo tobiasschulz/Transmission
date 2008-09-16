@@ -1,28 +1,24 @@
 EXTRA_DIST = \
     Credits.rtf \
     AboutWindow.xib \
-    BlocklistStatusWindow.xib \
     GroupsWindow.xib \
-    MessageWindow.xib \
-    StatsWindow.xib \
     Defaults.plist \
     Info.plist.in \
     Transmission_Prefix.pch \
     version.sh \
-    Growl.framework \
     Sparkle.framework \
     CTGradient \
     UKKQueue \
     TransmissionHelp \
+    Applescript \
     Images \
-    appcast \
+    Growl.framework \
     en.lproj \
     es.lproj \
     fr.lproj \
     it.lproj \
     nl.lproj \
     ru.lproj \
-    tr.lproj \
     zh_TW.lproj \
     AboutWindowController.h \
     AboutWindowController.m \
@@ -32,16 +28,8 @@ EXTRA_DIST = \
     Badger.m \
     BadgeView.h \
     BadgeView.m \
-    BlocklistDownloader.h \
-    BlocklistDownloader.m \
-    BlocklistDownloaderViewController.h \
-    BlocklistDownloaderViewController.m \
-    BlocklistScheduler.h \
-    BlocklistScheduler.m \
     ButtonToolbarItem.h \
     ButtonToolbarItem.m \
-    ColorTextField.h \
-    ColorTextField.m \
     Controller.h \
     Controller.m \
     CreatorWindowController.h \
@@ -54,20 +42,14 @@ EXTRA_DIST = \
     ExpandedPathToIconTransformer.m \
     ExpandedPathToPathTransformer.h \
     ExpandedPathToPathTransformer.m \
-    FileListNode.h \
-    FileListNode.m \
     FileNameCell.h \
     FileNameCell.m \
-    FileOutlineController.h \
-    FileOutlineController.m \
     FileOutlineView.h \
     FileOutlineView.m \
     FilePriorityCell.h \
     FilePriorityCell.m \
     FilterButton.h \
     FilterButton.m \
-    GroupsController.h \
-    GroupsController.m \
     GroupsWindowController.h \
     GroupsWindowController.m \
     GroupToolbarItem.h \
@@ -101,8 +83,6 @@ EXTRA_DIST = \
     PrefsController.m \
     PrefsWindow.h \
     PrefsWindow.m \
-    QuickLookController.h \
-    QuickLookController.m \
     SpeedLimitToTurtleIconTransformer.h \
     SpeedLimitToTurtleIconTransformer.m \
     StatsWindowController.h \
@@ -111,16 +91,12 @@ EXTRA_DIST = \
     StatusBarView.m \
     ToolbarSegmentedCell.h \
     ToolbarSegmentedCell.m \
-    Torrent.h \
-    Torrent.m \
     TorrentCell.h \
     TorrentCell.m \
-    TorrentGroup.h \
-    TorrentGroup.m \
+    Torrent.h \
+    Torrent.m \
     TorrentTableView.h \
-    TorrentTableView.m \
-    TrackerTableView.h \
-    TrackerTableView.m
+    TorrentTableView.m
 
 dist-hook:
 	rm -rf `find $(distdir)/ -type d -name .svn`

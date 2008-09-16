@@ -172,7 +172,7 @@ gtr_localtime( time_t time )
     return g_locale_to_utf8( buf, -1, NULL, NULL, NULL );
 }
 
-int
+gboolean
 mkdir_p( const char * path, mode_t mode )
 {
 #if GLIB_CHECK_VERSION( 2, 8, 0)
@@ -494,43 +494,17 @@ gtr_dbus_add_torrent( const char * filename )
     if( err )
        g_message( "err: %s", err->message );
 
-    g_object_unref( proxy );
-    dbus_g_connection_unref( conn );
-#endif
-    return success;
-}
-
-gboolean
-gtr_dbus_present_window( void )
-{
-    static gboolean success = FALSE;
-#ifdef HAVE_DBUS_GLIB
-    DBusGProxy * proxy = NULL;
-    GError * err = NULL;
-    DBusGConnection * conn;
-    if(( conn = dbus_g_bus_get( DBUS_BUS_SESSION, &err )))
-        proxy = dbus_g_proxy_new_for_name (conn, VALUE_SERVICE_NAME,
-                                                 VALUE_SERVICE_OBJECT_PATH,
-                                                 VALUE_SERVICE_INTERFACE );
-    else if( err )
-       g_message( "err: %s", err->message );
     if( proxy )
-        dbus_g_proxy_call( proxy, "PresentWindow", &err,
-                           G_TYPE_INVALID,
-                           G_TYPE_BOOLEAN, &success,
-                           G_TYPE_INVALID );
-    if( err )
-       g_message( "err: %s", err->message );
-
-    g_object_unref( proxy );
-    dbus_g_connection_unref( conn );
+        g_object_unref( proxy );
+    if( conn )
+        dbus_g_connection_unref( conn );
 #endif
     return success;
 }
 
 GtkWidget *
-gtr_button_new_from_stock( const char * stock,
-                           const char * mnemonic )
+tr_button_new_from_stock( const char * stock,
+                          const char * mnemonic )
 {
     GtkWidget * image = gtk_image_new_from_stock( stock, GTK_ICON_SIZE_BUTTON );
     GtkWidget * button = gtk_button_new_with_mnemonic( mnemonic );

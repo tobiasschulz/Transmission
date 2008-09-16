@@ -72,7 +72,8 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
         lib: (tr_handle *) lib
 {
     self = [self initWithHash: nil path: path torrentStruct: NULL lib: lib
-            publicTorrent: torrentDelete != TORRENT_FILE_DEFAULT ? [NSNumber numberWithBool: torrentDelete == TORRENT_FILE_SAVE] : nil
+            publicTorrent: torrentDelete != TORRENT_FILE_DEFAULT
+                            ? [NSNumber numberWithBool: torrentDelete == TORRENT_FILE_SAVE] : nil
             downloadFolder: location
             useIncompleteFolder: nil incompleteFolder: nil
             ratioSetting: nil ratioLimit: nil
@@ -123,7 +124,8 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
             [self startTransfer];
         }
         
-        //upgrading from versions < 1.30: get old added, activity, and done dates
+        #warning remove after 1.3 (from libT as well)
+        //get old added, activity, and done dates
         NSDate * date;
         if ((date = [history objectForKey: @"Date"]))
             tr_torrentSetAddedDate(fHandle, [date timeIntervalSince1970]);
@@ -191,10 +193,15 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
     return [@"Torrent: " stringByAppendingString: [self name]];
 }
 
-- (void) closeRemoveTorrent
+- (void) closeRemoveTorrentInterface
 {
     //allow the file to be index by Time Machine
     [self setTimeMachineExclude: NO forPath: [[self downloadFolder] stringByAppendingPathComponent: [self name]]];
+}
+
+- (void) closeRemoveTorrent
+{
+    [self closeRemoveTorrentInterface];
     
     tr_torrentRemove(fHandle);
 }
@@ -808,9 +815,6 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
     i--;
     
     NSString * tracker = [trackers objectAtIndex: i];
-    
-    tracker = [tracker stringByTrimmingCharactersInSet: [NSCharacterSet whitespaceAndNewlineCharacterSet]];
-    
     if ([tracker rangeOfString: @"://"].location == NSNotFound)
     {
         tracker = [@"http://" stringByAppendingString: tracker];
@@ -1011,9 +1015,9 @@ void completenessChangeCallback(tr_torrent * torrent, cp_status_t status, void *
         [dict setObject: [NSString stringWithUTF8String: peer->flagStr] forKey: @"Flags"];
         
         if (peer->isUploadingTo)
-            [dict setObject: [NSNumber numberWithFloat: peer->rateToPeer] forKey: @"UL To Rate"];
+            [dict setObject: [NSNumber numberWithFloat: peer->uploadToRate] forKey: @"UL To Rate"];
         if (peer->isDownloadingFrom)
-            [dict setObject: [NSNumber numberWithFloat: peer->rateToClient] forKey: @"DL From Rate"];
+            [dict setObject: [NSNumber numberWithFloat: peer->downloadFromRate] forKey: @"DL From Rate"];
         
         [peerDicts addObject: dict];
     }

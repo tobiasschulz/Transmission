@@ -35,13 +35,13 @@ main(int argc, char *argv[])
 #if !defined(NO_AUTH)
 	if (argc > 1 && argv[1][0] == '-' && argv[1][1] == 'A') {
 		if (argc != 6)
-			_shttpd_usage(argv[0]);
-		exit(shttpd_edit_passwords(argv[2],argv[3],argv[4],argv[5]));
+			usage(argv[0]);
+		exit(edit_passwords(argv[2],argv[3],argv[4],argv[5]));
 	}
 #endif /* NO_AUTH */
 
 	if (argc == 2 && (!strcmp(argv[1], "-h") || !strcmp(argv[1], "--help")))
-		_shttpd_usage(argv[0]);
+		usage(argv[0]);
 
 #if defined(_WIN32)
 	try_to_run_as_nt_service();
@@ -55,17 +55,15 @@ main(int argc, char *argv[])
 	(void) signal(SIGTERM, signal_handler);
 	(void) signal(SIGINT, signal_handler);
 
-	if ((ctx = shttpd_init(argc, argv)) == NULL)
-		_shttpd_elog(E_FATAL, NULL, "%s",
-		    "Cannot initialize SHTTPD context");
+	ctx = shttpd_init(argc, argv);
 
-	_shttpd_elog(E_LOG, NULL, "shttpd %s started on port(s) %s, serving %s",
-	    SHTTPD_VERSION, ctx->options[OPT_PORTS], ctx->options[OPT_ROOT]);
+	elog(E_LOG, NULL, "shttpd %s started on port(s) %s, serving %s",
+	    VERSION, ctx->options[OPT_PORTS], ctx->options[OPT_ROOT]);
 
 	while (exit_flag == 0)
 		shttpd_poll(ctx, 10 * 1000);
 
-	_shttpd_elog(E_LOG, NULL, "Exit on signal %d", exit_flag);
+	elog(E_LOG, NULL, "Exit on signal %d", exit_flag);
 	shttpd_fini(ctx);
 
 	return (EXIT_SUCCESS);

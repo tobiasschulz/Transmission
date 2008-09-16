@@ -23,8 +23,7 @@
  *****************************************************************************/
 
 #import "PrefsController.h"
-#import "BlocklistDownloaderViewController.h"
-#import "BlocklistScheduler.h"
+#import "BlocklistDownloader.h"
 #import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "UKKQueue.h"
@@ -41,6 +40,8 @@
 
 #define RPC_IP_ADD_TAG      0
 #define RPC_IP_REMOVE_TAG   1
+
+#define UPDATE_SECONDS 86400
 
 #define TOOLBAR_GENERAL     @"TOOLBAR_GENERAL"
 #define TOOLBAR_TRANSFERS   @"TOOLBAR_TRANSFERS"
@@ -71,32 +72,22 @@
 
 @implementation PrefsController
 
-tr_handle * fHandle;
-+ (void) setHandle: (tr_handle *) handle
-{
-    fHandle = handle;
-}
-
-+ (tr_handle *) handle
-{
-    return fHandle;
-}
-
-- (id) init
+- (id) initWithHandle: (tr_handle *) handle
 {
     if ((self = [super initWithWindowNibName: @"PrefsWindow"]))
     {
         fDefaults = [NSUserDefaults standardUserDefaults];
+        fHandle = handle;
         
         //checks for old version speeds of -1
         if ([fDefaults integerForKey: @"UploadLimit"] < 0)
         {
-            [fDefaults removeObjectForKey: @"UploadLimit"];
+            [fDefaults setInteger: 20 forKey: @"UploadLimit"];
             [fDefaults setBool: NO forKey: @"CheckUpload"];
         }
         if ([fDefaults integerForKey: @"DownloadLimit"] < 0)
         {
-            [fDefaults removeObjectForKey: @"DownloadLimit"];
+            [fDefaults setInteger: 20 forKey: @"DownloadLimit"];
             [fDefaults setBool: NO forKey: @"CheckDownload"];
         }
         
@@ -110,13 +101,13 @@ tr_handle * fHandle;
             [fDefaults removeObjectForKey: @"DownloadChoice"];
         }
         
+        //set check for update to right value
+        [self setCheckForUpdate: nil];
+        
         //set auto import
         NSString * autoPath;
         if ([fDefaults boolForKey: @"AutoImport"] && (autoPath = [fDefaults stringForKey: @"AutoImportDirectory"]))
             [[UKKQueue sharedFileWatcher] addPath: [autoPath stringByExpandingTildeInPath]];
-        
-        //set blocklist scheduler
-        [[BlocklistScheduler scheduler] updateSchedule];
         
         //set encryption
         [self setEncryptionMode: nil];
@@ -141,10 +132,13 @@ tr_handle * fHandle;
     return self;
 }
 
+- (tr_handle *) handle
+{
+    return fHandle;
+}
+
 - (void) dealloc
 {
-    [[NSNotificationCenter defaultCenter] removeObserver: self];
-    
     [fPortStatusTimer invalidate];
     if (fPortChecker)
     {
@@ -233,8 +227,6 @@ tr_handle * fHandle;
     
     //set blocklist
     [self updateBlocklistFields];
-    [[NSNotificationCenter defaultCenter] addObserver: self selector: @selector(updateBlocklistFields)
-        name: @"BlocklistUpdated" object: nil];
     
     //set rpc port
     [fRPCPortField setIntValue: [fDefaults integerForKey: @"RPCPort"]];
@@ -243,6 +235,11 @@ tr_handle * fHandle;
     const char * rpcPassword = tr_sessionGetRPCPassword(fHandle);
     [fRPCPasswordField setStringValue: [NSString stringWithUTF8String: rpcPassword]];
     tr_free(rpcPassword);
+}
+
+- (void) setUpdater: (SUUpdater *) updater
+{
+    fUpdater = updater;
 }
 
 - (NSToolbarItem *) toolbar: (NSToolbar *) toolbar itemForItemIdentifier: (NSString *) ident willBeInsertedIntoToolbar: (BOOL) flag
@@ -322,6 +319,12 @@ tr_handle * fHandle;
                                         TOOLBAR_PEERS, TOOLBAR_NETWORK, TOOLBAR_REMOTE, nil];
 }
 
+//used by ipc
+- (void) updatePortField
+{
+    [fPortField setIntValue: [fDefaults integerForKey: @"BindPort"]];
+}
+
 - (void) setPort: (id) sender
 {
     int port = [sender intValue];
@@ -344,10 +347,8 @@ tr_handle * fHandle;
 {
     const tr_port_forwarding fwd = tr_sessionGetPortForwarding(fHandle);
     const int port = tr_sessionGetPeerPort(fHandle);
-    BOOL natStatusChanged = (fNatStatus != fwd);
-    BOOL peerPortChanged = (fPeerPort != port);
 
-    if (natStatusChanged || peerPortChanged)
+    if (fNatStatus != fwd || fPeerPort != port )
     {
         fNatStatus = fwd;
         fPeerPort = port;
@@ -361,8 +362,7 @@ tr_handle * fHandle;
             [fPortChecker cancelProbe];
             [fPortChecker release];
         }
-        BOOL delay = natStatusChanged || tr_sessionIsPortForwardingEnabled(fHandle);
-        fPortChecker = [[PortChecker alloc] initForPort: fPeerPort delay: delay withDelegate: self];
+        fPortChecker = [[PortChecker alloc] initForPort: fPeerPort withDelegate: self];
     }
 }
 
@@ -380,7 +380,7 @@ tr_handle * fHandle;
             [fPortStatusImage setImage: [NSImage imageNamed: @"RedDot.png"]];
             break;
         case PORT_STATUS_ERROR:
-            [fPortStatusField setStringValue: NSLocalizedString(@"Port check site is down", "Preferences -> Network -> port status")];
+            [fPortStatusField setStringValue: NSLocalizedString(@"Port check website is down", "Preferences -> Network -> port status")];
             [fPortStatusImage setImage: [NSImage imageNamed: @"YellowDot.png"]];
             break;
     }
@@ -444,7 +444,7 @@ tr_handle * fHandle;
 - (void) setEncryptionMode: (id) sender
 {
     tr_sessionSetEncryption(fHandle, [fDefaults boolForKey: @"EncryptionPrefer"] ? 
-        ([fDefaults boolForKey: @"EncryptionRequire"] ? TR_ENCRYPTION_REQUIRED : TR_ENCRYPTION_PREFERRED) : TR_CLEAR_PREFERRED);
+        ([fDefaults boolForKey: @"EncryptionRequire"] ? TR_ENCRYPTION_REQUIRED : TR_ENCRYPTION_PREFERRED) : TR_PLAINTEXT_PREFERRED);
 }
 
 - (void) setBlocklistEnabled: (id) sender
@@ -452,18 +452,11 @@ tr_handle * fHandle;
     BOOL enable = [sender state] == NSOnState;
     [fDefaults setBool: enable forKey: @"Blocklist"];
     tr_blocklistSetEnabled(fHandle, enable);
-    
-    [[BlocklistScheduler scheduler] updateSchedule];
 }
 
 - (void) updateBlocklist: (id) sender
 {
-    [BlocklistDownloaderViewController downloadWithPrefsController: self];
-}
-
-- (void) setBlocklistAutoUpdate: (id) sender
-{
-    [[BlocklistScheduler scheduler] updateSchedule];
+    [BlocklistDownloader downloadWithPrefsController: self];
 }
 
 - (void) updateBlocklistFields
@@ -487,28 +480,6 @@ tr_handle * fHandle;
     
     [fBlocklistEnableCheck setEnabled: exists];
     [fBlocklistEnableCheck setState: exists && [fDefaults boolForKey: @"Blocklist"]];
-    
-    NSString * updatedDateString;
-    if (exists)
-    {
-        NSDate * updatedDate = [fDefaults objectForKey: @"BlocklistLastUpdate"];
-        if (updatedDate)
-        {
-            NSDateFormatter * dateFormatter = [[NSDateFormatter alloc] init];
-            [dateFormatter setDateStyle: NSDateFormatterFullStyle];
-            [dateFormatter setTimeStyle: NSDateFormatterShortStyle];
-            
-            updatedDateString = [dateFormatter stringFromDate: updatedDate];
-            [dateFormatter release];
-        }
-        else
-            updatedDateString = NSLocalizedString(@"N/A", "Prefs -> blocklist -> message");
-    }
-    else
-        updatedDateString = NSLocalizedString(@"Never", "Prefs -> blocklist -> message");
-    
-    [fBlocklistDateField setStringValue: [NSString stringWithFormat: @"%@: %@",
-        NSLocalizedString(@"Last updated", "Prefs -> blocklist -> message"), updatedDateString]];
 }
 
 - (void) applySpeedSettings: (id) sender
@@ -606,13 +577,21 @@ tr_handle * fHandle;
 
 - (void) resetWarnings: (id) sender
 {
-    [fDefaults removeObjectForKey: @"WarningDuplicate"];
-    [fDefaults removeObjectForKey: @"WarningRemainingSpace"];
-    [fDefaults removeObjectForKey: @"WarningFolderDataSameName"];
-    [fDefaults removeObjectForKey: @"WarningResetStats"];
-    [fDefaults removeObjectForKey: @"WarningCreatorBlankAddress"];
-    [fDefaults removeObjectForKey: @"WarningRemoveBuiltInTracker"];
-    [fDefaults removeObjectForKey: @"WarningInvalidOpen"];
+    [fDefaults setBool: YES forKey: @"WarningDuplicate"];
+    [fDefaults setBool: YES forKey: @"WarningRemainingSpace"];
+    [fDefaults setBool: YES forKey: @"WarningFolderDataSameName"];
+    [fDefaults setBool: YES forKey: @"WarningResetStats"];
+    [fDefaults setBool: YES forKey: @"WarningCreatorBlankAddress"];
+    [fDefaults setBool: YES forKey: @"WarningRemoveBuiltInTracker"];
+    [fDefaults setBool: YES forKey: @"WarningInvalidOpen"];
+}
+
+- (void) setCheckForUpdate: (id) sender
+{
+    NSTimeInterval seconds = [fDefaults boolForKey: @"CheckForUpdates"] ? UPDATE_SECONDS : 0;
+    [fDefaults setInteger: seconds forKey: @"SUScheduledCheckInterval"];
+    if (fUpdater)
+        [fUpdater scheduleCheckWithInterval: seconds];
 }
 
 - (void) setQueue: (id) sender
@@ -1029,7 +1008,7 @@ tr_handle * fHandle;
 {
     //encryption
     tr_encryption_mode encryptionMode = tr_sessionGetEncryption(fHandle);
-    [fDefaults setBool: encryptionMode != TR_CLEAR_PREFERRED forKey: @"EncryptionPrefer"];
+    [fDefaults setBool: encryptionMode != TR_PLAINTEXT_PREFERRED forKey: @"EncryptionPrefer"];
     [fDefaults setBool: encryptionMode == TR_ENCRYPTION_REQUIRED forKey: @"EncryptionRequire"];
     
     //download directory

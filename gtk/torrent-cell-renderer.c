@@ -83,8 +83,10 @@ getProgressString( const tr_info * info, const tr_stat * torStat )
         const int eta = torStat->eta;
         GString * gstr = g_string_new( str );
         g_string_append( gstr, " - " );
-        if( eta < 0 )
-            g_string_append( gstr, _( "Remaining time unknown" ) );
+        if( eta == TR_ETA_NOT_AVAIL )
+            g_string_append( gstr, _( "Data not fully available" ) );
+         else if( eta == TR_ETA_UNKNOWN )
+            g_string_append( gstr, _( "Stalled" ) );
         else {
             char timestr[128];
             tr_strltime( timestr, eta, sizeof( timestr ) );
@@ -451,8 +453,7 @@ torrent_cell_renderer_render( GtkCellRenderer      * cell,
         my_cell.height = p->bar_height;
         if( 1 )
         {
-            const double percent = MAX( 0.0, torStat->percentDone );
-            g_object_set( p->progress_renderer, "value", (int)(percent*100.0), 
+            g_object_set( p->progress_renderer, "value", (int)(torStat->percentDone*100.0), 
                                                 "text", "",
                                                 NULL );
             gtk_cell_renderer_render( p->progress_renderer,
