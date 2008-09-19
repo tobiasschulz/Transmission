@@ -137,45 +137,38 @@ tr_torrentUnlock( const tr_torrent * tor )
 
 void
 tr_torrentSetSpeedMode( tr_torrent   * tor,
-                        tr_direction   direction,
+                        int            up_or_down,
                         tr_speedlimit  mode )
 {
-    tr_speedlimit * limit = direction==TR_UP ? &tor->uploadLimitMode
-                                             : &tor->downloadLimitMode;
+    tr_speedlimit * limit = up_or_down==TR_UP
+        ? &tor->uploadLimitMode
+        : &tor->downloadLimitMode;
     *limit = mode;
 }
 
 tr_speedlimit
-tr_torrentGetSpeedMode( const tr_torrent  * tor,
-                        tr_direction        direction )
+tr_torrentGetSpeedMode( const tr_torrent * tor,
+                        int                up_or_down)
 {
-    return direction==TR_UP ? tor->uploadLimitMode
-                            : tor->downloadLimitMode;
+    return up_or_down==TR_UP ? tor->uploadLimitMode
+                             : tor->downloadLimitMode;
 }
 
 void
 tr_torrentSetSpeedLimit( tr_torrent   * tor,
-                         tr_direction   direction,
+                         int            up_or_down,
                          int            single_KiB_sec )
 {
-    switch( direction )
-    {
-        case TR_UP: tor->uploadLimit = single_KiB_sec; break;
-        case TR_DOWN: tor->downloadLimit = single_KiB_sec; break;
-        default: assert( 0 );
-    }
+    tr_ratecontrol * rc = up_or_down==TR_UP ? tor->upload : tor->download;
+    tr_rcSetLimit( rc, single_KiB_sec );
 }
 
 int
 tr_torrentGetSpeedLimit( const tr_torrent  * tor,
-                         tr_direction        direction )
+                         int                 up_or_down )
 {
-    switch( direction )
-    {
-        case TR_UP: return tor->uploadLimit;
-        case TR_DOWN: return tor->downloadLimit;
-        default: assert( 0 );
-    }
+    tr_ratecontrol * rc = up_or_down==TR_UP ? tor->upload : tor->download;
+    return tr_rcGetLimit( rc );
 }
 
 /***
@@ -386,7 +379,7 @@ randomizeTiers( tr_info * info )
     struct RandomTracker * r = tr_new0( struct RandomTracker, n );
     for( i=0; i<n; ++i ) {
         r[i].tracker = info->trackers[i];
-        r[i].random_value = tr_cryptoRandInt( INT_MAX );
+        r[i].random_value = tr_rand( INT_MAX );
     }
     qsort( r, n, sizeof( struct RandomTracker ), compareRandomTracker );
     for( i=0; i<n; ++i )
@@ -470,9 +463,9 @@ torrentRealInit( tr_handle     * h,
 
     tr_torrentInitFilePieces( tor );
 
-    tor->uploadLimit = 0;
-    tor->downloadLimit = 0;
-    tor->swarmSpeed = tr_rcInit();
+    tor->upload         = tr_rcInit();
+    tor->download       = tr_rcInit();
+    tor->swarmSpeed     = tr_rcInit();
 
     tr_sha1( tor->obfuscatedHash, "req2", 4,
                                   info->hash, SHA_DIGEST_LENGTH,
@@ -656,6 +649,22 @@ tr_torrentCanManualUpdate( const tr_torrent * tor )
         && ( tr_trackerCanManualAnnounce( tor->tracker ) );
 }
 
+/* rcRate's averaging code can make it appear that we're
+ * still sending bytes after a torrent stops or all the
+ * peers disconnect, so short-circuit that appearance here */
+void
+tr_torrentGetRates( const tr_torrent * tor,
+                    float            * toClient,
+                    float            * toPeer)
+{
+    const int showSpeed = tor->isRunning
+        && tr_peerMgrHasConnections( tor->handle->peerMgr, tor->info.hash );
+
+    if( toClient )
+        *toClient = showSpeed ? tr_rcRate( tor->download ) : 0.0;
+    if( toPeer )
+        *toPeer = showSpeed ? tr_rcRate( tor->upload ) : 0.0;
+}
 const tr_info *
 tr_torrentInfo( const tr_torrent * tor )
 {
@@ -726,9 +735,7 @@ tr_torrentStat( tr_torrent * tor )
                             &s->webseedsSendingToUs,
                             &s->peersSendingToUs,
                             &s->peersGettingFromUs,
-                             s->peersFrom,
-                            &s->rateDownload,
-                            &s->rateUpload );
+                             s->peersFrom );
 
     usableSeeds += tor->info.webseedCount;
 
@@ -741,6 +748,8 @@ tr_torrentStat( tr_torrent * tor )
     s->recheckProgress = s->status == TR_STATUS_CHECK
         ? 1.0 - (tr_torrentCountUncheckedPieces( tor ) / (double) tor->info.pieceCount)
         : 0.0;
+
+    tr_torrentGetRates( tor, &s->rateDownload, &s->rateUpload );
 
     s->swarmSpeed = tr_rcRate( tor->swarmSpeed );
     
@@ -963,6 +972,8 @@ freeTorrent( tr_torrent * tor )
 
     tr_cpClose( tor->completion );
 
+    tr_rcClose( tor->upload );
+    tr_rcClose( tor->download );
     tr_rcClose( tor->swarmSpeed );
 
     tr_trackerUnsubscribe( tor->tracker, tor->trackerSubscription );
@@ -1523,10 +1534,10 @@ tr_torrentCountUncheckedPieces( const tr_torrent * tor )
 }
 
 time_t*
-tr_torrentGetMTimes( const tr_torrent * tor, size_t * setme_n )
+tr_torrentGetMTimes( const tr_torrent * tor, int * setme_n )
 {
-    size_t i;
-    const size_t n = tor->info.fileCount;
+    int i;
+    const int n = tor->info.fileCount;
     time_t * m = tr_new0( time_t, n );
 
     for( i=0; i<n; ++i ) {

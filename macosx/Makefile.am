@@ -15,7 +15,6 @@ EXTRA_DIST = \
     UKKQueue \
     TransmissionHelp \
     Images \
-    appcast \
     en.lproj \
     es.lproj \
     fr.lproj \
@@ -34,10 +33,6 @@ EXTRA_DIST = \
     BadgeView.m \
     BlocklistDownloader.h \
     BlocklistDownloader.m \
-    BlocklistDownloaderViewController.h \
-    BlocklistDownloaderViewController.m \
-    BlocklistScheduler.h \
-    BlocklistScheduler.m \
     ButtonToolbarItem.h \
     ButtonToolbarItem.m \
     ColorTextField.h \

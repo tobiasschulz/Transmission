@@ -1,8 +1,4 @@
-AM_CPPFLAGS = \
-	-I. -I$(top_srcdir) -I$(top_srcdir)/third-party/ \
-	-D__TRANSMISSION__ $(LIBEVENT_CPPFLAGS) \
-	-DPACKAGE_DATA_DIR=\""$(datadir)"\"
-
+AM_CPPFLAGS = -I. -I$(top_srcdir) -I$(top_srcdir)/third-party/ -D__TRANSMISSION__ $(LIBEVENT_CPPFLAGS)
 AM_CFLAGS = $(LIBCURL_CFLAGS) $(OPENSSL_CFLAGS) $(PTHREAD_CFLAGS)
 
 noinst_LIBRARIES = libtransmission.a
@@ -35,7 +31,7 @@ libtransmission_a_SOURCES = \
     publish.c \
     ratecontrol.c \
     resume.c \
-    rpcimpl.c \
+    rpc.c \
     rpc-server.c \
     session.c \
     stats.c \
@@ -80,7 +76,7 @@ noinst_HEADERS = \
     publish.h \
     ratecontrol.h \
     resume.h \
-    rpcimpl.h \
+    rpc.h \
     rpc-server.h \
     session.h \
     stats.h \

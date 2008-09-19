@@ -113,8 +113,6 @@ tr_proxy_type;
 /** @see tr_sessionInitFull */
 #define TR_DEFAULT_PORT_STR                 "51413"
 /** @see tr_sessionInitFull */
-#define TR_DEFAULT_LAZY_BITFIELD_ENABLED    1
-/** @see tr_sessionInitFull */
 #define TR_DEFAULT_GLOBAL_PEER_LIMIT        200
 /** @see tr_sessionInitFull */
 #define TR_DEFAULT_PEER_SOCKET_TOS          8
@@ -145,13 +143,6 @@ tr_proxy_type;
 /** @see tr_sessionInitFull */
 #define TR_DEFAULT_PROXY_PASSWORD           NULL
 
-typedef enum
-{
-    TR_CLEAR_PREFERRED,
-    TR_ENCRYPTION_PREFERRED,
-    TR_ENCRYPTION_REQUIRED
-}
-tr_encryption_mode;
 
 /**
  * @brief Start a libtransmission session.
@@ -192,7 +183,7 @@ tr_encryption_mode;
  *  #TR_DEFAULT_PORT is the default.
  *
  * @param encryptionMode
- *  Must be one of #TR_CLEAR_PREFERRED,
+ *  Must be one of #TR_PLAINTEXT_PREFERRED,
  *  #TR_ENCRYPTION_PREFERRED, or #TR_ENCRYPTION_REQUIRED.
  *
  * @param isUploadLimitEnabled
@@ -201,7 +192,7 @@ tr_encryption_mode;
  *
  * @param uploadLimit
  *  The speed limit to use for the entire session when
- *  "isUploadLimitEnabled" is true.  Units are KiB/s.
+ *  "isUploadLimitEnabled" is true.
  *
  * @param isDownloadLimitEnabled
  *  If true, libtransmission will limit the entire
@@ -209,7 +200,7 @@ tr_encryption_mode;
  *
  * @param downloadLimit
  *  The speed limit to use for the entire session when
- *  "isDownloadLimitEnabled" is true.  Units are KiB/s.
+ *  "isDownloadLimitEnabled" is true.
  *
  * @param peerLimit
  *  The maximum number of peer connections allowed in a session.
@@ -248,36 +239,35 @@ tr_encryption_mode;
  * @see TR_DEFAULT_RPC_ACL
  * @see tr_sessionClose()
  */
-tr_handle * tr_sessionInitFull( const char         * configDir,
-                                const char         * tag,
-                                const char         * downloadDir,
-                                int                  isPexEnabled,
-                                int                  isPortForwardingEnabled,
-                                int                  publicPort,
-                                tr_encryption_mode   encryptionMode,
-                                int                  useLazyBitfield,
-                                int                  useUploadLimit,
-                                int                  uploadLimit,
-                                int                  useDownloadLimit,
-                                int                  downloadLimit,
-                                int                  peerLimit,
-                                int                  messageLevel,
-                                int                  isMessageQueueingEnabled,
-                                int                  isBlocklistEnabled,
-                                int                  peerSocketTOS,
-                                int                  rpcIsEnabled,
-                                int                  rpcPort,
-                                const char         * rpcAccessControlList,
-                                int                  rpcPasswordIsEnabled,
-                                const char         * rpcUsername,
-                                const char         * rpcPassword, 
-                                int                  proxyIsEnabled,
-                                const char         * proxy,
-                                int                  proxyPort,
-                                tr_proxy_type        proxyType,
-                                int                  proxyAuthIsEnabled,
-                                const char         * proxyUsername,
-                                const char         * proxyPassword );
+tr_handle * tr_sessionInitFull( const char    * configDir,
+                                const char    * tag,
+                                const char    * downloadDir,
+                                int             isPexEnabled,
+                                int             isPortForwardingEnabled,
+                                int             publicPort,
+                                int             encryptionMode,
+                                int             isUploadLimitEnabled,
+                                int             uploadLimit,
+                                int             isDownloadLimitEnabled,
+                                int             downloadLimit,
+                                int             peerLimit,
+                                int             messageLevel,
+                                int             isMessageQueueingEnabled,
+                                int             isBlocklistEnabled,
+                                int             peerSocketTOS,
+                                int             rpcIsEnabled,
+                                int             rpcPort,
+                                const char    * rpcAccessControlList,
+                                int             rpcPasswordIsEnabled,
+                                const char    * rpcUsername,
+                                const char    * rpcPassword, 
+                                int             proxyIsEnabled,
+                                const char    * proxy,
+                                int             proxyPort,
+                                tr_proxy_type   proxyType,
+                                int             proxyAuthIsEnabled,
+                                const char    * proxyUsername,
+                                const char    * proxyPassword );
 
 
 /** @brief Shorter form of tr_sessionInitFull()
@@ -424,23 +414,10 @@ typedef enum
 }
 tr_rpc_callback_type;
 
-typedef enum
-{
-    /* no special handling is needed by the caller */
-    TR_RPC_OK            = 0,
-
-    /* indicates to the caller that the client will take care of
-     * removing the torrent itself.  For example the client may
-     * need to keep the torrent alive long enough to cleanly close
-     * some resources in another thread. */
-    TR_RPC_NOREMOVE   = (1<<1)
-}
-tr_rpc_callback_status;
-
-typedef tr_rpc_callback_status ( *tr_rpc_func )( tr_session           * handle,
-                                                 tr_rpc_callback_type   type,
-                                                 struct tr_torrent    * tor_or_null,
-                                                 void                 * user_data );
+typedef void ( *tr_rpc_func )( tr_session           * handle,
+                               tr_rpc_callback_type   type,
+                               struct tr_torrent    * tor_or_null,
+                               void                 * user_data );
 
 void tr_sessionSetRPCCallback( tr_session   * handle,
                                tr_rpc_func    func,
@@ -499,9 +476,13 @@ void tr_sessionSetPexEnabled( tr_session *, int isEnabled );
 
 int tr_sessionIsPexEnabled( const tr_session * );
 
-void tr_sessionSetLazyBitfieldEnabled( tr_handle * handle, int enabled );
-
-int tr_sessionIsLazyBitfieldEnabled( const tr_handle * handle );
+typedef enum
+{
+    TR_PLAINTEXT_PREFERRED,
+    TR_ENCRYPTION_PREFERRED,
+    TR_ENCRYPTION_REQUIRED
+}
+tr_encryption_mode;
 
 tr_encryption_mode tr_sessionGetEncryption( tr_session * );
 
@@ -534,30 +515,25 @@ tr_port_forwarding tr_sessionGetPortForwarding( const tr_handle * );
 
 int tr_sessionCountTorrents( const tr_handle * h );
 
-typedef enum
-{
-    TR_CLIENT_TO_PEER = 0, TR_UP = 0,
-    TR_PEER_TO_CLIENT = 1, TR_DOWN = 1
-}
-tr_direction;
-
 void tr_sessionSetSpeedLimitEnabled( tr_handle   * session,
-                                     tr_direction  direction,
+                                     int           up_or_down,
                                      int           isEnabled );
+
+enum { TR_UP, TR_DOWN };
 
 void tr_sessionGetSpeed( const tr_handle * session,
                          float           * overall_down_KiBs,
                          float           * overall_up_KiBs );
 
 int tr_sessionIsSpeedLimitEnabled( const tr_handle   * session,
-                                   tr_direction        direction );
+                                   int                 up_or_down );
 
 void tr_sessionSetSpeedLimit( tr_handle   * session,
-                              tr_direction  direction,
+                              int           up_or_down,
                               int           KiB_sec );
 
-int tr_sessionGetSpeedLimit( const tr_handle  * session,
-                             tr_direction       direction );
+int tr_sessionGetSpeedLimit( const tr_handle   * session,
+                             int                 up_or_down );
 
 void tr_sessionSetPeerLimit( tr_handle * handle,
                              uint16_t    maxGlobalPeers );
@@ -848,18 +824,18 @@ typedef enum
 tr_speedlimit;
 
 void tr_torrentSetSpeedMode( tr_torrent   * tor,
-                             tr_direction   up_or_down,
+                             int            up_or_down,
                              tr_speedlimit  mode );
 
 tr_speedlimit tr_torrentGetSpeedMode( const tr_torrent  * tor,
-                                      tr_direction        direction );
+                                      int                 up_or_down);
 
 void tr_torrentSetSpeedLimit( tr_torrent   * tor,
-                              tr_direction   up_or_down,
+                              int            up_or_down,
                               int            KiB_sec );
 
 int tr_torrentGetSpeedLimit( const tr_torrent  * tor,
-                             tr_direction        direction );
+                             int                 up_or_down );
 
 /****
 *****  Peer Limits
@@ -1029,8 +1005,8 @@ typedef struct tr_peer_stat
     char flagStr[32];
     
     float progress;
-    float rateToPeer;
-    float rateToClient;
+    float downloadFromRate;
+    float uploadToRate;
 }
 tr_peer_stat;
 
@@ -1184,13 +1160,6 @@ typedef enum tr_errno
 }
 tr_errno;
 
-typedef enum
-{
-  TR_LOCKFILE_SUCCESS = 0,
-  TR_LOCKFILE_EOPEN,
-  TR_LOCKFILE_ELOCK
-} tr_lockfile_state_t;
-
 tr_torrent_status tr_torrentGetStatus( tr_torrent * );
 
 enum
@@ -1251,10 +1220,10 @@ typedef struct tr_stat
     float percentDone;
 
     /** Download speed in KiB/s */
-    double rateDownload;
+    float rateDownload;
 
     /** Upload speed in KiB/s */
-    double rateUpload;
+    float rateUpload;
 
  #define TR_ETA_NOT_AVAIL -1
  #define TR_ETA_UNKNOWN -2

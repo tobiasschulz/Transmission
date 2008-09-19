@@ -23,33 +23,27 @@
  *****************************************************************************/
 
 #import <Cocoa/Cocoa.h>
+#import <transmission.h>
 
-@class BlocklistDownloaderViewController;
-
-typedef enum
-{
-    BLOCKLIST_DL_START,
-    BLOCKLIST_DL_DOWNLOADING,
-    BLOCKLIST_DL_PROCESSING
-} blocklistDownloadState;
+@class PrefsController;
 
 @interface BlocklistDownloader : NSObject
-{
-    NSURLDownload * fDownload;
+{    
+    PrefsController * fPrefsController;
     
-    BlocklistDownloaderViewController * fViewController;
+    IBOutlet NSWindow * fStatusWindow;
+    IBOutlet NSProgressIndicator * fProgressBar;
+    IBOutlet NSTextField * fTextField;
+    IBOutlet NSButton * fButton;
+    
+    NSURLDownload * fDownload;
     
     NSUInteger fCurrentSize;
     long long fExpectedSize;
-    
-    blocklistDownloadState fState;
 }
 
-+ (BlocklistDownloader *) downloader; //starts download if not already occuring
-+ (BOOL) isRunning;
++ (void) downloadWithPrefsController: (PrefsController *) prefsController; //only use when no other blocklist is downloading
 
-- (void) setViewController: (BlocklistDownloaderViewController *) viewController;
-
-- (void) cancelDownload;
+- (void) cancelDownload: (id) sender;
 
 @end

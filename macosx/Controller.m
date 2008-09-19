@@ -38,7 +38,6 @@
 #import "ButtonToolbarItem.h"
 #import "GroupToolbarItem.h"
 #import "ToolbarSegmentedCell.h"
-#import "BlocklistDownloader.h"
 #import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "NSMenuAdditions.h"
@@ -139,13 +138,11 @@ typedef enum
 
 #define WEBSITE_URL @"http://www.transmissionbt.com/"
 #define FORUM_URL   @"http://forum.transmissionbt.com/"
-#define TRAC_URL   @"http://trac.transmissionbt.com/"
 #define DONATE_URL  @"http://www.transmissionbt.com/donate.php"
 
-static tr_rpc_callback_status rpcCallback(tr_handle * handle UNUSED, tr_rpc_callback_type type, struct tr_torrent * torrentStruct, void * controller)
+static void rpcCallback(tr_handle * handle UNUSED, tr_rpc_callback_type type, struct tr_torrent * torrentStruct, void * controller)
 {
     [(Controller *)controller rpcCallback: type forTorrentStruct: torrentStruct];
-    return TR_RPC_NOREMOVE; //we'll do the remove manually
 }
 
 static void sleepCallback(void * controller, io_service_t y, natural_t messageType, void * messageArgument)
@@ -211,7 +208,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                                 [fDefaults boolForKey: @"NatTraversal"],
                                 [fDefaults integerForKey: @"BindPort"],
                                 TR_ENCRYPTION_PREFERRED, /* reset in prefs */
-                                TR_DEFAULT_LAZY_BITFIELD_ENABLED,
                                 NO, /* reset in prefs */
                                 -1, /* reset in prefs */
                                 NO, /* reset in prefs */
@@ -242,9 +238,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         
         fMessageController = [[MessageWindowController alloc] init];
         fInfoController = [[InfoWindowController alloc] init];
-        
-        [PrefsController setHandle: fLib];
-        fPrefsController = [[PrefsController alloc] init];
+        fPrefsController = [[PrefsController alloc] initWithHandle: fLib];
         
         fBadger = [[Badger alloc] initWithLib: fLib];
         [QuickLookController quickLookControllerInitializeWithController: self infoController: fInfoController];
@@ -254,20 +248,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         tr_sessionSetRPCCallback(fLib, rpcCallback, self);
         
         [GrowlApplicationBridge setGrowlDelegate: self];
-        
         [[UKKQueue sharedFileWatcher] setDelegate: self];
-        
-        SUUpdater * updater = [SUUpdater sharedUpdater];
-        [updater setDelegate: self];
-        fUpdateInProgress = NO;
-        
-        //reset old Sparkle settings from previous versions
-        [fDefaults removeObjectForKey: @"SUScheduledCheckInterval"];
-        if ([fDefaults objectForKey: @"CheckForUpdates"])
-        {
-            [updater setAutomaticallyChecksForUpdates: [fDefaults boolForKey: @"CheckForUpdates"]];
-            [fDefaults removeObjectForKey: @"CheckForUpdates"];
-        }
     }
     return self;
 }
@@ -361,6 +342,8 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [fSpeedLimitButton setToolTip: NSLocalizedString(@"Speed Limit overrides the total bandwidth limits with its own limits.",
                                 "Main window -> 2nd bottom left button (turtle) tooltip")];
     
+    [fPrefsController setUpdater: fUpdater];
+    
     [fTableView registerForDraggedTypes: [NSArray arrayWithObject: TORRENT_TABLE_VIEW_DATA_TYPE]];
     [fWindow registerForDraggedTypes: [NSArray arrayWithObjects: NSFilenamesPboardType, NSURLPboardType, nil]];
 
@@ -450,6 +433,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     //avoids need of setting delegate
     [nc addObserver: self selector: @selector(torrentTableViewSelectionDidChange:)
                     name: NSOutlineViewSelectionDidChangeNotification object: fTableView];
+    
+    [nc addObserver: self selector: @selector(prepareForUpdate:)
+                    name: SUUpdaterWillRestartNotification object: nil];
+    fUpdateInProgress = NO;
     
     [nc addObserver: self selector: @selector(autoSpeedLimitChange:)
                     name: @"AutoSpeedLimitChange" object: nil];
@@ -563,10 +550,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) applicationWillTerminate: (NSNotification *) notification
 {
-    //stop blocklist download
-    if ([BlocklistDownloader isRunning])
-        [[BlocklistDownloader downloader] cancelDownload];
-    
     //stop timers and notification checking
     [[NSNotificationCenter defaultCenter] removeObserver: self];
     
@@ -1234,7 +1217,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         }
     }
     
-    [self confirmRemoveTorrents: torrents deleteData: deleteData deleteTorrent: deleteTorrent];
+    [self confirmRemoveTorrents: torrents deleteData: deleteData deleteTorrent: deleteTorrent fromRPC: NO];
 }
 
 - (void) removeSheetDidEnd: (NSWindow *) sheet returnCode: (int) returnCode contextInfo: (NSDictionary *) dict
@@ -1242,7 +1225,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     NSArray * torrents = [dict objectForKey: @"Torrents"];
     if (returnCode == NSAlertDefaultReturn)
         [self confirmRemoveTorrents: torrents deleteData: [[dict objectForKey: @"DeleteData"] boolValue]
-                deleteTorrent: [[dict objectForKey: @"DeleteTorrent"] boolValue]];
+                deleteTorrent: [[dict objectForKey: @"DeleteTorrent"] boolValue] fromRPC: NO];
     else
         [torrents release];
     
@@ -1250,6 +1233,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 }
 
 - (void) confirmRemoveTorrents: (NSArray *) torrents deleteData: (BOOL) deleteData deleteTorrent: (BOOL) deleteTorrent
+        fromRPC: (BOOL) rpc
 {
     //don't want any of these starting then stopping
     NSEnumerator * enumerator = [torrents objectEnumerator];
@@ -1273,7 +1257,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         
         lowestOrderValue = MIN(lowestOrderValue, [torrent orderValue]);
         
-        [torrent closeRemoveTorrent];
+        if (rpc)
+            [torrent closeRemoveTorrentInterface];
+        else
+            [torrent closeRemoveTorrent];
     }
     
     [torrents release];
@@ -2436,10 +2423,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     fSpeedLimitTimer = [[NSTimer alloc] initWithFireDate: dateToUse interval: 0 target: self selector: @selector(autoSpeedLimit:)
                         userInfo: [NSNumber numberWithBool: nextIsLimit] repeats: NO];
     
-    NSRunLoop * loop = [NSApp isOnLeopardOrBetter] ? [NSRunLoop mainRunLoop] : [NSRunLoop currentRunLoop];
-    [loop addTimer: fSpeedLimitTimer forMode: NSDefaultRunLoopMode];
-    [loop addTimer: fSpeedLimitTimer forMode: NSModalPanelRunLoopMode];
-    [loop addTimer: fSpeedLimitTimer forMode: NSEventTrackingRunLoopMode];
+    [[NSRunLoop currentRunLoop] addTimer: fSpeedLimitTimer forMode: NSDefaultRunLoopMode];
+    [[NSRunLoop currentRunLoop] addTimer: fSpeedLimitTimer forMode: NSModalPanelRunLoopMode];
+    [[NSRunLoop currentRunLoop] addTimer: fSpeedLimitTimer forMode: NSEventTrackingRunLoopMode];
     [fSpeedLimitTimer release];
 }
 
@@ -4196,17 +4182,12 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [[NSWorkspace sharedWorkspace] openURL: [NSURL URLWithString: FORUM_URL]];
 }
 
-- (void) linkTrac: (id) sender
-{
-    [[NSWorkspace sharedWorkspace] openURL: [NSURL URLWithString: TRAC_URL]];
-}
-
 - (void) linkDonate: (id) sender
 {
     [[NSWorkspace sharedWorkspace] openURL: [NSURL URLWithString: DONATE_URL]];
 }
 
-- (void) updaterWillRelaunchApplication: (SUUpdater *) updater
+- (void) prepareForUpdate: (NSNotification *) notification
 {
     fUpdateInProgress = YES;
 }
@@ -4306,7 +4287,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) rpcRemoveTorrent: (Torrent *) torrent
 {
-    [self confirmRemoveTorrents: [[NSArray arrayWithObject: torrent] retain] deleteData: NO deleteTorrent: NO];
+    [self confirmRemoveTorrents: [[NSArray arrayWithObject: torrent] retain] deleteData: NO deleteTorrent: NO fromRPC: YES];
     [torrent release];
 }
 

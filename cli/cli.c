@@ -134,7 +134,7 @@ scrapeDoneFunc( struct tr_handle    * session UNUSED,
         tr_bencFree( &top );
     }
     else
-        fprintf( stderr, "Unable to parse response (http code %lu) at %s", response_code, (char*)host );
+        printf( "unable to parse response (http code %lu) at %s", response_code, (char*)host );
 
     --leftToScrape;
 }
@@ -235,7 +235,7 @@ main( int argc, char ** argv )
 
     /* Check the options for validity */
     if( !torrentPath ) {
-        fprintf( stderr, "No torrent specified!\n" );
+        printf( "No torrent specified!\n" );
         return EXIT_FAILURE;
     }
     if( peerPort < 1 || peerPort > 65535 ) {
@@ -271,7 +271,6 @@ main( int argc, char ** argv )
             natTraversal,                  /* nat enabled */
             peerPort,
             encryptionMode,
-            TR_DEFAULT_LAZY_BITFIELD_ENABLED,
             uploadLimit >= 0,
             uploadLimit,
             downloadLimit >= 0,
@@ -375,9 +374,8 @@ main( int argc, char ** argv )
     }
 
     signal( SIGINT, sigHandler );
-#ifndef WIN32
     signal( SIGHUP, sigHandler );
-#endif
+
     tr_torrentSetStatusCallback( tor, torrentStateChanged, NULL );
     tr_torrentStart( tor );
 
@@ -523,7 +521,7 @@ parseCommandLine( int argc, const char ** argv )
             case 'v': verify = 1; break;
             case 'w': downloadDir = optarg; break;
             case 910: encryptionMode = TR_ENCRYPTION_REQUIRED; break;
-            case 911: encryptionMode = TR_CLEAR_PREFERRED; break;
+            case 911: encryptionMode = TR_PLAINTEXT_PREFERRED; break;
             case 912: encryptionMode = TR_ENCRYPTION_PREFERRED; break;
             case TR_OPT_UNK: torrentPath = optarg; break;
             default: return 1;
@@ -539,9 +537,7 @@ sigHandler( int signal )
     switch( signal )
     {
         case SIGINT: gotsig = 1; break;
-#ifndef WIN32
         case SIGHUP: manualUpdate = 1; break;
-#endif
         default: break;
     }
 }

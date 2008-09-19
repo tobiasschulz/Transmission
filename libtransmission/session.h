@@ -35,16 +35,6 @@
 #endif
 #endif
 
-enum
-{
-    /* How frequently to reallocate peer bandwidth. */
-    BANDWIDTH_PULSES_PER_SECOND = 8,
-
-    /* HOw many pulses to remember for averaging the current speed */
-    BANDWIDTH_PULSE_HISTORY = ( BANDWIDTH_PULSES_PER_SECOND * 2 )
-};
-
-
 typedef enum { TR_NET_OK, TR_NET_ERROR, TR_NET_WAIT } tr_tristate_t;
 
 uint8_t* tr_peerIdNew( void );
@@ -67,7 +57,6 @@ struct tr_handle
     unsigned int                 isClosed           : 1;
     unsigned int                 useUploadLimit     : 1;
     unsigned int                 useDownloadLimit   : 1;
-    unsigned int                 useLazyBitfield    : 1;
 
     tr_encryption_mode           encryptionMode;
 
@@ -91,8 +80,8 @@ struct tr_handle
     char                       * proxyUsername;
     char                       * proxyPassword;
 
-    int                          uploadLimit;
-    int                          downloadLimit;
+    struct tr_ratecontrol      * upload;
+    struct tr_ratecontrol      * download;
 
     struct tr_list             * blocklists;
     struct tr_peerMgr          * peerMgr;

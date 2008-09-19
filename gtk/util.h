@@ -40,7 +40,7 @@
 typedef void (*callbackfunc_t)(void*);
 
 /* return a human-readable string for the size given in bytes. */
-char* tr_strlsize( char * buf, uint64_t size, size_t buflen );
+char* tr_strlsize( char * buf, guint64 size, size_t buflen );
 
 /* return a human-readable string for the transfer rate given in bytes. */
 char* tr_strlspeed (char * buf, double KiBps, size_t buflen );
@@ -54,7 +54,8 @@ char* tr_strltime( char * buf, int secs, size_t buflen );
 char* gtr_localtime( time_t time );
 
 /* create a directory and any missing parent directories */
-int mkdir_p(const char *name, mode_t mode);
+gboolean
+mkdir_p(const char *name, mode_t mode);
 
 /* create a copy of a GSList of strings, this dups the actual strings too */
 GSList *
@@ -79,14 +80,13 @@ checkfilenames( int argc, char ** argv );
 void gtr_open_file( const char * path );
 
 gboolean gtr_dbus_add_torrent( const char * filename );
-gboolean gtr_dbus_present_window( void );
 
 char* gtr_get_help_url( void );
 
 #ifdef GTK_MAJOR_VERSION
 
-GtkWidget * gtr_button_new_from_stock( const char * stock,
-                                       const char * mnemonic );
+GtkWidget * tr_button_new_from_stock( const char * stock,
+                                      const char * mnemonic );
 
 void addTorrentErrorDialog( GtkWidget  * window_or_child,
                             int          err,

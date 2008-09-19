@@ -14,14 +14,8 @@
 #include <stdlib.h> /* free */
 #include <string.h>
 
-#ifdef WIN32
-#include <windows.h>
-#endif
-
 #include <libgen.h> /* basename */
-#ifndef WIN32
 #include <sys/mman.h>
-#endif
 #include <sys/types.h>
 #include <sys/stat.h>
 #include <fcntl.h>
@@ -30,7 +24,6 @@
 #include "ggets.h"
 
 #include "transmission.h"
-#include "platform.h"
 #include "blocklist.h"
 #include "net.h" /* tr_netResolve() */
 #include "utils.h"
@@ -87,11 +80,7 @@ blocklistLoad( tr_blocklist * b )
         return;
     }
 
-#ifndef WIN32
-     b->rules = mmap( NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0 );
-#else
-    b->rules = mmap( NULL, st.st_size, 0, 0, fd, 0 );
-#endif
+    b->rules = mmap( NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0 );
     if( !b->rules ) {
         tr_err( err_fmt, b->filename, tr_strerror(errno) );
         close( fd );

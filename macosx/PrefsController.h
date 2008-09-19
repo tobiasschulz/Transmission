@@ -24,10 +24,13 @@
 
 #import <Cocoa/Cocoa.h>
 #import <transmission.h>
+#import <Sparkle/Sparkle.h>
 #import "PortChecker.h"
 
 @interface PrefsController : NSWindowController
 {
+    tr_handle * fHandle;
+    
     NSUserDefaults * fDefaults;
     BOOL fHasLoaded;
     
@@ -37,11 +40,13 @@
     
     IBOutlet NSPopUpButton * fFolderPopUp, * fIncompleteFolderPopUp, * fImportFolderPopUp;
     IBOutlet NSTextField * fRatioStopField, * fQueueDownloadField, * fQueueSeedField, * fStalledField;
+    
+    SUUpdater * fUpdater;
 
     IBOutlet NSTextField * fUploadField, * fDownloadField,
                         * fSpeedLimitUploadField, * fSpeedLimitDownloadField;
     
-    IBOutlet NSTextField * fPeersGlobalField, * fPeersTorrentField, * fBlocklistMessageField, * fBlocklistDateField;
+    IBOutlet NSTextField * fPeersGlobalField, * fPeersTorrentField, * fBlocklistMessageField;
     IBOutlet NSButton * fBlocklistEnableCheck;
     
     PortChecker * fPortChecker;
@@ -61,9 +66,11 @@
     NSMutableArray * fRPCAccessArray;
 }
 
-+ (void) setHandle: (tr_handle *) handle;
-+ (tr_handle *) handle;
+- (id) initWithHandle: (tr_handle *) handle;
+- (tr_handle *) handle;
+- (void) setUpdater: (SUUpdater *) updater;
 
+- (void) updatePortField;
 - (void) setPort: (id) sender;
 - (void) setNat: (id) sender;
 - (void) updatePortStatus;
@@ -81,11 +88,11 @@
 
 - (void) setBlocklistEnabled: (id) sender;
 - (void) updateBlocklist: (id) sender;
-- (void) setBlocklistAutoUpdate: (id) sender;
 - (void) updateBlocklistFields;
 
 - (void) setBadge: (id) sender;
 - (void) resetWarnings: (id) sender;
+- (void) setCheckForUpdate: (id) sender;
 
 - (void) setQueue: (id) sender;
 - (void) setQueueNumber: (id) sender;

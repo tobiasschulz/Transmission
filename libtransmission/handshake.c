@@ -277,6 +277,7 @@ parseHandshake( tr_handshake     * handshake,
 static void
 sendYa( tr_handshake * handshake )
 {
+    int i;
     int len;
     const uint8_t * public_key;
     struct evbuffer * outbuf = evbuffer_new( );
@@ -289,8 +290,9 @@ sendYa( tr_handshake * handshake )
     evbuffer_add( outbuf, public_key, len );
 
     /* add some bullshit padding */
-    len = tr_cryptoRandInt( PadA_MAXLEN );
-    tr_cryptoRandBuf(pad_a, len);
+    len = tr_rand( PadA_MAXLEN );
+    for( i=0; i<len; ++i )
+        pad_a[i] = tr_rand( UCHAR_MAX );
     evbuffer_add( outbuf, pad_a, len );
 
     /* send it */
@@ -313,7 +315,7 @@ getCryptoProvide( const tr_handshake * handshake )
             provide |= CRYPTO_PROVIDE_CRYPTO;
             break;
 
-        case TR_CLEAR_PREFERRED:
+        case TR_PLAINTEXT_PREFERRED:
             provide |= CRYPTO_PROVIDE_CRYPTO | CRYPTO_PROVIDE_PLAINTEXT;
             break;
     }
@@ -338,7 +340,7 @@ getCryptoSelect( const tr_handshake * handshake, uint32_t crypto_provide )
             choices[nChoices++] = CRYPTO_PROVIDE_PLAINTEXT;
             break;
 
-        case TR_CLEAR_PREFERRED:
+        case TR_PLAINTEXT_PREFERRED:
             choices[nChoices++] = CRYPTO_PROVIDE_PLAINTEXT;
             choices[nChoices++] = CRYPTO_PROVIDE_CRYPTO;
             break;
@@ -702,15 +704,15 @@ dbgmsg( handshake, "in readYa... need %d, have %d", (int)KEY_LEN, (int)EVBUFFER_
     memcpy( handshake->mySecret, secret, KEY_LEN );
     tr_sha1( handshake->myReq1, "req1", 4, secret, KEY_LEN, NULL );
 
-    dbgmsg( handshake, "sending B->A: Diffie Hellman Yb, PadB" );
+dbgmsg( handshake, "sending B->A: Diffie Hellman Yb, PadB" );
     /* send our public key to the peer */
     walk = outbuf;
     myKey = tr_cryptoGetMyPublicKey( handshake->crypto, &len );
     memcpy( walk, myKey, len );
     walk += len;
-    len = tr_cryptoRandInt( PadB_MAXLEN );
-    tr_cryptoRandBuf( walk, len );
-    walk += len;
+    len = tr_rand( PadB_MAXLEN );
+    while( len-- )
+        *walk++ = tr_rand( UCHAR_MAX );
 
     setReadState( handshake, AWAITING_PAD_A );
     tr_peerIoWrite( handshake->io, outbuf, walk-outbuf );
@@ -785,7 +787,7 @@ readCryptoProvide( tr_handshake * handshake, struct evbuffer * inbuf )
         obfuscatedTorrentHash[i] = req2[i] ^ req3[i];
     if(( tor = tr_torrentFindFromObfuscatedHash( handshake->handle, obfuscatedTorrentHash )))
     {
-        dbgmsg( handshake, "got INCOMING connection's encrypted handshake for torrent [%s]", tor->info.name );
+        dbgmsg( handshake, "found the torrent; it's [%s]", tor->info.name );
         tr_peerIoSetTorrentHash( handshake->io, tor->info.hash );
         if( !tr_torrentAllowsPex( tor ) &&
             tr_peerMgrPeerIsSeed( handshake->handle->peerMgr,
@@ -1025,23 +1027,20 @@ tr_handshakeNew( tr_peerIo           * io,
 {
     tr_handshake * handshake;
 
-    tr_peerIoSetBandwidthUnlimited( io, TR_UP );
-    tr_peerIoSetBandwidthUnlimited( io, TR_DOWN );
-
     handshake = tr_new0( tr_handshake, 1 );
     handshake->io = io;
     handshake->crypto = tr_peerIoGetCrypto( io );
     handshake->encryptionMode = encryptionMode;
     handshake->doneCB = doneCB;
     handshake->doneUserData = doneUserData;
-    handshake->handle = tr_peerIoGetSession( io );
+    handshake->handle = tr_peerIoGetHandle( io );
     tr_peerIoSetTimeoutSecs( io, 15 );
     
     tr_peerIoSetIOFuncs( handshake->io, canRead, NULL, gotError, handshake );
 
     if( tr_peerIoIsIncoming( handshake->io ) )
         setReadState( handshake, AWAITING_HANDSHAKE );
-    else if( encryptionMode != TR_CLEAR_PREFERRED )
+    else if( encryptionMode != TR_PLAINTEXT_PREFERRED )
         sendYa( handshake );
     else {
         int msgSize; 
@@ -1053,15 +1052,6 @@ tr_handshakeNew( tr_peerIo           * io,
     }
 
     return handshake;
-}
-
-struct tr_peerIo*
-tr_handshakeGetIO( tr_handshake * handshake )
-{
-    assert( handshake );
-    assert( handshake->io );
-
-    return handshake->io;
 }
 
 const struct in_addr *

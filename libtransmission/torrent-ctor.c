@@ -106,15 +106,14 @@ tr_ctorSetMetainfoFromFile( tr_ctor        * ctor,
 
     /* if no `name' field was set, then set it from the filename */
     if( ctor->isSet_metainfo ) {
-        tr_benc * info;
-        if( tr_bencDictFindDict( &ctor->metainfo, "info", &info ) ) {
-            const char * name;
-            if( !tr_bencDictFindStr( info, "name.utf-8", &name ) )
-                if( !tr_bencDictFindStr( info, "name", &name ) )
-                    name = NULL;
-            if( !name || !*name ) {
+        tr_benc * info = tr_bencDictFindType( &ctor->metainfo, "info", TYPE_DICT );
+        if( info ) {
+            tr_benc * name = tr_bencDictFindFirst( info, "name.utf-8", "name", NULL );
+            if( name == NULL )
+                name = tr_bencDictAdd( info, "name" );
+            if( name->type!=TYPE_STR || !name->val.s.s || !*name->val.s.s ) {
                 char * tmp = tr_strdup( filename );
-                tr_bencDictAddStr( info, "name", basename( tmp ) );
+                tr_bencInitStrDup( name, basename( tmp ) );
                 tr_free( tmp );
             }
         }

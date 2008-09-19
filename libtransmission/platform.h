@@ -47,7 +47,7 @@ const char * tr_getTorrentDir ( const struct tr_handle * );
 const char * tr_getClutchDir  ( const struct tr_handle * );
 
 
-tr_thread*   tr_threadNew  ( void (*func)(void *), void * arg );
+tr_thread*   tr_threadNew  ( void (*func)(void *), void * arg, const char * name );
 int          tr_amInThread ( const tr_thread * );
 
 tr_lock *    tr_lockNew        ( void );
@@ -56,11 +56,14 @@ void         tr_lockLock       ( tr_lock * );
 void         tr_lockUnlock     ( tr_lock * );
 int          tr_lockHave       ( const tr_lock * );
 
-tr_lockfile_state_t tr_lockfile       ( const char * filename );
 
-#ifdef WIN32
-void *mmap (void *ptr, long size, long prot, long type, long handle, long arg);
-long munmap (void *ptr, long size);
-#endif
+enum
+{
+  TR_LOCKFILE_SUCCESS,
+  TR_LOCKFILE_EOPEN,
+  TR_LOCKFILE_ELOCK
+};
+
+int          tr_lockfile       ( const char * filename );
 
 #endif

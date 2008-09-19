@@ -29,9 +29,9 @@
 #ifndef TG_CONF_H
 #define TG_CONF_H
 
-int64_t      pref_int_get            ( const char * key );
-void         pref_int_set            ( const char * key, int64_t value );
-void         pref_int_set_default    ( const char * key, int64_t value );
+int          pref_int_get            ( const char * key );
+void         pref_int_set            ( const char * key, int value );
+void         pref_int_set_default    ( const char * key, int value );
 
 gboolean     pref_flag_get           ( const char * key );
 void         pref_flag_set           ( const char * key, gboolean value );
@@ -66,7 +66,7 @@ gboolean pref_flag_eval( pref_flag_t val, const char * key );
 gboolean
 cf_init(const char *confdir, char **errstr);
 gboolean
-cf_lock(tr_lockfile_state_t *tr_state, char **errstr);
+cf_lock(char **errstr);
 void
 cf_check_older_configs(void);
 

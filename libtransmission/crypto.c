@@ -10,8 +10,6 @@
  * $Id$
  */
 
-#include <stdlib.h> /* for abs() */
-#include <limits.h> /* for INT_MAX */
 #include <sys/types.h> /* for event.h, as well as netinet/in.h on some platforms */
 #include <assert.h>
 #include <inttypes.h> /* uint8_t */
@@ -22,7 +20,6 @@
 #include <openssl/dh.h>
 #include <openssl/rc4.h>
 #include <openssl/sha.h>
-#include <openssl/rand.h>
 
 #include <event.h>
 
@@ -267,34 +264,3 @@ tr_cryptoHasTorrentHash( const tr_crypto * crypto )
 
     return crypto->torrentHashIsSet ? 1 : 0;
 }
-
-int
-tr_cryptoRandInt( int sup )
-{
-    int r;
-
-    RAND_pseudo_bytes ((unsigned char *) &r, sizeof r);
-
-    return ((int) (sup * (abs(r) / (INT_MAX + 1.0))));
-}
-
-int
-tr_cryptoWeakRandInt( int sup )
-{
-    static int init = 0;
-    assert( sup > 0 );
-
-    if( !init )
-    {
-        srand( tr_date( ) );
-        init = 1;
-    }
-
-    return rand() % sup;
-}
-
-void tr_cryptoRandBuf ( unsigned char *buf, size_t len )
-{
-    RAND_pseudo_bytes ( buf, len );
-}
-

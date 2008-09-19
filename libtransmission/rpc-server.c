@@ -26,25 +26,24 @@
 #include "bencode.h"
 #include "list.h"
 #include "platform.h"
-#include "rpcimpl.h"
+#include "rpc.h"
 #include "rpc-server.h"
 #include "utils.h"
 
 #define MY_NAME "RPC Server"
-#define MY_REALM "Transmission"
+#define MY_REALM "Transmission RPC Server"
 
 #define ACTIVE_INTERVAL_MSEC 40
 #define INACTIVE_INTERVAL_MSEC 200
 
 struct tr_rpc_server
 {
-    unsigned int isEnabled          : 1;
-    unsigned int isPasswordEnabled  : 1;
     int port;
     time_t lastRequestTime;
     struct shttpd_ctx * ctx;
     tr_handle * session;
     struct event timer;
+    int isPasswordEnabled;
     char * username;
     char * password;
     char * acl;
@@ -133,41 +132,30 @@ pruneBuf( tr_rpc_server * server, struct ConnBuf * buf )
 static void
 handle_upload( struct shttpd_arg * arg )
 {
-    struct tr_rpc_server * s;
-    struct ConnBuf * cbuf;
-
-    s = arg->user_data;
+    struct tr_rpc_server * s = arg->user_data;
     s->lastRequestTime = time( NULL );
-    cbuf = getBuffer( s, arg );
+    struct ConnBuf * cbuf = getBuffer( s, arg );
 
     /* if we haven't parsed the POST, do that now */
     if( !EVBUFFER_LENGTH( cbuf->out ) )
     {
-        const char * query_string;
-        const char * content_type;
-        const char * delim;
-        const char * in;
-        size_t inlen;
-        char * boundary;
-        size_t boundary_len;
-        char buf[64];
-        int paused;
-
         /* if we haven't finished reading the POST, read more now */
         evbuffer_add( cbuf->in, arg->in.buf, arg->in.len );
         arg->in.num_bytes = arg->in.len;
         if( arg->flags & SHTTPD_MORE_POST_DATA )
             return;
 
-        query_string = shttpd_get_env( arg, "QUERY_STRING" );
-        content_type = shttpd_get_header( arg, "Content-Type" );
-        in = (const char *) EVBUFFER_DATA( cbuf->in );
-        inlen = EVBUFFER_LENGTH( cbuf->in );
-        boundary = tr_strdup_printf( "--%s", strstr( content_type, "boundary=" ) + strlen( "boundary=" ) );
-        boundary_len = strlen( boundary );
-        paused = ( query_string != NULL )
-              && ( shttpd_get_var( "paused", query_string, strlen( query_string ), buf, sizeof( buf ) ) == 4 )
-              && ( !strcmp( buf, "true" ) );
+        const char * query_string = shttpd_get_env( arg, "QUERY_STRING" );
+        const char * content_type = shttpd_get_header( arg, "Content-Type" );
+        const char * delim;
+        const char * in = (const char *) EVBUFFER_DATA( cbuf->in );
+        size_t inlen = EVBUFFER_LENGTH( cbuf->in );
+        char * boundary = tr_strdup_printf( "--%s", strstr( content_type, "boundary=" ) + strlen( "boundary=" ) );
+        const size_t boundary_len = strlen( boundary );
+        char buf[64];
+        int paused = ( query_string != NULL )
+                  && ( shttpd_get_var( "paused", query_string, strlen( query_string ), buf, sizeof( buf ) ) == 4 )
+                  && ( !strcmp( buf, "true" ) );
 
         delim = tr_memmem( in, inlen, boundary, boundary_len );
         if( delim ) do
@@ -269,12 +257,9 @@ handle_root( struct shttpd_arg * arg )
 static void
 handle_rpc( struct shttpd_arg * arg )
 {
-    struct tr_rpc_server * s;
-    struct ConnBuf * cbuf;
-
-    s = arg->user_data;
+    struct tr_rpc_server * s = arg->user_data;
     s->lastRequestTime = time( NULL );
-    cbuf = getBuffer( s, arg );
+    struct ConnBuf * cbuf = getBuffer( s, arg );
 
     if( !EVBUFFER_LENGTH( cbuf->out ) )
     {
@@ -372,7 +357,7 @@ startServer( tr_rpc_server * server )
         if( !server->isPasswordEnabled )
             unlink( passwd );
         else
-            shttpd_edit_passwords( passwd, MY_REALM, server->username, server->password );
+            edit_passwords( passwd, MY_REALM, server->username, server->password );
 
         argv[argc++] = tr_strdup( "appname-unused" );
 
@@ -409,15 +394,13 @@ startServer( tr_rpc_server * server )
 
         argv[argc] = NULL; /* shttpd_init() wants it null-terminated */
 
-        if(( server->ctx = shttpd_init( argc, argv )))
-        {
-            shttpd_register_uri( server->ctx, "/transmission/rpc", handle_rpc, server );
-            shttpd_register_uri( server->ctx, "/transmission/upload", handle_upload, server );
-            shttpd_register_uri( server->ctx, "/", handle_root, server );
+        server->ctx = shttpd_init( argc, argv );
+        shttpd_register_uri( server->ctx, "/transmission/rpc", handle_rpc, server );
+        shttpd_register_uri( server->ctx, "/transmission/upload", handle_upload, server );
+        shttpd_register_uri( server->ctx, "/", handle_root, server );
 
-            evtimer_set( &server->timer, rpcPulse, server );
-            evtimer_add( &server->timer, &tv );
-        }
+        evtimer_set( &server->timer, rpcPulse, server );
+        evtimer_add( &server->timer, &tv );
 
         for( i=0; i<argc; ++i )
             tr_free( argv[i] );
@@ -442,11 +425,10 @@ stopServer( tr_rpc_server * server )
 void
 tr_rpcSetEnabled( tr_rpc_server * server, int isEnabled )
 {
-    server->isEnabled = isEnabled != 0;
-
-    if( !isEnabled )
+    if( !isEnabled && server->ctx )
         stopServer( server );
-    else
+
+    if( isEnabled && !server->ctx )
         startServer( server );
 }
 
@@ -463,7 +445,7 @@ tr_rpcSetPort( tr_rpc_server * server, int port )
     {
         server->port = port;
 
-        if( server->isEnabled )
+        if( server->ctx )
         {
             stopServer( server );
             startServer( server );
@@ -562,7 +544,7 @@ cidrize( const char * acl )
     }
 
     /* the -1 is to eat the final ", " */
-    ret = tr_strndup( EVBUFFER_DATA( out ), EVBUFFER_LENGTH( out ) - 1 );
+    ret = tr_strndup( (char*) EVBUFFER_DATA(out), EVBUFFER_LENGTH(out)-1 );
     evbuffer_free( out );
     return ret;
 }
@@ -597,16 +579,16 @@ tr_rpcSetACL( tr_rpc_server   * server,
 
     if( !err )
     {
-        const int isEnabled = server->isEnabled;
+        const int isRunning = server->ctx != NULL;
 
-        if( isEnabled )
+        if( isRunning )
             stopServer( server );
 
         tr_free( server->acl );
         server->acl = tr_strdup( cidr );
         dbgmsg( "setting our ACL to [%s]", server->acl );
 
-        if( isEnabled )
+        if( isRunning )
             startServer( server );
     }
     tr_free( cidr );
@@ -628,16 +610,16 @@ void
 tr_rpcSetUsername( tr_rpc_server        * server,
                    const char           * username )
 {
-    const int isEnabled = server->isEnabled;
+    const int isRunning = server->ctx != NULL;
 
-    if( isEnabled )
+    if( isRunning )
         stopServer( server );
 
     tr_free( server->username );
     server->username = tr_strdup( username );
     dbgmsg( "setting our Username to [%s]", server->username );
 
-    if( isEnabled )
+    if( isRunning )
         startServer( server );
 }
 
@@ -651,16 +633,16 @@ void
 tr_rpcSetPassword( tr_rpc_server        * server,
                    const char           * password )
 {
-    const int isEnabled = server->isEnabled;
+    const int isRunning = server->ctx != NULL;
 
-    if( isEnabled )
+    if( isRunning )
         stopServer( server );
 
     tr_free( server->password );
     server->password = tr_strdup( password );
     dbgmsg( "setting our Password to [%s]", server->password );
 
-    if( isEnabled )
+    if( isRunning )
         startServer( server );
 }
 
@@ -674,15 +656,15 @@ void
 tr_rpcSetPasswordEnabled( tr_rpc_server  * server,
                           int              isEnabled )
 {
-    const int wasEnabled = server->isEnabled;
+    const int isRunning = server->ctx != NULL;
 
-    if( wasEnabled )
+    if( isRunning )
         stopServer( server );
 
     server->isPasswordEnabled = isEnabled;
     dbgmsg( "setting 'password enabled' to %d", isEnabled );
 
-    if( isEnabled )
+    if( isRunning )
         startServer( server );
 }
 
@@ -735,8 +717,7 @@ tr_rpcInit( tr_handle   * session,
     s->acl = tr_strdup( acl );
     s->username = tr_strdup( username );
     s->password = tr_strdup( password );
-    s->isPasswordEnabled = isPasswordEnabled != 0;
-    s->isEnabled = isEnabled != 0;
+    s->isPasswordEnabled = isPasswordEnabled;
    
     if( isEnabled )
         startServer( s );

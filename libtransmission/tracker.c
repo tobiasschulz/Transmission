@@ -18,7 +18,6 @@
 
 #include "transmission.h"
 #include "bencode.h"
-#include "crypto.h"
 #include "completion.h"
 #include "net.h"
 #include "publish.h"
@@ -107,8 +106,6 @@ struct tr_tracker
 
     time_t manualAnnounceAllowedAt;
     time_t reannounceAt;
-
-    /* 0==never, 1==in progress, other values==when to scrape */
     time_t scrapeAt;
 
     time_t lastScrapeTime;
@@ -478,7 +475,7 @@ onScrapeResponse( tr_session   * session,
                                              &benc, NULL );
         if( bencLoaded && tr_bencDictFindDict( &benc, "files", &files ) )
         {
-            size_t i;
+            int i;
             for( i=0; i<files->val.l.count; i+=2 )
             {
                 int64_t itmp;
@@ -639,7 +636,7 @@ createRequest( tr_session * session, tr_tracker * tracker, int reqtype )
     req->session = session;
     req->reqtype = reqtype;
     req->done_func =  isStopping ? onStoppedResponse : onTrackerResponse;
-    req->url = tr_strdup( EVBUFFER_DATA( url ) );
+    req->url = tr_strdup( ( char * ) EVBUFFER_DATA( url ) );
     memcpy( req->torrent_hash, tracker->hash, SHA_DIGEST_LENGTH );
 
     evbuffer_free( url );
@@ -660,7 +657,7 @@ createScrape( tr_session * session, tr_tracker * tracker )
     req = tr_new0( struct tr_tracker_request, 1 );
     req->session = session;
     req->reqtype = TR_REQ_SCRAPE;
-    req->url = tr_strdup( EVBUFFER_DATA( url ) );
+    req->url = tr_strdup( ( char * ) EVBUFFER_DATA( url ) );
     req->done_func = onScrapeResponse;
     memcpy( req->torrent_hash, tracker->hash, SHA_DIGEST_LENGTH );
 
@@ -723,6 +720,9 @@ invokeRequest( void * vreq )
             t->lastAnnounceTime = now;
             t->reannounceAt = 1;
             t->manualAnnounceAllowedAt = 1;
+            t->scrapeAt = req->reqtype == TR_REQ_STOPPED
+                        ? now + t->scrapeIntervalSec + t->randOffset
+                        : 0;
         }
     }
 
@@ -826,7 +826,7 @@ generateKeyParam( char * msg, int len )
     const char * pool = "abcdefghijklmnopqrstuvwxyz0123456789";
     const int poolSize = strlen( pool );
     for( i=0; i<len; ++i )
-        *msg++ = pool[tr_cryptoRandInt(poolSize)];
+        *msg++ = pool[tr_rand(poolSize)];
     *msg = '\0';
 }
 
@@ -873,7 +873,7 @@ tr_trackerNew( const tr_torrent * torrent )
     t->lastScrapeResponse       = -1;
     t->manualAnnounceAllowedAt  = ~(time_t)0;
     t->name = tr_strdup( info->name );
-    t->randOffset = tr_cryptoRandInt( 30 );
+    t->randOffset = tr_rand( 30 );
     memcpy( t->hash, info->hash, SHA_DIGEST_LENGTH );
     escape( t->escaped, info->hash, SHA_DIGEST_LENGTH );
     generateKeyParam( t->key_param, KEYLEN );

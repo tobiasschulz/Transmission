@@ -8,54 +8,52 @@
  * this stuff is worth it, you can buy me a beer in return.
  */
 
-#ifndef _WIN32
-
 #include "defs.h"
 
 void 
-_shttpd_set_close_on_exec(int fd)
+set_close_on_exec(int fd)
 {
 	(void) fcntl(fd, F_SETFD, FD_CLOEXEC);
 }
 
 int
-_shttpd_stat(const char *path, struct stat *stp)
+my_stat(const char *path, struct stat *stp)
 {
 	return (stat(path, stp));
 }
 
 int
-_shttpd_open(const char *path, int flags, int mode)
+my_open(const char *path, int flags, int mode)
 {
 	return (open(path, flags, mode));
 }
 
 int
-_shttpd_remove(const char *path)
+my_remove(const char *path)
 {
 	return (remove(path));
 }
 
 int
-_shttpd_rename(const char *path1, const char *path2)
+my_rename(const char *path1, const char *path2)
 {
 	return (rename(path1, path2));
 }
 
 int
-_shttpd_mkdir(const char *path, int mode)
+my_mkdir(const char *path, int mode)
 {
 	return (mkdir(path, mode));
 }
 
 char *
-_shttpd_getcwd(char *buffer, int maxlen)
+my_getcwd(char *buffer, int maxlen)
 {
 	return (getcwd(buffer, maxlen));
 }
 
 int
-_shttpd_set_non_blocking_mode(int fd)
+set_non_blocking_mode(int fd)
 {
 	int	ret = -1;
 	int	flags;
@@ -73,7 +71,7 @@ _shttpd_set_non_blocking_mode(int fd)
 
 #ifndef NO_CGI
 int
-_shttpd_spawn_process(struct conn *c, const char *prog, char *envblk,
+spawn_process(struct conn *c, const char *prog, char *envblk,
 		char *envp[], int sock, const char *dir)
 {
 	int		ret;
@@ -85,7 +83,7 @@ _shttpd_spawn_process(struct conn *c, const char *prog, char *envblk,
 	if ((pid = vfork()) == -1) {
 
 		ret = -1;
-		_shttpd_elog(E_LOG, c, "redirect: fork: %s", strerror(errno));
+		elog(E_LOG, c, "redirect: fork: %s", strerror(errno));
 
 	} else if (pid == 0) {
 
@@ -108,10 +106,10 @@ _shttpd_spawn_process(struct conn *c, const char *prog, char *envblk,
 		/* Execute CGI program */
 		if (interp == NULL) {
 			(void) execle(p, p, NULL, envp);
-			_shttpd_elog(E_FATAL, c, "redirect: exec(%s)", prog);
+			elog(E_FATAL, c, "redirect: exec(%s)", prog);
 		} else {
 			(void) execle(interp, interp, p, NULL, envp);
-			_shttpd_elog(E_FATAL, c, "redirect: exec(%s %s)",
+			elog(E_FATAL, c, "redirect: exec(%s %s)",
 			    interp, prog);
 		}
 
@@ -128,6 +126,3 @@ _shttpd_spawn_process(struct conn *c, const char *prog, char *envblk,
 	return (ret);
 }
 #endif /* !NO_CGI */
-
-#endif /* !_WIN32 */
-

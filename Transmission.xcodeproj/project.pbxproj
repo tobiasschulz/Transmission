@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 45;
+	objectVersion = 44;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -83,8 +83,6 @@
 		A21DFF100A292B2B007C5F76 /* Transfers.png in Resources */ = {isa = PBXBuildFile; fileRef = A21DFF0F0A292B2B007C5F76 /* Transfers.png */; };
 		A22180980D148A71007D09ED /* GroupsWindowController.m in Sources */ = {isa = PBXBuildFile; fileRef = A22180970D148A71007D09ED /* GroupsWindowController.m */; };
 		A22180B60D148F0F007D09ED /* GroupsWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = A22180B50D148F0F007D09ED /* GroupsWindow.xib */; };
-		A222E9870E6B21D9009FB003 /* BlocklistDownloaderViewController.m in Sources */ = {isa = PBXBuildFile; fileRef = A222E9860E6B21D9009FB003 /* BlocklistDownloaderViewController.m */; };
-		A222EA7B0E6C32C4009FB003 /* BlocklistScheduler.m in Sources */ = {isa = PBXBuildFile; fileRef = A222EA7A0E6C32C4009FB003 /* BlocklistScheduler.m */; };
 		A224D2640DAAC55F000954EA /* Peers.png in Resources */ = {isa = PBXBuildFile; fileRef = A224D2630DAAC55F000954EA /* Peers.png */; };
 		A2265F420B5EF5F40093DDA5 /* FileNameCell.m in Sources */ = {isa = PBXBuildFile; fileRef = A2265F400B5EF5F40093DDA5 /* FileNameCell.m */; };
 		A226FDAC0D0CDF20005A7F71 /* libnatpmp.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 3C7A118D0D0B2EB800B5701F /* libnatpmp.a */; };
@@ -94,7 +92,6 @@
 		A22E59A70DC11A1D00F4BE15 /* libcurl.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = A29EBE700DC06068006CEE80 /* libcurl.dylib */; };
 		A22E59A80DC11A1F00F4BE15 /* libcurl.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = A29EBE700DC06068006CEE80 /* libcurl.dylib */; };
 		A22E59A90DC11A2000F4BE15 /* libcurl.dylib in Frameworks */ = {isa = PBXBuildFile; fileRef = A29EBE700DC06068006CEE80 /* libcurl.dylib */; };
-		A22F1E550E7DA8030065DB9D /* sparkle_dsa_pub.pem in Resources */ = {isa = PBXBuildFile; fileRef = A22F1E540E7DA8030065DB9D /* sparkle_dsa_pub.pem */; };
 		A231274C0D11D0B7003F9AFF /* AboutWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = A231274B0D11D0B7003F9AFF /* AboutWindow.xib */; };
 		A232D29E0A70903E00973B12 /* Filter.png in Resources */ = {isa = PBXBuildFile; fileRef = A232D29D0A70903E00973B12 /* Filter.png */; };
 		A233BD330D8C6585007EE7B4 /* MessageWindow.xib in Resources */ = {isa = PBXBuildFile; fileRef = A233BD320D8C6585007EE7B4 /* MessageWindow.xib */; };
@@ -180,14 +177,14 @@
 		A2A6321B0CD9751700E3DA60 /* BadgeView.m in Sources */ = {isa = PBXBuildFile; fileRef = A2A6321A0CD9751700E3DA60 /* BadgeView.m */; };
 		A2AA579D0ADFCAB400CA59F6 /* PiecesView.m in Sources */ = {isa = PBXBuildFile; fileRef = A2AA579B0ADFCAB400CA59F6 /* PiecesView.m */; };
 		A2AAB65C0DE0CF6200E04DDA /* rpc-server.c in Sources */ = {isa = PBXBuildFile; fileRef = A2AAB6580DE0CF6200E04DDA /* rpc-server.c */; };
-		A2AAB65D0DE0CF6200E04DDA /* rpcimpl.h in Headers */ = {isa = PBXBuildFile; fileRef = A2AAB6590DE0CF6200E04DDA /* rpcimpl.h */; };
+		A2AAB65D0DE0CF6200E04DDA /* rpc.h in Headers */ = {isa = PBXBuildFile; fileRef = A2AAB6590DE0CF6200E04DDA /* rpc.h */; };
 		A2AAB65E0DE0CF6200E04DDA /* rpc-server.h in Headers */ = {isa = PBXBuildFile; fileRef = A2AAB65A0DE0CF6200E04DDA /* rpc-server.h */; };
-		A2AAB65F0DE0CF6200E04DDA /* rpcimpl.c in Sources */ = {isa = PBXBuildFile; fileRef = A2AAB65B0DE0CF6200E04DDA /* rpcimpl.c */; };
+		A2AAB65F0DE0CF6200E04DDA /* rpc.c in Sources */ = {isa = PBXBuildFile; fileRef = A2AAB65B0DE0CF6200E04DDA /* rpc.c */; };
 		A2AAB6650DE0D08B00E04DDA /* blocklist.h in Headers */ = {isa = PBXBuildFile; fileRef = A2D307930D9EC4860051FD27 /* blocklist.h */; };
 		A2AF1C390A3D0F6200F1575D /* FileOutlineView.m in Sources */ = {isa = PBXBuildFile; fileRef = A2AF1C370A3D0F6200F1575D /* FileOutlineView.m */; };
-		A2B3FB460E5901E700FF78FB /* cli.c in Sources */ = {isa = PBXBuildFile; fileRef = A2B3FB450E5901E700FF78FB /* cli.c */; };
-		A2B3FB4C0E59023000FF78FB /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
-		A2B3FB530E59027100FF78FB /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
+		A2B3FBD10E59033C00FF78FB /* cli.c in Sources */ = {isa = PBXBuildFile; fileRef = A2B3FBD00E59033C00FF78FB /* cli.c */; };
+		A2B3FBD30E59035500FF78FB /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
+		A2B3FBD40E59035800FF78FB /* Cocoa.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 1058C7A1FEA54F0111CA2CBB /* Cocoa.framework */; };
 		A2BB67790D5BA74600AB0618 /* OpenWeb.png in Resources */ = {isa = PBXBuildFile; fileRef = A2BB67780D5BA74600AB0618 /* OpenWeb.png */; };
 		A2BC19850CA9AF5A00DD302A /* CompleteCheck.png in Resources */ = {isa = PBXBuildFile; fileRef = A2BC19840CA9AF5A00DD302A /* CompleteCheck.png */; };
 		A2BE9C520C1E4AF5002D16E6 /* makemeta.c in Sources */ = {isa = PBXBuildFile; fileRef = A2BE9C4E0C1E4ADA002D16E6 /* makemeta.c */; };
@@ -496,10 +493,6 @@
 		A22180960D148A71007D09ED /* GroupsWindowController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = GroupsWindowController.h; path = macosx/GroupsWindowController.h; sourceTree = "<group>"; };
 		A22180970D148A71007D09ED /* GroupsWindowController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = GroupsWindowController.m; path = macosx/GroupsWindowController.m; sourceTree = "<group>"; };
 		A22180B50D148F0F007D09ED /* GroupsWindow.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = GroupsWindow.xib; path = macosx/GroupsWindow.xib; sourceTree = "<group>"; };
-		A222E9850E6B21D9009FB003 /* BlocklistDownloaderViewController.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = BlocklistDownloaderViewController.h; path = macosx/BlocklistDownloaderViewController.h; sourceTree = "<group>"; };
-		A222E9860E6B21D9009FB003 /* BlocklistDownloaderViewController.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = BlocklistDownloaderViewController.m; path = macosx/BlocklistDownloaderViewController.m; sourceTree = "<group>"; };
-		A222EA790E6C32C4009FB003 /* BlocklistScheduler.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = BlocklistScheduler.h; path = macosx/BlocklistScheduler.h; sourceTree = "<group>"; };
-		A222EA7A0E6C32C4009FB003 /* BlocklistScheduler.m */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.objc; name = BlocklistScheduler.m; path = macosx/BlocklistScheduler.m; sourceTree = "<group>"; };
 		A223AA7D0D220CEB00840069 /* nl */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = nl; path = macosx/nl.lproj/Creator.xib; sourceTree = "<group>"; };
 		A223AA7E0D220CEB00840069 /* nl */ = {isa = PBXFileReference; lastKnownFileType = text.plist.strings; name = nl; path = macosx/nl.lproj/InfoPlist.strings; sourceTree = "<group>"; };
 		A223AA7F0D220CEB00840069 /* nl */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = nl; path = macosx/nl.lproj/InfoWindow.xib; sourceTree = "<group>"; };
@@ -511,7 +504,6 @@
 		A2265F400B5EF5F40093DDA5 /* FileNameCell.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; name = FileNameCell.m; path = macosx/FileNameCell.m; sourceTree = "<group>"; };
 		A22D3AA30D00D1790079CFED /* Turtle.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Turtle.png; path = macosx/Images/Turtle.png; sourceTree = "<group>"; };
 		A22D3AA40D00D1790079CFED /* TurtleBlue.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = TurtleBlue.png; path = macosx/Images/TurtleBlue.png; sourceTree = "<group>"; };
-		A22F1E540E7DA8030065DB9D /* sparkle_dsa_pub.pem */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text; name = sparkle_dsa_pub.pem; path = macosx/sparkle_dsa_pub.pem; sourceTree = "<group>"; };
 		A231274B0D11D0B7003F9AFF /* AboutWindow.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = AboutWindow.xib; path = macosx/AboutWindow.xib; sourceTree = "<group>"; };
 		A232D29D0A70903E00973B12 /* Filter.png */ = {isa = PBXFileReference; lastKnownFileType = image.png; name = Filter.png; path = macosx/Images/Filter.png; sourceTree = "<group>"; };
 		A233BD320D8C6585007EE7B4 /* MessageWindow.xib */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = MessageWindow.xib; path = macosx/MessageWindow.xib; sourceTree = "<group>"; };
@@ -643,9 +635,9 @@
 		A2AA579A0ADFCAB400CA59F6 /* PiecesView.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = PiecesView.h; path = macosx/PiecesView.h; sourceTree = "<group>"; };
 		A2AA579B0ADFCAB400CA59F6 /* PiecesView.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; name = PiecesView.m; path = macosx/PiecesView.m; sourceTree = "<group>"; };
 		A2AAB6580DE0CF6200E04DDA /* rpc-server.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = "rpc-server.c"; path = "libtransmission/rpc-server.c"; sourceTree = "<group>"; };
-		A2AAB6590DE0CF6200E04DDA /* rpcimpl.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = rpcimpl.h; path = libtransmission/rpcimpl.h; sourceTree = "<group>"; };
+		A2AAB6590DE0CF6200E04DDA /* rpc.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = rpc.h; path = libtransmission/rpc.h; sourceTree = "<group>"; };
 		A2AAB65A0DE0CF6200E04DDA /* rpc-server.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = "rpc-server.h"; path = "libtransmission/rpc-server.h"; sourceTree = "<group>"; };
-		A2AAB65B0DE0CF6200E04DDA /* rpcimpl.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = rpcimpl.c; path = libtransmission/rpcimpl.c; sourceTree = "<group>"; };
+		A2AAB65B0DE0CF6200E04DDA /* rpc.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = rpc.c; path = libtransmission/rpc.c; sourceTree = "<group>"; };
 		A2AAB6C10DE0D5A400E04DDA /* auth.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = auth.c; path = "third-party/shttpd/auth.c"; sourceTree = "<group>"; };
 		A2AAB6C50DE0D5A400E04DDA /* compat_unix.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = compat_unix.c; path = "third-party/shttpd/compat_unix.c"; sourceTree = "<group>"; };
 		A2AAB6C60DE0D5A400E04DDA /* compat_unix.h */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.h; name = compat_unix.h; path = "third-party/shttpd/compat_unix.h"; sourceTree = "<group>"; };
@@ -664,7 +656,7 @@
 		A2AC81D60D987E2D00A2878C /* nl */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = nl; path = macosx/nl.lproj/AddWindow.xib; sourceTree = "<group>"; };
 		A2AF1C360A3D0F6200F1575D /* FileOutlineView.h */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.h; name = FileOutlineView.h; path = macosx/FileOutlineView.h; sourceTree = "<group>"; };
 		A2AF1C370A3D0F6200F1575D /* FileOutlineView.m */ = {isa = PBXFileReference; fileEncoding = 30; lastKnownFileType = sourcecode.c.objc; name = FileOutlineView.m; path = macosx/FileOutlineView.m; sourceTree = "<group>"; };
-		A2B3FB450E5901E700FF78FB /* cli.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = cli.c; path = cli/cli.c; sourceTree = "<group>"; };
+		A2B3FBD00E59033C00FF78FB /* cli.c */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = sourcecode.c.c; name = cli.c; path = cli/cli.c; sourceTree = "<group>"; };
 		A2B5BB7A0D9C7C2300FCB650 /* es */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = es; path = macosx/es.lproj/AddWindow.xib; sourceTree = "<group>"; };
 		A2B5DF860E39880000394E9A /* tr */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = tr; path = macosx/tr.lproj/AddWindow.xib; sourceTree = "<group>"; };
 		A2B5DF890E39881000394E9A /* tr */ = {isa = PBXFileReference; lastKnownFileType = file.xib; name = tr; path = macosx/tr.lproj/Creator.xib; sourceTree = "<group>"; };
@@ -827,7 +819,7 @@
 				4D9A2BF009E16D21002D0FF9 /* libtransmission.a in Frameworks */,
 				4D9A2BF909E16D4F002D0FF9 /* libcrypto.0.9.7.dylib in Frameworks */,
 				A22E59A70DC11A1D00F4BE15 /* libcurl.dylib in Frameworks */,
-				A2B3FB4C0E59023000FF78FB /* Cocoa.framework in Frameworks */,
+				A2B3FBD40E59035800FF78FB /* Cocoa.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -886,7 +878,7 @@
 				BEFC1C040C07753100B0BB3C /* libcrypto.0.9.7.dylib in Frameworks */,
 				BEFC1C050C07753500B0BB3C /* libtransmission.a in Frameworks */,
 				A22E59A80DC11A1F00F4BE15 /* libcurl.dylib in Frameworks */,
-				A2B3FB530E59027100FF78FB /* Cocoa.framework in Frameworks */,
+				A2B3FBD30E59035500FF78FB /* Cocoa.framework in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -970,10 +962,6 @@
 				A2FB701B0D95CAEA0001F331 /* GroupsController.m */,
 				A2D307A20D9EC6870051FD27 /* BlocklistDownloader.h */,
 				A2D307A30D9EC6870051FD27 /* BlocklistDownloader.m */,
-				A222E9850E6B21D9009FB003 /* BlocklistDownloaderViewController.h */,
-				A222E9860E6B21D9009FB003 /* BlocklistDownloaderViewController.m */,
-				A222EA790E6C32C4009FB003 /* BlocklistScheduler.h */,
-				A222EA7A0E6C32C4009FB003 /* BlocklistScheduler.m */,
 				A2DF567C0DE323D3000795D5 /* QuickLook.h */,
 				A2DF57720DE46A6A000795D5 /* QuickLookController.h */,
 				A2DF57730DE46A6A000795D5 /* QuickLookController.m */,
@@ -1024,7 +1012,6 @@
 				A250EE800E2ED87B00A688E6 /* web */,
 				4DE5CCCA0981D9BE00BE280E /* Defaults.plist */,
 				8D1107310486CEB800E47090 /* Info.plist */,
-				A22F1E540E7DA8030065DB9D /* sparkle_dsa_pub.pem */,
 				089C165CFE840E0CC02AAC07 /* InfoPlist.strings */,
 				A23F50000D1D99D7002FCB97 /* MainMenu.xib */,
 				A23F4FF00D1D98AD002FCB97 /* PrefsWindow.xib */,
@@ -1146,8 +1133,8 @@
 		4D1838DC09DEC04A0047D688 /* libtransmission */ = {
 			isa = PBXGroup;
 			children = (
-				A2AAB65B0DE0CF6200E04DDA /* rpcimpl.c */,
-				A2AAB6590DE0CF6200E04DDA /* rpcimpl.h */,
+				A2AAB65B0DE0CF6200E04DDA /* rpc.c */,
+				A2AAB6590DE0CF6200E04DDA /* rpc.h */,
 				A2AAB6580DE0CF6200E04DDA /* rpc-server.c */,
 				A2AAB65A0DE0CF6200E04DDA /* rpc-server.h */,
 				A29DF8B60DB2544C00D04E5A /* resume.c */,
@@ -1257,7 +1244,7 @@
 		4DDBB71F09E16BFE00284745 /* CLI */ = {
 			isa = PBXGroup;
 			children = (
-				A2B3FB450E5901E700FF78FB /* cli.c */,
+				A2B3FBD00E59033C00FF78FB /* cli.c */,
 			);
 			name = CLI;
 			sourceTree = "<group>";
@@ -1457,7 +1444,7 @@
 				BEFC1E290C07861A00B0BB3C /* version.h in Headers */,
 				BEFC1E2A0C07861A00B0BB3C /* utils.h in Headers */,
 				BEFC1E2C0C07861A00B0BB3C /* upnp.h in Headers */,
-				A2AAB65D0DE0CF6200E04DDA /* rpcimpl.h in Headers */,
+				A2AAB65D0DE0CF6200E04DDA /* rpc.h in Headers */,
 				A2AAB65E0DE0CF6200E04DDA /* rpc-server.h in Headers */,
 				BEFC1E2E0C07861A00B0BB3C /* transmission.h in Headers */,
 				BEFC1E300C07861A00B0BB3C /* tracker.h in Headers */,
@@ -1562,6 +1549,7 @@
 				4DC4AA3D0B05673D0005DB76 /* ShellScript */,
 				4D18389309DEC0030047D688 /* Headers */,
 				4D18389409DEC0030047D688 /* Sources */,
+				BEFC1CA00C077F1200B0BB3C /* Resources */,
 				BE75C3860C72A1D300DBEFE0 /* Frameworks */,
 			);
 			buildRules = (
@@ -1705,11 +1693,8 @@
 /* Begin PBXProject section */
 		29B97313FDCFA39411CA2CEA /* Project object */ = {
 			isa = PBXProject;
-			attributes = {
-				BuildIndependentTargetsInParallel = YES;
-			};
 			buildConfigurationList = 4DF0C59A089918A300DD8943 /* Build configuration list for PBXProject "Transmission" */;
-			compatibilityVersion = "Xcode 3.1";
+			compatibilityVersion = "Xcode 3.0";
 			hasScannedForEncodings = 1;
 			knownRegions = (
 				English,
@@ -1847,7 +1832,13 @@
 				A2C0C5030E02CB6100D95339 /* Remote.png in Resources */,
 				A2CB38AF0E1E6896002B514C /* COPYING in Resources */,
 				A250EEB60E2ED87B00A688E6 /* web in Resources */,
-				A22F1E550E7DA8030065DB9D /* sparkle_dsa_pub.pem in Resources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
+		BEFC1CA00C077F1200B0BB3C /* Resources */ = {
+			isa = PBXResourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -1897,7 +1888,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BEFC1E2B0C07861A00B0BB3C /* utils.c in Sources */,
-				A2AAB65F0DE0CF6200E04DDA /* rpcimpl.c in Sources */,
+				A2AAB65F0DE0CF6200E04DDA /* rpc.c in Sources */,
 				BEFC1E2D0C07861A00B0BB3C /* upnp.c in Sources */,
 				A2AAB65C0DE0CF6200E04DDA /* rpc-server.c in Sources */,
 				BEFC1E2F0C07861A00B0BB3C /* session.c in Sources */,
@@ -1944,7 +1935,7 @@
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
-				A2B3FB460E5901E700FF78FB /* cli.c in Sources */,
+				A2B3FBD10E59033C00FF78FB /* cli.c in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2008,8 +1999,6 @@
 				A2725D5D0DE7507C003445E7 /* TrackerTableView.m in Sources */,
 				A28F4F770E085BDC003A3882 /* ColorTextField.m in Sources */,
 				A27F0F330E19AD9800B2DB97 /* TorrentGroup.m in Sources */,
-				A222E9870E6B21D9009FB003 /* BlocklistDownloaderViewController.m in Sources */,
-				A222EA7B0E6C32C4009FB003 /* BlocklistScheduler.m in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -2232,22 +2221,20 @@
 /* End PBXVariantGroup section */
 
 /* Begin XCBuildConfiguration section */
-		0053D3D30C86774200545606 /* Debug */ = {
+		0053D3D30C86774200545606 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_DEBUGGING_SYMBOLS = full;
 				GCC_ENABLE_SYMBOL_SEPARATION = NO;
 				GCC_INLINES_ARE_PRIVATE_EXTERN = YES;
 				OTHER_CFLAGS = "-DHAVE_CONFIG_H";
 				PRODUCT_NAME = event;
 				USER_HEADER_SEARCH_PATHS = "third-party/libevent";
 			};
-			name = Debug;
+			name = Development;
 		};
-		0053D3D40C86774200545606 /* Debug */ = {
+		0053D3D40C86774200545606 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_DEBUGGING_SYMBOLS = full;
 				HEADER_SEARCH_PATHS = (
 					"third-party/shttpd",
 					"third-party/libevent",
@@ -2269,13 +2256,12 @@
 				);
 				PRODUCT_NAME = transmission;
 			};
-			name = Debug;
+			name = Development;
 		};
-		0053D3D50C86774200545606 /* Debug */ = {
+		0053D3D50C86774200545606 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				FRAMEWORK_SEARCH_PATHS = macosx;
-				GCC_DEBUGGING_SYMBOLS = full;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = macosx/Transmission_Prefix.pch;
 				INFOPLIST_FILE = macosx/Info.plist;
@@ -2286,21 +2272,19 @@
 				PRODUCT_NAME = Transmission;
 				WRAPPER_EXTENSION = app;
 			};
-			name = Debug;
+			name = Development;
 		};
-		0053D3D60C86774200545606 /* Debug */ = {
+		0053D3D60C86774200545606 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_DEBUGGING_SYMBOLS = full;
 				HEADER_SEARCH_PATHS = .;
 				PRODUCT_NAME = transmissioncli;
 			};
-			name = Debug;
+			name = Development;
 		};
-		0053D3D70C86774200545606 /* Debug */ = {
+		0053D3D70C86774200545606 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_DEBUGGING_SYMBOLS = full;
 				HEADER_SEARCH_PATHS = (
 					.,
 					"third-party/",
@@ -2312,12 +2296,11 @@
 				);
 				PRODUCT_NAME = "transmission-daemon";
 			};
-			name = Debug;
+			name = Development;
 		};
-		0053D3D80C86774200545606 /* Debug */ = {
+		0053D3D80C86774200545606 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_DEBUGGING_SYMBOLS = full;
 				HEADER_SEARCH_PATHS = (
 					.,
 					"third-party/",
@@ -2325,20 +2308,17 @@
 				);
 				PRODUCT_NAME = "transmission-remote";
 			};
-			name = Debug;
+			name = Development;
 		};
-		0053D3DA0C86774200545606 /* Debug */ = {
+		0053D3DA0C86774200545606 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
 				GCC_ENABLE_FIX_AND_CONTINUE = YES;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
 				GCC_OPTIMIZATION_LEVEL = 0;
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_UNROLL_LOOPS = NO;
-				GCC_VERSION = 4.2;
 				GCC_WARN_ABOUT_MISSING_NEWLINE = NO;
 				GCC_WARN_ABOUT_RETURN_TYPE = NO;
 				GCC_WARN_PROTOTYPE_CONVERSION = NO;
@@ -2356,10 +2336,9 @@
 				OTHER_LDFLAGS = "";
 				PREBINDING = NO;
 				PRELINK_LIBS = "";
-				SDKROOT = macosx10.5;
-				STRIP_INSTALLED_PRODUCT = NO;
+				SDKROOT = "$(DEVELOPER_SDK_DIR)/MacOSX10.5.sdk";
 			};
-			name = Debug;
+			name = Development;
 		};
 		3C7A118E0D0B2EB800B5701F /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -2378,7 +2357,6 @@
 		3C7A118F0D0B2EB800B5701F /* Release - Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_DEBUGGING_SYMBOLS = full;
 				GCC_ENABLE_FIX_AND_CONTINUE = YES;
 				GCC_MODEL_TUNING = G5;
 				INSTALL_PATH = /usr/local/lib;
@@ -2388,11 +2366,10 @@
 			};
 			name = "Release - Debug";
 		};
-		3C7A11900D0B2EB800B5701F /* Debug */ = {
+		3C7A11900D0B2EB800B5701F /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COPY_PHASE_STRIP = NO;
-				GCC_DEBUGGING_SYMBOLS = full;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_ENABLE_FIX_AND_CONTINUE = YES;
 				GCC_MODEL_TUNING = G5;
@@ -2402,7 +2379,7 @@
 				PRODUCT_NAME = natpmp;
 				ZERO_LINK = YES;
 			};
-			name = Debug;
+			name = Development;
 		};
 		4D18389C09DEC01E0047D688 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -2461,13 +2438,9 @@
 					i386,
 				);
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEPLOYMENT_POSTPROCESSING = YES;
-				GCC_DEBUGGING_SYMBOLS = used;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
-				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
+				GCC_GENERATE_DEBUGGING_SYMBOLS = NO;
 				GCC_UNROLL_LOOPS = NO;
-				GCC_VERSION = 4.2;
 				GCC_WARN_ABOUT_MISSING_NEWLINE = NO;
 				GCC_WARN_ABOUT_RETURN_TYPE = NO;
 				GCC_WARN_PROTOTYPE_CONVERSION = NO;
@@ -2478,7 +2451,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.4;
 				OTHER_LDFLAGS = "";
 				PREBINDING = NO;
-				SDKROOT = macosx10.5;
+				SDKROOT = "$(DEVELOPER_SDK_DIR)/MacOSX10.5.sdk";
 			};
 			name = Release;
 		};
@@ -2489,14 +2462,10 @@
 					ppc,
 					i386,
 				);
-				COPY_PHASE_STRIP = NO;
 				DEBUG_INFORMATION_FORMAT = dwarf;
-				DEPLOYMENT_POSTPROCESSING = YES;
 				GCC_ENABLE_OBJC_EXCEPTIONS = YES;
 				GCC_GENERATE_DEBUGGING_SYMBOLS = YES;
-				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_UNROLL_LOOPS = NO;
-				GCC_VERSION = 4.2;
 				GCC_WARN_ABOUT_MISSING_NEWLINE = NO;
 				GCC_WARN_ABOUT_RETURN_TYPE = NO;
 				GCC_WARN_PROTOTYPE_CONVERSION = NO;
@@ -2507,8 +2476,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 10.4;
 				OTHER_LDFLAGS = "";
 				PREBINDING = NO;
-				SDKROOT = macosx10.5;
-				STRIP_INSTALLED_PRODUCT = NO;
+				SDKROOT = "$(DEVELOPER_SDK_DIR)/MacOSX10.5.sdk";
 			};
 			name = "Release - Debug";
 		};
@@ -2516,7 +2484,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				FRAMEWORK_SEARCH_PATHS = macosx;
-				GCC_DEBUGGING_SYMBOLS = full;
 				GCC_PRECOMPILE_PREFIX_HEADER = YES;
 				GCC_PREFIX_HEADER = macosx/Transmission_Prefix.pch;
 				INFOPLIST_FILE = macosx/Info.plist;
@@ -2532,7 +2499,6 @@
 		A250CFED0CDA19680068B4B6 /* Release - Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_DEBUGGING_SYMBOLS = full;
 				HEADER_SEARCH_PATHS = .;
 				PRODUCT_NAME = transmissioncli;
 			};
@@ -2541,7 +2507,6 @@
 		A250CFEE0CDA19680068B4B6 /* Release - Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_DEBUGGING_SYMBOLS = full;
 				HEADER_SEARCH_PATHS = (
 					"third-party/shttpd",
 					"third-party/libevent",
@@ -2567,7 +2532,6 @@
 		A250CFEF0CDA19680068B4B6 /* Release - Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_DEBUGGING_SYMBOLS = full;
 				HEADER_SEARCH_PATHS = (
 					.,
 					"third-party/",
@@ -2584,7 +2548,6 @@
 		A250CFF00CDA19680068B4B6 /* Release - Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_DEBUGGING_SYMBOLS = full;
 				HEADER_SEARCH_PATHS = (
 					.,
 					"third-party/",
@@ -2597,7 +2560,6 @@
 		A250CFF20CDA19680068B4B6 /* Release - Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_DEBUGGING_SYMBOLS = full;
 				OTHER_CFLAGS = "-DHAVE_CONFIG_H";
 				PRODUCT_NAME = event;
 				USER_HEADER_SEARCH_PATHS = "third-party/libevent";
@@ -2630,7 +2592,6 @@
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
-				GCC_DEBUGGING_SYMBOLS = full;
 				GCC_ENABLE_FIX_AND_CONTINUE = YES;
 				GCC_MODEL_TUNING = G5;
 				INSTALL_PATH = /usr/local/lib;
@@ -2646,12 +2607,11 @@
 			};
 			name = "Release - Debug";
 		};
-		A2DF58280DE4B0EF000795D5 /* Debug */ = {
+		A2DF58280DE4B0EF000795D5 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				ALWAYS_SEARCH_USER_PATHS = NO;
 				COPY_PHASE_STRIP = NO;
-				GCC_DEBUGGING_SYMBOLS = full;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_ENABLE_FIX_AND_CONTINUE = YES;
 				GCC_MODEL_TUNING = G5;
@@ -2667,7 +2627,7 @@
 				PRODUCT_NAME = shttpd;
 				USER_HEADER_SEARCH_PATHS = "third-party/shttpd";
 			};
-			name = Debug;
+			name = Development;
 		};
 		BE1183490CE160960002D0F3 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -2691,7 +2651,6 @@
 		BE11834A0CE160960002D0F3 /* Release - Debug */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
-				GCC_DEBUGGING_SYMBOLS = full;
 				GCC_ENABLE_FIX_AND_CONTINUE = YES;
 				GCC_MODEL_TUNING = G5;
 				INSTALL_PATH = /usr/local/lib;
@@ -2706,11 +2665,10 @@
 			};
 			name = "Release - Debug";
 		};
-		BE11834B0CE160960002D0F3 /* Debug */ = {
+		BE11834B0CE160960002D0F3 /* Development */ = {
 			isa = XCBuildConfiguration;
 			buildSettings = {
 				COPY_PHASE_STRIP = NO;
-				GCC_DEBUGGING_SYMBOLS = full;
 				GCC_DYNAMIC_NO_PIC = NO;
 				GCC_ENABLE_FIX_AND_CONTINUE = YES;
 				GCC_MODEL_TUNING = G5;
@@ -2725,7 +2683,7 @@
 				PRODUCT_NAME = miniupnp;
 				ZERO_LINK = YES;
 			};
-			name = Debug;
+			name = Development;
 		};
 		BE75C34B0C729EB600DBEFE0 /* Release */ = {
 			isa = XCBuildConfiguration;
@@ -2772,100 +2730,100 @@
 			buildConfigurations = (
 				3C7A118E0D0B2EB800B5701F /* Release */,
 				3C7A118F0D0B2EB800B5701F /* Release - Debug */,
-				3C7A11900D0B2EB800B5701F /* Debug */,
+				3C7A11900D0B2EB800B5701F /* Development */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = Development;
 		};
 		4D18389B09DEC01E0047D688 /* Build configuration list for PBXNativeTarget "libtransmission" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4D18389C09DEC01E0047D688 /* Release */,
 				A250CFEE0CDA19680068B4B6 /* Release - Debug */,
-				0053D3D40C86774200545606 /* Debug */,
+				0053D3D40C86774200545606 /* Development */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = Development;
 		};
 		4DDBB71D09E16BF100284745 /* Build configuration list for PBXNativeTarget "transmissioncli" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4DDBB71E09E16BF100284745 /* Release */,
 				A250CFED0CDA19680068B4B6 /* Release - Debug */,
-				0053D3D60C86774200545606 /* Debug */,
+				0053D3D60C86774200545606 /* Development */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = Development;
 		};
 		4DF0C596089918A300DD8943 /* Build configuration list for PBXNativeTarget "Transmission" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4DF0C599089918A300DD8943 /* Release */,
 				A250CFEC0CDA19680068B4B6 /* Release - Debug */,
-				0053D3D50C86774200545606 /* Debug */,
+				0053D3D50C86774200545606 /* Development */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = Development;
 		};
 		4DF0C59A089918A300DD8943 /* Build configuration list for PBXProject "Transmission" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				4DF0C59D089918A300DD8943 /* Release */,
 				A250CFEB0CDA19680068B4B6 /* Release - Debug */,
-				0053D3DA0C86774200545606 /* Debug */,
+				0053D3DA0C86774200545606 /* Development */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = Development;
 		};
 		A2DF584A0DE4B15A000795D5 /* Build configuration list for PBXNativeTarget "shttpd" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				A2DF58260DE4B0EF000795D5 /* Release */,
 				A2DF58270DE4B0EF000795D5 /* Release - Debug */,
-				A2DF58280DE4B0EF000795D5 /* Debug */,
+				A2DF58280DE4B0EF000795D5 /* Development */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = Development;
 		};
 		BE11834C0CE160A80002D0F3 /* Build configuration list for PBXNativeTarget "miniupnp" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				BE1183490CE160960002D0F3 /* Release */,
 				BE11834A0CE160960002D0F3 /* Release - Debug */,
-				BE11834B0CE160960002D0F3 /* Debug */,
+				BE11834B0CE160960002D0F3 /* Development */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = Development;
 		};
 		BE75C34A0C729EB600DBEFE0 /* Build configuration list for PBXNativeTarget "event" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				BE75C34B0C729EB600DBEFE0 /* Release */,
 				A250CFF20CDA19680068B4B6 /* Release - Debug */,
-				0053D3D30C86774200545606 /* Debug */,
+				0053D3D30C86774200545606 /* Development */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = Development;
 		};
 		BEFC1C090C07753800B0BB3C /* Build configuration list for PBXNativeTarget "transmission-daemon" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				BEFC1C0A0C07753800B0BB3C /* Release */,
 				A250CFEF0CDA19680068B4B6 /* Release - Debug */,
-				0053D3D70C86774200545606 /* Debug */,
+				0053D3D70C86774200545606 /* Development */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = Development;
 		};
 		BEFC1CF70C07822400B0BB3C /* Build configuration list for PBXNativeTarget "transmission-remote" */ = {
 			isa = XCConfigurationList;
 			buildConfigurations = (
 				BEFC1CF80C07822400B0BB3C /* Release */,
 				A250CFF00CDA19680068B4B6 /* Release - Debug */,
-				0053D3D80C86774200545606 /* Debug */,
+				0053D3D80C86774200545606 /* Development */,
 			);
 			defaultConfigurationIsVisible = 0;
-			defaultConfigurationName = Debug;
+			defaultConfigurationName = Development;
 		};
 /* End XCConfigurationList section */
 	};

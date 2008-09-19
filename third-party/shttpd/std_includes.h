@@ -28,6 +28,7 @@
 #include <limits.h>
 #include <stddef.h>
 #include <stdio.h>
+#include <wchar.h>
 
 #if defined(_WIN32)		/* Windows specific	*/
 #include "compat_win32.h"

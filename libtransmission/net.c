@@ -43,7 +43,6 @@
 #include "fdlimit.h"
 #include "natpmp.h"
 #include "net.h"
-#include "peer-io.h"
 #include "platform.h"
 #include "utils.h"
 
@@ -141,7 +140,9 @@ tr_netOpenTCP( const struct in_addr * addr, tr_port_t port, int priority )
     const int type = SOCK_STREAM;
 
     if( ( s = createSocket( type, priority ) ) < 0 )
+    {
         return -1;
+    }
 
     memset( &sock, 0, sizeof( sock ) );
     sock.sin_family      = AF_INET;
@@ -161,9 +162,6 @@ tr_netOpenTCP( const struct in_addr * addr, tr_port_t port, int priority )
         tr_netClose( s );
         s = -1;
     }
-
-    tr_deepLog( __FILE__, __LINE__, NULL, "New OUTGOING connection %d (%s)",
-                s, tr_peerIoAddrStr( addr, port ) );
 
     return s;
 }

@@ -14,8 +14,10 @@
  * Log function
  */
 void
-_shttpd_elog(int flags, struct conn *c, const char *fmt, ...)
+elog(int flags, struct conn *c, const char *fmt, ...)
 {
+	char	date[64], buf[URI_MAX];
+	int	len;
 	FILE	*fp = c == NULL ? NULL : c->ctx->error_log;
 	va_list	ap;
 
@@ -27,29 +29,23 @@ _shttpd_elog(int flags, struct conn *c, const char *fmt, ...)
 		va_end(ap);
 	}
 
+	strftime(date, sizeof(date), "%a %b %d %H:%M:%S %Y",
+	    localtime(&current_time));
+
+	len = my_snprintf(buf, sizeof(buf),
+	    "[%s] [error] [client %s] \"%s\" ",
+	    date, c ? inet_ntoa(c->sa.u.sin.sin_addr) : "-",
+	    c && c->request ? c->request : "-");
+
+	va_start(ap, fmt);
+	(void) vsnprintf(buf + len, sizeof(buf) - len, fmt, ap);
+	va_end(ap);
+
+	buf[sizeof(buf) - 1] = '\0';
+
 	if (fp != NULL && (flags & (E_FATAL | E_LOG))) {
-		char	date[64];
-		char	*buf = malloc( URI_MAX );
-		int	len;
-
-		strftime(date, sizeof(date), "%a %b %d %H:%M:%S %Y",
-		    localtime(&_shttpd_current_time));
-
-		len = _shttpd_snprintf(buf, URI_MAX,
-		    "[%s] [error] [client %s] \"%s\" ",
-		    date, c ? inet_ntoa(c->sa.u.sin.sin_addr) : "-",
-		    c && c->request ? c->request : "-");
-
-		va_start(ap, fmt);
-		(void) vsnprintf(buf + len, URI_MAX - len, fmt, ap);
-		va_end(ap);
-
-		buf[URI_MAX - 1] = '\0';
-
 		(void) fprintf(fp, "%s\n", buf);
 		(void) fflush(fp);
-
-		free(buf);
 	}
 
 	if (flags & E_FATAL)
@@ -57,22 +53,14 @@ _shttpd_elog(int flags, struct conn *c, const char *fmt, ...)
 }
 
 void
-_shttpd_log_access(FILE *fp, const struct conn *c)
+log_access(FILE *fp, const struct conn *c)
 {
 	static const struct vec	dash = {"-", 1};
 
-	const struct vec	*user;
-	const struct vec	*referer;
-	const struct vec	*user_agent;
-	char			date[64], *buf, *q1, *q2;
-
-	if (fp == NULL)
-		return;
-
-	user = &c->ch.user.v_vec;
-	referer = &c->ch.referer.v_vec;
-	user_agent = &c->ch.useragent.v_vec;
-	q1 = q2 = "\"";
+	const struct vec	*user = &c->ch.user.v_vec;
+	const struct vec	*referer = &c->ch.referer.v_vec;
+	const struct vec	*user_agent = &c->ch.useragent.v_vec;
+	char			date[64], buf[URI_MAX], *q1 = "\"", *q2 = "\"";
 
 	if (user->len == 0)
 		user = &dash;
@@ -90,18 +78,16 @@ _shttpd_log_access(FILE *fp, const struct conn *c)
 	(void) strftime(date, sizeof(date), "%d/%b/%Y:%H:%M:%S",
 			localtime(&c->birth_time));
 
-	buf = malloc(URI_MAX);
-
-	(void) _shttpd_snprintf(buf, URI_MAX,
+	(void) my_snprintf(buf, sizeof(buf),
 	    "%s - %.*s [%s %+05d] \"%s\" %d %lu %s%.*s%s %s%.*s%s",
 	    inet_ntoa(c->sa.u.sin.sin_addr), user->len, user->ptr,
-	    date, _shttpd_tz_offset, c->request ? c->request : "-",
+	    date, tz_offset, c->request ? c->request : "-",
 	    c->status, (unsigned long) c->loc.io.total,
 	    q1, referer->len, referer->ptr, q1,
 	    q2, user_agent->len, user_agent->ptr, q2);
 
-	(void) fprintf(fp, "%s\n", buf);
-	(void) fflush(fp);
-
-	free(buf);
+	if (fp != NULL) {
+		(void) fprintf(fp, "%s\n", buf);
+		(void) fflush(fp);
+	}
 }

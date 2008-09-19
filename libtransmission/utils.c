@@ -54,8 +54,7 @@ static int            messageQueuing = FALSE;
 static tr_msg_list *  messageQueue = NULL;
 static tr_msg_list ** messageQueueTail = &messageQueue;
 
-void
-tr_msgInit( void )
+void tr_msgInit( void )
 {
     if( !messageLock )
          messageLock = tr_lockNew( );
@@ -191,7 +190,7 @@ tr_deepLog( const char * file, int line, const char * name, const char * fmt, ..
         evbuffer_add_vprintf( buf, fmt, args );
         va_end( args );
         evbuffer_add_printf( buf, " (%s:%d)\n", basename(myfile), line );
-        fwrite( EVBUFFER_DATA( buf ), 1, EVBUFFER_LENGTH( buf ), fp );
+        fwrite( EVBUFFER_DATA(buf), 1, EVBUFFER_LENGTH(buf), fp );
 
         tr_free( myfile );
         evbuffer_free( buf );
@@ -266,6 +265,20 @@ tr_msg( const char * file, int line, int level,
         tr_lockUnlock( messageLock );
 }
 
+int tr_rand( int sup )
+{
+    static int init = 0;
+
+    assert( sup > 0 );
+
+    if( !init )
+    {
+        srand( tr_date() );
+        init = 1;
+    }
+    return rand() % sup;
+}
+
 /***
 ****
 ***/
@@ -325,37 +338,62 @@ tr_set_compare( const void * va, size_t aCount,
 ****
 ***/
 
-#ifdef DISABLE_GETTEXT
-
-const char*
-tr_strip_positional_args( const char* str )
+int
+tr_compareUint16( uint16_t a, uint16_t b )
 {
-    static size_t bufsize = 0;
-    static char * buf = NULL;
-    const size_t len = strlen( str );
-    char * out;
-
-    if( bufsize < len ) {
-        bufsize = len * 2;
-        buf = tr_renew( char, buf, bufsize );
-    }
-
-    for( out=buf; *str; ++str ) {
-        *out++ = *str;
-        if( ( *str == '%' ) && isdigit( str[1] ) ) {
-            const char * tmp = str + 1;
-            while( isdigit( *tmp ) )
-                ++tmp;
-            if( *tmp == '$' )
-                str = tmp;
-        }
-    }
-    *out = '\0';
-
-    return buf;
+    if( a < b ) return -1;
+    if( a > b ) return 1;
+    return 0;
 }
 
+int
+tr_compareUint32( uint32_t a, uint32_t b )
+{
+    if( a < b ) return -1;
+    if( a > b ) return 1;
+    return 0;
+}
+
+int
+tr_compareUint64( uint64_t a, uint64_t b )
+{
+    if( a < b ) return -1;
+    if( a > b ) return 1;
+    return 0;
+}
+
+int
+tr_compareDouble( double a, double b )
+{
+    if( a < b ) return -1;
+    if( a > b ) return 1;
+    return 0;
+}
+
+int
+tr_strcmp( const void * a, const void * b )
+{
+    if( a && b ) return strcmp( a, b );
+    if( a ) return 1;
+    if( b ) return -1;
+    return 0;
+}
+
+int
+tr_strcasecmp( const char * a, const char * b )
+{
+    if( !a && !b ) return 0;
+    if( !a ) return -1;
+    if( !b ) return 1;
+#ifdef HAVE_STRCASECMP
+    return strcasecmp( a, b );
+#else
+    while( *a && ( tolower( *(uint8_t*)a ) == tolower( *(uint8_t*)b ) ) )
+        ++a, ++b;
+    return tolower( *(uint8_t*)a) - tolower(*(uint8_t*)b );
 #endif
+}
+
 
 /**
 ***
@@ -407,11 +445,12 @@ tr_loadFile( const char * path, size_t * size )
         fclose( file );
         return NULL;
     }
+    fseek( file, 0, SEEK_SET );
     if( fread( buf, sb.st_size, 1, file ) != 1 )
     {
         tr_err( err_fmt, path, tr_strerror(errno) );
-        fclose( file );
         free( buf );
+        fclose( file );
         return NULL;
     }
     fclose( file );
@@ -510,7 +549,7 @@ tr_buildPath ( char *buf, size_t buflen, const char *first_element, ... )
         element = (const char*) va_arg( vl, const char* );
     }
     if( EVBUFFER_LENGTH(evbuf) )
-        tr_strlcpy( buf, EVBUFFER_DATA( evbuf ), buflen );
+        tr_strlcpy( buf, (char*)EVBUFFER_DATA(evbuf), buflen );
     else
         *buf = '\0';
 
@@ -631,11 +670,17 @@ tr_strdup_printf( const char * fmt, ... )
     va_start( ap, fmt );
 
     if( evbuffer_add_vprintf( buf, fmt, ap ) != -1 )
-        ret = tr_strdup( EVBUFFER_DATA( buf ) );
+        ret = tr_strdup( (char*)EVBUFFER_DATA( buf ) );
 
     va_end( ap );
     evbuffer_free( buf );
     return ret;
+}
+
+void*
+tr_calloc( size_t nmemb, size_t size )
+{
+    return nmemb && size ? calloc( nmemb, size ) : NULL;
 }
 
 void*
@@ -672,34 +717,6 @@ tr_strerror( int i )
 *****
 ****/
 
-char*
-tr_strstrip( char * str )
-{
-    if( str != NULL )
-    {
-        size_t pos;
-        size_t len = strlen( str );
-
-        while( len && isspace( str[len-1] ) )
-            --len;
-        str[len] = '\0';
-
-        for( pos=0; pos<len && isspace( str[pos] ); )
-            ++pos;
-
-        len -= pos;
-        memmove( str, str+pos, len );
-        str[len] = '\0';
-    }
-
-    return str;
-}
-
-
-/****
-*****
-****/
-
 tr_bitfield*
 tr_bitfieldNew( size_t bitCount )
 {
@@ -713,7 +730,7 @@ tr_bitfieldNew( size_t bitCount )
 tr_bitfield*
 tr_bitfieldDup( const tr_bitfield * in )
 {
-    tr_bitfield * ret = tr_new0( tr_bitfield, 1 );
+    tr_bitfield * ret = calloc( 1, sizeof(tr_bitfield) );
     ret->bitCount = in->bitCount;
     ret->byteCount = in->byteCount;
     ret->bits = tr_memdup( in->bits, in->byteCount );
@@ -749,6 +766,60 @@ tr_bitfieldIsEmpty( const tr_bitfield * bitfield )
 }
 
 int
+tr_bitfieldHas( const tr_bitfield * bitfield, size_t nth )
+{
+    return ( tr_bitfieldTestFast( bitfield, nth ) )
+        && ( tr_bitfieldHasFast( bitfield, nth ) );
+}
+
+#if 0
+static int
+find_top_bit( uint8_t val )
+{
+    int pos = 0;
+    if ( val & 0xF0U ) pos |= 4, val >>= 4;
+    if ( val & 0xCU )  pos |= 2, val >>= 2;
+    if ( val & 0x2 )   pos |= 1;
+    return 7 - pos;
+}
+
+int
+tr_bitfieldFindTrue( const tr_bitfield  * bitfield,
+                     size_t               startBit,
+                     size_t             * setmePos )
+{
+    if( bitfield && bitfield->bits && startBit < bitfield->bitCount )
+    {
+        const uint8_t * b   = bitfield->bits + startBit/8;
+        const uint8_t * end = bitfield->bits + bitfield->byteCount;
+
+        /* If first byte already contains a set bit after startBit*/
+        if( *b & ( 0xff >> (startBit&7) ) ) {
+            *setmePos  = 8 * ( b - bitfield->bits );
+            *setmePos += find_top_bit( *b & ( 0xff >> (startBit&7) ) );
+            return 1;
+        }
+
+        /* Test bitfield for first non zero byte */
+        ++b;
+        while( (b < end) && !*b )
+            ++b;
+
+        /* If we hit the end of our bitfield, no set bit was found */
+        if( b == end )
+            return 0;
+
+        /* New bitposition is byteoff*8 */
+        *setmePos = 8 * ( b - bitfield->bits ) + find_top_bit( *b );
+
+        return 1;
+    }
+
+    return 0;
+}
+#endif
+
+int
 tr_bitfieldAdd( tr_bitfield  * bitfield, size_t nth )
 {
     assert( bitfield );
@@ -761,35 +832,17 @@ tr_bitfieldAdd( tr_bitfield  * bitfield, size_t nth )
     return 0;
 }
 
-/* Sets bit range [begin, end) to 1 */
 int
-tr_bitfieldAddRange( tr_bitfield  * b,
+tr_bitfieldAddRange( tr_bitfield  * bitfield,
                      size_t         begin,
                      size_t         end )
 {
-    size_t sb, eb;
-    unsigned char sm, em;
-
-    end--;
-
-    if( ( end >= b->bitCount ) || ( begin > end ) )
-        return -1;
-
-    sb = begin >> 3;
-    sm = ~( 0xff << ( 8 - ( begin & 7 ) ) );
-    eb = end >> 3;
-    em = 0xff << ( 7 - ( end & 7 ) );
-
-    if ( sb == eb ) {
-        b->bits[sb] |= ( sm & em );
-    } else {
-        b->bits[sb] |= sm;
-        b->bits[eb] |= em;
-        if( ++sb < eb )
-            memset (b->bits + sb, 0xff, eb - sb);
-    }
-
-    return 0;
+    int err = 0;
+    size_t i;
+    for( i=begin; i<end; ++i )
+        if(( err = tr_bitfieldAdd( bitfield, i )))
+            break;
+    return err;
 }
 
 int
@@ -806,35 +859,17 @@ tr_bitfieldRem( tr_bitfield   * bitfield,
     return 0;
 }
 
-/* Clears bit range [begin, end) to 0 */
 int
 tr_bitfieldRemRange ( tr_bitfield  * b,
                       size_t         begin,
                       size_t         end )
 {
-    size_t sb, eb;
-    unsigned char sm, em;
-
-    end--;
-
-    if( ( end >= b->bitCount ) || ( begin > end ) )
-        return -1;
-
-    sb = begin >> 3;
-    sm = 0xff << ( 8 - ( begin & 7 ) );
-    eb = end >> 3;
-    em = ~( 0xff << ( 7 - ( end & 7 ) ) );
-
-    if ( sb == eb ) {
-        b->bits[sb] &= ( sm | em );
-    } else {
-        b->bits[sb] &= sm;
-        b->bits[eb] &= em;
-        if( ++sb < eb )
-            memset (b->bits + sb, 0, eb - sb);
-    }
-
-    return 0;
+    int err = 0;
+    size_t i;
+    for( i=begin; i<end; ++i )
+        if(( err = tr_bitfieldRem( b, i )))
+            break;
+    return err;
 }
 
 tr_bitfield*
@@ -927,6 +962,14 @@ tr_wait( uint64_t delay_milliseconds )
 ***/
 
 int
+tr_stringEndsWith( const char * str, const char * end )
+{
+    const size_t slen = strlen( str );
+    const size_t elen = strlen( end );
+    return slen>=elen && !memcmp( &str[slen-elen], end, elen );
+}
+
+int
 tr_snprintf( char * buf, size_t buflen, const char * fmt, ... )
 {
     int len;
@@ -944,7 +987,7 @@ tr_snprintf( char * buf, size_t buflen, const char * fmt, ... )
  * Returns strlen(src); if retval >= siz, truncation occurred.
  */
 size_t
-tr_strlcpy(char *dst, const void * src, size_t siz)
+tr_strlcpy(char *dst, const char *src, size_t siz)
 {
 #ifdef HAVE_STRLCPY
     return strlcpy( dst, src, siz );
@@ -972,7 +1015,7 @@ tr_strlcpy(char *dst, const void * src, size_t siz)
             ;
     }
 
-    return(s - (char*)src - 1); /* count does not include NUL */
+    return(s - src - 1); /* count does not include NUL */
 #endif
 }
 

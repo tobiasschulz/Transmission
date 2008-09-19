@@ -11,7 +11,7 @@
 #include "defs.h"
 
 void
-_shttpd_strlcpy(register char *dst, register const char *src, size_t n)
+my_strlcpy(register char *dst, register const char *src, size_t n)
 {
 	for (; *src != '\0' && n > 1; n--)
 		*dst++ = *src++;
@@ -19,7 +19,7 @@ _shttpd_strlcpy(register char *dst, register const char *src, size_t n)
 }
 
 int
-_shttpd_strncasecmp(const char *str1, const char *str2, size_t len)
+my_strncasecmp(const char *str1, const char *str2, size_t len)
 {
 	register const unsigned char	*s1 = (unsigned char *) str1,
 		 			*s2 = (unsigned char *) str2, *e;
@@ -33,21 +33,21 @@ _shttpd_strncasecmp(const char *str1, const char *str2, size_t len)
 }
 
 char *
-_shttpd_strndup(const char *ptr, size_t len)
+my_strndup(const char *ptr, size_t len)
 {
 	char	*p;
 
 	if ((p = malloc(len + 1)) != NULL)
-		_shttpd_strlcpy(p, ptr, len + 1);
+		my_strlcpy(p, ptr, len + 1);
 
 	return (p);
 
 }
 
 char *
-_shttpd_strdup(const char *str)
+my_strdup(const char *str)
 {
-	return (_shttpd_strndup(str, strlen(str)));
+	return (my_strndup(str, strlen(str)));
 }
 
 /*
@@ -57,7 +57,7 @@ _shttpd_strdup(const char *str)
  * in his audit report.
  */
 int
-_shttpd_snprintf(char *buf, size_t buflen, const char *fmt, ...)
+my_snprintf(char *buf, size_t buflen, const char *fmt, ...)
 {
 	va_list		ap;
 	int		n;
@@ -80,7 +80,7 @@ _shttpd_snprintf(char *buf, size_t buflen, const char *fmt, ...)
  * Verify that given file has certain extension
  */
 int
-_shttpd_match_extension(const char *path, const char *ext_list)
+match_extension(const char *path, const char *ext_list)
 {
 	size_t		len, path_len;
 	
@@ -88,7 +88,7 @@ _shttpd_match_extension(const char *path, const char *ext_list)
 
 	FOR_EACH_WORD_IN_LIST(ext_list, len)
 		if (len < path_len && path[path_len - len - 1] == '.' &&
-		    !_shttpd_strncasecmp(path + path_len - len, ext_list, len))
+		    !my_strncasecmp(path + path_len - len, ext_list, len))
 			return (TRUE);
 
 	return (FALSE);

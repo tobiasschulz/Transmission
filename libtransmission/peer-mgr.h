@@ -72,7 +72,7 @@ void tr_peerMgrAddPex( tr_peerMgr     * manager,
 
 void tr_peerMgrSetBlame( tr_peerMgr     * manager,
                          const uint8_t  * torrentHash,
-                         tr_piece_index_t pieceIndex,
+                         int              pieceIndex,
                          int              success );
 
 int tr_peerMgrGetPeers( tr_peerMgr      * manager,
@@ -94,7 +94,7 @@ void tr_peerMgrRemoveTorrent( tr_peerMgr     * manager,
 void tr_peerMgrTorrentAvailability( const tr_peerMgr * manager,
                                     const uint8_t    * torrentHash,
                                     int8_t           * tab,
-                                    unsigned int       tabCount );
+                                    int                tabCount );
 
 struct tr_bitfield* tr_peerMgrGetAvailable( const tr_peerMgr * manager,
                                             const uint8_t    * torrentHash );
@@ -110,12 +110,7 @@ void tr_peerMgrTorrentStats( const tr_peerMgr * manager,
                              int              * setmeWebseedsSendingToUs,
                              int              * setmePeersSendingToUs,
                              int              * setmePeersGettingFromUs,
-                             int              * setmePeersFrom, /* <-- array of TR_PEER_FROM__MAX */
-                             double           * setmeRateToClient,
-                             double           * setmeRateToPeers );
-
-double tr_peerMgrGetRate( const tr_peerMgr  * manager,
-                          tr_direction        direction );
+                             int              * setmePeersFrom ); /* <-- array of TR_PEER_FROM__MAX */
 
 struct tr_peer_stat * tr_peerMgrPeerStats( const tr_peerMgr  * manager,
                                            const uint8_t     * torrentHash,

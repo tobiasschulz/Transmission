@@ -35,8 +35,6 @@ void         tr_peerMsgsSetChoke( tr_peermsgs *, int doChoke );
 void         tr_peerMsgsHave( tr_peermsgs * msgs,
                               uint32_t      pieceIndex );
 
-void         tr_peerMsgsPulse( tr_peermsgs * msgs );
-
 #if 0
 void         tr_peerMsgsCancel( tr_peermsgs * msgs,
                                 uint32_t      pieceIndex,
@@ -46,7 +44,7 @@ void         tr_peerMsgsCancel( tr_peermsgs * msgs,
 
 void         tr_peerMsgsFree( tr_peermsgs* );
 
-tr_addreq_t  tr_peerMsgsAddRequest( tr_peermsgs      * peer,
+int          tr_peerMsgsAddRequest( tr_peermsgs      * peer,
                                     tr_piece_index_t   piece );
 
 void         tr_peerMsgsUnsubscribe ( tr_peermsgs       * peer,
