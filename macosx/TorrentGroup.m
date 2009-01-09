@@ -57,7 +57,9 @@
 - (CGFloat) ratio
 {
     uint64_t uploaded = 0, downloaded = 0;
-    for (Torrent * torrent in fTorrents)
+    NSEnumerator * enumerator = [fTorrents objectEnumerator];
+    Torrent * torrent;
+    while ((torrent = [enumerator nextObject]))
     {
         uploaded += [torrent uploadedTotal];
         downloaded += [torrent downloadedTotal];
@@ -69,7 +71,9 @@
 - (CGFloat) uploadRate
 {
     CGFloat rate = 0.0f;
-    for (Torrent * torrent in fTorrents)
+    NSEnumerator * enumerator = [fTorrents objectEnumerator];
+    Torrent * torrent;
+    while ((torrent = [enumerator nextObject]))
         rate += [torrent uploadRate];
     
     return rate;
@@ -78,7 +82,9 @@
 - (CGFloat) downloadRate
 {
     CGFloat rate = 0.0f;
-    for (Torrent * torrent in fTorrents)
+    NSEnumerator * enumerator = [fTorrents objectEnumerator];
+    Torrent * torrent;
+    while ((torrent = [enumerator nextObject]))
         rate += [torrent downloadRate];
     
     return rate;

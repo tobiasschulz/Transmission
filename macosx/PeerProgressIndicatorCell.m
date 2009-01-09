@@ -40,11 +40,6 @@
     [super dealloc];
 }
 
-- (void) setSeed: (BOOL) seed
-{
-    fSeed = seed;
-}
-
 - (void) drawWithFrame: (NSRect) cellFrame inView: (NSView *) controlView
 {
     if ([[NSUserDefaults standardUserDefaults] boolForKey: @"DisplayPeerProgressBarNumber"])
@@ -63,7 +58,7 @@
         }
         
         [super drawWithFrame: cellFrame inView: controlView];
-        if (fSeed)
+        if ([self floatValue] >= 1.0f)
         {
             NSImage * checkImage = [NSImage imageNamed: @"CompleteCheck.png"];
             [checkImage setFlipped: YES];

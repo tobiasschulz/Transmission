@@ -33,7 +33,7 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef SYS_DARWIN
- #include <fcntl.h>
+#include <fcntl.h>
 #endif
 
 #ifdef HAVE_FALLOCATE
@@ -71,29 +71,28 @@
 
 enum
 {
+    TR_MAX_OPEN_FILES = 16, /* real files, not sockets */
+
     NOFILE_BUFFER = 512, /* the process' number of open files is
                             globalMaxPeers + NOFILE_BUFFER */
 };
 
 struct tr_openfile
 {
-    tr_bool    isCheckedOut;
-    tr_bool    isWritable;
-    tr_bool    closeWhenDone;
-    char       filename[MAX_PATH_LENGTH];
-    int        fd;
-    uint64_t   date;
+    unsigned int    isCheckedOut  : 1;
+    unsigned int    isWritable    : 1;
+    unsigned int    closeWhenDone : 1;
+    char            filename[MAX_PATH_LENGTH];
+    int             fd;
+    uint64_t        date;
 };
 
 struct tr_fd_s
 {
     int                   socketCount;
-    int                   socketLimit;
-
-    struct tr_openfile  * openFiles;
-    int                   openFileLimit;
-
-    tr_lock             * lock;
+    int                   socketMax;
+    tr_lock *             lock;
+    struct tr_openfile    open[TR_MAX_OPEN_FILES];
 };
 
 static struct tr_fd_s * gFd = NULL;
@@ -105,7 +104,7 @@ static struct tr_fd_s * gFd = NULL;
 ***/
 
 #ifndef O_LARGEFILE
- #define O_LARGEFILE 0
+#define O_LARGEFILE 0
 #endif
 
 static int
@@ -177,7 +176,7 @@ TrOpenFile( int          i,
             int          doPreallocate,
             uint64_t     desiredFileSize )
 {
-    struct tr_openfile * file = &gFd->openFiles[i];
+    struct tr_openfile * file = &gFd->open[i];
     int                  flags;
     char               * filename;
     struct stat          sb;
@@ -237,10 +236,10 @@ fileIsOpen( const struct tr_openfile * o )
 static void
 TrCloseFile( int i )
 {
-    struct tr_openfile * o = &gFd->openFiles[i];
+    struct tr_openfile * o = &gFd->open[i];
 
     assert( i >= 0 );
-    assert( i < gFd->openFileLimit );
+    assert( i < TR_MAX_OPEN_FILES );
     assert( fileIsOpen( o ) );
 
     close( o->fd );
@@ -262,23 +261,24 @@ tr_fdFileCheckout( const char * folder,
                    int          doPreallocate,
                    uint64_t     desiredFileSize )
 {
-    int i, winner = -1;
+    int                  i, winner = -1;
     struct tr_openfile * o;
-    char filename[MAX_PATH_LENGTH];
+    char               * filename;
 
     assert( folder && *folder );
     assert( torrentFile && *torrentFile );
     assert( doWrite == 0 || doWrite == 1 );
 
-    tr_snprintf( filename, sizeof( filename ), "%s%c%s", folder, TR_PATH_DELIMITER, torrentFile );
-    dbgmsg( "looking for file '%s', writable %c", filename, doWrite ? 'y' : 'n' );
+    filename = tr_buildPath( folder, torrentFile, NULL );
+    dbgmsg( "looking for file '%s', writable %c", filename,
+            doWrite ? 'y' : 'n' );
 
     tr_lockLock( gFd->lock );
 
     /* Is it already open? */
-    for( i = 0; i < gFd->openFileLimit; ++i )
+    for( i = 0; i < TR_MAX_OPEN_FILES; ++i )
     {
-        o = &gFd->openFiles[i];
+        o = &gFd->open[i];
 
         if( !fileIsOpen( o ) )
             continue;
@@ -316,9 +316,9 @@ tr_fdFileCheckout( const char * folder,
         uint64_t date = tr_date( ) + 1;
 
         /* look for the file that's been open longest */
-        for( i = 0; i < gFd->openFileLimit; ++i )
+        for( i = 0; i < TR_MAX_OPEN_FILES; ++i )
         {
-            o = &gFd->openFiles[i];
+            o = &gFd->open[i];
 
             if( !fileIsOpen( o ) )
             {
@@ -336,10 +336,10 @@ tr_fdFileCheckout( const char * folder,
 
         if( winner >= 0 )
         {
-            if( fileIsOpen( &gFd->openFiles[winner] ) )
+            if( fileIsOpen( &gFd->open[winner] ) )
             {
                 dbgmsg( "closing file '%s', slot #%d",
-                        gFd->openFiles[winner].filename,
+                        gFd->open[winner].filename,
                         winner );
                 TrCloseFile( winner );
             }
@@ -355,12 +355,13 @@ tr_fdFileCheckout( const char * folder,
     }
 
     assert( winner >= 0 );
-    o = &gFd->openFiles[winner];
+    o = &gFd->open[winner];
     if( !fileIsOpen( o ) )
     {
         const int err = TrOpenFile( winner, folder, torrentFile, doWrite, doPreallocate, desiredFileSize );
         if( err ) {
             tr_lockUnlock( gFd->lock );
+            tr_free( filename );
             errno = err;
             return -1;
         }
@@ -375,6 +376,7 @@ tr_fdFileCheckout( const char * folder,
     o->isCheckedOut = 1;
     o->closeWhenDone = 0;
     o->date = tr_date( );
+    tr_free( filename );
     tr_lockUnlock( gFd->lock );
     return o->fd;
 }
@@ -386,9 +388,9 @@ tr_fdFileReturn( int fd )
 
     tr_lockLock( gFd->lock );
 
-    for( i = 0; i < gFd->openFileLimit; ++i )
+    for( i = 0; i < TR_MAX_OPEN_FILES; ++i )
     {
-        struct tr_openfile * o = &gFd->openFiles[i];
+        struct tr_openfile * o = &gFd->open[i];
         if( o->fd != fd )
             continue;
 
@@ -410,9 +412,9 @@ tr_fdFileClose( const char * filename )
 
     tr_lockLock( gFd->lock );
 
-    for( i = 0; i < gFd->openFileLimit; ++i )
+    for( i = 0; i < TR_MAX_OPEN_FILES; ++i )
     {
-        struct tr_openfile * o = &gFd->openFiles[i];
+        struct tr_openfile * o = &gFd->open[i];
         if( !fileIsOpen( o ) || strcmp( filename, o->filename ) )
             continue;
 
@@ -427,7 +429,7 @@ tr_fdFileClose( const char * filename )
         {
             dbgmsg(
                 "flagging file '%s', slot #%d to be closed when checked in",
-                gFd->openFiles[i].filename, i );
+                gFd->open[i].filename, i );
             o->closeWhenDone = 1;
         }
     }
@@ -444,26 +446,20 @@ tr_fdFileClose( const char * filename )
 static int
 getSocketMax( struct tr_fd_s * gFd )
 {
-    return gFd->socketLimit;
+    return gFd->socketMax;
 }
 
 int
-tr_fdSocketCreate( int domain, int type )
+tr_fdSocketCreate( int type )
 {
     int s = -1;
 
     tr_lockLock( gFd->lock );
 
     if( gFd->socketCount < getSocketMax( gFd ) )
-        if( ( s = socket( domain, type, 0 ) ) < 0 )
-        {
-#ifdef SYS_DARWIN
-            if( sockerrno != EAFNOSUPPORT )
-#endif
+        if( ( s = socket( AF_INET, type, 0 ) ) < 0 )
             tr_err( _( "Couldn't create socket: %s" ),
                    tr_strerror( sockerrno ) );
-            s = -sockerrno;
-        }
 
     if( s > -1 )
         ++gFd->socketCount;
@@ -475,13 +471,13 @@ tr_fdSocketCreate( int domain, int type )
 }
 
 int
-tr_fdSocketAccept( int           b,
-                   tr_address  * addr,
-                   tr_port     * port )
+tr_fdSocketAccept( int              b,
+                   struct in_addr * addr,
+                   tr_port_t *      port )
 {
     int                s = -1;
     unsigned int       len;
-    struct sockaddr_storage sock;
+    struct sockaddr_in sock;
 
     assert( addr );
     assert( port );
@@ -489,27 +485,13 @@ tr_fdSocketAccept( int           b,
     tr_lockLock( gFd->lock );
     if( gFd->socketCount < getSocketMax( gFd ) )
     {
-        len = sizeof( struct sockaddr_storage );
+        len = sizeof( sock );
         s = accept( b, (struct sockaddr *) &sock, &len );
     }
     if( s > -1 )
     {
-        /* "The ss_family field of the sockaddr_storage structure will always 
-         * align with the family field of any protocol-specific structure." */ 
-        if( sock.ss_family == AF_INET ) 
-        { 
-            struct sockaddr_in * sock4 = (struct sockaddr_in *)&sock; 
-            addr->type = TR_AF_INET; 
-            addr->addr.addr4.s_addr = sock4->sin_addr.s_addr; 
-            *port = sock4->sin_port; 
-        } 
-        else 
-        { 
-            struct sockaddr_in6 * sock6 = (struct sockaddr_in6 *)&sock; 
-            addr->type = TR_AF_INET6; 
-            addr->addr.addr6 = sock6->sin6_addr;
-            *port = sock6->sin6_port; 
-        } 
+        *addr = sock.sin_addr;
+        *port = sock.sin_port;
         ++gFd->socketCount;
     }
     tr_lockUnlock( gFd->lock );
@@ -520,7 +502,11 @@ tr_fdSocketAccept( int           b,
 static void
 socketClose( int fd )
 {
+#ifdef BEOS_NETSERVER
+    closesocket( fd );
+#else
     EVUTIL_CLOSESOCKET( fd );
+#endif
 }
 
 void
@@ -546,14 +532,12 @@ tr_fdSocketClose( int s )
 ***/
 
 void
-tr_fdInit( size_t openFileLimit, size_t socketLimit )
+tr_fdInit( int globalPeerLimit )
 {
     int i;
 
     assert( gFd == NULL );
     gFd = tr_new0( struct tr_fd_s, 1 );
-    gFd->openFiles = tr_new0( struct tr_openfile, openFileLimit );
-    gFd->openFileLimit = openFileLimit;
     gFd->lock = tr_lockNew( );
 
 #ifdef HAVE_GETRLIMIT
@@ -561,18 +545,18 @@ tr_fdInit( size_t openFileLimit, size_t socketLimit )
         struct rlimit rlim;
         getrlimit( RLIMIT_NOFILE, &rlim );
         rlim.rlim_cur = MIN( rlim.rlim_max,
-                            (rlim_t)( socketLimit + NOFILE_BUFFER ) );
+                            (rlim_t)( globalPeerLimit + NOFILE_BUFFER ) );
         setrlimit( RLIMIT_NOFILE, &rlim );
-        gFd->socketLimit = rlim.rlim_cur - NOFILE_BUFFER;
+        gFd->socketMax = rlim.rlim_cur - NOFILE_BUFFER;
         tr_dbg( "setrlimit( RLIMIT_NOFILE, %d )", (int)rlim.rlim_cur );
     }
 #else
-    gFd->socketLimit = socketLimit;
+    gFd->socketMax = globalPeerLimit;
 #endif
-    tr_dbg( "%zu usable file descriptors", socketLimit );
+    tr_dbg( "%d usable file descriptors", globalPeerLimit );
 
-    for( i = 0; i < gFd->openFileLimit; ++i )
-        gFd->openFiles[i].fd = -1;
+    for( i = 0; i < TR_MAX_OPEN_FILES; ++i )
+        gFd->open[i].fd = -1;
 }
 
 void
@@ -580,8 +564,8 @@ tr_fdClose( void )
 {
     int i = 0;
 
-    for( i = 0; i < gFd->openFileLimit; ++i )
-        if( fileIsOpen( &gFd->openFiles[i] ) )
+    for( i = 0; i < TR_MAX_OPEN_FILES; ++i )
+        if( fileIsOpen( &gFd->open[i] ) )
             TrCloseFile( i );
 
     tr_lockFree( gFd->lock );
@@ -594,12 +578,12 @@ void
 tr_fdSetPeerLimit( uint16_t n )
 {
     assert( gFd != NULL && "tr_fdInit() must be called first!" );
-    gFd->socketLimit = n;
+    gFd->socketMax = n;
 }
 
 uint16_t
 tr_fdGetPeerLimit( void )
 {
-    return gFd ? gFd->socketLimit : -1;
+    return gFd ? gFd->socketMax : -1;
 }
 

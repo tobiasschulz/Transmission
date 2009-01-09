@@ -7,14 +7,25 @@
 #         "Z" for unsupported trunk builds,
 #         "0" for stable, supported releases
 # these should be the only two lines you need to change
-PEERID_PREFIX="-TR142Z-"
-USERAGENT_PREFIX="1.42+"
+PEERID_PREFIX="-TR1420-"
+USERAGENT_PREFIX="1.42"
 
-SVN_REVISION=`find -E ./libtransmission ./macosx                     \
-                  -regex ".*\.([chmp]|cpp|po|sh)"                    \
-                  -exec grep -oh '\$Id: [^ ]\+ [0-9]\+' {} +         \
-                  | awk '{ if ($3 > max) max = $3} END { print max }'`
+SVN_REVISION=`find ./libtransmission -name "*\.[chmp]" -o -name "*\.cpp" -o -name "*\.po" -o -name "*\.sh" | \
+              xargs grep "\$Id:" | \
+              grep -v third-party | \
+              cut -d"$Id:" -f3 | cut -d" " -f3 | sort -n | tail -n 1`
 
+#dirty fix to ensure the highest version number is found when running release_builder.sh
+SVN_REVISION_MAC=`find ./macosx -name "*\.[chmp]" -o -name "*\.cpp" -o -name "*\.po" -o -name "*\.sh" | \
+              xargs grep "\$Id:" | \
+              grep -v third-party | \
+              cut -d"$Id:" -f3 | cut -d" " -f3 | sort -n | tail -n 1`
+
+if [ $SVN_REVISION_MAC -gt $SVN_REVISION ]
+then
+	SVN_REVISION=$SVN_REVISION_MAC
+fi
+  
 # Generate files to be included: only overwrite them if changed so make
 # won't rebuild everything unless necessary
 replace_if_differs ()

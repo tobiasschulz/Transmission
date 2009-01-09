@@ -2,6 +2,7 @@ EXTRA_DIST = \
     Credits.rtf \
     AboutWindow.xib \
     BlocklistStatusWindow.xib \
+    GroupsWindow.xib \
     MessageWindow.xib \
     StatsWindow.xib \
     Defaults.plist \
@@ -10,7 +11,7 @@ EXTRA_DIST = \
     version.sh \
     Growl.framework \
     Sparkle.framework \
-    sparkle_dsa_pub.pem \
+    CTGradient \
     UKKQueue \
     TransmissionHelp \
     Images \
@@ -25,6 +26,8 @@ EXTRA_DIST = \
     zh_TW.lproj \
     AboutWindowController.h \
     AboutWindowController.m \
+    ActionPopUpButton.h \
+    ActionPopUpButton.m \
     AddWindowController.h \
     AddWindowController.m \
     Badger.h \
@@ -37,8 +40,6 @@ EXTRA_DIST = \
     BlocklistDownloaderViewController.m \
     BlocklistScheduler.h \
     BlocklistScheduler.m \
-    BonjourController.h \
-    BonjourController.m \
     ButtonToolbarItem.h \
     ButtonToolbarItem.m \
     ColorTextField.h \
@@ -69,8 +70,8 @@ EXTRA_DIST = \
     FilterButton.m \
     GroupsController.h \
     GroupsController.m \
-    GroupsPrefsController.h \
-    GroupsPrefsController.m \
+    GroupsWindowController.h \
+    GroupsWindowController.m \
     GroupToolbarItem.h \
     GroupToolbarItem.m \
     InfoTabButtonCell.h \
@@ -78,8 +79,16 @@ EXTRA_DIST = \
     InfoWindowController.h \
     InfoWindowController.m \
     main.m \
+    MenuLabel.h \
+    MenuLabel.m \
     MessageWindowController.h \
     MessageWindowController.m \
+    NSApplicationAdditions.h \
+    NSApplicationAdditions.m \
+    NSBezierPathAdditions.h \
+    NSBezierPathAdditions.m \
+    NSMenuAdditions.h \
+    NSMenuAdditions.m \
     NSStringAdditions.h \
     NSStringAdditions.m \
     PeerProgressIndicatorCell.h \
@@ -90,8 +99,6 @@ EXTRA_DIST = \
     PiecesView.m \
     PortChecker.h \
     PortChecker.m \
-    PredicateEditorRowTemplateAny.h \
-    PredicateEditorRowTemplateAny.m \
     PrefsController.h \
     PrefsController.m \
     PrefsWindow.h \
@@ -101,6 +108,8 @@ EXTRA_DIST = \
     QuickLookController.h \
     QuickLookController.m \
     QuickLook.h \
+    SpeedLimitToTurtleIconTransformer.h \
+    SpeedLimitToTurtleIconTransformer.m \
     StatsWindowController.h \
     StatsWindowController.m \
     StatusBarView.h \

@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2008 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -21,6 +21,8 @@
 
 #ifdef WIN32
  #include <winsock2.h> /* struct in_addr */
+#else
+ #include <netinet/in.h> /* struct in_addr */
 #endif
 
 #include "publish.h" /* tr_publisher_tag */
@@ -37,12 +39,6 @@ enum
     ENCRYPTION_PREFERENCE_NO
 };
 
-/**
- * State information about a connected peer.
- *
- * @see struct peer_atom
- * @see tr_peermsgs
- */
 typedef struct tr_peer
 {
     tr_bool                  peerIsChoked;
@@ -55,8 +51,8 @@ typedef struct tr_peer
     uint8_t                  strikes;
 
     uint8_t                  encryption_preference;
-    tr_port                  port;
-    tr_address               addr;
+    uint16_t                 port;
+    struct in_addr           addr;
     struct tr_peerIo       * io;
 
     struct tr_bitfield     * blame;
@@ -72,11 +68,12 @@ typedef struct tr_peer
 
     struct tr_peermsgs     * msgs;
     tr_publisher_tag         msgsTag;
+
+    struct tr_bandwidth    * bandwidth;
 }
 tr_peer;
 
 double tr_peerGetPieceSpeed( const tr_peer    * peer,
-                             uint64_t           now,
                              tr_direction       direction );
 
 #endif

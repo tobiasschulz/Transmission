@@ -41,7 +41,6 @@
     
     Torrent * fTorrent;
     NSString * fDestination;
-    BOOL fLockDestination;
     
     BOOL fDeleteTorrent, fDeleteEnable;
     NSInteger fGroupValue;
@@ -49,8 +48,8 @@
     NSTimer * fTimer;
 }
 
-- (id) initWithTorrent: (Torrent *) torrent destination: (NSString *) path lockDestination: (BOOL) lockDestination
-    controller: (Controller *) controller deleteTorrent: (torrentFileState) deleteTorrent;
+- (id) initWithTorrent: (Torrent *) torrent destination: (NSString *) path controller: (Controller *) controller
+        deleteTorrent: (torrentFileState) deleteTorrent;
 
 - (Torrent *) torrent;
 
@@ -64,5 +63,6 @@
 - (void) updateStatusField: (NSNotification *) notification;
 
 - (void) updateGroupMenu: (NSNotification *) notification;
+- (void) showGroupsWindow: (id) sender;
 
 @end

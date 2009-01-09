@@ -23,6 +23,7 @@
  *****************************************************************************/
 
 #import "CreatorWindowController.h"
+#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "utils.h" //tr_httpIsValidURL
 
@@ -44,7 +45,7 @@
 
 @implementation CreatorWindowController
 
-+ (void) createTorrentFile: (tr_session *) handle
++ (void) createTorrentFile: (tr_handle *) handle
 {
     //get file/folder for torrent
     NSString * path;
@@ -55,13 +56,13 @@
     [creator showWindow: nil];
 }
 
-+ (void) createTorrentFile: (tr_session *) handle forFile: (NSString *) file
++ (void) createTorrentFile: (tr_handle *) handle forFile: (NSString *) file
 {
     CreatorWindowController * creator = [[self alloc] initWithHandle: handle path: file];
     [creator showWindow: nil];
 }
 
-- (id) initWithHandle: (tr_session *) handle path: (NSString *) path
+- (id) initWithHandle: (tr_handle *) handle path: (NSString *) path
 {
     if ((self = [super initWithWindowNibName: @"Creator"]))
     {
@@ -183,6 +184,13 @@
     
     fOpenTorrent = [fDefaults boolForKey: @"CreatorOpen"];
     [self updateEnableOpenCheckForTrackers];
+    
+    if (![NSApp isOnLeopardOrBetter])
+    {
+        [fTrackerAddRemoveControl sizeToFit];
+        [fTrackerAddRemoveControl setLabel: @"+" forSegment: TRACKER_ADD_TAG];
+        [fTrackerAddRemoveControl setLabel: @"-" forSegment: TRACKER_REMOVE_TAG];
+    }
 }
 
 - (void) dealloc
@@ -232,7 +240,11 @@
             " that will add the address for you.", "Create torrent -> blank address -> message")];
         [alert addButtonWithTitle: NSLocalizedString(@"Create", "Create torrent -> blank address -> button")];
         [alert addButtonWithTitle: NSLocalizedString(@"Cancel", "Create torrent -> blank address -> button")];
-        [alert setShowsSuppressionButton: YES];
+        
+        if ([NSApp isOnLeopardOrBetter])
+            [alert setShowsSuppressionButton: YES];
+        else
+            [alert addButtonWithTitle: NSLocalizedString(@"Don't Alert Again", "Create torrent -> blank address -> button")];
 
         [alert beginSheetModalForWindow: [self window] modalDelegate: self
             didEndSelector: @selector(createBlankAddressAlertDidEnd:returnCode:contextInfo:) contextInfo: nil];
@@ -365,7 +377,7 @@
 
 - (void) createBlankAddressAlertDidEnd: (NSAlert *) alert returnCode: (NSInteger) returnCode contextInfo: (void *) contextInfo
 {
-    if ([[alert suppressionButton] state] == NSOnState)
+    if (([NSApp isOnLeopardOrBetter] ? [[alert suppressionButton] state] == NSOnState : returnCode == NSAlertThirdButtonReturn))
         [[NSUserDefaults standardUserDefaults] setBool: NO forKey: @"WarningCreatorBlankAddress"];
     
     [alert release];

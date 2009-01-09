@@ -20,7 +20,6 @@
 #include <event.h>
 
 #include "transmission.h"
-#include "session.h"
 #include "bencode.h"
 #include "clients.h"
 #include "crypto.h"
@@ -314,7 +313,7 @@ sendYa( tr_handshake * handshake )
 {
     int               len;
     const uint8_t *   public_key;
-    struct evbuffer * outbuf = tr_getBuffer( );
+    struct evbuffer * outbuf = evbuffer_new( );
     uint8_t           pad_a[PadA_MAXLEN];
 
     /* add our public key (Ya) */
@@ -333,7 +332,7 @@ sendYa( tr_handshake * handshake )
     tr_peerIoWriteBuf( handshake->io, outbuf, FALSE );
 
     /* cleanup */
-    tr_releaseBuffer( outbuf );
+    evbuffer_free( outbuf );
 }
 
 static uint32_t
@@ -426,7 +425,7 @@ readYb( tr_handshake *    handshake,
 
     /* now send these: HASH('req1', S), HASH('req2', SKEY) xor HASH('req3', S),
      * ENCRYPT(VC, crypto_provide, len(PadC), PadC, len(IA)), ENCRYPT(IA) */
-    outbuf = tr_getBuffer( );
+    outbuf = evbuffer_new( );
 
     /* HASH('req1', S) */
     {
@@ -483,7 +482,7 @@ readYb( tr_handshake *    handshake,
     tr_peerIoWriteBuf( handshake->io, outbuf, FALSE );
 
     /* cleanup */
-    tr_releaseBuffer( outbuf );
+    evbuffer_free( outbuf );
     return READ_LATER;
 }
 
@@ -843,19 +842,19 @@ readCryptoProvide( tr_handshake *    handshake,
     tr_sha1( req3, "req3", 4, handshake->mySecret, KEY_LEN, NULL );
     for( i = 0; i < SHA_DIGEST_LENGTH; ++i )
         obfuscatedTorrentHash[i] = req2[i] ^ req3[i];
-    if(( tor = tr_torrentFindFromObfuscatedHash( handshake->session, obfuscatedTorrentHash )))
+    if( ( tor =
+             tr_torrentFindFromObfuscatedHash( handshake->session,
+                                               obfuscatedTorrentHash ) ) )
     {
-        const tr_bool clientIsSeed = tr_torrentIsSeed( tor );
-        const tr_bool peerIsSeed = tr_peerMgrPeerIsSeed( handshake->session->peerMgr,
-                                                         tor->info.hash,
-                                                         tr_peerIoGetAddress( handshake->io, NULL ) );
         dbgmsg( handshake, "got INCOMING connection's encrypted handshake for torrent [%s]",
                 tor->info.name );
         tr_peerIoSetTorrentHash( handshake->io, tor->info.hash );
-
-        if( clientIsSeed && peerIsSeed )
+        if( !tr_torrentAllowsPex( tor )
+          && tr_peerMgrPeerIsSeed( handshake->session->peerMgr,
+                                  tor->info.hash,
+                                  tr_peerIoGetAddress( handshake->io, NULL ) ) )
         {
-            dbgmsg( handshake, "another seed tried to reconnect to us!" );
+            dbgmsg( handshake, "a peer has tried to reconnect to us!" );
             return tr_handshakeDone( handshake, FALSE );
         }
     }
@@ -919,7 +918,7 @@ readIA( tr_handshake *    handshake,
     **/
 
     tr_cryptoEncryptInit( handshake->crypto );
-    outbuf = tr_getBuffer( );
+    outbuf = evbuffer_new( );
 
     dbgmsg( handshake, "sending vc" );
     /* send VC */
@@ -939,7 +938,7 @@ readIA( tr_handshake *    handshake,
     else
     {
         dbgmsg( handshake, "peer didn't offer an encryption mode we like." );
-        tr_releaseBuffer( outbuf );
+        evbuffer_free( outbuf );
         return tr_handshakeDone( handshake, FALSE );
     }
 
@@ -968,7 +967,7 @@ readIA( tr_handshake *    handshake,
 
     /* send it out */
     tr_peerIoWriteBuf( handshake->io, outbuf, FALSE );
-    tr_releaseBuffer( outbuf );
+    evbuffer_free( outbuf );
 
     /* now await the handshake */
     setState( handshake, AWAITING_PAYLOAD_STREAM );
@@ -1091,11 +1090,11 @@ fireDoneFunc( tr_handshake * handshake,
     return success;
 }
 
-static void
+void
 tr_handshakeFree( tr_handshake * handshake )
 {
     if( handshake->io )
-        tr_peerIoUnref( handshake->io ); /* balanced by the ref in tr_handshakeNew */
+        tr_peerIoFree( handshake->io );
 
     tr_free( handshake );
 }
@@ -1110,8 +1109,6 @@ tr_handshakeDone( tr_handshake * handshake,
     tr_peerIoSetIOFuncs( handshake->io, NULL, NULL, NULL, NULL );
 
     success = fireDoneFunc( handshake, isOK );
-
-    tr_handshakeFree( handshake );    
 
     return success ? READ_LATER : READ_ERR;
 }
@@ -1174,7 +1171,6 @@ tr_handshakeNew( tr_peerIo *        io,
     handshake->doneUserData = doneUserData;
     handshake->session = tr_peerIoGetSession( io );
 
-    tr_peerIoRef( io ); /* balanced by the unref in tr_handshakeFree */
     tr_peerIoSetIOFuncs( handshake->io, canRead, NULL, gotError, handshake );
 
     if( tr_peerIoIsIncoming( handshake->io ) )

@@ -23,6 +23,7 @@
  *****************************************************************************/
 
 #import "PortChecker.h"
+#import "NSApplicationAdditions.h"
 
 #define CHECKER_URL @"http://portcheck.transmissionbt.com/%d"
 #define CHECK_FIRE  3.0
@@ -129,8 +130,9 @@
     fTimer = nil;
     
     NSURLRequest * portProbeRequest = [NSURLRequest requestWithURL: [NSURL URLWithString:
-                                        [NSString stringWithFormat: CHECKER_URL, fPortNumber]]
-                                        cachePolicy: NSURLRequestReloadIgnoringLocalAndRemoteCacheData timeoutInterval: 15.0];
+                [NSString stringWithFormat: CHECKER_URL, fPortNumber]] cachePolicy:
+                [NSApp isOnLeopardOrBetter] ? NSURLRequestReloadIgnoringLocalAndRemoteCacheData : NSURLRequestReloadIgnoringCacheData
+                timeoutInterval: 15.0];
     
     if ((fConnection = [[NSURLConnection alloc] initWithRequest: portProbeRequest delegate: self]))
         fPortProbeData = [[NSMutableData alloc] init];

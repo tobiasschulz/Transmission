@@ -26,7 +26,7 @@
 #import "BlocklistDownloaderViewController.h"
 #import "BlocklistScheduler.h"
 #import "PortChecker.h"
-#import "BonjourController.h"
+#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "UKKQueue.h"
 #import "utils.h"
@@ -43,7 +43,6 @@
 
 #define TOOLBAR_GENERAL     @"TOOLBAR_GENERAL"
 #define TOOLBAR_TRANSFERS   @"TOOLBAR_TRANSFERS"
-#define TOOLBAR_GROUPS      @"TOOLBAR_GROUPS"
 #define TOOLBAR_BANDWIDTH   @"TOOLBAR_BANDWIDTH"
 #define TOOLBAR_PEERS       @"TOOLBAR_PEERS"
 #define TOOLBAR_NETWORK     @"TOOLBAR_NETWORK"
@@ -71,13 +70,13 @@
 
 @implementation PrefsController
 
-tr_session * fHandle;
-+ (void) setHandle: (tr_session *) handle
+tr_handle * fHandle;
++ (void) setHandle: (tr_handle *) handle
 {
     fHandle = handle;
 }
 
-+ (tr_session *) handle
++ (tr_handle *) handle
 {
     return fHandle;
 }
@@ -109,10 +108,6 @@ tr_session * fHandle;
             
             [fDefaults removeObjectForKey: @"DownloadChoice"];
         }
-        
-        //save a new random port
-        if ([fDefaults boolForKey: @"RandomPort"])
-            [fDefaults setInteger: tr_sessionGetPeerPort(fHandle) forKey: @"BindPort"];
         
         //set auto import
         NSString * autoPath;
@@ -174,6 +169,13 @@ tr_session * fHandle;
     [toolbar release];
     
     [self setPrefView: nil];
+    
+    if (![NSApp isOnLeopardOrBetter])
+    {
+        [fRPCAddRemoveControl sizeToFit];
+        [fRPCAddRemoveControl setLabel: @"+" forSegment: RPC_IP_ADD_TAG];
+        [fRPCAddRemoveControl setLabel: @"-" forSegment: RPC_IP_REMOVE_TAG];
+    }
     
     //set download folder
     [fFolderPopUp selectItemAtIndex: [fDefaults boolForKey: @"DownloadLocationConstant"] ? DOWNLOAD_FOLDER : DOWNLOAD_TORRENT];
@@ -248,7 +250,7 @@ tr_session * fHandle;
     if ([ident isEqualToString: TOOLBAR_GENERAL])
     {
         [item setLabel: NSLocalizedString(@"General", "Preferences -> toolbar item title")];
-        [item setImage: [NSImage imageNamed: NSImageNamePreferencesGeneral]];
+        [item setImage: [NSImage imageNamed: [NSApp isOnLeopardOrBetter] ? NSImageNamePreferencesGeneral : @"Preferences.png"]];
         [item setTarget: self];
         [item setAction: @selector(setPrefView:)];
         [item setAutovalidates: NO];
@@ -257,14 +259,6 @@ tr_session * fHandle;
     {
         [item setLabel: NSLocalizedString(@"Transfers", "Preferences -> toolbar item title")];
         [item setImage: [NSImage imageNamed: @"Transfers.png"]];
-        [item setTarget: self];
-        [item setAction: @selector(setPrefView:)];
-        [item setAutovalidates: NO];
-    }
-    else if ([ident isEqualToString: TOOLBAR_GROUPS])
-    {
-        [item setLabel: NSLocalizedString(@"Groups", "Preferences -> toolbar item title")];
-        [item setImage: [NSImage imageNamed: @"Groups.png"]];
         [item setTarget: self];
         [item setAction: @selector(setPrefView:)];
         [item setAutovalidates: NO];
@@ -280,7 +274,7 @@ tr_session * fHandle;
     else if ([ident isEqualToString: TOOLBAR_PEERS])
     {
         [item setLabel: NSLocalizedString(@"Peers", "Preferences -> toolbar item title")];
-        [item setImage: [NSImage imageNamed: NSImageNameUserGroup]];
+        [item setImage: [NSImage imageNamed: [NSApp isOnLeopardOrBetter] ? NSImageNameUserGroup : @"Peers.png"]];
         [item setTarget: self];
         [item setAction: @selector(setPrefView:)];
         [item setAutovalidates: NO];
@@ -288,7 +282,7 @@ tr_session * fHandle;
     else if ([ident isEqualToString: TOOLBAR_NETWORK])
     {
         [item setLabel: NSLocalizedString(@"Network", "Preferences -> toolbar item title")];
-        [item setImage: [NSImage imageNamed: NSImageNameNetwork]];
+        [item setImage: [NSImage imageNamed: [NSApp isOnLeopardOrBetter] ? NSImageNameNetwork : @"Network.png"]];
         [item setTarget: self];
         [item setAction: @selector(setPrefView:)];
         [item setAutovalidates: NO];
@@ -322,7 +316,7 @@ tr_session * fHandle;
 
 - (NSArray *) toolbarAllowedItemIdentifiers: (NSToolbar *) toolbar
 {
-    return [NSArray arrayWithObjects: TOOLBAR_GENERAL, TOOLBAR_TRANSFERS, TOOLBAR_GROUPS, TOOLBAR_BANDWIDTH,
+    return [NSArray arrayWithObjects: TOOLBAR_GENERAL, TOOLBAR_TRANSFERS, TOOLBAR_BANDWIDTH,
                                         TOOLBAR_PEERS, TOOLBAR_NETWORK, TOOLBAR_REMOTE, nil];
 }
 
@@ -334,14 +328,6 @@ tr_session * fHandle;
     
     fPeerPort = -1;
     [self updatePortStatus];
-}
-
-- (void) randomPort: (id) sender
-{
-    tr_port port = tr_sessionSetPeerPortRandom(fHandle);
-    
-    [fPortField setIntValue: port];
-    [self setPort: fPortField];
 }
 
 - (void) setNat: (id) sender
@@ -404,22 +390,25 @@ tr_session * fHandle;
 {
     NSMutableArray * sounds = [NSMutableArray array];
     
-    NSArray * directories = [NSArray arrayWithObjects: @"/System/Library/Sounds", @"/Library/Sounds", @"Library/Sounds", nil];
+    NSMutableArray * directories = [NSMutableArray arrayWithObjects: @"/System/Library/Sounds", @"/Library/Sounds", nil];
+    if ([NSApp isOnLeopardOrBetter])
+        [directories addObject: [NSHomeDirectory() stringByAppendingPathComponent: @"Library/Sounds"]];
     
-    for (NSString * directory in directories)
-    {
-        BOOL isDirectory;
+    BOOL isDirectory;
+    NSString * directory;
+    NSEnumerator * enumerator = [directories objectEnumerator];
+    while ((directory = [enumerator nextObject]))
         if ([[NSFileManager defaultManager] fileExistsAtPath: directory isDirectory: &isDirectory] && isDirectory)
         {
-            NSArray * directoryContents = [[NSFileManager defaultManager] directoryContentsAtPath: directory];
-            for (NSString * sound in directoryContents)
+            NSString * sound;
+            NSEnumerator * soundEnumerator = [[[NSFileManager defaultManager] directoryContentsAtPath: directory] objectEnumerator];
+            while ((sound = [soundEnumerator nextObject]))
             {
                 sound = [sound stringByDeletingPathExtension];
                 if ([NSSound soundNamed: sound])
                     [sounds addObject: sound];
             }
         }
-    }
     
     return sounds;
 }
@@ -434,14 +423,14 @@ tr_session * fHandle;
 
 - (void) setPeersGlobal: (id) sender
 {
-    const int count = [sender intValue];
+    int count = [sender intValue];
     [fDefaults setInteger: count forKey: @"PeersTotal"];
     tr_sessionSetPeerLimit(fHandle, count);
 }
 
 - (void) setPeersTorrent: (id) sender
 {
-    const int count = [sender intValue];
+    int count = [sender intValue];
     [fDefaults setInteger: count forKey: @"PeersTorrent"];
 }
 
@@ -452,14 +441,13 @@ tr_session * fHandle;
 
 - (void) setEncryptionMode: (id) sender
 {
-    const tr_encryption_mode mode = [fDefaults boolForKey: @"EncryptionPrefer"] ? 
-        ([fDefaults boolForKey: @"EncryptionRequire"] ? TR_ENCRYPTION_REQUIRED : TR_ENCRYPTION_PREFERRED) : TR_CLEAR_PREFERRED;
-    tr_sessionSetEncryption(fHandle, mode);
+    tr_sessionSetEncryption(fHandle, [fDefaults boolForKey: @"EncryptionPrefer"] ? 
+        ([fDefaults boolForKey: @"EncryptionRequire"] ? TR_ENCRYPTION_REQUIRED : TR_ENCRYPTION_PREFERRED) : TR_CLEAR_PREFERRED);
 }
 
 - (void) setBlocklistEnabled: (id) sender
 {
-    const BOOL enable = [sender state] == NSOnState;
+    BOOL enable = [sender state] == NSOnState;
     [fDefaults setBool: enable forKey: @"Blocklist"];
     tr_blocklistSetEnabled(fHandle, enable);
     
@@ -539,8 +527,6 @@ tr_session * fHandle;
         tr_sessionSetSpeedLimitEnabled(fHandle, TR_DOWN, [fDefaults boolForKey: @"CheckDownload"]);
         tr_sessionSetSpeedLimit(fHandle, TR_DOWN, [fDefaults integerForKey: @"DownloadLimit"]);
     }
-    
-    [[NSNotificationCenter defaultCenter] postNotificationName: @"SpeedLimitUpdate" object: nil];
 }
 
 - (void) applyRatioSetting: (id) sender
@@ -821,10 +807,7 @@ tr_session * fHandle;
 
 - (void) setRPCEnabled: (id) sender
 {
-    BOOL enable = [fDefaults boolForKey: @"RPC"];
-    tr_sessionSetRPCEnabled(fHandle, enable);
-    
-    [self setRPCWebUIDiscovery: nil];
+    tr_sessionSetRPCEnabled(fHandle, [fDefaults boolForKey: @"RPC"]);
 }
 
 - (void) linkWebUI: (id) sender
@@ -875,21 +858,11 @@ tr_session * fHandle;
     int port = [sender intValue];
     [fDefaults setInteger: port forKey: @"RPCPort"];
     tr_sessionSetRPCPort(fHandle, port);
-    
-    [self setRPCWebUIDiscovery: nil];
 }
 
 - (void) setRPCUseWhitelist: (id) sender
 {
     tr_sessionSetRPCWhitelistEnabled(fHandle, [fDefaults boolForKey: @"RPCUseWhitelist"]);
-}
-
-- (void) setRPCWebUIDiscovery: (id) sender
-{
-    if ([fDefaults boolForKey:@"RPC"] && [fDefaults boolForKey: @"RPCWebDiscovery"])
-        [[BonjourController defaultController] startWithPort: [fDefaults integerForKey: @"RPCPort"]];
-    else
-        [[BonjourController defaultController] stop];
 }
 
 - (void) updateRPCWhitelist
@@ -945,7 +918,9 @@ tr_session * fHandle;
     if ([components count] == 4)
     {
         valid = true;
-        for (NSString * component in components)
+        NSEnumerator * enumerator = [components objectEnumerator];
+        NSString * component;
+        while ((component = [enumerator nextObject]))
         {
             if ([component isEqualToString: @"*"])
                 [newComponents addObject: component];
@@ -1035,7 +1010,7 @@ tr_session * fHandle;
     [fDefaults setBool: pex forKey: @"PEXGlobal"];
     
     //port
-    tr_port port = tr_sessionGetPeerPort(fHandle);
+    int port = tr_sessionGetPeerPort(fHandle);
     [fDefaults setInteger: port forKey: @"BindPort"];
     
     BOOL nat = tr_sessionIsPortForwardingEnabled(fHandle);
@@ -1058,8 +1033,6 @@ tr_session * fHandle;
     
     int upLimit = tr_sessionGetSpeedLimit(fHandle, TR_UP);
     [fDefaults setInteger: upLimit forKey: @"UploadLimit"];
-    
-    [[NSNotificationCenter defaultCenter] postNotificationName: @"SpeedLimitUpdate" object: nil];
     
     //update gui if loaded
     if (fHasLoaded)
@@ -1089,35 +1062,22 @@ tr_session * fHandle;
 
 - (void) setPrefView: (id) sender
 {
-    NSString * identifier;
+    NSView * view = fGeneralView;
     if (sender)
     {
-        identifier = [sender itemIdentifier];
-        [[NSUserDefaults standardUserDefaults] setObject: identifier forKey: @"SelectedPrefView"];
+        NSString * identifier = [sender itemIdentifier];
+        if ([identifier isEqualToString: TOOLBAR_TRANSFERS])
+            view = fTransfersView;
+        else if ([identifier isEqualToString: TOOLBAR_BANDWIDTH])
+            view = fBandwidthView;
+        else if ([identifier isEqualToString: TOOLBAR_PEERS])
+            view = fPeersView;
+        else if ([identifier isEqualToString: TOOLBAR_NETWORK])
+            view = fNetworkView;
+        else if ([identifier isEqualToString: TOOLBAR_REMOTE])
+            view = fRemoteView;
+        else; //general view already selected
     }
-    else
-        identifier = [[NSUserDefaults standardUserDefaults] stringForKey: @"SelectedPrefView"];
-    
-    NSView * view;
-    if ([identifier isEqualToString: TOOLBAR_TRANSFERS])
-        view = fTransfersView;
-    else if ([identifier isEqualToString: TOOLBAR_GROUPS])
-        view = fGroupsView;
-    else if ([identifier isEqualToString: TOOLBAR_BANDWIDTH])
-        view = fBandwidthView;
-    else if ([identifier isEqualToString: TOOLBAR_PEERS])
-        view = fPeersView;
-    else if ([identifier isEqualToString: TOOLBAR_NETWORK])
-        view = fNetworkView;
-    else if ([identifier isEqualToString: TOOLBAR_REMOTE])
-        view = fRemoteView;
-    else
-    {
-        identifier = TOOLBAR_GENERAL; //general view is the default selected
-        view = fGeneralView;
-    }
-    
-    [[[self window] toolbar] setSelectedItemIdentifier: identifier];
     
     NSWindow * window = [self window];
     if ([window contentView] == view)
@@ -1140,13 +1100,19 @@ tr_session * fHandle;
     {
         NSToolbar * toolbar = [window toolbar];
         NSString * itemIdentifier = [toolbar selectedItemIdentifier];
-        for (NSToolbarItem * item in [toolbar items])
+        NSEnumerator * enumerator = [[toolbar items] objectEnumerator];
+        NSToolbarItem * item;
+        while ((item = [enumerator nextObject]))
             if ([[item itemIdentifier] isEqualToString: itemIdentifier])
             {
                 [window setTitle: [item label]];
                 break;
             }
     }
+    
+    //for network view make sure progress indicator hides itself (get around a Tiger bug)
+    if (![NSApp isOnLeopardOrBetter] && view == fNetworkView && [fPortStatusImage image])
+        [fPortStatusProgress setDisplayedWhenStopped: NO];
 }
 
 - (void) folderSheetClosed: (NSOpenPanel *) openPanel returnCode: (int) code contextInfo: (void *) info

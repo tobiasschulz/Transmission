@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,21 +22,20 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#import "PredicateEditorRowTemplateAny.h"
+#import <Cocoa/Cocoa.h>
 
-@implementation PredicateEditorRowTemplateAny
+@class CTGradient;
 
-- (NSPredicate *) predicateWithSubpredicates: (NSArray *) subpredicates
+@interface GroupsWindowController : NSWindowController
 {
-    //we only make NSComparisonPredicates
-    NSComparisonPredicate * predicate = (NSComparisonPredicate *)[super predicateWithSubpredicates: subpredicates];
+    IBOutlet NSTableView * fTableView;
+    IBOutlet NSSegmentedControl * fAddRemoveControl;
     
-    //construct a near-identical predicate
-    return [NSComparisonPredicate predicateWithLeftExpression: [predicate leftExpression]
-											  rightExpression: [predicate rightExpression]
-													 modifier: NSAnyPredicateModifier
-														 type: [predicate predicateOperatorType]
-													  options: [predicate options]];
+    int fCurrentColorIndex;
 }
+
++ (GroupsWindowController *) groupsWindow;
+
+- (void) addRemoveGroup: (id) sender;
 
 @end

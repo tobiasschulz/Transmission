@@ -36,6 +36,7 @@
 @class TorrentTableView;
 @class StatusBarView;
 @class FilterButton;
+@class MenuLabel;
 
 typedef enum
 {
@@ -48,7 +49,7 @@ typedef enum
 
 @interface Controller : NSObject <GrowlApplicationBridgeDelegate>
 {
-    tr_session                       * fLib;
+    tr_handle                       * fLib;
     
     NSMutableArray                  * fTorrents, * fDisplayedTorrents;
     
@@ -66,11 +67,15 @@ typedef enum
     NSTimer                         * fTimer;
     
     IBOutlet NSMenuItem             * fOpenIgnoreDownloadFolder;
+    
+    IBOutlet NSBox                  * fBottomTigerLine;
     IBOutlet NSButton               * fActionButton, * fSpeedLimitButton;
     IBOutlet NSTextField            * fTotalTorrentsField;
     
     IBOutlet StatusBarView          * fStatusBar;
     IBOutlet NSButton               * fStatusButton;
+    IBOutlet MenuLabel              * fStatusTigerField;
+    IBOutlet NSImageView            * fStatusTigerImageView;
     IBOutlet NSTextField            * fTotalDLField, * fTotalULField;
     IBOutlet NSImageView            * fTotalDLImageView;
     
@@ -181,8 +186,6 @@ typedef enum
 - (void) resizeStatusButton;
 - (void) setBottomCountText: (BOOL) filtering;
 
-- (void) updateSpeedFieldsToolTips;
-
 - (void) updateTorrentsInQueue;
 - (NSInteger) numToStartFromQueue: (BOOL) downloadQueue;
 
@@ -206,13 +209,13 @@ typedef enum
 
 - (void) setStatusLabel: (id) sender;
 
+- (void) showGroups: (id) sender;
 - (void) setGroup: (id) sender; //used by delegate-generated menu items
 - (void) setGroupFilter: (id) sender;
 - (void) updateGroupsFilterButton;
 - (void) updateGroupsFilters: (NSNotification *) notification;
 
 - (void) toggleSpeedLimit: (id) sender;
-- (void) speedLimitChanged: (id) sender;
 - (void) autoSpeedLimitChange: (NSNotification *) notification;
 - (void) autoSpeedLimit: (NSTimer *) timer;
 - (void) setAutoSpeedLimitTimer: (BOOL) nextIsLimit;

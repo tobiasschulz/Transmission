@@ -32,7 +32,7 @@
     NSUserDefaults * fDefaults;
     BOOL fHasLoaded;
     
-    IBOutlet NSView * fGeneralView, * fTransfersView, * fBandwidthView, * fPeersView, * fNetworkView, * fRemoteView, * fGroupsView;
+    IBOutlet NSView * fGeneralView, * fTransfersView, * fBandwidthView, * fPeersView, * fNetworkView, * fRemoteView;
     
     NSString * fInitialString;
     
@@ -62,11 +62,10 @@
     IBOutlet NSSegmentedControl * fRPCAddRemoveControl;
 }
 
-+ (void) setHandle: (tr_session *) handle;
-+ (tr_session *) handle;
++ (void) setHandle: (tr_handle *) handle;
++ (tr_handle *) handle;
 
 - (void) setPort: (id) sender;
-- (void) randomPort: (id) sender;
 - (void) setNat: (id) sender;
 - (void) updatePortStatus;
 - (void) portCheckerDidFinishProbing: (PortChecker *) portChecker;
@@ -134,7 +133,6 @@
 - (void) updateRPCPassword;
 - (void) setRPCPort: (id) sender;
 - (void) setRPCUseWhitelist: (id) sender;
-- (void) setRPCWebUIDiscovery: (id) sender;
 - (void) updateRPCWhitelist;
 - (void) addRemoveRPCIP: (id) sender;
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
- *
- * Copyright (c) 2008 Transmission authors and contributors
+ * 
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,16 +22,10 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
+//TIGER-ONLY
+
 #import <Cocoa/Cocoa.h>
 
-@interface BonjourController : NSObject
-{
-    NSNetService * fService;
-}
-
-+ (BonjourController *) defaultController;
-
-- (void) startWithPort: (NSInteger) port;
-- (void) stop;
+@interface MenuLabel : NSTextField
 
 @end

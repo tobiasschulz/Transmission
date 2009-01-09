@@ -22,32 +22,32 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#import <Cocoa/Cocoa.h>
+#import "NSBezierPathAdditions.h"
+#import "NSApplicationAdditions.h"
 
-@interface GroupsPrefsController : NSObject
+@implementation NSBezierPath (NSBezierPathAdditions)
+
++ (NSBezierPath *) bezierPathWithRoundedRect: (NSRect) rect radius: (CGFloat) radius
 {
-    IBOutlet NSTableView * fTableView;
-    IBOutlet NSSegmentedControl * fAddRemoveControl;
+    if ([NSApp isOnLeopardOrBetter])
+        return [self bezierPathWithRoundedRect: rect xRadius: radius yRadius: radius];
     
-    IBOutlet NSColorWell * fSelectedColorView;
-    IBOutlet NSTextField * fSelectedColorNameField;
-    IBOutlet NSButton * fCustomLocationEnableCheck;
-    IBOutlet NSPopUpButton * fCustomLocationPopUp;
+    CGFloat minX = NSMinX(rect),
+            minY = NSMinY(rect),
+            maxX = NSMaxX(rect),
+            maxY = NSMaxY(rect),
+            midX = NSMidX(rect),
+            midY = NSMidY(rect);
     
-    IBOutlet NSButton * fAutoAssignRulesEnableCheck;
-    IBOutlet NSButton * fAutoAssignRulesEditButton;
+    NSBezierPath * bp = [NSBezierPath bezierPath];
+    [bp moveToPoint: NSMakePoint(maxX, midY)];
+    [bp appendBezierPathWithArcFromPoint: NSMakePoint(maxX, maxY) toPoint: NSMakePoint(midX, maxY) radius: radius];
+    [bp appendBezierPathWithArcFromPoint: NSMakePoint(minX, maxY) toPoint: NSMakePoint(minX, midY) radius: radius];
+    [bp appendBezierPathWithArcFromPoint: NSMakePoint(minX, minY) toPoint: NSMakePoint(midX, minY) radius: radius];
+    [bp appendBezierPathWithArcFromPoint: NSMakePoint(maxX, minY) toPoint: NSMakePoint(maxX, midY) radius: radius];
+    [bp closePath];
     
-    IBOutlet NSWindow * fGroupRulesSheetWindow;
-    IBOutlet NSPredicateEditor * fRuleEditor;
+    return bp;
 }
 
-- (void) addRemoveGroup: (id) sender;
-
-- (IBAction) toggleUseCustomDownloadLocation: (id) sender;
-- (IBAction) customDownloadLocationSheetShow: (id) sender;
-
-- (IBAction) toggleUseAutoAssignRules: (id) sender;
-- (IBAction) orderFrontRulesSheet: (id) sender;
-- (IBAction) cancelRules: (id) sender;
-- (IBAction) saveRules: (id) sender;
 @end

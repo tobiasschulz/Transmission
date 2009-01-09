@@ -28,12 +28,12 @@ static int test = 0;
 static int
 test_utf8( void )
 {
-    const char      * in = "{ \"key\": \"Letöltések\" }";
-    tr_benc           top;
-    const char      * str;
-    char            * json;
-    int               err;
-    struct evbuffer * buf = tr_getBuffer( );
+    const char * in = "{ \"key\": \"Letöltések\" }";
+    tr_benc      top;
+    const char * str;
+    char *       json;
+    int          json_len;
+    int          err;
 
     err = tr_jsonParse( in, strlen( in ), &top, NULL );
     check( !err );
@@ -66,13 +66,13 @@ test_utf8( void )
     check( tr_bencIsDict( &top ) );
     check( tr_bencDictFindStr( &top, "key", &str ) );
     check( !strcmp( str, "Letöltések" ) );
-    json = tr_bencSaveAsJSON( &top, buf );
+    json = tr_bencSaveAsJSON( &top, &json_len );
     if( !err )
         tr_bencFree( &top );
     check( json );
     check( strstr( json, "\\u00f6" ) != NULL );
     check( strstr( json, "\\u00e9" ) != NULL );
-    err = tr_jsonParse( json, strlen( json ), &top, NULL );
+    err = tr_jsonParse( json, json_len, &top, NULL );
     check( !err );
     check( tr_bencIsDict( &top ) );
     check( tr_bencDictFindStr( &top, "key", &str ) );
@@ -81,7 +81,6 @@ test_utf8( void )
         tr_bencFree( &top );
     tr_free( json );
 
-    tr_releaseBuffer( buf );
     return 0;
 }
 

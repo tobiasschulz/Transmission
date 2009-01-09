@@ -1,20 +1,5 @@
 NEWS file for Transmission <http://www.transmissionbt.com/>
 
-1.50 (2009/mm/dd)
-<http://trac.transmissionbt.com/query?milestone=1.50&group=component&groupdesc=1&order=severity>
-- All Platforms
-   + IPv6 support
-   + Random port, with optional randomization on startup
-   + When removing local data only remove data from the torrent
-- Mac
-   + Requires Mac OS X 10.5 Leopard or newer
-   + Groups (moved to preferences) can be auto-assigned to transfers when adding based on name and tracker
-   + Groups can have a default location when adding transfers
-   + Bonjour support for the web interface
-   + File filter field in the inspector
-- GTK+
-   + Minor display improvements and HIG compliance
-
 1.42 (2008/12/24)
 <http://trac.transmissionbt.com/query?milestone=1.42&group=component&groupdesc=1&order=severity>
 - All Platforms
@@ -79,6 +64,7 @@ NEWS file for Transmission <http://www.transmissionbt.com/>
    + Added the ability to get detailed peer information on torrents
    + Fix bug that didn't handle --config-dir and TRANSMISSION_HOME correctly
    + Windows portability
+
 
 1.34 (2008/09/16)
 <http://trac.transmissionbt.com/query?milestone=1.34&group=component&groupdesc=1&order=severity>

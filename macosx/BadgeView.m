@@ -35,7 +35,7 @@
 
 @implementation BadgeView
 
-- (id) initWithFrame: (NSRect) frame lib: (tr_session *) lib
+- (id) initWithFrame: (NSRect) frame lib: (tr_handle *) lib
 {
     if ((self = [super initWithFrame: frame]))
     {
@@ -72,7 +72,7 @@
 
 - (void) drawRect: (NSRect) rect
 {
-    [[NSApp applicationIconImage] drawInRect: rect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
+    [[NSImage imageNamed: @"NSApplicationIcon"] drawInRect: rect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
     
     if (fQuitting)
     {
@@ -82,8 +82,8 @@
         return;
     }
     
-    const BOOL upload = fUploadRate >= 0.1f,
-            download = fDownloadRate >= 0.1f;
+    BOOL upload = fUploadRate >= 0.1f,
+        download = fDownloadRate >= 0.1f;
     CGFloat bottom = 0.0f;
     if (upload)
     {

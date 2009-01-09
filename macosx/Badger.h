@@ -27,12 +27,18 @@
 
 @interface Badger : NSObject
 {
-    tr_session * fLib;
+    tr_handle * fLib;
     
     NSUInteger fCompleted;
+    
+    //tiger-only fields
+    NSImage * fDockIcon, * fBadge;
+    NSDictionary * fAttributes;
+    NSUInteger fCompletedBadged;
+    BOOL fSpeedBadge, fQuittingTiger;
 }
 
-- (id) initWithLib: (tr_session *) lib;
+- (id) initWithLib: (tr_handle *) lib;
 
 - (void) updateBadge;
 - (void) incrementCompleted;
