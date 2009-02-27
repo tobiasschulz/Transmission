@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -9,10 +9,6 @@
  *
  * $Id$
  */
-
-#ifndef __TRANSMISSION__
-#error only libtransmission should #include this header.
-#endif
 
 #ifndef TR_PEER_MSGS_H
 #define TR_PEER_MSGS_H
@@ -55,14 +51,7 @@ tr_addreq_t  tr_peerMsgsAddRequest( tr_peermsgs * peer,
                                     uint32_t      offset,
                                     uint32_t      length );
 
-void         tr_peerMsgsUnsubscribe( tr_peermsgs      * peer,
-                                     tr_publisher_tag   tag );
-
-size_t       tr_generateAllowedSet( tr_piece_index_t  * setmePieces,
-                                    size_t              desiredSetSize,
-                                    size_t              pieceCount,
-                                    const uint8_t     * infohash,
-                                    const tr_address  * addr );
-
+void         tr_peerMsgsUnsubscribe( tr_peermsgs *    peer,
+                                     tr_publisher_tag tag );
 
 #endif

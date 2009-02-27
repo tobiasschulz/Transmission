@@ -18,7 +18,6 @@
 	
 	NSString *DSASignature;	
 	NSString *minimumSystemVersion;
-    NSString *tag;
 	
 	NSURL *fileURL;
 	NSString *versionString;
@@ -39,7 +38,6 @@
 - (NSURL *)fileURL;
 - (NSString *)DSASignature;
 - (NSString *)minimumSystemVersion;
-- (NSString *)tag;
 
 // Returns the dictionary provided in initWithDictionary; this might be useful later for extensions.
 - (NSDictionary *)propertiesDictionary;

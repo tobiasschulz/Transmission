@@ -22,10 +22,6 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#ifndef __TRANSMISSION__
-#error only libtransmission should #include this header.
-#endif
-
 #ifndef TR_INTERNAL_H
 #define TR_INTERNAL_H 1
 
@@ -52,40 +48,23 @@ struct tr_metainfo_lookup
     char *  filename;
 };
 
-struct tr_address;
-struct tr_bandwidth;
+struct tr_ratecontrol;
 
-struct tr_session
+struct tr_handle
 {
-    tr_bool                      isPortSet;
-    tr_bool                      isPortRandom;
-    tr_bool                      isPexEnabled;
-    tr_bool                      isBlocklistEnabled;
-    tr_bool                      isProxyEnabled;
-    tr_bool                      isProxyAuthEnabled;
-    tr_bool                      isClosed;
-    tr_bool                      isWaiting;
-    tr_bool                      useLazyBitfield;
-    tr_bool                      isRatioLimited;
-
-    tr_bool                      isSpeedLimited[2];
-    int                          speedLimit[2];
-    int                          magicNumber;
+    unsigned int                 isPortSet          : 1;
+    unsigned int                 isPexEnabled       : 1;
+    unsigned int                 isBlocklistEnabled : 1;
+    unsigned int                 isProxyEnabled     : 1;
+    unsigned int                 isProxyAuthEnabled : 1;
+    unsigned int                 isClosed           : 1;
+    unsigned int                 useUploadLimit     : 1;
+    unsigned int                 useDownloadLimit   : 1;
+    unsigned int                 useLazyBitfield    : 1;
 
     tr_encryption_mode           encryptionMode;
 
-    tr_preallocation_mode        preallocationMode;
-
     struct tr_event_handle *     events;
-
-    uint16_t                     peerLimitPerTorrent;
-    uint16_t                     openFileLimit;
-
-    int                          uploadSlotsPerTorrent;
-
-    tr_port                      peerPort;
-    tr_port                      randomPortLow;
-    tr_port                      randomPortHigh;
 
     int                          proxyPort;
     int                          peerSocketTOS;
@@ -94,6 +73,7 @@ struct tr_session
     tr_torrent *                 torrentList;
 
     char *                       tag;
+
     char *                       configDir;
     char *                       downloadDir;
     char *                       resumeDir;
@@ -103,6 +83,9 @@ struct tr_session
     char *                       proxy;
     char *                       proxyUsername;
     char *                       proxyPassword;
+
+    int                          uploadLimit;
+    int                          downloadLimit;
 
     struct tr_list *             blocklists;
     struct tr_peerMgr *          peerMgr;
@@ -122,16 +105,12 @@ struct tr_session
     struct tr_metainfo_lookup *  metainfoLookup;
     int                          metainfoLookupCount;
 
-    /* the size of the output buffer for peer connections */
-    int so_sndbuf;
+    /* the rate at which pieces are being transferred between client and peer.
+     * protocol overhead is NOT included; this is only the piece data */
+    struct tr_ratecontrol     *  pieceSpeed[2];
 
-    /* the size of the input buffer for peer connections */
-    int so_rcvbuf;
-
-    /* monitors the "global pool" speeds */
-    struct tr_bandwidth        * bandwidth;
-
-    double                       desiredRatio;
+    /* the rate at which bytes are being transferred between client and peer. */
+    struct tr_ratecontrol     *  rawSpeed[2];
 };
 
 const char * tr_sessionFindTorrentFile( const tr_session * session,
@@ -141,23 +120,16 @@ void         tr_sessionSetTorrentFile( tr_session * session,
                                        const char * hashString,
                                        const char * filename );
 
-tr_bool      tr_sessionIsAddressBlocked( const tr_session        * session,
-                                         const struct tr_address * addr );
+struct in_addr;
+
+int          tr_sessionIsAddressBlocked( const tr_session *     session,
+                                         const struct in_addr * addr );
+
 
 void         tr_globalLock( tr_session * );
 
 void         tr_globalUnlock( tr_session * );
 
-tr_bool      tr_globalIsLocked( const tr_session * );
-
-enum
-{
-    SESSION_MAGIC_NUMBER = 3845
-};
-
-static inline tr_bool tr_isSession( const tr_session * session )
-{
-    return ( session != NULL ) && ( session->magicNumber == SESSION_MAGIC_NUMBER );
-}
+int          tr_globalIsLocked( const tr_session * );
 
 #endif

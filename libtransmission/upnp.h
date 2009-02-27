@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -9,10 +9,6 @@
  *
  * $Id$
  */
-
-#ifndef __TRANSMISSION__
-#error only libtransmission should #include this header.
-#endif
 
 #ifndef TR_UPNP_H
 #define TR_UPNP_H 1

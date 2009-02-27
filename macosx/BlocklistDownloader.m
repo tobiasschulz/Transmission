@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2008-2009 Transmission authors and contributors
+ * Copyright (c) 2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
 #import "BlocklistDownloaderViewController.h"
 #import "BlocklistScheduler.h"
 #import "PrefsController.h"
+#import "NSApplicationAdditions.h"
 
 #define LIST_URL @"http://download.m0k.org/transmission/files/level1.gz"
 #define DESTINATION [NSTemporaryDirectory() stringByAppendingPathComponent: @"level1.gz"]
@@ -123,7 +124,11 @@ BlocklistDownloader * fDownloader = nil;
 - (void) downloadDidFinish: (NSURLDownload *) download
 {
     fState = BLOCKLIST_DL_PROCESSING;
-    [self performSelectorInBackground: @selector(finishDownloadSuccess) withObject: nil];
+    
+    if ([NSApp isOnLeopardOrBetter])
+        [self performSelectorInBackground: @selector(finishDownloadSuccess) withObject: nil];
+    else
+        [self finishDownloadSuccess];
 }
 
 @end
@@ -152,7 +157,10 @@ BlocklistDownloader * fDownloader = nil;
     tr_blocklistSetContent([PrefsController handle], [DESTINATION UTF8String]);
     
     //delete downloaded file
-    [[NSFileManager defaultManager] removeItemAtPath: DESTINATION error: NULL];
+    if ([NSApp isOnLeopardOrBetter])
+        [[NSFileManager defaultManager] removeItemAtPath: DESTINATION error: NULL];
+    else
+        [[NSFileManager defaultManager] removeFileAtPath: DESTINATION handler: nil];
     
     [fViewController setFinished];
     

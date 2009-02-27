@@ -41,7 +41,7 @@ typedef void ( *callbackfunc_t )( void* );
 
 /* return a human-readable string for the size given in bytes. */
 char*       tr_strlsize( char *   buf,
-                         guint64  size,
+                         uint64_t size,
                          size_t   buflen );
 
 /* return a human-readable string for the transfer rate given in bytes. */
@@ -95,10 +95,6 @@ char*       gtr_get_help_url( void );
 GtkWidget * gtr_button_new_from_stock( const char * stock,
                                        const char * mnemonic );
 
-guint       gtr_timeout_add_seconds( guint       interval,
-                                     GSourceFunc function,
-                                     gpointer    data );
-
 void        addTorrentErrorDialog( GtkWidget *  window_or_child,
                                    int          err,
                                    const char * filename );
@@ -132,7 +128,7 @@ gboolean    on_tree_view_button_released( GtkWidget *      view,
 
 gpointer    tr_object_ref_sink( gpointer object );
 
-int         tr_file_trash_or_remove( const char * filename );
+void        tr_file_trash_or_unlink( const char * filename );
 
 #endif /* GTK_MAJOR_VERSION */
 

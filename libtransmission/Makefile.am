@@ -3,16 +3,11 @@ AM_CPPFLAGS = \
 	-D__TRANSMISSION__ $(LIBEVENT_CPPFLAGS) \
 	-DPACKAGE_DATA_DIR=\""$(datadir)"\"
 
-AM_CFLAGS = \
-    $(LIBCURL_CFLAGS) \
-    $(OPENSSL_CFLAGS) \
-    $(PTHREAD_CFLAGS) \
-    $(ZLIB_CFLAGS)
+AM_CFLAGS = $(LIBCURL_CFLAGS) $(OPENSSL_CFLAGS) $(PTHREAD_CFLAGS)
 
 noinst_LIBRARIES = libtransmission.a
 
 libtransmission_a_SOURCES = \
-    bandwidth.c \
     bencode.c \
     blocklist.c \
     clients.c \
@@ -39,7 +34,6 @@ libtransmission_a_SOURCES = \
     ptrarray.c \
     publish.c \
     ratecontrol.c \
-    request-list.c \
     resume.c \
     rpcimpl.c \
     rpc-server.c \
@@ -58,7 +52,6 @@ libtransmission_a_SOURCES = \
     wildmat.c
 
 noinst_HEADERS = \
-    bandwidth.h \
     bencode.h \
     blocklist.h \
     clients.h \
@@ -80,13 +73,13 @@ noinst_HEADERS = \
     peer-common.h \
     peer-io.h \
     peer-mgr.h \
+    peer-mgr-private.h \
     peer-msgs.h \
     platform.h \
     port-forwarding.h \
     ptrarray.h \
     publish.h \
     ratecontrol.h \
-    request-list.h \
     resume.h \
     rpcimpl.h \
     rpc-server.h \
@@ -108,18 +101,14 @@ TESTS = \
     bencode-test \
     clients-test \
     json-test \
-    peer-msgs-test \
-    request-list-test \
     rpc-test \
+    test-fastset \
     test-peer-id \
     utils-test
 
 noinst_PROGRAMS = $(TESTS)
 
-apps_ldflags = \
-    $(ZLIB_LDFLAGS)
-
-apps_ldadd = \
+APPS_LDADD = \
     ./libtransmission.a  \
     $(top_builddir)/third-party/miniupnp/libminiupnp.a \
     $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
@@ -128,49 +117,28 @@ apps_ldadd = \
     $(LIBCURL_LIBS) \
     $(OPENSSL_LIBS) \
     $(PTHREAD_LIBS) \
-    $(ZLIB_LIBS) \
     -lm
 
 bencode_test_SOURCES = bencode-test.c
-bencode_test_LDADD = ${apps_ldadd}
-bencode_test_LDFLAGS = ${apps_ldflags}
-
+bencode_test_LDADD = $(APPS_LDADD)
 blocklist_test_SOURCES = blocklist-test.c
-blocklist_test_LDADD = ${apps_ldadd}
-blocklist_test_LDFLAGS = ${apps_ldflags}
-
+blocklist_test_LDADD = $(APPS_LDADD)
 clients_test_SOURCES = clients-test.c
-clients_test_LDADD = ${apps_ldadd}
-clients_test_LDFLAGS = ${apps_ldflags}
-
+clients_test_LDADD = $(APPS_LDADD)
 json_test_SOURCES = json-test.c
-json_test_LDADD = ${apps_ldadd}
-json_test_LDFLAGS = ${apps_ldflags}
-
+json_test_LDADD = $(APPS_LDADD)
 rpc_test_SOURCES = rpc-test.c
-rpc_test_LDADD = ${apps_ldadd}
-rpc_test_LDFLAGS = ${apps_ldflags}
-
+rpc_test_LDADD = $(APPS_LDADD)
+test_fastset_SOURCES = test-fastset.c
+test_fastset_LDADD = $(APPS_LDADD)
 test_peer_id_SOURCES = test-peer-id.c
-test_peer_id_LDADD = ${apps_ldadd}
-test_peer_id_LDFLAGS = ${apps_ldflags}
-
-request_list_test_SOURCES = request-list-test.c
-request_list_test_LDADD = ${apps_ldadd}
-request_list_test_LDFLAGS = ${apps_ldflags}
-
-peer_msgs_test_SOURCES = peer-msgs-test.c
-peer_msgs_test_LDADD = ${apps_ldadd}
-peer_msgs_test_LDFLAGS = ${apps_ldflags}
-
+test_peer_id_LDADD = $(APPS_LDADD)
 utils_test_SOURCES = utils-test.c
-utils_test_LDADD = ${apps_ldadd}
-utils_test_LDFLAGS = ${apps_ldflags}
-
+utils_test_LDADD = $(APPS_LDADD)
 
 
 clean-local:
-	if test -d .svn; then if test -e version.h; then rm version.h; fi; fi;
+	if test -d .svn; then rm version.h; fi;
 
 EXTRA_libtransmission_a_SOURCES = \
     version.h

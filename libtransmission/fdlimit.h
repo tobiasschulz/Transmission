@@ -22,15 +22,16 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#ifndef __TRANSMISSION__
-#error only libtransmission should #include this header.
-#endif
-
-#include "transmission.h"
 #include "net.h"
 
-void tr_fdInit( size_t openFileLimit,
-                size_t globalPeerLimit );
+/***********************************************************************
+ * tr_fdInit
+ ***********************************************************************
+ * Detect the maximum number of open files and initializes things.
+ **********************************************************************/
+void tr_fdInit( int globalPeerLimit );
+
+void tr_fdClose( void );
 
 /**
  * Returns an fd to the specified filename.
@@ -51,11 +52,11 @@ void tr_fdInit( size_t openFileLimit,
  * @see tr_fdFileReturn
  * @see tr_fdFileClose
  */
-int  tr_fdFileCheckout( const char             * folder,
-                        const char             * torrentFile,
-                        tr_bool                  doWrite,
-                        tr_preallocation_mode    preallocationMode,
-                        uint64_t                 desiredFileSize );
+int  tr_fdFileCheckout( const char * folder,
+                        const char * torrentFile,
+                        int          doWrite,
+                        int          doPreallocate,
+                        uint64_t     desiredFileSize );
 
 /**
  * Returns an fd from tr_fdFileCheckout() so that other clients may borrow it.
@@ -80,11 +81,11 @@ void     tr_fdFileClose( const char * filename );
 /***********************************************************************
  * Sockets
  **********************************************************************/
-int      tr_fdSocketCreate( int domain, int type );
+int      tr_fdSocketCreate( int type );
 
-int      tr_fdSocketAccept( int           b,
-                            tr_address  * addr,
-                            tr_port     * port );
+int      tr_fdSocketAccept( int              b,
+                            struct in_addr * addr,
+                            tr_port_t *      port );
 
 void     tr_fdSocketClose( int s );
 

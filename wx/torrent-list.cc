@@ -1,6 +1,6 @@
 /*
  * Xmission - a cross-platform bittorrent client
- * Copyright (C) 2007 Charles Kerr <charles@transmissionbt.com>
+ * Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -184,7 +184,7 @@ END_EVENT_TABLE()
 
 
 
-TorrentListCtrl :: TorrentListCtrl( tr_session       * handle,
+TorrentListCtrl :: TorrentListCtrl( tr_handle       * handle,
                                     wxConfig        * config,
                                     wxWindow        * parent,
                                     const wxPoint   & pos,
@@ -248,8 +248,8 @@ TorrentListCtrl :: RefreshTorrent( tr_torrent   * tor,
                 break;
 
             case COL_DOWNLOAD_SPEED:
-                if( s->pieceDownloadSpeed > 0.01 )
-                    xstr = getReadableSpeed( s->pieceDownloadSpeed );
+                if( s->rateDownload > 0.01 )
+                    xstr = getReadableSpeed( s->rateDownload );
                 else
                     xstr.Clear( );
                 break;
@@ -304,7 +304,7 @@ TorrentListCtrl :: RefreshTorrent( tr_torrent   * tor,
 
             case COL_STATE: /* FIXME: divine the meaning of these two columns */
             case COL_STATUS:
-                switch( s->activity ) {
+                switch( s->status ) {
                     case TR_STATUS_STOPPED:     xstr = _("Stopped"); break;
                     case TR_STATUS_CHECK:       xstr = wxString::Format ( _("Checking Files (%.0f)"), s->recheckProgress );  break;
                     case TR_STATUS_CHECK_WAIT:  xstr = _("Waiting to Check"); break;
@@ -319,8 +319,8 @@ TorrentListCtrl :: RefreshTorrent( tr_torrent   * tor,
                 break;
 
             case COL_UPLOAD_SPEED:
-                if( s->pieceUploadSpeed > 0.01 )
-                    xstr = getReadableSpeed( s->pieceUploadSpeed );
+                if( s->rateUpload > 0.01 )
+                    xstr = getReadableSpeed( s->rateUpload );
                 else
                     xstr.Clear( );
                 break;
@@ -420,9 +420,9 @@ TorrentListCtrl :: Compare( long item1, long item2, long sortData )
             break;
 
         case COL_DOWNLOAD_SPEED:
-            if( sa->pieceDownloadSpeed < sb->pieceDownloadSpeed )
+            if( sa->rateDownload < sb->rateDownload )
                 ret = -1;
-            else if( sa->pieceDownloadSpeed > sb->pieceDownloadSpeed )
+            else if( sa->rateDownload > sb->rateDownload )
                 ret =  1;
             else
                 ret = 0;
@@ -498,7 +498,7 @@ TorrentListCtrl :: Compare( long item1, long item2, long sortData )
 
         case COL_STATE: /* FIXME */
         case COL_STATUS:
-            ret = sa->activity - sb->activity;
+            ret = sa->status - sb->status;
             break;
 
         case COL_TOTAL:
@@ -506,9 +506,9 @@ TorrentListCtrl :: Compare( long item1, long item2, long sortData )
             break;
 
         case COL_UPLOAD_SPEED:
-            if( sa->pieceUploadSpeed < sb->pieceUploadSpeed )
+            if( sa->rateUpload < sb->rateUpload )
                 ret = -1;
-            else if( sa->pieceUploadSpeed > sb->pieceUploadSpeed )
+            else if( sa->rateUpload > sb->rateUpload )
                 ret = 1;
             else
                 ret = 0;

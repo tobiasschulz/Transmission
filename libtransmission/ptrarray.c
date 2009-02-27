@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -19,27 +19,23 @@
 
 #define GROW 32
 
-const tr_ptrArray TR_PTR_ARRAY_INIT = { NULL, 0, 0 };
-
-void
-tr_ptrArrayDestruct( tr_ptrArray * p, PtrArrayForeachFunc func )
+struct tr_ptrArray
 {
-    assert( p );
-    assert( p->items || !p->n_items );
-
-    if( func )
-        tr_ptrArrayForeach( p, func );
-
-    tr_free( p->items );
-
-    memset( p, ~0, sizeof( tr_ptrArray ) );
-}
+    void ** items;
+    int     n_items;
+    int     n_alloc;
+};
 
 tr_ptrArray*
 tr_ptrArrayNew( void )
 {
-    tr_ptrArray * p = tr_new( tr_ptrArray, 1 );
-    *p = TR_PTR_ARRAY_INIT;
+    tr_ptrArray * p;
+
+    p = tr_new( tr_ptrArray, 1 );
+    p->n_items = 0;
+    p->n_alloc = 0;
+    p->items = NULL;
+
     return p;
 }
 
@@ -73,7 +69,13 @@ void
 tr_ptrArrayFree( tr_ptrArray *       t,
                  PtrArrayForeachFunc func )
 {
-    tr_ptrArrayDestruct( t, func );
+    assert( t );
+    assert( t->items || !t->n_items );
+
+    if( func )
+        tr_ptrArrayForeach( t, func );
+
+    tr_free( t->items );
     tr_free( t );
 }
 
@@ -82,6 +84,12 @@ tr_ptrArrayPeek( tr_ptrArray * t,
                  int *         size )
 {
     *size = t->n_items;
+    return t->items;
+}
+
+void**
+tr_ptrArrayBase( tr_ptrArray * t )
+{
     return t->items;
 }
 
@@ -105,8 +113,26 @@ tr_ptrArrayBack( tr_ptrArray* t )
 }
 
 int
+tr_ptrArraySize( const tr_ptrArray * t )
+{
+    return t->n_items;
+}
+
+int
+tr_ptrArrayEmpty( const tr_ptrArray * t )
+{
+    return t->n_items == 0;
+}
+
+void
+tr_ptrArrayClear( tr_ptrArray * t )
+{
+    t->n_items = 0;
+}
+
+int
 tr_ptrArrayInsert( tr_ptrArray * t,
-                   void        * ptr,
+                   void *        ptr,
                    int           pos )
 {
     if( pos < 0 || pos > t->n_items )
@@ -119,12 +145,19 @@ tr_ptrArrayInsert( tr_ptrArray * t,
     }
 
     memmove( t->items + pos + 1,
-             t->items + pos,
-             sizeof( void* ) * ( t->n_items - pos ) );
+            t->items + pos,
+            sizeof( void* ) * ( t->n_items - pos ) );
 
     t->items[pos] = ptr;
     t->n_items++;
     return pos;
+}
+
+int
+tr_ptrArrayAppend( tr_ptrArray * t,
+                   void *        ptr )
+{
+    return tr_ptrArrayInsert( t, ptr, -1 );
 }
 
 void*
@@ -205,7 +238,7 @@ assertSortedAndUnique( const tr_ptrArray * t,
     int i;
 
     for( i = 0; i < t->n_items - 2; ++i )
-        assert( compare( t->items[i], t->items[i + 1] ) <= 0 );
+        assert( compare( t->items[i], t->items[i + 1] ) < 0 );
 }
 
 int

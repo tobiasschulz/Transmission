@@ -1,6 +1,6 @@
 /*
  * Xmission - a cross-platform bittorrent client
- * Copyright (C) 2007 Charles Kerr <charles@transmissionbt.com>
+ * Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -27,7 +27,7 @@ TorrentFilter :: GetFlags( const tr_torrent * tor )
     int flags = 0;
     const tr_stat * s = tr_torrentStat( (tr_torrent*)tor );
 
-    switch( s->activity )
+    switch( s->status )
     {
         case TR_STATUS_DOWNLOAD:
             flags |= FLAG_LEECHING;
@@ -43,7 +43,7 @@ TorrentFilter :: GetFlags( const tr_torrent * tor )
             break;
     }
 
-    flags |= ( ( s->pieceUploadSpeed + s->pieceDownloadSpeed ) > 0.01 )
+    flags |= ( ( s->rateUpload + s->rateDownload ) > 0.01 )
         ? FLAG_ACTIVE
         : FLAG_IDLE;
 

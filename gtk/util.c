@@ -23,7 +23,6 @@
  *****************************************************************************/
 
 #include <ctype.h> /* isxdigit() */
-#include <errno.h>
 #include <stdarg.h>
 #include <stdlib.h> /* free() */
 #include <string.h> /* strcmp() */
@@ -515,8 +514,8 @@ tr_object_ref_sink( gpointer object )
     return object;
 }
 
-int
-tr_file_trash_or_remove( const char * filename )
+void
+tr_file_trash_or_unlink( const char * filename )
 {
     if( filename && *filename )
     {
@@ -525,20 +524,11 @@ tr_file_trash_or_remove( const char * filename )
         GError * err = NULL;
         GFile *  file = g_file_new_for_path( filename );
         trashed = g_file_trash( file, NULL, &err );
-        if( err )
-            g_message( "Unable to trash file \"%s\": %s", filename, err->message );
-        g_clear_error( &err );
         g_object_unref( G_OBJECT( file ) );
 #endif
-
-        if( !trashed && g_remove( filename ) )
-        {
-            const int err = errno;
-            g_message( "Unable to remove file \"%s\": %s", filename, g_strerror( err ) );
-        }
+        if( !trashed )
+            g_unlink( filename );
     }
-
-    return 0;
 }
 
 char*
@@ -651,18 +641,3 @@ gtr_button_new_from_stock( const char * stock,
     return button;
 }
 
-/***
-****
-***/
-
-guint
-gtr_timeout_add_seconds( guint        interval,
-                         GSourceFunc  function,
-                         gpointer     data )
-{
-#if GLIB_CHECK_VERSION( 2,14,0 )
-    return g_timeout_add_seconds( interval, function, data );
-#else
-    return g_timeout_add( interval*1000, function, data );
-#endif
-}

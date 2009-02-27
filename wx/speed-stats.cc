@@ -1,6 +1,6 @@
 /*
  * Xmission - a cross-platform bittorrent client
- * Copyright (C) 2007 Charles Kerr <charles@transmissionbt.com>
+ * Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -210,19 +210,19 @@ SpeedStats :: SetTorrent( tr_torrent * tor )
 }
 
 void
-SpeedStats :: Pulse( tr_session * handle )
+SpeedStats :: Pulse( tr_handle * handle )
 {
     // add a new record
-    const double allUp   = tr_sessionGetPieceSpeed( handle, TR_UP );
-    const double allDown = tr_sessionGetPieceSpeed( handle, TR_DOWN );
+    float allUp, allDown;
+    tr_sessionGetSpeed( handle, &allDown, &allUp );
     Speed s;
     s.time = time( NULL );
     s.allUp = allUp;
     s.allDown = allDown;
     if( myTorrent ) {
         const tr_stat * stat = tr_torrentStat( myTorrent );
-        s.torrentUp = stat->pieceUploadSpeed;
-        s.torrentDown = stat->pieceDownloadSpeed;
+        s.torrentUp = stat->rateUpload;
+        s.torrentDown = stat->rateDownload;
     }
     myStats.push_back( s );
 

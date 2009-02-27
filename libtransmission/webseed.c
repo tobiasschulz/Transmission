@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -26,8 +26,8 @@
 
 struct tr_webseed
 {
-    tr_bool             busy;
-    tr_bool             dead;
+    unsigned int        busy : 1;
+    unsigned int        dead : 1;
 
     uint8_t             hash[SHA_DIGEST_LENGTH];
 
@@ -40,7 +40,7 @@ struct tr_webseed
     uint32_t            pieceOffset;
     uint32_t            byteCount;
 
-    tr_ratecontrol      rateDown;
+    tr_ratecontrol    * rateDown;
 
     tr_session        * session;
 
@@ -51,7 +51,7 @@ struct tr_webseed
 ****
 ***/
 
-static const tr_peer_event blankEvent = { 0, 0, 0, 0, 0.0f, 0, 0, 0 };
+static const tr_peer_event blankEvent = { 0, 0, 0, 0, 0.0f, 0 };
 
 static void
 publish( tr_webseed *    w,
@@ -65,14 +65,19 @@ static void
 fireNeedReq( tr_webseed * w )
 {
     tr_peer_event e = blankEvent;
+
     e.eventType = TR_PEER_NEED_REQ;
     publish( w, &e );
 }
 
 static void
-fireClientGotBlock( tr_webseed * w, uint32_t pieceIndex, uint32_t offset, uint32_t length )
+fireClientGotBlock( tr_webseed * w,
+                    uint32_t     pieceIndex,
+                    uint32_t     offset,
+                    uint32_t     length )
 {
     tr_peer_event e = blankEvent;
+
     e.eventType = TR_PEER_CLIENT_GOT_BLOCK;
     e.pieceIndex = pieceIndex;
     e.offset = offset;
@@ -81,12 +86,13 @@ fireClientGotBlock( tr_webseed * w, uint32_t pieceIndex, uint32_t offset, uint32
 }
 
 static void
-fireClientGotData( tr_webseed * w, uint32_t length )
+fireClientGotData( tr_webseed * w,
+                   uint32_t     length )
 {
     tr_peer_event e = blankEvent;
+
     e.eventType = TR_PEER_CLIENT_GOT_DATA;
     e.length = length;
-    e.wasPieceData = TRUE;
     publish( w, &e );
 }
 
@@ -99,7 +105,7 @@ makeURL( tr_webseed *    w,
          const tr_file * file )
 {
     char *            ret;
-    struct evbuffer * out = tr_getBuffer( );
+    struct evbuffer * out = evbuffer_new( );
     const char *      url = w->url;
     const size_t      url_len = strlen( url );
 
@@ -116,21 +122,75 @@ makeURL( tr_webseed *    w,
         {
             switch( *str )
             {
-                case ',': case '-': case '.': case '/':
-                case '0': case '1': case '2': case '3': case '4':
-                case '5': case '6': case '7': case '8': case '9':
-                case 'a': case 'b': case 'c': case 'd': case 'e':
-                case 'f': case 'g': case 'h': case 'i': case 'j':
-                case 'k': case 'l': case 'm': case 'n': case 'o':
-                case 'p': case 'q': case 'r': case 's': case 't':
-                case 'u': case 'v': case 'w': case 'x': case 'y': case 'z':
-                case 'A': case 'B': case 'C': case 'D': case 'E':
-                case 'F': case 'G': case 'H': case 'I': case 'J':
-                case 'K': case 'L': case 'M': case 'N': case 'O':
-                case 'P': case 'Q': case 'R': case 'S': case 'T':
-                case 'U': case 'V': case 'W': case 'X': case 'Y': case 'Z':
+                case ',':
+                case '-':
+                case '.':
+                case '/':
+                case '0':
+                case '1':
+                case '2':
+                case '3':
+                case '4':
+                case '5':
+                case '6':
+                case '7':
+                case '8':
+                case '9':
+                case 'a':
+                case 'b':
+                case 'c':
+                case 'd':
+                case 'e':
+                case 'f':
+                case 'g':
+                case 'h':
+                case 'i':
+                case 'j':
+                case 'k':
+                case 'l':
+                case 'm':
+                case 'n':
+                case 'o':
+                case 'p':
+                case 'q':
+                case 'r':
+                case 's':
+                case 't':
+                case 'u':
+                case 'v':
+                case 'w':
+                case 'x':
+                case 'y':
+                case 'z':
+                case 'A':
+                case 'B':
+                case 'C':
+                case 'D':
+                case 'E':
+                case 'F':
+                case 'G':
+                case 'H':
+                case 'I':
+                case 'J':
+                case 'K':
+                case 'L':
+                case 'M':
+                case 'N':
+                case 'O':
+                case 'P':
+                case 'Q':
+                case 'R':
+                case 'S':
+                case 'T':
+                case 'U':
+                case 'V':
+                case 'W':
+                case 'X':
+                case 'Y':
+                case 'Z':
                     evbuffer_add( out, str, 1 );
                     break;
+
                 default:
                     evbuffer_add_printf( out, "%%%02X", *str );
                     break;
@@ -140,14 +200,14 @@ makeURL( tr_webseed *    w,
     }
 
     ret = tr_strndup( EVBUFFER_DATA( out ), EVBUFFER_LENGTH( out ) );
-    tr_releaseBuffer( out );
+    evbuffer_free( out );
     return ret;
 }
 
 static void requestNextChunk( tr_webseed * w );
 
 static void
-webResponseFunc( tr_session    * session,
+webResponseFunc( tr_handle     * session,
                  long            response_code,
                  const void    * response,
                  size_t          response_byte_count,
@@ -169,7 +229,7 @@ webResponseFunc( tr_session    * session,
         if( !w->dead )
         {
             fireClientGotData( w, response_byte_count );
-            tr_rcTransferred( &w->rateDown, response_byte_count );
+            tr_rcTransferred( w->rateDown, response_byte_count );
         }
 
         if( EVBUFFER_LENGTH( w->content ) < w->byteCount )
@@ -252,11 +312,12 @@ tr_webseedIsActive( const tr_webseed * w )
 }
 
 int
-tr_webseedGetSpeed( const tr_webseed * w, uint64_t now, float * setme_KiBs )
+tr_webseedGetSpeed( const tr_webseed * w,
+                    float *            setme_KiBs )
 {
     const int isActive = tr_webseedIsActive( w );
 
-    *setme_KiBs = isActive ? tr_rcRate( &w->rateDown, now ) : 0.0f;
+    *setme_KiBs = isActive ? tr_rcRate( w->rateDown ) : 0.0f;
     return isActive;
 }
 
@@ -275,10 +336,10 @@ tr_webseedNew( struct tr_torrent * torrent,
     memcpy( w->hash, torrent->info.hash, SHA_DIGEST_LENGTH );
     w->session = torrent->session;
     w->content = evbuffer_new( );
+    w->rateDown = tr_rcInit( );
     w->url = tr_strdup( url );
     w->callback = callback;
     w->callback_userdata = callback_userdata;
-    tr_rcConstruct( &w->rateDown );
 /*fprintf( stderr, "w->callback_userdata is %p\n", w->callback_userdata );*/
     return w;
 }
@@ -295,7 +356,7 @@ tr_webseedFree( tr_webseed * w )
         else
         {
             evbuffer_free( w->content );
-            tr_rcDestruct( &w->rateDown );
+            tr_rcClose( w->rateDown );
             tr_free( w->url );
             tr_free( w );
         }

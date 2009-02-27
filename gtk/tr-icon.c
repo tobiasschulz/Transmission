@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -26,7 +26,7 @@ tr_icon_new( TrCore * core )
 
 #else
 
-#define UPDATE_INTERVAL_SECONDS 2
+ #define UPDATE_INTERVAL 2500
 
 static void
 activated( GtkStatusIcon   * self      UNUSED,
@@ -90,7 +90,7 @@ tr_icon_new( TrCore * core )
 
     g_signal_connect( icon, "activate", G_CALLBACK( activated ), NULL );
     g_signal_connect( icon, "popup-menu", G_CALLBACK( popup ), NULL );
-    id = gtr_timeout_add_seconds( UPDATE_INTERVAL_SECONDS, refresh_tooltip_cb, icon );
+    id = g_timeout_add( UPDATE_INTERVAL, refresh_tooltip_cb, icon );
     g_object_set_data( G_OBJECT( icon ), "tr-core", core );
     g_object_set_data_full( G_OBJECT(
                                 icon ), "update-tag", GUINT_TO_POINTER(

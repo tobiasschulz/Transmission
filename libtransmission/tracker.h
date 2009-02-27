@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -9,10 +9,6 @@
  *
  * $Id$
  */
-
-#ifndef __TRANSMISSION__
-#error only libtransmission should #include this header.
-#endif
 
 #ifndef _TR_TRACKER_H_
 #define _TR_TRACKER_H_
@@ -31,13 +27,7 @@ tr_tracker * tr_trackerNew( const tr_torrent * );
 
 void         tr_trackerFree( tr_tracker * );
 
-/**
-***
-**/
-
-void         tr_trackerSessionInit( tr_session * );
-
-void         tr_trackerSessionClose( tr_session * );
+void         tr_trackerSessionClose( tr_handle * );
 
 /**
 ***  Tracker Publish / Subscribe
@@ -56,6 +46,9 @@ typedef struct
 {
     /* what type of event this is */
     TrackerEventType    messageType;
+
+    /* the torrent's 20-character sha1 hash */
+    const uint8_t *  hash;
 
     /* for TR_TRACKER_WARNING and TR_TRACKER_ERROR */
     const char *  text;
@@ -91,16 +84,20 @@ void                    tr_trackerReannounce( struct tr_tracker * );
 
 void                    tr_trackerChangeMyPort( struct tr_tracker * );
 
-const tr_tracker_info * tr_trackerGetAddress( struct tr_tracker *, const tr_torrent * tor );
+const tr_tracker_info * tr_trackerGetAddress( struct tr_tracker * );
 
-int                     tr_trackerCanManualAnnounce( const struct tr_tracker * );
+int                     tr_trackerCanManualAnnounce(
+    const struct tr_tracker * );
 
-time_t                  tr_trackerGetManualAnnounceTime( const struct tr_tracker * );
+time_t                  tr_trackerGetManualAnnounceTime(
+    const struct tr_tracker * );
 
-void                    tr_trackerGetCounts( const struct tr_tracker *,
-                                             int * setme_completedCount,
-                                             int * setme_leecherCount,
-                                             int * setme_seederCount,
-                                             int * setme_downloaderCount );
+void                    tr_trackerGetCounts(
+    const struct tr_tracker *,
+    int *
+                 setme_completedCount,
+    int *
+                 setme_leecherCount,
+    int *        setme_seederCount );
 
 #endif

@@ -5,43 +5,35 @@
 #include "json.h"
 #include "utils.h" /* tr_free */
 
-#undef VERBOSE
+#define VERBOSE 0
 
 static int test = 0;
 
-#ifdef VERBOSE
-  #define check( A ) \
+#define check( A ) \
     { \
         ++test; \
         if( A ){ \
-            fprintf( stderr, "PASS test #%d (%s, %d)\n", test, __FILE__, __LINE__ ); \
+            if( VERBOSE ) \
+                fprintf( stderr, "PASS test #%d (%s, %d)\n", test, __FILE__,\
+                         __LINE__ );\
         } else { \
-            fprintf( stderr, "FAIL test #%d (%s, %d)\n", test, __FILE__, __LINE__ ); \
+            fprintf( stderr, "FAIL test #%d (%s, %d)\n", test, __FILE__,\
+                     __LINE__ ); \
             return test; \
         } \
     }
-#else
-  #define check( A ) \
-    { \
-        ++test; \
-        if( !( A ) ){ \
-            fprintf( stderr, "FAIL test #%d (%s, %d)\n", test, __FILE__, __LINE__ ); \
-            return test; \
-        } \
-    }
-#endif
 
 #include "ConvertUTF.h"
 
 static int
 test_utf8( void )
 {
-    const char      * in = "{ \"key\": \"Letöltések\" }";
-    tr_benc           top;
-    const char      * str;
-    char            * json;
-    int               err;
-    struct evbuffer * buf = tr_getBuffer( );
+    const char * in = "{ \"key\": \"Letöltések\" }";
+    tr_benc      top;
+    const char * str;
+    char *       json;
+    int          json_len;
+    int          err;
 
     err = tr_jsonParse( in, strlen( in ), &top, NULL );
     check( !err );
@@ -74,13 +66,13 @@ test_utf8( void )
     check( tr_bencIsDict( &top ) );
     check( tr_bencDictFindStr( &top, "key", &str ) );
     check( !strcmp( str, "Letöltések" ) );
-    json = tr_bencSaveAsJSON( &top, buf );
+    json = tr_bencSaveAsJSON( &top, &json_len );
     if( !err )
         tr_bencFree( &top );
     check( json );
     check( strstr( json, "\\u00f6" ) != NULL );
     check( strstr( json, "\\u00e9" ) != NULL );
-    err = tr_jsonParse( json, strlen( json ), &top, NULL );
+    err = tr_jsonParse( json, json_len, &top, NULL );
     check( !err );
     check( tr_bencIsDict( &top ) );
     check( tr_bencDictFindStr( &top, "key", &str ) );
@@ -89,7 +81,6 @@ test_utf8( void )
         tr_bencFree( &top );
     tr_free( json );
 
-    tr_releaseBuffer( buf );
     return 0;
 }
 
@@ -139,19 +130,6 @@ test1( void )
     return 0;
 }
 
-static int
-test2( void )
-{
-    tr_benc top;
-    const char * in = " ";
-    const int err = tr_jsonParse( in, strlen( in ), &top, NULL );
-
-    check( err );
-    check( !tr_bencIsDict( &top ) );
-
-    return 0;
-}
-
 int
 main( void )
 {
@@ -161,9 +139,6 @@ main( void )
         return i;
 
     if( ( i = test1( ) ) )
-        return i;
-
-    if( ( i = test2( ) ) )
         return i;
 
     return 0;

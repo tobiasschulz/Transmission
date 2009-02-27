@@ -18,14 +18,10 @@
 	
 	SUHost *host;
 	IBOutlet id delegate;
-    
-    NSSet *tags;
 }
 
 + (SUUpdater *)sharedUpdater;
 + (SUUpdater *)updaterForBundle:(NSBundle *)bundle;
-- initForBundle:(NSBundle *)bundle;
-
 - (NSBundle *)hostBundle;
 
 - (void)setDelegate:(id)delegate;
@@ -45,9 +41,6 @@
 
 - (void)setAutomaticallyDownloadsUpdates:(BOOL)automaticallyDownloadsUpdates;
 - (BOOL)automaticallyDownloadsUpdates;
-
-- (void)setAllowedTags:(NSSet *)aTags;
-- (NSSet *)allowedTags;
 
 // This IBAction is meant for a main menu item. Hook up any menu item to this action,
 // and Sparkle will check for updates and report back its findings verbosely.

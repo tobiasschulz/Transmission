@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,12 +27,12 @@
 
 @interface DragOverlayWindow : NSWindow
 {
-    tr_session * fLib;
+    tr_handle * fLib;
     
     NSViewAnimation * fFadeInAnimation, * fFadeOutAnimation;
 }
 
-- (id) initWithLib: (tr_session *) lib forWindow: (NSWindow *) window;
+- (id) initWithLib: (tr_handle *) lib forWindow: (NSWindow *) window;
 
 - (void) setTorrents: (NSArray *) files;
 - (void) setFile: (NSString *) file;

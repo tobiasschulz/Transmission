@@ -1,89 +1,6 @@
 NEWS file for Transmission <http://www.transmissionbt.com/>
 
-1.60 (2009/mm/dd)
-<http://trac.transmissionbt.com/query?milestone=1.60&group=component&groupdesc=1&order=severity>
-- All Platforms
-   + Random port, with optional randomization on startup
-- Mac
-   + Requires Mac OS X 10.5 Leopard or newer
-   + Groups (moved to preferences) can be auto-assigned to transfers when adding based on multiple criteria
-   + Groups can have a default location when adding transfers
-   + Bonjour support for the web interface
-   + File filter field in the inspector
-   + Option to include beta releases when auto-updating (using modified Sparkle 1.5)
-
-1.51 (2009/02/26)
-<http://trac.transmissionbt.com/query?milestone=1.51&group=component&groupdesc=1&order=severity>
-- All Platforms
-   + Fix configure script issues with non-gcc compilers and user-defined CFLAGS environment variables 
-   + Decrease CPU usage in some situations
-   + Close a rare race condition on startup
-   + More efficient use of libcurl when curl 7.18.0 or newer is present
-- GTK+
-   + Play nicely with Ubuntu's new notification server
-   + Add Pause All and Resume All buttons
-- Web Client
-   + Support for Internet Explorer
-   + Layout fixes when viewed on an iPhone/iPod touch
-
-1.50 (2009/02/13)
-<http://trac.transmissionbt.com/query?milestone=1.50&group=component&groupdesc=1&order=severity>
-- All Platforms
-   + IPv6 support for peers, and for trackers with explicit IPv6 addresses
-   + Improved connectivity for encrypted peers
-   + Fix 1.42 error that made tracker announces slower over time
-   + Fix a Mac-centric peer connection bug from 1.41
-   + Use less CPU cycles when managing very fast peers
-   + Better handling of non-UTF-8 torrent files 
-   + When removing local data, only remove data from the torrent
-   + Close potential DoS vulnerability in 1.41
-   + Many other bugfixes
-- GTK+
-   + Various usability improvements 
-   + Better Gnome HIG compliance in the statusbar, properties dialog, and more
-- Daemon
-   + Lots of new options added to transmission-remote
-   + Fix 1.42 whitelist bug
-   + Make i18n support optional for cli and daemon clients
-- CLI
-   + Support session.json settings, just as the Daemon and GTK+ clients do
-- Web Client 
-   + Torrents can now be added by URL
-   + Add the ability to "remove local data" from the web client
-
-1.42 (2008/12/24)
-<http://trac.transmissionbt.com/query?milestone=1.42&group=component&groupdesc=1&order=severity>
-- All Platforms
-   + Fix 1.41 lockup issue
-
-1.41 (2008/12/23)
-<http://trac.transmissionbt.com/query?milestone=1.41&group=component&groupdesc=1&order=severity>
-- All Platforms
-   + Better peer management in large swarms
-   + Support BitTorrent Enhancement Proposal (BEP) #21 "Extension for Partial Seeds"
-   + Partial support for BEP #6 "Fast Extension" (reject, have all/none)
-   + Honor the peer's BEP #10 reqq key, when available
-   + Fix 1.40 "Got HTTP Status Code: 0" error message
-   + Fix 1.40 "lazy bitfield" error
-   + Fix 1.40 "jumpy upload speed" bug
-   + Fix handshake peer_id error
-   + Corrrectly handle Windows-style newlines in Bluetack blocklists
-   + More accurate bandwidth measurement
-   + File selection & priority was reset when editing a torrent's tracker list
-   + Fix autoconf/automake build warnings
-- GTK+
-   + In the Details dialog's peer tabs, rows were sometimes duplicated
-   + Minor bugfixes, usability changes, and locale improvements
-   + Three new translations: Afrikaans, Asturian, Bosnian
-   + Sixteen updated translations
-- Daemon
-   + Fix 1.40 bug in handling IP whitelist
-   + Minor bugfixes and output cleanup
-   + Windows portability
-- CLI
-   + Fix minor free-memory-read bug
-
-1.40 (2008/11/09)
+1.40 (2008/mm/dd)
 <http://trac.transmissionbt.com/query?milestone=1.40&group=component&groupdesc=1&order=severity>
 - All Platforms
    + Tracker communication uses fewer resources
@@ -127,10 +44,10 @@ NEWS file for Transmission <http://www.transmissionbt.com/>
 - Mac
    + Fix memory leak when updating blocklist
    + Connect to the web interface when the application's path contains a space
-- GTK+
++ GTK+
    + Minor display fixes
    + 15 updated translations + 1 new language
-- Daemon
++ Daemon+
    + Minor display fixes
 - Web Client
    + Minor display fixes

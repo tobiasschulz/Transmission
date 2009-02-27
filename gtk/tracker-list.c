@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -28,6 +28,7 @@
 #include "hig.h"
 #include "util.h"
 
+#define UPDATE_INTERVAL_MSEC 2000
 #define PAGE_KEY "page"
 
 struct tracker_page
@@ -154,10 +155,11 @@ onTrackerAddClicked( GtkButton * w UNUSED,
     setTrackerChangeState( page, TRUE );
     gtk_list_store_set( page->store, &iter,
                         TR_COL_TIER, 1,
-                        TR_COL_ANNOUNCE, "",
+                        TR_COL_ANNOUNCE, "http://",
                         -1 );
     path = gtk_tree_model_get_path( GTK_TREE_MODEL( page->store ), &iter );
-    gtk_tree_view_set_cursor( page->view, path,
+    gtk_tree_view_set_cursor( page->view,
+                              path,
                               gtk_tree_view_get_column( page->view,
                                                         TR_COL_ANNOUNCE ),
                               TRUE );

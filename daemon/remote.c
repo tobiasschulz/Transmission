@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -15,15 +15,7 @@
 #include <stdlib.h>
 #include <string.h> /* strcmp */
 
-#ifdef WIN32
- #include <direct.h> /* getcwd */
-#else
- #include <unistd.h> /* getcwd */
-#endif
-
 #include <libevent/event.h>
-
-#define CURL_DISABLE_TYPECHECK /* otherwise -Wunreachable-code goes insane */
 #include <curl/curl.h>
 
 #include <libtransmission/transmission.h>
@@ -36,9 +28,9 @@
 
 #define MY_NAME "transmission-remote"
 #define DEFAULT_HOST "localhost"
-#define DEFAULT_PORT atoi(TR_DEFAULT_RPC_PORT_STR)
+#define DEFAULT_PORT TR_DEFAULT_RPC_PORT
 
-enum { TAG_SESSION, TAG_LIST, TAG_DETAILS, TAG_FILES, TAG_PEERS };
+enum { TAG_LIST, TAG_DETAILS, TAG_FILES, TAG_PEERS };
 
 static const char*
 getUsage( void )
@@ -60,48 +52,69 @@ getUsage( void )
 
 static tr_option opts[] =
 {
-    { 'a', "add",                  "Add torrent files by filename or URL", "a",  0, NULL },
-    { 'b', "debug",                "Print debugging information", "b",  0, NULL },
-    { 'd', "downlimit",            "Set the maximum global download speed in KB/s", "d",  1, "<speed>" },
-    { 'D', "no-downlimit",         "Don't limit the global download speed", "D",  0, NULL },
-    { 910, "encryption-required",  "Encrypt all peer connections", "er", 0, NULL },
-    { 911, "encryption-preferred", "Prefer encrypted peer connections", "ep", 0, NULL },
-    { 912, "encryption-tolerated", "Prefer unencrypted peer connections", "et", 0, NULL },
-    { 'f', "files",                "List the current torrent(s)' files", "f",  0, NULL },
-    { 'g', "get",                  "Mark files for download", "g",  1, "<files>" },
-    { 'G', "no-get",               "Mark files for not downloading", "G",  1, "<files>" },
-    { 'i', "info",                 "Show the current torrent(s)' details", "i",  0, NULL },
-    { 920, "session-info",         "Show the session's details", "si", 0, NULL },
-    { 'l', "list",                 "List all torrents", "l",  0, NULL },
-    { 'm', "portmap",              "Enable portmapping via NAT-PMP or UPnP", "m",  0, NULL },
-    { 'M', "no-portmap",           "Disable portmapping", "M",  0, NULL },
-    { 'n', "auth",                 "Set authentication info", "n",  1, "<username:password>" },
-    { 'N', "netrc",                "Set authentication info from a .netrc file", "N",  1, "<filename>" },
-    { 'p', "port",                 "Port for incoming peers (Default: " TR_DEFAULT_PEER_PORT_STR ")", "p", 1, "<port>" },
-    { 900, "priority-high",        "Set the files' priorities as high", "ph", 1, "<files>" },
-    { 901, "priority-normal",      "Set the files' priorities as normal", "pn", 1, "<files>" },
-    { 902, "priority-low",         "Set the files' priorities as low", "pl", 1, "<files>" },
-    { 'r', "remove",               "Remove the current torrent(s)", "r",  0, NULL },
-    { 930, "peers",                "Set the current torrent(s)' maximum number of peers each", "pr", 1, "<max>" },
-    { 931, "global-peers",         "Set the global maximum number of peers", "gpr", 1, "<max>" },
-    { 'R', "remove-and-delete",    "Remove the current torrent(s) and delete local data", NULL, 0, NULL },
-    { 950, "seedratio",            "Let the current torrent(s) seed until a specific ratio", "sr", 1, "ratio" },
-    { 951, "seedratio-default",    "Let the current torrent(s) use the global seedratio settings", "srd", 0, NULL },
-    { 952, "no-seedratio",         "Let the current torrent(s) seed regardless of ratio", "SR", 0, NULL },
-    { 953, "global-seedratio",     "All torrents, unless overridden by a per-torrent setting, should seed until a specific ratio", "gsr", 1, "ratio" },
-    { 954, "no-global-seedratio",  "All torrents, unless overridden by a per-torrent setting, should seed regardless of ratio", "GSR", 0, NULL },
-    { 's', "start",                "Start the current torrent(s)", "s",  0, NULL },
-    { 'S', "stop",                 "Stop the current torrent(s)", "S",  0, NULL },
-    { 't', "torrent",              "Set the current torrent(s)", "t",  1, "<torrent>" },
-    { 'u', "uplimit",              "Set the maximum global upload speed in KB/s", "u",  1, "<speed>" },
-    { 'U', "no-uplimit",           "Don't limit the global upload speed", "U",  0, NULL },
-    { 'v', "verify",               "Verify the current torrent(s)", "v",  0, NULL },
-    { 'V', "version",              "Show version number and exit", "V", 0, NULL },
-    { 'w', "download-dir",         "Set the default download folder", "w",  1, "<path>" },
-    { 'x', "pex",                  "Enable peer exchange (PEX)", "x",  0, NULL },
-    { 'X', "no-pex",               "Disable peer exchange (PEX)", "X",  0, NULL },
-    { 940, "peer-info",            "List the current torrent(s)' peers", "pi",  0, NULL },
-    {   0, NULL,                   NULL, NULL, 0, NULL }
+    { 'a', "add",                  "Add torrent files",
+      "a",  0, NULL                  },
+    { 'b', "debug",                "Print debugging information",
+      "b",  0, NULL                  },
+    { 'd', "downlimit",            "Set the maximum download speed in KB/s",
+      "d",  1, "<speed>"             },
+    { 'D', "no-downlimit",         "Don't limit the download speed",
+      "D",  0, NULL                  },
+    { 910, "encryption-required",  "Encrypt all peer connections",
+      "er", 0, NULL                  },
+    { 911, "encryption-preferred", "Prefer encrypted peer connections",
+      "ep", 0, NULL                  },
+    { 912, "encryption-tolerated", "Prefer unencrypted peer connections",
+      "et", 0, NULL                  },
+    { 'f', "files",                "List the current torrent's files",
+      "f",  0, NULL                  },
+    { 'g', "get",                  "Mark files for download",
+      "g",  1, "<files>"             },
+    { 'G', "no-get",               "Mark files for not downloading",
+      "G",  1, "<files>"             },
+    { 'i', "info",                 "Show details of the current torrent(s)",
+      "i",  0, NULL                  },
+    { 'l', "list",                 "List all torrents",
+      "l",  0, NULL                  },
+    { 'm', "portmap",              "Enable portmapping via NAT-PMP or UPnP",
+      "m",  0, NULL                  },
+    { 'M', "no-portmap",           "Disable portmapping",
+      "M",  0, NULL                  },
+    { 'n', "auth",                 "Set authentication info",
+      "n",  1, "<username:password>" },
+    { 'p', "port",
+      "Port for incoming peers (Default: " TR_DEFAULT_PORT_STR ")",
+      "p", 1, "<port>" },
+    { 900, "priority-high",        "Set the files' priorities as high",
+      "ph", 1, "<files>"             },
+    { 901, "priority-normal",      "Set the files' priorities as normal",
+      "pn", 1, "<files>"             },
+    { 902, "priority-low",         "Set the files' priorities as low",
+      "pl", 1, "<files>"             },
+    { 'r', "remove",               "Remove the current torrent(s)",
+      "r",  0, NULL                  },
+    { 's', "start",                "Start the current torrent(s)",
+      "s",  0, NULL                  },
+    { 'S', "stop",                 "Stop the current torrent(s)",
+      "S",  0, NULL                  },
+    { 't', "torrent",              "Set the current torrent(s)",
+      "t",  1, "<torrent>"           },
+    { 'u', "uplimit",              "Set the maximum upload speed in KB/s",
+      "u",  1, "<speed>"             },
+    { 'U', "no-uplimit",           "Don't limit the upload speed",
+      "U",  0, NULL                  },
+    { 'v', "verify",               "Verify the current torrent(s)",
+      "v",  0, NULL                  },
+    { 'w', "download-dir",         "Set the default download folder",
+      "w",  1, "<path>"              },
+    { 'x', "pex",                  "Enable peer exchange (PEX)",
+      "x",  0, NULL                  },
+    { 'X', "no-pex",               "Disable peer exchange (PEX)",
+      "X",  0, NULL                  },
+    { 'z', "peers",                "List the current torrent's peers",
+      "z",  0, NULL                  },
+    {   0, NULL,                   NULL,
+        NULL, 0, NULL                  }
 };
 
 static void
@@ -129,20 +142,6 @@ static char * reqs[256]; /* arbitrary max */
 static int    reqCount = 0;
 static int    debug = 0;
 static char * auth = NULL;
-static char * netrc = NULL;
-
-static char*
-tr_getcwd( void )
-{
-    char buf[2048];
-    *buf = '\0';
-#ifdef WIN32
-    _getcwd( buf, sizeof( buf ) );
-#else
-    getcwd( buf, sizeof( buf ) );
-#endif
-    return tr_strdup( buf );
-}
 
 static char*
 absolutify( const char * path )
@@ -207,84 +206,57 @@ addFiles( tr_benc *    args,
     }
     if( strcmp( arg, "all" ) )
     {
-        int i;
-        int valueCount;
-        int * values = tr_parseNumberRange( arg, -1, &valueCount );
-        for( i=0; i<valueCount; ++i )
-            tr_bencListAddInt( files, values[i] );
-        tr_free( values );
+        const char * walk = arg;
+        while( *walk )
+        {
+            char *        p;
+            unsigned long l;
+            errno = 0;
+            l = strtol( walk, &p, 10 );
+            if( errno )
+                break;
+            tr_bencListAddInt( files, l - 1 );
+            if( *p != ',' )
+                break;
+            walk = p + 1;
+        }
     }
 }
 
 #define TR_N_ELEMENTS( ary ) ( sizeof( ary ) / sizeof( *ary ) )
 
 static const char * files_keys[] = {
-    "files",
-    "name",
-    "priorities",
-    "wanted"
+    "files", "name", "priorities", "wanted"
 };
 
 static const char * details_keys[] = {
-    "activityDate",
-    "addedDate",
-    "announceResponse",
+    "activityDate",     "addedDate",              "announceResponse",
     "announceURL",
-    "comment",
-    "corruptEver",
-    "creator",
-    "dateCreated",
-    "doneDate",
-    "downloadDir",
-    "downloadedEver",
-    "errorString",
-    "eta",
-    "hashString",
-    "haveUnchecked",
-    "haveValid",
-    "id",
-    "isPrivate",
-    "lastAnnounceTime",
-    "lastScrapeTime",
-    "leechers",
-    "leftUntilDone",
-    "name",
-    "nextAnnounceTime",
-    "nextScrapeTime",
-    "peersConnected",
-    "peersGettingFromUs",
-    "peersSendingToUs",
-    "pieceCount",
-    "pieceSize",
-    "rateDownload",
-    "rateUpload",
-    "recheckProgress",
-    "scrapeResponse",
-    "seeders",
-    "sizeWhenDone",
-    "startDate",
-    "status",
-    "timesCompleted",
-    "totalSize",
+    "comment",        "corruptEver",        "creator",
+    "dateCreated",     "doneDate",
+    "downloadedEver", "errorString",        "eta",
+    "hashString",      "haveUnchecked",
+    "haveValid",      "id",                 "isPrivate",
+    "lastAnnounceTime", "lastScrapeTime",
+    "leechers",       "leftUntilDone",      "name",
+    "nextAnnounceTime", "nextScrapeTime",
+    "peersConnected", "peersGettingFromUs", "peersSendingToUs",
+    "pieceCount",     "pieceSize",          "rateDownload",
+    "rateUpload",      "recheckProgress",
+    "scrapeResponse", "seeders",
+    "sizeWhenDone",    "startDate",
+    "status",         "timesCompleted",     "totalSize",
     "uploadedEver",
-    "webseeds",
-    "webseedsSendingToUs"
+    "webseeds",       "webseedsSendingToUs"
 };
 
 static const char * list_keys[] = {
-    "error",
-    "errorString",
-    "eta",
-    "id",
+    "downloadedEver", "eta",              "id",
     "leftUntilDone",
     "name",
-    "peersGettingFromUs",
-    "peersSendingToUs",
+    "peersGettingFromUs", "peersSendingToUs",
     "rateDownload",
-    "rateUpload",
-    "sizeWhenDone",
-    "status",
-    "uploadRatio"
+    "rateUpload", "sizeWhenDone", "status", "uploadedEver"
 };
 
 static void
@@ -320,8 +292,8 @@ readargs( int           argc,
                     }
                     else
                     {
-                        tr_bencDictAddStr( &top, "method", "torrent-add" );
-                        tr_bencDictAddStr( args, "filename", optarg );
+                        fprintf( stderr, "Couldn't add file: %s\n", optarg );
+                        addArg = FALSE;
                     }
                 }
                 else
@@ -408,11 +380,6 @@ readargs( int           argc,
                 addArg = FALSE;
                 break;
 
-            case 'N':
-                netrc = tr_strdup( optarg );
-                addArg = FALSE;
-                break;
-
             case 'p':
                 tr_bencDictAddStr( &top, "method", "session-set" );
                 tr_bencDictAddInt( args, "port", numarg( optarg ) );
@@ -421,12 +388,6 @@ readargs( int           argc,
             case 'r':
                 tr_bencDictAddStr( &top, "method", "torrent-remove" );
                 addIdArg( args, id );
-                break;
-
-            case 'R':
-                tr_bencDictAddStr( &top, "method", "torrent-remove" );
-                addIdArg( args, id );
-                tr_bencDictAddInt( args, "delete-local-data", 1 );
                 break;
 
             case 's':
@@ -460,11 +421,6 @@ readargs( int           argc,
                 addIdArg( args, id );
                 break;
 
-            case 'V':
-                fprintf( stderr, "Transmission %s\n", LONG_VERSION_STRING );
-                exit( 0 );
-                break;
-
             case 'w': {
                 char * path = absolutify( optarg );
                 tr_bencDictAddStr( &top, "method", "session-set" );
@@ -481,6 +437,14 @@ readargs( int           argc,
             case 'X':
                 tr_bencDictAddStr( &top, "method", "session-set" );
                 tr_bencDictAddInt( args, "pex-allowed", 0 );
+                break;
+
+            case 'z':
+                tr_bencDictAddStr( &top, "method", "torrent-get" );
+                tr_bencDictAddInt( &top, "tag", TAG_PEERS );
+                addIdArg( args, id );
+                fields = tr_bencDictAddList( args, "fields", 1 );
+                tr_bencListAddStr( fields, "peers" );
                 break;
 
             case 900:
@@ -516,60 +480,6 @@ readargs( int           argc,
                 tr_bencDictAddStr( args, "encryption", "tolerated" );
                 break;
 
-            case 920:
-                tr_bencDictAddStr( &top, "method", "session-get" );
-                tr_bencDictAddInt( &top, "tag", TAG_SESSION );
-                break;
-
-            case 930:
-                tr_bencDictAddStr( &top, "method", "torrent-set" );
-                addIdArg( args, id );
-                tr_bencDictAddInt( args, "peer-limit", atoi(optarg) );
-                break;
-
-            case 931:
-                tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddInt( args, "peer-limit", atoi(optarg) );
-                break;
-
-            case 940:
-                tr_bencDictAddStr( &top, "method", "torrent-get" );
-                tr_bencDictAddInt( &top, "tag", TAG_PEERS );
-                addIdArg( args, id );
-                fields = tr_bencDictAddList( args, "fields", 1 );
-                tr_bencListAddStr( fields, "peers" );
-                break;
-
-            case 950:
-                tr_bencDictAddStr( &top, "method", "torrent-set" );
-                tr_bencDictAddDouble( args, "ratio-limit", atof(optarg) );
-                tr_bencDictAddInt( args, "ratio-limit-mode", TR_RATIOLIMIT_SINGLE );
-                addIdArg( args, id );
-                break;
-
-            case 951:
-                tr_bencDictAddStr( &top, "method", "torrent-set" );
-                tr_bencDictAddInt( args, "ratio-limit-mode", TR_RATIOLIMIT_GLOBAL );
-                addIdArg( args, id );
-                break;
-
-            case 952:
-                tr_bencDictAddStr( &top, "method", "torrent-set" );
-                tr_bencDictAddInt( args, "ratio-limit-mode", TR_RATIOLIMIT_UNLIMITED );
-                addIdArg( args, id );
-                break;
-
-            case 953:
-                tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddDouble( args, "ratio-limit", atof(optarg) );
-                tr_bencDictAddInt( args, "ratio-limit-enabled", 1 );
-                break;
-
-            case 954:
-                tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddInt( args, "ratio-limit-enabled", 0 );
-                break;
-
             case TR_OPT_ERR:
                 fprintf( stderr, "invalid option\n" );
                 showUsage( );
@@ -582,12 +492,7 @@ readargs( int           argc,
         }
 
         if( addArg )
-        {
-            struct evbuffer * buf = tr_getBuffer( );
-            reqs[reqCount++] = tr_strdup( tr_bencSaveAsJSON( &top, buf ) );
-            tr_releaseBuffer( buf );
-        }
-
+            reqs[reqCount++] = tr_bencSaveAsJSON( &top, NULL );
         tr_bencFree( &top );
     }
 }
@@ -658,41 +563,32 @@ etaToString( char *  buf,
 #define GIGABYTE_FACTOR ( 1024.0 * 1024.0 * 1024.0 )
 
 static char*
-strlratio2( char * buf, double ratio, size_t buflen )
-{
-    if( (int)ratio == TR_RATIO_NA )
-        tr_strlcpy( buf, "None", buflen );
-    else if( (int)ratio == TR_RATIO_INF )
-        tr_strlcpy( buf, "Inf", buflen );
-    else if( ratio < 10.0 )
-        tr_snprintf( buf, buflen, "%'.2f", ratio );
-    else if( ratio < 100.0 )
-        tr_snprintf( buf, buflen, "%'.1f", ratio );
-    else
-        tr_snprintf( buf, buflen, "%'.0f", ratio );
-    return buf;
-}
-
-static char*
 strlratio( char * buf,
            double numerator,
            double denominator,
            size_t buflen )
 {
-    double ratio;
-
     if( denominator )
-        ratio = numerator / denominator;
+    {
+        const double ratio = numerator / denominator;
+        if( ratio < 10.0 )
+            tr_snprintf( buf, buflen, "%'.2f", ratio );
+        else if( ratio < 100.0 )
+            tr_snprintf( buf, buflen, "%'.1f", ratio );
+        else
+            tr_snprintf( buf, buflen, "%'.0f", ratio );
+    }
     else if( numerator )
-        ratio = TR_RATIO_INF;
+        tr_strlcpy( buf, "Infinity", buflen );
     else
-        ratio = TR_RATIO_NA;
-
-    return strlratio2( buf, ratio, buflen );
+        tr_strlcpy( buf, "None", buflen );
+    return buf;
 }
 
 static char*
-strlsize( char *  buf, int64_t size, size_t  buflen )
+strlsize( char *  buf,
+          int64_t size,
+          size_t  buflen )
 {
     if( !size )
         tr_strlcpy( buf, "None", buflen );
@@ -751,86 +647,28 @@ getStatusString( tr_benc * t, char * buf, size_t buflen )
 
         case TR_STATUS_DOWNLOAD:
         case TR_STATUS_SEED: {
-	    int64_t fromUs = 0; 
-	    int64_t toUs = 0; 
- 	    tr_bencDictFindInt( t, "peersGettingFromUs", &fromUs ); 
- 	    tr_bencDictFindInt( t, "peersSendingToUs", &toUs ); 
- 	    if( fromUs && toUs ) 
- 	        tr_strlcpy( buf, "Up & Down", buflen ); 
- 	    else if( toUs ) 
- 	        tr_strlcpy( buf, "Downloading", buflen ); 
- 	    else if( fromUs ) { 
- 	        int64_t leftUntilDone = 0; 
- 	        tr_bencDictFindInt( t, "leftUntilDone", &leftUntilDone ); 
- 	        if( leftUntilDone > 0 )
- 	            tr_strlcpy( buf, "Uploading", buflen ); 
- 	        else
- 	            tr_strlcpy( buf, "Seeding", buflen ); 
- 	    } else {
- 	        tr_strlcpy( buf, "Idle", buflen ); 
-            }
+            int64_t fromUs = 0;
+            int64_t toUs = 0;
+            tr_bencDictFindInt( t, "peersGettingFromUs", &fromUs );
+            tr_bencDictFindInt( t, "peersSendingToUs", &toUs );
+            if( fromUs && toUs )
+                tr_strlcpy( buf, "Up & Down", buflen );
+            else if( toUs )
+                tr_strlcpy( buf, "Downloading", buflen );
+            else if( fromUs ) {
+                int64_t leftUntilDone = 0;
+                tr_bencDictFindInt( t, "leftUntilDone", &leftUntilDone );
+                if( leftUntilDone > 0 )
+                    tr_strlcpy( buf, "Uploading", buflen );
+                else
+                    tr_strlcpy( buf, "Seeding", buflen );
+            } else
+                tr_strlcpy( buf, "Idle", buflen );
             break;
         }
     }
 
     return buf;
-}
-
-static const char*
-getTrackerDateStr( const time_t t, tr_bool isStopped )
-{
-    const char * str;
-    switch( t ) {
-        case 0: str = isStopped ? "None (Stopped)\n" : "None\n"; break;
-        case 1: str = "In Progress\n"; break;
-        default: str = ctime( &t ); break;
-    }
-    return str;
-}
-
-static void
-printSession( tr_benc * top )
-{
-    tr_benc *args;
-    if( ( tr_bencDictFindDict( top, "arguments", &args ) ) )
-    {
-        const char * str;
-        int64_t      i;
-
-        printf( "VERSION\n" );
-        if( tr_bencDictFindStr( args,  "version", &str ) )
-            printf( "  Daemon version: %s\n", str );
-        if( tr_bencDictFindInt( args, "rpc-version", &i ) )
-            printf( "  RPC version: %" PRId64 "\n", i );
-        if( tr_bencDictFindInt( args, "rpc-version-minimum", &i ) )
-            printf( "  RPC minimum version: %" PRId64 "\n", i );
-        printf( "\n" );
-
-        printf( "TRANSFER\n" );
-        if( tr_bencDictFindStr( args,  "download-dir", &str ) )
-            printf( "  Download directory: %s\n", str );
-        if( tr_bencDictFindInt( args, "port", &i ) )
-            printf( "  Listenport: %" PRId64 "\n", i );
-        if( tr_bencDictFindInt( args, "port-forwarding-enabled", &i ) )
-            printf( "  Portforwarding enabled: %s\n", ( i ? "Yes" : "No" ) );
-        if( tr_bencDictFindInt( args, "pex-allowed", &i ) )
-            printf( "  Peer exchange allowed: %s\n", ( i ? "Yes" : "No" ) );
-        if( tr_bencDictFindStr( args,  "encryption", &str ) )
-            printf( "  Encryption: %s\n", str );
-        printf( "\n" );
-
-        printf( "LIMITS\n" );
-        if( tr_bencDictFindInt( args, "peer-limit", &i ) )
-            printf( "  Peer limit: %" PRId64 "\n", i );
-        if( tr_bencDictFindInt( args, "speed-limit-down-enabled", &i ) )
-            printf( "  Downloadlimit enabled: %s\n", ( i ? "Yes" : "No" ) );
-        if( tr_bencDictFindInt( args, "speed-limit-down", &i ) )
-            printf( "  Downloadlimit: %6" PRId64 " KB/sec\n", i );
-        if( tr_bencDictFindInt( args, "speed-limit-up-enabled", &i ) )
-            printf( "  Uploadlimit enabled:   %s\n", ( i ? "Yes" : "No" ) );
-        if( tr_bencDictFindInt( args, "speed-limit-up", &i ) )
-            printf( "  Uploadlimit:   %6" PRId64 " KB/sec\n", i );
-    }
 }
 
 static void
@@ -851,9 +689,6 @@ printDetails( tr_benc * top )
             char         buf[512];
             char         buf2[512];
             int64_t      i, j, k;
-            tr_bool      isStopped;
-
-            isStopped = tr_bencDictFindInt( t, "status", &i ) && (i==TR_STATUS_STOPPED);
 
             printf( "NAME\n" );
             if( tr_bencDictFindInt( t, "id", &i ) )
@@ -867,9 +702,6 @@ printDetails( tr_benc * top )
             printf( "TRANSFER\n" );
             getStatusString( t, buf, sizeof( buf ) );
             printf( "  State: %s\n", buf );
-
-            if( tr_bencDictFindStr( t, "downloadDir", &str ) )
-                printf( "  Location: %s\n", str );
 
             if( tr_bencDictFindInt( t, "sizeWhenDone", &i )
               && tr_bencDictFindInt( t, "leftUntilDone", &j ) )
@@ -970,24 +802,42 @@ printDetails( tr_benc * top )
             printf( "\n" );
 
             printf( "TRACKER\n" );
-            if( tr_bencDictFindInt( t, "lastAnnounceTime", &i ) )
-                printf( "  Latest announce: %s", getTrackerDateStr( (time_t)i, isStopped ) );
+            if( tr_bencDictFindInt( t, "lastAnnounceTime", &i ) && i )
+            {
+                const time_t tt = i;
+                printf( "  Latest announce: %s", ctime( &tt ) );
+            }
             if( tr_bencDictFindStr( t, "announceURL", &str ) )
                 printf( "  Announce URL: %s\n", str );
-            if( tr_bencDictFindStr( t, "announceResponse", &str ) && str && *str )
+            if( tr_bencDictFindStr( t, "announceResponse",
+                                    &str ) && str && *str )
                 printf( "  Announce response: %s\n", str );
-            if( tr_bencDictFindInt( t, "nextAnnounceTime", &i ) )
-                printf( "  Next announce:   %s", getTrackerDateStr( (time_t)i, isStopped ) );
-            if( tr_bencDictFindInt( t, "lastScrapeTime", &i ) )
-                printf( "  Latest scrape:   %s", getTrackerDateStr( (time_t)i, isStopped ) );
+            if( tr_bencDictFindInt( t, "nextAnnounceTime", &i ) && i )
+            {
+                const time_t tt = i;
+                printf( "  Next announce:   %s", ctime( &tt ) );
+            }
+            if( tr_bencDictFindInt( t, "lastScrapeTime", &i ) && i )
+            {
+                const time_t tt = i;
+                printf( "  Latest scrape:   %s", ctime( &tt ) );
+            }
             if( tr_bencDictFindStr( t, "scrapeResponse", &str ) )
                 printf( "  Scrape response: %s\n", str );
-            if( tr_bencDictFindInt( t, "nextScrapeTime", &i ) )
-                printf( "  Next scrape:     %s", getTrackerDateStr( (time_t)i, isStopped ) );
-            if( tr_bencDictFindInt( t, "seeders", &i ) && tr_bencDictFindInt( t, "leechers", &j ) )
-                printf( "  Tracker knows of %" PRId64 " seeders and %" PRId64 " leechers\n", i, j );
+            if( tr_bencDictFindInt( t, "nextScrapeTime", &i ) && i )
+            {
+                const time_t tt = i;
+                printf( "  Next scrape:     %s", ctime( &tt ) );
+            }
+            if( tr_bencDictFindInt( t, "seeders", &i )
+              && tr_bencDictFindInt( t, "leechers", &j ) )
+                printf(
+                    "  Tracker knows of %" PRId64 " seeders and %" PRId64
+                    " leechers\n", i, j );
             if( tr_bencDictFindInt( t, "timesCompleted", &i ) )
-                printf( "  Tracker has seen %" PRId64 " clients complete this torrent\n", i );
+                printf(
+                    "  Tracker has seen %" PRId64
+                    " clients complete this torrent\n", i );
             printf( "\n" );
 
             printf( "ORIGINS\n" );
@@ -1066,7 +916,7 @@ printFileList( tr_benc * top )
                                 pristr = "Normal"; break;
                         }
                         printf( "%3d: %3.0f%% %-8s %-3s %9s  %s\n",
-                                j,
+                                ( j + 1 ),
                                 ( 100.0 * percent ),
                                 pristr,
                                 ( wanted ? "Yes" : "No" ),
@@ -1083,24 +933,21 @@ static void
 printPeersImpl( tr_benc * peers )
 {
     int i, n;
-    printf( "%-20s  %-12s  %-5s %-6s  %-6s  %s\n",
-            "Address", "Flags", "Done", "Down", "Up", "Client" );
+    printf( "%-20s  %-12s  %-6s  %-6s  %s\n",
+            "Address", "Flags", "Down", "Up", "Client" );
     for( i = 0, n = tr_bencListSize( peers ); i < n; ++i )
     {
-        double progress;
         const char * address, * client, * flagstr;
-        int64_t rateToClient, rateToPeer;
-        tr_benc * d = tr_bencListChild( peers, i );
-
+        int64_t      rateToClient, rateToPeer;
+        tr_benc *    d = tr_bencListChild( peers, i );
         if( tr_bencDictFindStr( d, "address", &address )
           && tr_bencDictFindStr( d, "clientName", &client )
-          && tr_bencDictFindDouble( d, "progress", &progress )
           && tr_bencDictFindStr( d, "flagStr", &flagstr )
           && tr_bencDictFindInt( d, "rateToClient", &rateToClient )
           && tr_bencDictFindInt( d, "rateToPeer", &rateToPeer ) )
         {
-            printf( "%-20s  %-12s  %-5.1f %6.1f  %6.1f  %s\n",
-                    address, flagstr, (progress*100.0),
+            printf( "%-20s  %-12s  %6.1f  %6.1f  %s\n",
+                    address, flagstr,
                     rateToClient / 1024.0,
                     rateToPeer / 1024.0,
                     client );
@@ -1139,21 +986,18 @@ printTorrentList( tr_benc * top )
       && ( tr_bencDictFindList( args, "torrents", &list ) ) )
     {
         int i, n;
-        int64_t total_up = 0, total_down = 0, total_size = 0;
-        char haveStr[32];
-
-        printf( "%-4s   %-4s  %9s  %-8s  %6s  %6s  %-5s  %-11s  %s\n",
-                "ID", "Done", "Have", "ETA", "Up", "Down", "Ratio", "Status",
+        printf( "%-4s  %-4s  %-8s  %-6s  %-6s  %-5s  %-11s  %s\n",
+                "ID", "Done", "ETA", "Up", "Down", "Ratio", "Status",
                 "Name" );
-
         for( i = 0, n = tr_bencListSize( list ); i < n; ++i )
         {
-            int64_t      id, eta, status, up, down;
-            int64_t      sizeWhenDone, leftUntilDone;
-            double       ratio;
-            const char * name;
+            int64_t     id, eta, status, up, down;
+            int64_t     sizeWhenDone, leftUntilDone;
+            int64_t     upEver, downEver;
+            const char *name;
             tr_benc *   d = tr_bencListChild( list, i );
-            if( tr_bencDictFindInt( d, "eta", &eta )
+            if( tr_bencDictFindInt( d, "downloadedEver", &downEver )
+              && tr_bencDictFindInt( d, "eta", &eta )
               && tr_bencDictFindInt( d, "id", &id )
               && tr_bencDictFindInt( d, "leftUntilDone", &leftUntilDone )
               && tr_bencDictFindStr( d, "name", &name )
@@ -1161,52 +1005,28 @@ printTorrentList( tr_benc * top )
               && tr_bencDictFindInt( d, "rateUpload", &up )
               && tr_bencDictFindInt( d, "sizeWhenDone", &sizeWhenDone )
               && tr_bencDictFindInt( d, "status", &status )
-              && tr_bencDictFindDouble( d, "uploadRatio", &ratio ) )
+              && tr_bencDictFindInt( d, "uploadedEver", &upEver ) )
             {
                 char etaStr[16];
                 char statusStr[64];
-                char ratioStr[32];
-                char doneStr[8];
-                int64_t error;
-                char errorMark;
-
-                if( sizeWhenDone )
-                    tr_snprintf( doneStr, sizeof( doneStr ), "%d%%", (int)( 100.0 * ( sizeWhenDone - leftUntilDone ) / sizeWhenDone ) );
-                else
-                    tr_strlcpy( doneStr, "n/a", sizeof( doneStr ) );
-
-                strlsize( haveStr, sizeWhenDone - leftUntilDone, sizeof( haveStr ) );
-
                 if( leftUntilDone )
                     etaToString( etaStr, sizeof( etaStr ), eta );
                 else
                     tr_snprintf( etaStr, sizeof( etaStr ), "Done" );
-                if( tr_bencDictFindInt( d, "error", &error ) && error )
-                    errorMark = '*';
-                else
-                    errorMark = ' ';
                 printf(
-                    "%4d%c  %4s  %9s  %-8s  %6.1f  %6.1f  %5s  %-11s  %s\n",
-                    (int)id, errorMark,
-                    doneStr,
-                    haveStr,
+                    "%4d  %3d%%  %-8s  %6.1f  %6.1f  %5.1f  %-11s  %s\n",
+                    (int)id,
+                    (int)( 100.0 *
+                           ( sizeWhenDone - leftUntilDone ) / sizeWhenDone ),
                     etaStr,
                     up / 1024.0,
                     down / 1024.0,
-                    strlratio2( ratioStr, ratio, sizeof( ratioStr ) ),
+                    (double)( downEver ? ( (double)upEver /
+                                          downEver ) : 0.0 ),
                     getStatusString( d, statusStr, sizeof( statusStr ) ),
                     name );
-
-                total_up += up;
-                total_down += up;
-                total_size += sizeWhenDone - leftUntilDone;
             }
         }
-
-        printf( "Sum:         %9s             %6.1f  %6.1f\n",
-                strlsize( haveStr, total_size, sizeof( haveStr ) ),
-                total_up / 1024.0,
-                total_down / 1024.0 );
     }
 }
 
@@ -1219,7 +1039,7 @@ processResponse( const char * host,
     tr_benc top;
 
     if( debug )
-        fprintf( stderr, "got response:\n--------\n%*.*s\n--------\n",
+        fprintf( stderr, "got response: [%*.*s]\n",
                  (int)len, (int)len, (const char*) response );
 
     if( tr_jsonParse( response, len, &top, NULL ) )
@@ -1233,9 +1053,6 @@ processResponse( const char * host,
 
         switch( tag )
         {
-            case TAG_SESSION:
-                printSession( &top ); break;
-
             case TAG_FILES:
                 printFileList( &top ); break;
 
@@ -1274,24 +1091,24 @@ processRequests( const char *  host,
 #ifdef HAVE_LIBZ
     curl_easy_setopt( curl, CURLOPT_ENCODING, "deflate" );
 #endif
-    curl_easy_setopt( curl, CURLOPT_USERAGENT, MY_NAME "/" LONG_VERSION_STRING );
+    curl_easy_setopt( curl, CURLOPT_USERAGENT,
+                      MY_NAME "/" LONG_VERSION_STRING );
     curl_easy_setopt( curl, CURLOPT_WRITEFUNCTION, writeFunc );
     curl_easy_setopt( curl, CURLOPT_WRITEDATA, buf );
     curl_easy_setopt( curl, CURLOPT_POST, 1 );
     curl_easy_setopt( curl, CURLOPT_URL, url );
-    curl_easy_setopt( curl, CURLOPT_NETRC, CURL_NETRC_OPTIONAL );
-    curl_easy_setopt( curl, CURLOPT_HTTPAUTH, CURLAUTH_ANY );
-    if( netrc )
-        curl_easy_setopt( curl, CURLOPT_NETRC_FILE, netrc );
     if( auth )
+    {
         curl_easy_setopt( curl, CURLOPT_USERPWD, auth );
+        curl_easy_setopt( curl, CURLOPT_HTTPAUTH, CURLAUTH_ANY );
+    }
 
     for( i = 0; i < reqCount; ++i )
     {
         CURLcode res;
         curl_easy_setopt( curl, CURLOPT_POSTFIELDS, reqs[i] );
         if( debug )
-            fprintf( stderr, "posting:\n--------\n%s\n--------\n", reqs[i] );
+            fprintf( stderr, "posting [%s]\n", reqs[i] );
         if( ( res = curl_easy_perform( curl ) ) )
             tr_nerr( MY_NAME, "(%s:%d) %s", host, port,
                     curl_easy_strerror( res ) );

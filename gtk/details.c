@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -11,7 +11,6 @@
  */
 
 #include <errno.h>
-#include <math.h> /* ceil() */
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,14 +28,7 @@
 #include "hig.h"
 #include "util.h"
 
-#define UPDATE_INTERVAL_SECONDS 2
-typedef struct 
-{
-    gpointer    gtor;
-    TrCore    * core;
-    guint       handler;
-} ResponseData;
-
+#define UPDATE_INTERVAL_MSEC 2000
 
 /****
 *****  PIECES VIEW
@@ -297,8 +289,7 @@ webseed_model_new( const tr_torrent * tor )
     {
         GtkTreeIter iter;
         gtk_list_store_append( store, &iter );
-        gtk_list_store_set( store, &iter,
-                            WEBSEED_COL_URL, inf->webseeds[i],
+        gtk_list_store_set( store, &iter, WEBSEED_COL_URL, inf->webseeds[i],
                             WEBSEED_COL_DOWNLOAD_RATE, speeds[i],
                             -1 );
     }
@@ -334,26 +325,29 @@ static const char* peer_column_names[N_PEER_COLS] =
 };
 
 static int
-compare_peers( const void * a, const void * b )
+compare_peers( const void * a,
+               const void * b )
 {
     const tr_peer_stat * pa = a;
     const tr_peer_stat * pb = b;
 
-    return strcmp( pa->addr, pb->addr );
+    return strcmp ( pa->addr, pb->addr );
 }
 
 static int
-compare_addr_to_peer( const void * addr, const void * b )
+compare_addr_to_peer( const void * a,
+                      const void * b )
 {
+    const char *         addr = (const char *) a;
     const tr_peer_stat * peer = b;
 
-    return strcmp( addr, peer->addr );
+    return strcmp ( addr, peer->addr );
 }
 
 static void
-peer_row_set( GtkListStore        * store,
-              GtkTreeIter         * iter,
-              const tr_peer_stat  * peer )
+peer_row_set( GtkListStore *       store,
+              GtkTreeIter *        iter,
+              const tr_peer_stat * peer )
 {
     const char * client = peer->client;
 
@@ -394,7 +388,8 @@ peer_model_new( tr_torrent * tor )
                                             G_TYPE_FLOAT, /* downloadFromRate */
                                             G_TYPE_FLOAT, /* uploadToRate */
                                             G_TYPE_STRING, /* client */
-                                            G_TYPE_INT,   /* progress [0..100] */
+                                            G_TYPE_INT,   /* progress [0..100]
+                                                            */
                                             G_TYPE_BOOLEAN, /* isEncrypted */
                                             G_TYPE_STRING ); /* flagString */
 
@@ -491,7 +486,6 @@ typedef struct
     GtkWidget *     seeders_lb;
     GtkWidget *     leechers_lb;
     GtkWidget *     completed_lb;
-    GtkWidget *     peer_tree_view;
 }
 PeerData;
 
@@ -593,8 +587,6 @@ refresh_peers( GtkWidget * top )
     fmtpeercount ( p->completed_lb, stat->timesCompleted );
 
     free( peers );
-
-    gtk_widget_queue_draw( p->peer_tree_view );
 }
 
 #if GTK_CHECK_VERSION( 2, 12, 0 )
@@ -690,13 +682,13 @@ peer_page_new( TrTorrent * gtor )
     const tr_info * inf = tr_torrent_info( gtor );
 
     /* TODO: make this configurable? */
-    int view_columns[] = { PEER_COL_IS_ENCRYPTED,
-                           PEER_COL_UPLOAD_RATE,
-                           PEER_COL_DOWNLOAD_RATE,
-                           PEER_COL_PROGRESS,
-                           PEER_COL_STATUS,
-                           PEER_COL_ADDRESS,
-                           PEER_COL_CLIENT };
+    int             view_columns[] = { PEER_COL_IS_ENCRYPTED,
+                                       PEER_COL_UPLOAD_RATE,
+                                       PEER_COL_DOWNLOAD_RATE,
+                                       PEER_COL_PROGRESS,
+                                       PEER_COL_STATUS,
+                                       PEER_COL_ADDRESS,
+                                       PEER_COL_CLIENT };
 
 
     if( inf->webseedCount )
@@ -704,52 +696,51 @@ peer_page_new( TrTorrent * gtor )
         GtkTreeViewColumn * c;
         GtkCellRenderer *   r;
         const char *        t;
-        GtkWidget *         w;
-        GtkWidget *         v;
+        GtkWidget *         fr;
 
         m = webseed_model_new( tr_torrent_handle( gtor ) );
-        v = gtk_tree_view_new_with_model( m );
-        g_signal_connect( v, "button-release-event", G_CALLBACK( on_tree_view_button_released ), NULL );
-        gtk_tree_view_set_rules_hint( GTK_TREE_VIEW( v ), TRUE );
+        webtree = gtk_tree_view_new_with_model( m );
+        g_signal_connect( webtree, "button-release-event",
+                          G_CALLBACK( on_tree_view_button_released ), NULL );
+        gtk_tree_view_set_rules_hint( GTK_TREE_VIEW( webtree ), TRUE );
         p->webseeds = GTK_LIST_STORE( m );
         g_object_unref( G_OBJECT( m ) );
 
         t = _( webseed_column_names[WEBSEED_COL_URL] );
         r = gtk_cell_renderer_text_new ( );
         g_object_set( G_OBJECT( r ), "ellipsize", PANGO_ELLIPSIZE_END, NULL );
-        c = gtk_tree_view_column_new_with_attributes( t, r, "text", WEBSEED_COL_URL, NULL );
+        c =
+            gtk_tree_view_column_new_with_attributes( t, r, "text",
+                                                      WEBSEED_COL_URL,
+                                                      NULL );
         g_object_set( G_OBJECT( c ), "expand", TRUE, NULL );
         gtk_tree_view_column_set_sort_column_id( c, WEBSEED_COL_URL );
-        gtk_tree_view_append_column( GTK_TREE_VIEW( v ), c );
+        gtk_tree_view_append_column( GTK_TREE_VIEW( webtree ), c );
 
         t = _( webseed_column_names[WEBSEED_COL_DOWNLOAD_RATE] );
         r = gtk_cell_renderer_text_new ( );
-        c = gtk_tree_view_column_new_with_attributes ( t, r, "text", WEBSEED_COL_DOWNLOAD_RATE, NULL );
-        gtk_tree_view_column_set_cell_data_func ( c, r, render_dl_rate, NULL, NULL );
-        gtk_tree_view_column_set_sort_column_id( c, WEBSEED_COL_DOWNLOAD_RATE );
-        gtk_tree_view_append_column( GTK_TREE_VIEW( v ), c );
+        c = gtk_tree_view_column_new_with_attributes (
+            t, r, "text", WEBSEED_COL_DOWNLOAD_RATE, NULL );
+        gtk_tree_view_column_set_cell_data_func ( c, r, render_dl_rate,
+                                                  NULL, NULL );
+        gtk_tree_view_column_set_sort_column_id( c,
+                                                 WEBSEED_COL_DOWNLOAD_RATE );
+        gtk_tree_view_append_column( GTK_TREE_VIEW( webtree ), c );
 
-        w = gtk_scrolled_window_new ( NULL, NULL );
-        gtk_scrolled_window_set_policy ( GTK_SCROLLED_WINDOW( w ),
-                                         GTK_POLICY_AUTOMATIC,
-                                         GTK_POLICY_AUTOMATIC );
-        gtk_scrolled_window_set_shadow_type ( GTK_SCROLLED_WINDOW( w ),
-                                              GTK_SHADOW_IN );
-        gtk_container_add ( GTK_CONTAINER( w ), v );
-
-        webtree = w;
+        fr = gtk_frame_new( NULL );
+        gtk_frame_set_shadow_type( GTK_FRAME( fr ), GTK_SHADOW_IN );
+        gtk_container_add( GTK_CONTAINER( fr ), webtree );
+        webtree = fr;
     }
 
     m  = peer_model_new ( tor );
     v = GTK_WIDGET( g_object_new( GTK_TYPE_TREE_VIEW,
-                                  "model",  gtk_tree_model_sort_new_with_model( m ),
+                                  "model", m,
                                   "rules-hint", TRUE,
 #if GTK_CHECK_VERSION( 2, 12, 0 )
                                   "has-tooltip", TRUE,
 #endif
                                   NULL ) );
-    p->peer_tree_view = v;
-
 #if GTK_CHECK_VERSION( 2, 12, 0 )
     g_signal_connect( v, "query-tooltip",
                       G_CALLBACK( onPeerViewQueryTooltip ), NULL );
@@ -763,6 +754,7 @@ peer_page_new( TrTorrent * gtor )
     {
         const int           col = view_columns[i];
         const char *        t = _( peer_column_names[col] );
+        gboolean            resizable = TRUE;
         GtkTreeViewColumn * c;
         GtkCellRenderer *   r;
 
@@ -770,50 +762,80 @@ peer_page_new( TrTorrent * gtor )
         {
             case PEER_COL_ADDRESS:
                 r = gtk_cell_renderer_text_new ( );
-                c = gtk_tree_view_column_new_with_attributes ( t, r, "text", col, NULL );
+                c =
+                    gtk_tree_view_column_new_with_attributes ( t, r, "text",
+                                                               col,
+                                                               NULL );
                 break;
 
             case PEER_COL_CLIENT:
                 r = gtk_cell_renderer_text_new ( );
-                c = gtk_tree_view_column_new_with_attributes ( t, r, "text", col, NULL );
-                gtk_tree_view_column_set_cell_data_func ( c, r, render_client, NULL, NULL );
+                c =
+                    gtk_tree_view_column_new_with_attributes ( t, r, "text",
+                                                               col,
+                                                               NULL );
+                gtk_tree_view_column_set_cell_data_func ( c, r,
+                                                          render_client,
+                                                          NULL,
+                                                          NULL );
                 break;
 
             case PEER_COL_PROGRESS:
                 r = gtk_cell_renderer_progress_new ( );
-                c = gtk_tree_view_column_new_with_attributes ( t, r, "value", PEER_COL_PROGRESS, NULL );
+                c = gtk_tree_view_column_new_with_attributes (
+                    t, r, "value", PEER_COL_PROGRESS, NULL );
                 break;
 
             case PEER_COL_IS_ENCRYPTED:
+                resizable = FALSE;
                 r = gtk_cell_renderer_pixbuf_new ( );
                 c = gtk_tree_view_column_new_with_attributes ( t, r, NULL );
-                gtk_tree_view_column_set_sizing ( c, GTK_TREE_VIEW_COLUMN_FIXED );
+                gtk_tree_view_column_set_sizing (
+                    c, GTK_TREE_VIEW_COLUMN_FIXED );
                 gtk_tree_view_column_set_fixed_width ( c, 20 );
-                gtk_tree_view_column_set_cell_data_func ( c, r, render_encrypted, NULL, NULL );
+                gtk_tree_view_column_set_cell_data_func ( c, r,
+                                                          render_encrypted,
+                                                          NULL,
+                                                          NULL );
                 break;
 
             case PEER_COL_DOWNLOAD_RATE:
                 r = gtk_cell_renderer_text_new ( );
-                c = gtk_tree_view_column_new_with_attributes ( t, r, "text", col, NULL );
-                gtk_tree_view_column_set_cell_data_func ( c, r, render_dl_rate, NULL, NULL );
+                c =
+                    gtk_tree_view_column_new_with_attributes ( t, r, "text",
+                                                               col,
+                                                               NULL );
+                gtk_tree_view_column_set_cell_data_func ( c, r,
+                                                          render_dl_rate,
+                                                          NULL,
+                                                          NULL );
                 break;
 
             case PEER_COL_UPLOAD_RATE:
                 r = gtk_cell_renderer_text_new ( );
-                c = gtk_tree_view_column_new_with_attributes ( t, r, "text", col, NULL );
-                gtk_tree_view_column_set_cell_data_func ( c, r, render_ul_rate, NULL, NULL );
+                c =
+                    gtk_tree_view_column_new_with_attributes ( t, r, "text",
+                                                               col,
+                                                               NULL );
+                gtk_tree_view_column_set_cell_data_func ( c, r,
+                                                          render_ul_rate,
+                                                          NULL,
+                                                          NULL );
                 break;
 
             case PEER_COL_STATUS:
                 r = gtk_cell_renderer_text_new( );
-                c = gtk_tree_view_column_new_with_attributes ( t, r, "text", col, NULL );
+                c =
+                    gtk_tree_view_column_new_with_attributes ( t, r, "text",
+                                                               col,
+                                                               NULL );
                 break;
 
             default:
                 abort ( );
         }
 
-        gtk_tree_view_column_set_resizable ( c, FALSE );
+        gtk_tree_view_column_set_resizable ( c, resizable );
         gtk_tree_view_column_set_sort_column_id ( c, col );
         gtk_tree_view_append_column ( GTK_TREE_VIEW( v ), c );
     }
@@ -831,7 +853,7 @@ peer_page_new( TrTorrent * gtor )
 
     w = sw = gtk_scrolled_window_new ( NULL, NULL );
     gtk_scrolled_window_set_policy ( GTK_SCROLLED_WINDOW( w ),
-                                     GTK_POLICY_AUTOMATIC,
+                                     GTK_POLICY_NEVER,
                                      GTK_POLICY_AUTOMATIC );
     gtk_scrolled_window_set_shadow_type ( GTK_SCROLLED_WINDOW( w ),
                                           GTK_SHADOW_IN );
@@ -841,14 +863,12 @@ peer_page_new( TrTorrent * gtor )
     vbox = gtk_vbox_new ( FALSE, GUI_PAD );
     gtk_container_set_border_width ( GTK_CONTAINER( vbox ), GUI_PAD_BIG );
 
-    if( webtree == NULL )
-        gtk_box_pack_start( GTK_BOX( vbox ), sw, TRUE, TRUE, 0 );
-    else {
-        GtkWidget * vpaned = gtk_vpaned_new( );
-        gtk_paned_pack1( GTK_PANED( vpaned ), webtree, FALSE, TRUE );
-        gtk_paned_pack2( GTK_PANED( vpaned ), sw, TRUE, TRUE );
-        gtk_box_pack_start( GTK_BOX( vbox ), vpaned, TRUE, TRUE, 0 );
-    }
+    if( webtree )
+        gtk_box_pack_start( GTK_BOX( vbox ), webtree, FALSE, FALSE, 0 );
+
+    /* h = gtk_hbox_new (FALSE, GUI_PAD); */
+    /* gtk_box_pack_start_defaults (GTK_BOX(h), sw); */
+    gtk_box_pack_start( GTK_BOX( vbox ), sw, TRUE, TRUE, 0 );
 
     hbox = gtk_hbox_new ( FALSE, GUI_PAD );
     l = gtk_label_new ( NULL );
@@ -1020,10 +1040,8 @@ refresh_activity( GtkWidget * top )
     char            sizeStr2[64];
     char            buf[128];
     const tr_stat * stat = tr_torrent_stat( a->gtor );
-    const tr_info * info = tr_torrent_info( a->gtor );
     const double    complete = stat->percentComplete * 100.0;
     const double    done = stat->percentDone * 100.0;
-    const double    verifiedPieceCount = (double)stat->haveValid / info->pieceSize;
 
     pch = tr_torrent_status_str( a->gtor );
     gtk_label_set_text ( GTK_LABEL( a->state_lb ), pch );
@@ -1046,10 +1064,9 @@ refresh_activity( GtkWidget * top )
     tr_strlsize( sizeStr2, stat->haveValid,
                 sizeof( sizeStr2 ) );
     /* %1$s is total size of what we've saved to disk
-       %2$s is how much of it's passed the checksum test
-       %3$s is how many pieces are verified */
-    g_snprintf( buf, sizeof( buf ), _( "%1$s (%2$s verified in %3$d pieces)" ),
-                sizeStr, sizeStr2, (int)ceil(verifiedPieceCount) );
+       %2$s is how much of it's passed the checksum test */
+    g_snprintf( buf, sizeof( buf ), _(
+                    "%1$s (%2$s verified)" ), sizeStr, sizeStr2 );
     gtk_label_set_text( GTK_LABEL( a->have_lb ), buf );
 
     tr_strlsize( sizeStr, stat->downloadedEver, sizeof( sizeStr ) );
@@ -1179,19 +1196,6 @@ dl_speed_toggled_cb( GtkToggleButton *tb,
     speed_toggled_cb( tb, gtor, TR_DOWN );
 }
 
-#define RATIO_MODE_KEY "ratio-mode"
-
-static void
-ratio_mode_changed_cb( GtkToggleButton * tb, gpointer gtor )
-{
-    if( gtk_toggle_button_get_active( tb ) )
-    {
-        tr_torrent * tor = tr_torrent_handle( gtor );
-        const int mode = GPOINTER_TO_INT( g_object_get_data( G_OBJECT( tb ), RATIO_MODE_KEY ) );
-        tr_torrentSetRatioMode( tor, mode );
-    }
-}
-
 static void
 sensitize_from_check_cb( GtkToggleButton *toggle,
                          gpointer         w )
@@ -1226,16 +1230,6 @@ dl_speed_spun_cb( GtkSpinButton *spin,
 }
 
 static void
-ratio_spun_cb( GtkSpinButton *spin,
-               gpointer       gtor )
-{
-    tr_torrent * tor = tr_torrent_handle ( gtor );
-    float        ratio = gtk_spin_button_get_value ( spin );
-
-    tr_torrentSetRatioLimit( tor, ratio );
-}
-
-static void
 max_peers_spun_cb( GtkSpinButton * spin,
                    gpointer        gtor )
 {
@@ -1244,45 +1238,13 @@ max_peers_spun_cb( GtkSpinButton * spin,
     tr_torrentSetPeerLimit( tr_torrent_handle( gtor ), n );
 }
 
-static char*
-get_global_ratio_radiobutton_string( void )
-{
-    char * s;
-    const gboolean b = pref_flag_get( TR_PREFS_KEY_RATIO_ENABLED );
-    const double d = pref_double_get( TR_PREFS_KEY_RATIO );
-
-    if( b )
-        s = g_strdup_printf( _( "Use _Global setting  (currently: stop seeding when a torrent's ratio reaches %.2f)" ), d );
-    else
-        s = g_strdup( _( "Use _Global setting  (currently: seed regardless of ratio)" ) );
-
-    return s;
-}
-
-static void
-prefsChanged( TrCore * core UNUSED, const char *  key, gpointer rb )
-{
-    if( !strcmp( key, TR_PREFS_KEY_RATIO_ENABLED ) || !strcmp( key, TR_PREFS_KEY_RATIO ) )
-    {
-        char * s = get_global_ratio_radiobutton_string( );
-        gtk_button_set_label( GTK_BUTTON( rb ), s );
-        g_free( s );
-    }
-}
-
 static GtkWidget*
-options_page_new( ResponseData * data )
+options_page_new( TrTorrent * gtor )
 {
     uint16_t     maxConnectedPeers;
     int          i, row;
-    double       d;
     gboolean     b;
-    char       * s;
-    GSList     * group;
-    GtkWidget  * t, *w, *tb, *h;
-    tr_ratiolimit mode;
-    TrCore     * core = data->core;
-    TrTorrent  * gtor = data->gtor;
+    GtkWidget *  t, *w, *tb;
     tr_torrent * tor = tr_torrent_handle ( gtor );
 
     row = 0;
@@ -1327,44 +1289,6 @@ options_page_new( ResponseData * data )
     sensitize_from_check_cb ( GTK_TOGGLE_BUTTON( tb ), w );
     hig_workarea_add_row_w ( t, &row, tb, w, NULL );
 
-    hig_workarea_add_section_divider ( t, &row );
-    hig_workarea_add_section_title ( t, &row, _( "Seed-Until Ratio" ) );
-
-
-        group = NULL;
-        mode = tr_torrentGetRatioMode( tor );
-        s = get_global_ratio_radiobutton_string( );
-        w = gtk_radio_button_new_with_mnemonic( group, s );
-        data->handler = g_signal_connect( core, "prefs-changed", G_CALLBACK( prefsChanged ), w );
-        group = gtk_radio_button_get_group( GTK_RADIO_BUTTON( w ) );
-        gtk_toggle_button_set_active ( GTK_TOGGLE_BUTTON( w ), mode == TR_RATIOLIMIT_GLOBAL);
-        hig_workarea_add_wide_control( t, &row, w );
-        g_free( s );
-        g_object_set_data( G_OBJECT( w ), RATIO_MODE_KEY, GINT_TO_POINTER( TR_RATIOLIMIT_GLOBAL ) );
-        g_signal_connect( w, "toggled", G_CALLBACK( ratio_mode_changed_cb ), gtor );
-
-        w = gtk_radio_button_new_with_mnemonic( group, _( "Seed _regardless of ratio" ) );
-        group = gtk_radio_button_get_group( GTK_RADIO_BUTTON( w ) );
-        gtk_toggle_button_set_active ( GTK_TOGGLE_BUTTON( w ), mode == TR_RATIOLIMIT_UNLIMITED);
-        hig_workarea_add_wide_control( t, &row, w );
-        g_object_set_data( G_OBJECT( w ), RATIO_MODE_KEY, GINT_TO_POINTER( TR_RATIOLIMIT_UNLIMITED ) );
-        g_signal_connect( w, "toggled", G_CALLBACK( ratio_mode_changed_cb ), gtor );
-
-        h = gtk_hbox_new ( FALSE, GUI_PAD );
-        w = gtk_radio_button_new_with_mnemonic( group, _( "_Stop seeding when a torrent's ratio reaches" ) );
-        g_object_set_data( G_OBJECT( w ), RATIO_MODE_KEY, GINT_TO_POINTER( TR_RATIOLIMIT_SINGLE ) );
-        gtk_toggle_button_set_active ( GTK_TOGGLE_BUTTON( w ), mode == TR_RATIOLIMIT_SINGLE);
-        g_signal_connect( w, "toggled", G_CALLBACK( ratio_mode_changed_cb ), gtor );
-        group = gtk_radio_button_get_group( GTK_RADIO_BUTTON( w ) );
-        gtk_box_pack_start ( GTK_BOX( h ), w, FALSE, FALSE, 0 );
-        d = tr_torrentGetRatioLimit( tor );
-        w = gtk_spin_button_new_with_range( 0.5, INT_MAX, .05 );
-        gtk_spin_button_set_digits( GTK_SPIN_BUTTON( w ), 2 );
-        gtk_spin_button_set_value( GTK_SPIN_BUTTON( w ), d );
-        g_signal_connect ( w, "value-changed", G_CALLBACK( ratio_spun_cb ), gtor );
-        gtk_box_pack_start ( GTK_BOX( h ), w, FALSE, FALSE, 0 );
-        hig_workarea_add_wide_control( t, &row, h );
-   
     hig_workarea_add_section_divider ( t, &row );
     hig_workarea_add_section_title ( t, &row, _( "Peer Connections" ) );
 
@@ -1560,17 +1484,10 @@ remove_tag( gpointer tag )
 static void
 response_cb( GtkDialog *  dialog,
              int response UNUSED,
-             gpointer     data )
+             gpointer     gtor )
 {
-    ResponseData *rd = data;
-    TrCore * core = rd->core;
-    gulong handler = rd-> handler;
-
-    g_signal_handler_disconnect( core, handler );
-    g_object_weak_unref ( G_OBJECT( rd->gtor ), torrent_destroyed, dialog );
+    g_object_weak_unref ( G_OBJECT( gtor ), torrent_destroyed, dialog );
     gtk_widget_destroy ( GTK_WIDGET( dialog ) );
-
-    g_free ( rd );
 }
 
 static gboolean
@@ -1586,26 +1503,26 @@ periodic_refresh( gpointer data )
 
 GtkWidget*
 torrent_inspector_new( GtkWindow * parent,
-                       TrCore    * core,
                        TrTorrent * gtor )
 {
     guint           tag;
     GtkWidget *     d, *n, *w;
     tr_torrent *    tor = tr_torrent_handle ( gtor );
+    char            sizeStr[64];
     char            title[512];
     const tr_info * info = tr_torrent_info ( gtor );
-    ResponseData  * rd;
 
     /* create the dialog */
-    rd = g_new0(ResponseData, 1);
-    rd->gtor = gtor;
-    rd->core = core;
-    g_snprintf( title, sizeof( title ), _( "%s Properties" ), info->name );
+    tr_strlsize( sizeStr, info->totalSize, sizeof( sizeStr ) );
+    /* %1$s is torrent name
+       %2$s its file size */
+    g_snprintf( title, sizeof( title ), _(
+                    "Details for %1$s (%2$s)" ), info->name, sizeStr );
     d = gtk_dialog_new_with_buttons ( title, parent, 0,
                                       GTK_STOCK_CLOSE, GTK_RESPONSE_CLOSE,
                                       NULL );
     gtk_window_set_role ( GTK_WINDOW( d ), "tr-info" );
-    g_signal_connect ( d, "response", G_CALLBACK ( response_cb ), rd );
+    g_signal_connect ( d, "response", G_CALLBACK ( response_cb ), gtor );
     gtk_dialog_set_has_separator( GTK_DIALOG( d ), FALSE );
     gtk_container_set_border_width( GTK_CONTAINER( d ), GUI_PAD );
     g_object_weak_ref ( G_OBJECT( gtor ), torrent_destroyed, d );
@@ -1640,14 +1557,14 @@ torrent_inspector_new( GtkWindow * parent,
     gtk_notebook_append_page ( GTK_NOTEBOOK( n ), w,
                               gtk_label_new ( _( "Files" ) ) );
 
-    w = options_page_new ( rd );
+    w = options_page_new ( gtor );
     g_object_set_data ( G_OBJECT( d ), "options-top", w );
     gtk_notebook_append_page ( GTK_NOTEBOOK( n ), w,
-                               gtk_label_new ( _( "Options" ) ) );
+                              gtk_label_new ( _( "Options" ) ) );
 
     gtk_box_pack_start( GTK_BOX( GTK_DIALOG( d )->vbox ), n, TRUE, TRUE, 0 );
 
-    tag = gtr_timeout_add_seconds( UPDATE_INTERVAL_SECONDS, periodic_refresh, d );
+    tag = g_timeout_add ( UPDATE_INTERVAL_MSEC, periodic_refresh, d );
     g_object_set_data_full ( G_OBJECT( d ), "tag",
                              GUINT_TO_POINTER( tag ), remove_tag );
 

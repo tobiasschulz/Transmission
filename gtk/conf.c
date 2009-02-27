@@ -41,20 +41,18 @@
 #include "conf.h"
 #include "util.h"
 
-#define MY_NAME "transmission"
-
 static char * gl_confdir = NULL;
 static char * gl_lockpath = NULL;
 
 /* errstr may be NULL, this might be called before GTK is initialized */
 gboolean
-cf_init( const char   * configDir,
-         char        ** errstr )
+cf_init( const char *dir,
+         char **     errstr )
 {
     if( errstr != NULL )
         *errstr = NULL;
 
-    gl_confdir = g_strdup( configDir );
+    gl_confdir = g_strdup( dir );
 
     if( mkdir_p( gl_confdir, 0755 ) )
         return TRUE;
@@ -153,28 +151,24 @@ getPrefsFilename( void )
 static tr_benc*
 getPrefs( void )
 {
-    static tr_benc settings;
+    static tr_benc  dict;
     static gboolean loaded = FALSE;
 
     if( !loaded )
     {
-        tr_bencInitDict( &settings, 0 );
-        tr_sessionLoadSettings( &settings, gl_confdir, MY_NAME );
+        char * filename = getPrefsFilename( );
+        if( tr_bencLoadJSONFile( filename, &dict ) )
+            tr_bencInitDict( &dict, 100 );
+        g_free( filename );
         loaded = TRUE;
     }
 
-    return &settings;
+    return &dict;
 }
 
 /***
 ****
 ***/
-
-tr_benc*
-pref_get_all( void )
-{
-    return getPrefs( );
-}
 
 int64_t
 pref_int_get( const char * key )
@@ -189,7 +183,10 @@ void
 pref_int_set( const char * key,
               int64_t      value )
 {
-    tr_bencDictAddInt( getPrefs( ), key, value );
+    tr_benc * d = getPrefs( );
+
+    tr_bencDictRemove( d, key );
+    tr_bencDictAddInt( d, key, value );
 }
 
 void
@@ -198,30 +195,6 @@ pref_int_set_default( const char * key,
 {
     if( !tr_bencDictFind( getPrefs( ), key ) )
         pref_int_set( key, value );
-}
-
-double
-pref_double_get( const char * key )
-{
-    double d = 0.0;
-
-    tr_bencDictFindDouble( getPrefs( ), key, &d );
-    return d;
-}
-
-void
-pref_double_set( const char * key,
-                 double       value )
-{
-    tr_bencDictAddDouble( getPrefs( ), key, value );
-}
-
-void
-pref_double_set_default( const char * key,
-                         double       value )
-{
-    if ( !tr_bencDictFind( getPrefs( ), key ) )
-         pref_double_set( key, value );
 }
 
 /***
@@ -285,7 +258,10 @@ void
 pref_string_set( const char * key,
                  const char * value )
 {
-    tr_bencDictAddStr( getPrefs( ), key, value );
+    tr_benc * d = getPrefs( );
+
+    tr_bencDictRemove( d, key );
+    tr_bencDictAddStr( d, key, value );
 }
 
 void
@@ -301,9 +277,16 @@ pref_string_set_default( const char * key,
 ***/
 
 void
-pref_save( tr_session * session )
+pref_save( void )
 {
-    tr_sessionSaveSettings( session, gl_confdir, getPrefs( ) );
+    char * filename = getPrefsFilename( );
+    char * path = g_path_get_dirname( filename );
+
+    mkdir_p( path, 0755 );
+    tr_bencSaveJSONFile( filename, getPrefs( ) );
+
+    g_free( path );
+    g_free( filename );
 }
 
 /***
@@ -333,29 +316,32 @@ static char*
 getCompat080PrefsFilename( void )
 {
     assert( gl_confdir != NULL );
-
-    return g_build_filename( g_get_home_dir( ), ".transmission", "gtk", "prefs", NULL );
+    return g_build_filename(
+               g_get_home_dir( ), ".transmission", "gtk", "prefs", NULL );
 }
 
 static char*
 getCompat090PrefsFilename( void )
 {
     assert( gl_confdir != NULL );
-
-    return g_build_filename( g_get_home_dir( ), ".transmission", "gtk", "prefs.ini", NULL );
+    return g_build_filename(
+               g_get_home_dir( ), ".transmission", "gtk", "prefs.ini", NULL );
 }
 
 static char*
 getCompat121PrefsFilename( void )
 {
-    return g_build_filename( g_get_user_config_dir( ), "transmission", "gtk", "prefs.ini", NULL );
+    return g_build_filename(
+               g_get_user_config_dir( ), "transmission", "gtk", "prefs.ini",
+               NULL );
 }
 
 static void
 translate_08_to_09( const char* oldfile,
                     const char* newfile )
 {
-    static struct pref_entry {
+    static struct pref_entry
+    {
         const char*   oldkey;
         const char*   newkey;
     } pref_table[] = {

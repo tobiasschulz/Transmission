@@ -1,13 +1,5 @@
 AM_CPPFLAGS = -I@top_srcdir@ $(LIBEVENT_CPPFLAGS) -I$(top_srcdir)/third-party/ -DEMBEDDED
-
-AM_CFLAGS = \
-    $(OPENSSL_CFLAGS) \
-    $(LIBCURL_CFLAGS) \
-    $(ZLIB_CFLAGS) \
-    $(PTHREAD_CFLAGS)
-
-AM_LDFLAGS = \
-    $(ZLIB_LDFLAGS)
+AM_CFLAGS = $(OPENSSL_CFLAGS) $(LIBCURL_CFLAGS) $(PTHREAD_CFLAGS)
 
 dist_man_MANS = \
     transmission-daemon.1 \
@@ -24,7 +16,6 @@ LDADD = \
     $(top_builddir)/third-party/libevent/libevent.la \
     $(INTLLIBS) \
     $(LIBCURL_LIBS) \
-    $(ZLIB_LIBS) \
     $(OPENSSL_LIBS) \
     $(PTHREAD_LIBS) -lm
 

@@ -7,22 +7,20 @@
 	<key>CFBundleDocumentTypes</key>
 	<array>
 		<dict>
+			<key>CFBundleTypeExtensions</key>
+			<array>
+				<string>torrent</string>
+			</array>
 			<key>CFBundleTypeIconFile</key>
 			<string>TransmissionDocument</string>
 			<key>CFBundleTypeName</key>
 			<string>BitTorrent Document</string>
 			<key>CFBundleTypeRole</key>
 			<string>Viewer</string>
-			<key>CFBundleTypeExtensions</key>
-			<array>
-				<string>torrent</string>
-			</array>
-			<key>LSItemContentTypes</key>
-			<array>
-				<string>org.bittorrent.torrent</string>
-			</array>
-			<key>LSHandlerRank</key>
-			<string>Owner</string>
+			<key>LSTypeIsPackage</key>
+			<false/>
+			<key>NSPersistentStoreTypeKey</key>
+			<string>XML</string>
 		</dict>
 	</array>
 	<key>CFBundleExecutable</key>
@@ -49,8 +47,6 @@
 	<string>BUNDLE_VERSION_INFOPLIST</string>
 	<key>CFBundleGetInfoString</key>
 	<string>VERSION_STRING_INFOPLIST (BUNDLE_VERSION_INFOPLIST)</string>
-	<key>LSMinimumSystemVersion</key>
-	<string>10.5.0</string>
 	<key>NSAppleScriptEnabled</key>
 	<string>YES</string>
 	<key>NSMainNibFile</key>
@@ -77,35 +73,5 @@
 	<string>sparkle_dsa_pub.pem</string>
 	<key>SUScheduledCheckInterval</key>
 	<string>86400</string>
-	<key>UTExportedTypeDeclarations</key>
-	<array>
-		<dict>
-			<key>UTTypeIdentifier</key>
-			<string>org.bittorrent.torrent</string>
-			<key>UTTypeReferenceURL</key>
-			<string>http://www.bittorrent.org/beps/bep_0000.html</string>
-			<key>UTTypeDescription</key>
-			<string>BitTorrent Document</string>
-			<key>UTTypeIconFile</key>
-			<string>TransmissionDocument</string>
-			<key>UTTypeConformsTo</key>
-			<array>
-				<string>public.data</string>
-				<string>public.item</string>
-				<string>com.bittorrent.torrent</string>
-			</array>
-			<key>UTTypeTagSpecification</key>
-			<dict>
-				<key>com.apple.ostype</key>
-				<string>TORR</string>
-				<key>public.filename-extension</key>
-				<array>
-					<string>torrent</string>
-				</array>
-				<key>public.mime-type</key>
-				<string>application/x-bittorrent</string>
-			</dict>
-		</dict>
-	</array>
 </dict>
 </plist>

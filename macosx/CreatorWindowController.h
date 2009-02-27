@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -49,10 +49,10 @@
     NSUserDefaults * fDefaults;
 }
 
-+ (void) createTorrentFile: (tr_session *) handle;
-+ (void) createTorrentFile: (tr_session *) handle forFile: (NSString *) file;
++ (void) createTorrentFile: (tr_handle *) handle;
++ (void) createTorrentFile: (tr_handle *) handle forFile: (NSString *) file;
 
-- (id) initWithHandle: (tr_session *) handle path: (NSString *) path;
+- (id) initWithHandle: (tr_handle *) handle path: (NSString *) path;
 
 - (void) toggleOpenCheck: (id) sender;
 

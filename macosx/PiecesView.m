@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2009 Transmission authors and contributors
+ * Copyright (c) 2006-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -25,6 +25,7 @@
 #import "PiecesView.h"
 #import "Torrent.h"
 #import "InfoWindowController.h"
+#import "CTGradient.h"
 #import "utils.h"
 
 #define MAX_ACROSS 18
@@ -46,10 +47,9 @@
     fBack = [[NSImage alloc] initWithSize: [self bounds].size];
     
     [fBack lockFocus];
-    NSGradient * gradient = [[NSGradient alloc] initWithStartingColor: [NSColor colorWithCalibratedWhite: 0.0f alpha: 0.4f]
+    CTGradient * gradient = [CTGradient gradientWithBeginningColor: [NSColor colorWithCalibratedWhite: 0.0f alpha: 0.4f]
                                 endingColor: [NSColor colorWithCalibratedWhite: 0.2f alpha: 0.4f]];
-    [gradient drawInRect: [self bounds] angle: 90.0f];
-    [gradient release];
+    [gradient fillRect: [self bounds] angle: 90.0f];
     [fBack unlockFocus];
     
     //store box colors
