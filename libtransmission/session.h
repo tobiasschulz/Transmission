@@ -66,7 +66,6 @@ struct tr_session
     tr_bool                      isClosed;
     tr_bool                      isWaiting;
     tr_bool                      useLazyBitfield;
-    tr_bool                      isRatioLimited;
 
     tr_bool                      isSpeedLimited[2];
     int                          speedLimit[2];
@@ -129,9 +128,7 @@ struct tr_session
     int so_rcvbuf;
 
     /* monitors the "global pool" speeds */
-    struct tr_bandwidth        * bandwidth;
-
-    double                       desiredRatio;
+    struct tr_bandwidth       * bandwidth;
 };
 
 const char * tr_sessionFindTorrentFile( const tr_session * session,
@@ -143,6 +140,7 @@ void         tr_sessionSetTorrentFile( tr_session * session,
 
 tr_bool      tr_sessionIsAddressBlocked( const tr_session        * session,
                                          const struct tr_address * addr );
+
 
 void         tr_globalLock( tr_session * );
 

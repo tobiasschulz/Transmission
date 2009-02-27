@@ -86,8 +86,8 @@ struct tr_datatype
 static void
 didWriteWrapper( tr_peerIo * io, size_t bytes_transferred )
 {
-     while( bytes_transferred && tr_isPeerIo( io ) )
-     {
+    while( bytes_transferred )
+    {
         struct tr_datatype * next = __tr_list_entry( io->outbuf_datatypes.next, struct tr_datatype, head );
         const size_t payload = MIN( next->length, bytes_transferred );
         const size_t overhead = getPacketOverhead( payload );
@@ -99,16 +99,13 @@ didWriteWrapper( tr_peerIo * io, size_t bytes_transferred )
 
         if( io->didWrite )
             io->didWrite( io, payload, next->isPieceData, io->userData );
-        
-        if( tr_isPeerIo( io ) )
-        {
-            bytes_transferred -= payload;
-            next->length -= payload;
-            if( !next->length ) {
-                __tr_list_remove( io->outbuf_datatypes.next );
-                tr_free( next );
-            }
-        }
+
+        bytes_transferred -= payload;
+        next->length -= payload;
+        if( !next->length ) {
+            __tr_list_remove( io->outbuf_datatypes.next );
+            tr_free( next );
+	}
     }
 }
 

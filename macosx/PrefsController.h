@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2009 Transmission authors and contributors
+ * Copyright (c) 2005-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -32,7 +32,7 @@
     NSUserDefaults * fDefaults;
     BOOL fHasLoaded;
     
-    IBOutlet NSView * fGeneralView, * fTransfersView, * fBandwidthView, * fPeersView, * fNetworkView, * fRemoteView, * fGroupsView;
+    IBOutlet NSView * fGeneralView, * fTransfersView, * fBandwidthView, * fPeersView, * fNetworkView, * fRemoteView;
     
     NSString * fInitialString;
     
@@ -65,10 +65,7 @@
 + (void) setHandle: (tr_session *) handle;
 + (tr_session *) handle;
 
-- (void) setAutoUpdateToBeta: (id) sender;
-
 - (void) setPort: (id) sender;
-- (void) randomPort: (id) sender;
 - (void) setNat: (id) sender;
 - (void) updatePortStatus;
 - (void) portCheckerDidFinishProbing: (PortChecker *) portChecker;
@@ -136,7 +133,6 @@
 - (void) updateRPCPassword;
 - (void) setRPCPort: (id) sender;
 - (void) setRPCUseWhitelist: (id) sender;
-- (void) setRPCWebUIDiscovery: (id) sender;
 - (void) updateRPCWhitelist;
 - (void) addRemoveRPCIP: (id) sender;
 

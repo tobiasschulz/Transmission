@@ -1084,16 +1084,6 @@ prefschanged( TrCore * core UNUSED,
         const int limit = pref_int_get( key );
         tr_sessionSetSpeedLimit( tr, TR_UP, limit );
     }
-    else if( !strcmp( key, TR_PREFS_KEY_RATIO_ENABLED ) )
-    {
-        const gboolean b = pref_flag_get( key );
-        tr_sessionSetRatioLimited( tr, b );
-    }
-    else if( !strcmp( key, TR_PREFS_KEY_RATIO ) )
-    {
-        const double limit = pref_double_get( key );
-        tr_sessionSetRatioLimit( tr, limit );
-    }
     else if( !strncmp( key, "sched-", 6 ) )
     {
         updateScheduledLimits( tr );
@@ -1328,7 +1318,7 @@ showInfoForeach( GtkTreeModel *      model,
         gtk_window_present( GTK_WINDOW( w ) );
     else
     {
-        w = torrent_inspector_new( GTK_WINDOW( data->wind ), data->core, tor );
+        w = torrent_inspector_new( GTK_WINDOW( data->wind ), tor );
         gtk_widget_show( w );
         g_hash_table_insert( data->tor2details, (gpointer)hashString, w );
         g_hash_table_insert( data->details2tor, w, (gpointer)hashString );

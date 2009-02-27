@@ -37,7 +37,6 @@ static const char * fallback_ui_file =
     "      <menuitem action='sort-by-age'/>\n"
     "      <menuitem action='sort-by-name'/>\n"
     "      <menuitem action='sort-by-progress'/>\n"
-    "      <menuitem action='sort-by-eta'/>\n"
     "      <menuitem action='sort-by-ratio'/>\n"
     "      <menuitem action='sort-by-state'/>\n"
     "      <menuitem action='sort-by-tracker'/>\n"

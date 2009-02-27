@@ -145,44 +145,7 @@ int
 tr_torrentGetSpeedLimit( const tr_torrent * tor,
                          tr_direction       dir )
 {
-    assert( tr_isTorrent( tor ) );
-
     return tr_bandwidthGetDesiredSpeed( tor->bandwidth, dir );
-}
-
-void
-tr_torrentSetRatioMode( tr_torrent *  tor,                    
-                        tr_ratiolimit mode )
-{
-    assert( tr_isTorrent( tor ) );
-    assert( mode==TR_RATIOLIMIT_GLOBAL || mode==TR_RATIOLIMIT_SINGLE || mode==TR_RATIOLIMIT_UNLIMITED  );
-
-    tor->ratioLimitMode = mode;
-}
-
-tr_ratiolimit
-tr_torrentGetRatioMode( const tr_torrent * tor )
-{
-    assert( tr_isTorrent( tor ) );
-
-    return tor->ratioLimitMode;
-}
-
-void
-tr_torrentSetRatioLimit( tr_torrent * tor,
-                         double       desiredRatio )
-{
-    assert( tr_isTorrent( tor ) );
-
-    tor->desiredRatio = desiredRatio;   
-}
-
-double
-tr_torrentGetRatioLimit( const tr_torrent * tor )
-{
-    assert( tr_isTorrent( tor ) );
-
-    return tor->desiredRatio;
 }
 
 tr_bool
@@ -212,33 +175,6 @@ tr_torrentIsPieceTransferAllowed( const tr_torrent  * tor,
     }
 
     return isEnabled;
-}
-
-tr_bool
-tr_torrentGetSeedRatio( const tr_torrent * tor, double * ratio )
-{
-    tr_bool isLimited;
-
-    switch( tr_torrentGetRatioMode( tor ) )
-    {
-        case TR_RATIOLIMIT_SINGLE:
-            isLimited = TRUE;
-            if( ratio )
-                *ratio = tr_torrentGetRatioLimit( tor );
-            break;
-
-        case TR_RATIOLIMIT_GLOBAL:
-            isLimited = tr_sessionIsRatioLimited( tor->session );
-            if( isLimited && ratio )
-                *ratio = tr_sessionGetRatioLimit( tor->session );
-            break;
-
-        case TR_RATIOLIMIT_UNLIMITED:
-            isLimited = FALSE;
-            break;
-    }
-
-    return isLimited;
 }
 
 /***
@@ -589,13 +525,8 @@ torrentRealInit( tr_session      * session,
         tr_torrentSetSpeedLimit( tor, TR_UP,
                                 tr_sessionGetSpeedLimit( tor->session, TR_UP ) );
         tr_torrentSetSpeedLimit( tor, TR_DOWN,
-                                tr_sessionGetSpeedLimit( tor->session, TR_DOWN ) );
-    }
-
-    if( !( loaded & TR_FR_RATIOLIMIT ) )
-    {
-        tr_torrentSetRatioMode( tor, TR_RATIOLIMIT_GLOBAL );
-        tr_torrentSetRatioLimit( tor, tr_sessionGetRatioLimit( tor->session ) );
+                                tr_sessionGetSpeedLimit( tor->session,
+                                                         TR_DOWN ) );
     }
 
     tor->completeness = tr_cpGetStatus( &tor->completion );
@@ -800,7 +731,6 @@ tr_torrentStat( tr_torrent * tor )
     const tr_tracker_info * ti;
     int                     usableSeeds = 0;
     uint64_t                now;
-    double                  downloadedForRatio, seedRatio;
 
     if( !tor )
         return NULL;
@@ -870,6 +800,7 @@ tr_torrentStat( tr_torrent * tor )
     s->haveValid       = tr_cpHaveValid( &tor->completion );
     s->haveUnchecked   = tr_cpHaveTotal( &tor->completion ) - s->haveValid;
 
+
     if( usableSeeds > 0 )
     {
         s->desiredAvailable = s->leftUntilDone;
@@ -890,36 +821,17 @@ tr_torrentStat( tr_torrent * tor )
         tr_bitfieldFree( peerPieces );
     }
 
-    downloadedForRatio = s->downloadedEver ? s->downloadedEver : s->haveValid;
-    s->ratio = tr_getRatio( s->uploadedEver, downloadedForRatio );
+    if( s->leftUntilDone > s->desiredAvailable )
+        s->eta = TR_ETA_NOT_AVAIL;
+    else if( s->pieceDownloadSpeed < 0.1 )
+        s->eta = TR_ETA_UNKNOWN;
+    else
+        s->eta = s->leftUntilDone / s->pieceDownloadSpeed / 1024.0;
 
-    switch( s->activity )
-    {
-        case TR_STATUS_DOWNLOAD:
-            if( s->leftUntilDone > s->desiredAvailable )
-                s->eta = TR_ETA_NOT_AVAIL;
-            else if( s->pieceDownloadSpeed < 0.1 )
-                s->eta = TR_ETA_UNKNOWN;
-            else
-                s->eta = s->leftUntilDone / s->pieceDownloadSpeed / 1024.0;
-            break;
-        
-        case TR_STATUS_SEED:
-            if( tr_torrentGetSeedRatio( tor, &seedRatio ) )
-            {
-                if( s->pieceUploadSpeed < 0.1 )
-                    s->eta = TR_ETA_UNKNOWN;
-                else
-                    s->eta = (downloadedForRatio * (seedRatio - s->ratio)) / s->pieceUploadSpeed / 1024.0;
-            }
-            else
-                s->eta = TR_ETA_NOT_AVAIL;
-            break;
-        
-        default:
-            s->eta = TR_ETA_NOT_AVAIL;
-            break;
-    }
+    s->ratio = tr_getRatio(
+        s->uploadedEver,
+        s->downloadedEver ? s->downloadedEver : s->
+        haveValid );
 
     tr_torrentUnlock( tor );
 
@@ -1385,26 +1297,9 @@ tr_torrentSetCompletenessCallback( tr_torrent                    * tor,
 }
 
 void
-tr_torrentSetRatioLimitHitCallback( tr_torrent                     * tor,
-                                    tr_torrent_ratio_limit_hit_func  func,
-                                    void                           * user_data )
-{
-    assert( tr_isTorrent( tor ) );
-
-    tor->ratio_limit_hit_func = func;
-    tor->ratio_limit_hit_func_user_data = user_data;
-}
-
-void
 tr_torrentClearCompletenessCallback( tr_torrent * torrent )
 {
     tr_torrentSetCompletenessCallback( torrent, NULL, NULL );
-}
-
-void
-tr_torrentClearRatioLimitHitCallback( tr_torrent * torrent )
-{
-    tr_torrentSetRatioLimitHitCallback( torrent, NULL, NULL );
 }
 
 void
