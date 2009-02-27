@@ -6,29 +6,22 @@
 #include "net.h"
 #include "utils.h"
 
-#undef VERBOSE
+#define VERBOSE 0
 
-#ifdef VERBOSE
-  #define check( A ) \
+#define check( A ) \
     { \
         ++test; \
         if( A ){ \
-            fprintf( stderr, "PASS test #%d (%s, %d)\n", test, __FILE__, __LINE__ ); \
+            if( VERBOSE ) \
+                fprintf( stderr, "PASS test #%d (%s, %d)\n", test, __FILE__,\
+                         __LINE__ );\
         } else { \
-            fprintf( stderr, "FAIL test #%d (%s, %d)\n", test, __FILE__, __LINE__ ); \
+            if( VERBOSE ) \
+                fprintf( stderr, "FAIL test #%d (%s, %d)\n", test, __FILE__,\
+                         __LINE__ );\
             return test; \
         } \
     }
-#else
-  #define check( A )\
-    { \
-        ++test; \
-        if( !( A ) ){ \
-            fprintf( stderr, "FAIL test #%d (%s, %d)\n", test, __FILE__, __LINE__ ); \
-            return test; \
-        } \
-    }
-#endif
 
 static void
 createTestBlocklist( const char * tmpfile )
@@ -52,13 +45,13 @@ int
 main( void )
 {
 #ifndef WIN32
-    const char *   tmpfile_txt = "/tmp/transmission-blocklist-test.txt";
-    const char *   tmpfile_bin = "/tmp/transmission-blocklist-test.bin";
+    char *         tmpfile_txt = "/tmp/transmission-blocklist-test.txt";
+    char *         tmpfile_bin = "/tmp/transmission-blocklist-test.bin";
 #else
-    const char *   tmpfile_txt = "transmission-blocklist-test.txt";
-    const char *   tmpfile_bin = "transmission-blocklist-test.bin";
+    char *         tmpfile_txt = "transmission-blocklist-test.txt";
+    char *         tmpfile_bin = "transmission-blocklist-test.bin";
 #endif
-    struct tr_address addr;
+    struct in_addr addr;
     int            test = 0;
     tr_blocklist * b;
 
@@ -70,31 +63,31 @@ main( void )
     _tr_blocklistSetContent( b, tmpfile_txt );
 
     /* now run some tests */
-    check( tr_pton( "216.16.1.143", &addr ) );
+    check( !tr_netResolve( "216.16.1.143", &addr ) );
     check( !_tr_blocklistHasAddress( b, &addr ) );
-    check( tr_pton( "216.16.1.144", &addr ) );
+    check( !tr_netResolve( "216.16.1.144", &addr ) );
     check( _tr_blocklistHasAddress( b, &addr ) );
-    check( tr_pton( "216.16.1.145", &addr ) );
+    check( !tr_netResolve( "216.16.1.145", &addr ) );
     check( _tr_blocklistHasAddress( b, &addr ) );
-    check( tr_pton( "216.16.1.146", &addr ) );
+    check( !tr_netResolve( "216.16.1.146", &addr ) );
     check( _tr_blocklistHasAddress( b, &addr ) );
-    check( tr_pton( "216.16.1.147", &addr ) );
+    check( !tr_netResolve( "216.16.1.147", &addr ) );
     check( _tr_blocklistHasAddress( b, &addr ) );
-    check( tr_pton( "216.16.1.148", &addr ) );
+    check( !tr_netResolve( "216.16.1.148", &addr ) );
     check( _tr_blocklistHasAddress( b, &addr ) );
-    check( tr_pton( "216.16.1.149", &addr ) );
+    check( !tr_netResolve( "216.16.1.149", &addr ) );
     check( _tr_blocklistHasAddress( b, &addr ) );
-    check( tr_pton( "216.16.1.150", &addr ) );
+    check( !tr_netResolve( "216.16.1.150", &addr ) );
     check( _tr_blocklistHasAddress( b, &addr ) );
-    check( tr_pton( "216.16.1.151", &addr ) );
+    check( !tr_netResolve( "216.16.1.151", &addr ) );
     check( _tr_blocklistHasAddress( b, &addr ) );
-    check( tr_pton( "216.16.1.152", &addr ) );
+    check( !tr_netResolve( "216.16.1.152", &addr ) );
     check( !_tr_blocklistHasAddress( b, &addr ) );
-    check( tr_pton( "216.16.1.153", &addr ) );
+    check( !tr_netResolve( "216.16.1.153", &addr ) );
     check( !_tr_blocklistHasAddress( b, &addr ) );
-    check( tr_pton( "217.0.0.1", &addr ) );
+    check( !tr_netResolve( "217.0.0.1", &addr ) );
     check( !_tr_blocklistHasAddress( b, &addr ) );
-    check( tr_pton( "255.0.0.1", &addr ) );
+    check( !tr_netResolve( "255.0.0.1", &addr ) );
 
     /* cleanup */
     _tr_blocklistFree( b );

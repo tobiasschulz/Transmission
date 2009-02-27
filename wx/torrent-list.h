@@ -1,6 +1,6 @@
 /*
  * Xmission - a cross-platform bittorrent client
- * Copyright (C) 2007 Charles Kerr <charles@transmissionbt.com>
+ * Copyright (C) 2007 Charles Kerr <charles@rebelbase.com>
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
@@ -31,7 +31,7 @@
 class TorrentListCtrl: public wxListCtrl
 {
     public:
-        TorrentListCtrl( tr_session       * handle,
+        TorrentListCtrl( tr_handle       * handle,
                          wxConfig        * config,
                          wxWindow        * parent, 
                          const wxPoint   & pos = wxDefaultPosition,
@@ -123,7 +123,7 @@ class TorrentListCtrl: public wxListCtrl
         bool IsSorted( ) const;
 
     private:
-        tr_session * myHandle;
+        tr_handle * myHandle;
         wxConfig * myConfig;
         torrents_v myTorrents;
         int prevSortCol;

@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -29,12 +29,12 @@ extern int tr_optind;
 
 typedef struct tr_option
 {
-    int           val;          /* the value to return from tr_getopt() */
-    const char *  longName;     /* --long-form */
-    const char *  description;  /* option's description for tr_getopt_usage() */
-    const char *  shortName;    /* short form */
-    int           has_arg;      /* 0 for no argument, 1 for argument */
-    const char *  argName;      /* argument's description for tr_getopt_usage() */
+    int     val;          /* the value to return from tr_getopt() */
+    char *  longName;     /* --long-form */
+    char *  description;  /* option's description for tr_getopt_usage() */
+    char *  shortName;    /* short form */
+    int     has_arg;      /* 0 for no argument, 1 for argument */
+    char *  argName;      /* argument's description for tr_getopt_usage() */
 }
 tr_option;
 

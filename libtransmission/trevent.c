@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -17,9 +17,6 @@
 #include <stdio.h>
 
 #include <signal.h>
-
-#include "transmission.h"
-#include "session.h"
 
 #ifdef WIN32
 
@@ -124,7 +121,7 @@ typedef struct tr_event_handle
     uint8_t      die;
     int          fds[2];
     tr_lock *    lock;
-    tr_session *  session;
+    tr_handle *  h;
     tr_thread *  thread;
     struct event_base * base;
     struct event pipeEvent;
@@ -135,7 +132,7 @@ typedef int timer_func ( void* );
 
 struct tr_timer
 {
-    tr_bool                   inCallback;
+    unsigned int              inCallback : 1;
     timer_func *              func;
     void *                    user_data;
     struct tr_event_handle *  eh;
@@ -191,6 +188,19 @@ readFromPipe( int    fd,
             break;
         }
 
+        case 't': /* create timer */
+        {
+            tr_timer *    timer;
+            const size_t  nwant = sizeof( timer );
+            const ssize_t ngot = piperead( fd, &timer, nwant );
+            if( !eh->die && ( ngot == (ssize_t)nwant ) )
+            {
+                dbgmsg( "adding timer in libevent thread" );
+                evtimer_add( &timer->event, &timer->tv );
+            }
+            break;
+        }
+
         case '\0': /* eof */
         {
             dbgmsg( "pipe eof reached... removing event listener" );
@@ -207,7 +217,8 @@ readFromPipe( int    fd,
 }
 
 static void
-logFunc( int severity, const char * message )
+logFunc( int          severity,
+         const char * message )
 {
     if( severity >= _EVENT_LOG_ERR )
         tr_err( "%s", message );
@@ -219,6 +230,7 @@ static void
 libeventThreadFunc( void * veh )
 {
     tr_event_handle * eh = veh;
+
     tr_dbg( "Starting libevent thread" );
 
 #ifndef WIN32
@@ -226,64 +238,55 @@ libeventThreadFunc( void * veh )
     signal( SIGPIPE, SIG_IGN );
 #endif
 
-    eh->base = event_init( );
-    eh->session->events = eh;
+    eh->h->events = eh;
 
     /* listen to the pipe's read fd */
-    event_set( &eh->pipeEvent, eh->fds[0], EV_READ | EV_PERSIST, readFromPipe, veh );
+    event_set( &eh->pipeEvent, eh->fds[0], EV_READ | EV_PERSIST,
+               readFromPipe,
+               veh );
     event_add( &eh->pipeEvent, NULL );
     event_set_log_callback( logFunc );
-
-    /* loop until all the events are done */
     event_dispatch( );
 
-    /* shut down the thread */
     tr_lockFree( eh->lock );
     event_base_free( eh->base );
-    eh->session->events = NULL;
+    eh->h->events = NULL;
     tr_free( eh );
     tr_dbg( "Closing libevent thread" );
 }
 
 void
-tr_eventInit( tr_session * session )
+tr_eventInit( tr_handle * handle )
 {
     tr_event_handle * eh;
-
-    session->events = NULL;
 
     eh = tr_new0( tr_event_handle, 1 );
     eh->lock = tr_lockNew( );
     pipe( eh->fds );
-    eh->session = session;
+    eh->h = handle;
+    eh->base = event_init( );
     eh->thread = tr_threadNew( libeventThreadFunc, eh );
-
-    /* wait until the libevent thread is running */
-    while( session->events == NULL )
-        tr_wait( 100 );
 }
 
 void
-tr_eventClose( tr_session * session )
+tr_eventClose( tr_handle * handle )
 {
-    assert( tr_isSession( session ) );
-
-    session->events->die = TRUE;
+    handle->events->die = TRUE;
     tr_deepLog( __FILE__, __LINE__, NULL, "closing trevent pipe" );
-    EVUTIL_CLOSESOCKET( session->events->fds[1] );
+    EVUTIL_CLOSESOCKET( handle->events->fds[1] );
 }
 
 /**
 ***
 **/
 
-tr_bool
-tr_amInEventThread( tr_session * session )
+int
+tr_amInEventThread( struct tr_handle * handle )
 {
-    assert( tr_isSession( session ) );
-    assert( session->events != NULL );
+    assert( handle );
+    assert( handle->events );
 
-    return tr_amInThread( session->events->thread );
+    return tr_amInThread( handle->events->thread );
 }
 
 /**
@@ -291,9 +294,9 @@ tr_amInEventThread( tr_session * session )
 **/
 
 static void
-timerCallback( int    fd UNUSED,
-               short  event UNUSED,
-               void * vtimer )
+timerCallback( int fd      UNUSED,
+               short event UNUSED,
+               void *      vtimer )
 {
     int               more;
     struct tr_timer * timer = vtimer;
@@ -321,50 +324,66 @@ tr_timerFree( tr_timer ** ptimer )
     /* destroy the timer directly or via the command queue */
     if( timer && !timer->inCallback )
     {
-        assert( tr_amInEventThread( timer->eh->session ) );
+        assert( tr_amInEventThread( timer->eh->h ) );
         event_del( &timer->event );
         tr_free( timer );
     }
 }
 
 tr_timer*
-tr_timerNew( tr_session  * session,
-             timer_func    func,
-             void        * user_data,
-             uint64_t      interval_milliseconds )
+tr_timerNew( struct tr_handle * handle,
+             timer_func         func,
+             void *             user_data,
+             uint64_t           interval_milliseconds )
 {
     tr_timer * timer;
 
-    assert( tr_amInEventThread( session ) );
+    assert( handle );
+    assert( handle->events );
 
     timer = tr_new0( tr_timer, 1 );
+    tr_timevalMsec( interval_milliseconds, &timer->tv );
     timer->func = func;
     timer->user_data = user_data;
-    timer->eh = session->events;
-
-    tr_timevalMsec( interval_milliseconds, &timer->tv );
+    timer->eh = handle->events;
     evtimer_set( &timer->event, timerCallback, timer );
-    evtimer_add( &timer->event,  &timer->tv );
+
+    if( tr_amInThread( handle->events->thread ) )
+    {
+        evtimer_add( &timer->event,  &timer->tv );
+    }
+    else
+    {
+        const char ch = 't';
+        int        fd = handle->events->fds[1];
+        tr_lock *  lock = handle->events->lock;
+
+        tr_lockLock( lock );
+        pipewrite( fd, &ch, 1 );
+        pipewrite( fd, &timer, sizeof( timer ) );
+        tr_lockUnlock( lock );
+    }
 
     return timer;
 }
 
 void
-tr_runInEventThread( tr_session * session,
-                     void func( void* ), void * user_data )
+tr_runInEventThread( struct tr_handle *       handle,
+                     void               func( void* ),
+                     void *                   user_data )
 {
-    assert( tr_isSession( session ) );
-    assert( session->events != NULL );
+    assert( handle );
+    assert( handle->events );
 
-    if( tr_amInThread( session->events->thread ) )
+    if( tr_amInThread( handle->events->thread ) )
     {
         (func)( user_data );
     }
     else
     {
         const char         ch = 'r';
-        int                fd = session->events->fds[1];
-        tr_lock *          lock = session->events->lock;
+        int                fd = handle->events->fds[1];
+        tr_lock *          lock = handle->events->lock;
         struct tr_run_data data;
 
         tr_lockLock( lock );
@@ -379,7 +398,5 @@ tr_runInEventThread( tr_session * session,
 struct event_base *
 tr_eventGetBase( tr_session * session )
 {
-    assert( tr_isSession( session ) );
-
     return session->events->base;
 }

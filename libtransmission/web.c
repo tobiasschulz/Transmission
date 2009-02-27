@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -14,33 +14,20 @@
 #include <stdlib.h> /* bsearch */
 
 #include <event.h>
-
-#define CURL_DISABLE_TYPECHECK /* otherwise -Wunreachable-code goes insane */
 #include <curl/curl.h>
 
 #include "transmission.h"
-#include "session.h"
 #include "list.h"
 #include "net.h" /* socklen_t */
 #include "trevent.h"
 #include "utils.h"
 #include "web.h"
 
-/* Use curl_multi_socket_action() instead of curl_multi_perform()
-   if libcurl >= 7.18.2.  See http://trac.transmissionbt.com/ticket/1844 */
-#if LIBCURL_VERSION_NUM >= 0x071202
-    #define USE_CURL_MULTI_SOCKET_ACTION
-#endif
+/* arbitrary number */
+#define MAX_CONCURRENT_TASKS 24
 
-
-enum
-{
-    /* arbitrary number */
-    MAX_CONCURRENT_TASKS = 100,
-
-    /* arbitrary number */
-    DEFAULT_TIMER_MSEC = 2500
-};
+/* arbitrary number */
+#define DEFAULT_TIMER_MSEC 2000
 
 #if 0
 #define dbgmsg(...) \
@@ -56,77 +43,17 @@ enum
     } while( 0 )
 #endif
 
-struct tr_web_sockinfo
-{
-    int fd;
-    tr_bool evset;
-    struct event ev;
-};
-
 struct tr_web
 {
-    tr_bool closing;
+    unsigned int closing : 1;
     int prev_running;
     int still_running;
     long timer_ms;
     CURLM * multi;
     tr_session * session;
+    tr_list * easy_queue;
     struct event timer_event;
-    tr_list * fds;
 };
-
-/***
-****
-***/
-
-static struct tr_web_sockinfo *
-getSockinfo( tr_web * web, int fd, tr_bool createIfMissing )
-{
-    tr_list * l = web->fds;
-
-    for( l=web->fds; l!=NULL; l=l->next ) {
-        struct tr_web_sockinfo * s =  l->data;
-        if( s->fd == fd ) {
-            dbgmsg( "looked up sockinfo %p for fd %d", s, fd );
-            return s;
-        }
-    }
-
-    if( createIfMissing ) {
-        struct tr_web_sockinfo * s =  tr_new0( struct tr_web_sockinfo, 1 );
-        s->fd = fd;
-        tr_list_prepend( &web->fds, s );
-        dbgmsg( "created sockinfo %p for fd %d... we now have %d sockinfos", s, fd, tr_list_size(web->fds) );
-        return s;
-    }
-
-    return NULL;
-}
-
-static void
-clearSockinfoEvent( struct tr_web_sockinfo * s )
-{
-    if( s && s->evset )
-    {
-        dbgmsg( "clearing libevent polling for sockinfo %p, fd %d", s, s->fd );
-        event_del( &s->ev );
-        s->evset = FALSE;
-    }
-}
-
-static void
-purgeSockinfo( tr_web * web, int fd )
-{
-    struct tr_web_sockinfo * s = getSockinfo( web, fd, FALSE );
-
-    if( s != NULL )
-    {
-        tr_list_remove_data( &web->fds, s );
-        clearSockinfoEvent( s );
-        dbgmsg( "freeing sockinfo %p, fd %d", s, s->fd );
-        tr_free( s );
-    }
-}
 
 /***
 ****
@@ -167,7 +94,7 @@ static void
 addTask( void * vtask )
 {
     struct tr_web_task * task = vtask;
-    const tr_session * session = task->session;
+    const tr_handle * session = task->session;
 
     if( session && session->web )
     {
@@ -192,11 +119,9 @@ addTask( void * vtask )
             tr_free( str );
         }
 
-        curl_easy_setopt( easy, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4 );
         curl_easy_setopt( easy, CURLOPT_DNS_CACHE_TIMEOUT, 360L );
         curl_easy_setopt( easy, CURLOPT_CONNECTTIMEOUT, 60L );
         curl_easy_setopt( easy, CURLOPT_FOLLOWLOCATION, 1L );
-        curl_easy_setopt( easy, CURLOPT_FORBID_REUSE, 1L );
         curl_easy_setopt( easy, CURLOPT_MAXREDIRS, 16L );
         curl_easy_setopt( easy, CURLOPT_NOSIGNAL, 1L );
         curl_easy_setopt( easy, CURLOPT_PRIVATE, task );
@@ -214,13 +139,16 @@ addTask( void * vtask )
         else /* don't set encoding on webseeds; it messes up binary data */
             curl_easy_setopt( easy, CURLOPT_ENCODING, "" );
 
-        {
-            const CURLMcode mcode = curl_multi_add_handle( web->multi, easy );
-            tr_assert( mcode == CURLM_OK, "curl_multi_add_handle() failed: %d (%s)", mcode, curl_multi_strerror( mcode ) );
-            if( mcode == CURLM_OK )
+        if( web->still_running >= MAX_CONCURRENT_TASKS ) {
+            tr_list_append( &web->easy_queue, easy );
+            dbgmsg( " >> enqueueing a task ... size is now %d",
+                                           tr_list_size( web->easy_queue ) );
+        } else {
+            const CURLMcode rc = curl_multi_add_handle( web->multi, easy );
+            if( rc == CURLM_OK )
                 ++web->still_running;
             else
-                tr_err( "%s", curl_multi_strerror( mcode ) );
+                tr_err( "%s", curl_multi_strerror( rc ) );
         }
     }
 }
@@ -228,6 +156,12 @@ addTask( void * vtask )
 /***
 ****
 ***/
+
+struct tr_web_sockinfo
+{
+    struct event ev;
+    int evset;
+};
 
 static void
 task_free( struct tr_web_task * task )
@@ -271,25 +205,10 @@ remove_finished_tasks( tr_web * g )
 
         if( easy ) {
             long code;
-            long fd;
             struct tr_web_task * task;
-            CURLcode ecode;
-            CURLMcode mcode;
-
-            ecode = curl_easy_getinfo( easy, CURLINFO_PRIVATE, (void*)&task );
-            tr_assert( ecode == CURLE_OK, "curl_easy_getinfo() failed: %d (%s)", ecode, curl_easy_strerror( ecode ) );
-
-            ecode = curl_easy_getinfo( easy, CURLINFO_RESPONSE_CODE, &code );
-            tr_assert( ecode == CURLE_OK, "curl_easy_getinfo() failed: %d (%s)", ecode, curl_easy_strerror( ecode ) );
-
-            ecode = curl_easy_getinfo( easy, CURLINFO_LASTSOCKET, &fd );
-            tr_assert( ecode == CURLE_OK, "curl_easy_getinfo() failed: %d (%s)", ecode, curl_easy_strerror( ecode ) );
-            if( fd != -1L )
-                purgeSockinfo( g, fd );
-
-            mcode = curl_multi_remove_handle( g->multi, easy );
-            tr_assert( mcode == CURLM_OK, "curl_multi_remove_handle() failed: %d (%s)", mcode, curl_multi_strerror( mcode ) );
-
+            curl_easy_getinfo( easy, CURLINFO_PRIVATE, (void*)&task );
+            curl_easy_getinfo( easy, CURLINFO_RESPONSE_CODE, &code );
+            curl_multi_remove_handle( g->multi, easy );
             curl_easy_cleanup( easy );
             task_finish( task, code );
         }
@@ -313,11 +232,6 @@ static void
 restart_timer( tr_web * g )
 {
     struct timeval interval;
-
-    assert( tr_amInEventThread( g->session ) );
-    assert( g->session != NULL );
-    assert( g->session->events != NULL );
-
     stop_timer( g );
     dbgmsg( "adding a timeout for %ld seconds from now", g->timer_ms/1000L );
     tr_timevalMsec( g->timer_ms, &interval );
@@ -325,17 +239,31 @@ restart_timer( tr_web * g )
 }
 
 static void
+add_tasks_from_queue( tr_web * g )
+{
+    while( ( g->still_running < MAX_CONCURRENT_TASKS ) 
+        && ( tr_list_size( g->easy_queue ) > 0 ) )
+    {
+        CURL * easy = tr_list_pop_front( &g->easy_queue );
+        if( easy )
+        {
+            const CURLMcode rc = curl_multi_add_handle( g->multi, easy );
+            if( rc != CURLM_OK )
+                tr_err( "%s", curl_multi_strerror( rc ) );
+            else {
+                dbgmsg( "pumped the task queue, %d remain",
+                        tr_list_size( g->easy_queue ) );
+                ++g->still_running;
+            }
+        }
+    }
+}
+
+static void
 web_close( tr_web * g )
 {
-    CURLMcode mcode;
-
     stop_timer( g );
-
-    mcode = curl_multi_cleanup( g->multi );
-    tr_assert( mcode == CURLM_OK, "curl_multi_cleanup() failed: %d (%s)", mcode, curl_multi_strerror( mcode ) );
-    if( mcode != CURLM_OK )
-        tr_err( "%s", curl_multi_strerror( mcode ) );
-
+    curl_multi_cleanup( g->multi );
     tr_free( g );
 }
 
@@ -343,37 +271,28 @@ web_close( tr_web * g )
    and no tasks remain.  callers must not reference their g pointer
    after calling this function */
 static void
-tr_multi_perform( tr_web * g, int fd )
+tr_multi_socket_action( tr_web * g, int fd, int mask )
 {
     int closed = FALSE;
-    CURLMcode mcode;
+    CURLMcode rc;
 
     dbgmsg( "check_run_count: prev_running %d, still_running %d",
             g->prev_running, g->still_running );
 
     /* invoke libcurl's processing */
-#ifdef USE_CURL_MULTI_SOCKET_ACTION
     do {
-        dbgmsg( "calling curl_multi_socket_action..." );
-        mcode = curl_multi_socket_action( g->multi, fd, 0, &g->still_running );
-        fd = CURL_SOCKET_TIMEOUT;
-        dbgmsg( "done calling curl_multi_socket_action..." );
-    } while( mcode == CURLM_CALL_MULTI_SOCKET );
-#else
-    do {
-        dbgmsg( "calling curl_multi_perform..." );
-        mcode = curl_multi_perform( g->multi, &g->still_running );
-        dbgmsg( "done calling curl_multi_perform..." );
-    } while( mcode == CURLM_CALL_MULTI_PERFORM );
-#endif
-    tr_assert( mcode == CURLM_OK, "curl_multi_perform() failed: %d (%s)", mcode, curl_multi_strerror( mcode ) );
-    if( mcode != CURLM_OK )
-        tr_err( "%s", curl_multi_strerror( mcode ) );
+        rc = curl_multi_socket_action( g->multi, fd, mask, &g->still_running );
+        dbgmsg( "event_cb(): fd %d, mask %d, still_running is %d",
+                fd, mask, g->still_running );
+    } while( rc == CURLM_CALL_MULTI_PERFORM );
+    if( rc != CURLM_OK )
+        tr_err( "%s", curl_multi_strerror( rc ) );
 
     remove_finished_tasks( g );
 
+    add_tasks_from_queue( g );
+
     if( !g->still_running ) {
-        assert( tr_list_size( g->fds ) == 0 );
         stop_timer( g );
         if( g->closing ) {
             web_close( g );
@@ -387,9 +306,24 @@ tr_multi_perform( tr_web * g, int fd )
 
 /* libevent says that sock is ready to be processed, so wake up libcurl */
 static void
-event_cb( int fd, short kind UNUSED, void * g )
+event_cb( int fd, short kind, void * g )
 {
-    tr_multi_perform( g, fd );
+    int error;
+    int mask;
+    socklen_t errsz;
+
+    error = 0;
+    errsz = sizeof( error );
+    getsockopt( fd, SOL_SOCKET, SO_ERROR, &error, &errsz );
+    if( error )
+        mask = CURL_CSELECT_ERR;
+    else {
+        mask = 0;
+        if( kind & EV_READ  ) mask |= CURL_CSELECT_IN;
+        if( kind & EV_WRITE ) mask |= CURL_CSELECT_OUT;
+    }
+
+    tr_multi_socket_action( g, fd, mask );
 }
 
 /* libevent says that timer_ms have passed, so wake up libcurl */
@@ -397,43 +331,67 @@ static void
 timer_cb( int socket UNUSED, short action UNUSED, void * g )
 {
     dbgmsg( "libevent timer is done" );
-    tr_multi_perform( g, CURL_SOCKET_TIMEOUT );
+    tr_multi_socket_action( g, CURL_SOCKET_TIMEOUT, 0 );
+}
+
+static void
+remsock( struct tr_web_sockinfo * f )
+{
+    if( f ) {
+        dbgmsg( "deleting sockinfo %p", f );
+        if( f->evset )
+            event_del( &f->ev );
+        tr_free( f );
+    }
+}
+
+static void
+setsock( curl_socket_t            sockfd,
+         int                      action,
+         struct tr_web          * g,
+         struct tr_web_sockinfo * f )
+{
+    const int kind = EV_PERSIST
+                   | (( action & CURL_POLL_IN ) ? EV_READ : 0 )
+                   | (( action & CURL_POLL_OUT ) ? EV_WRITE : 0 );
+    dbgmsg( "setsock: fd is %d, curl action is %d, libevent action is %d",
+            sockfd, action, kind );
+    if( f->evset )
+        event_del( &f->ev );
+    event_set( &f->ev, sockfd, kind, event_cb, g );
+    f->evset = 1;
+    event_add( &f->ev, NULL );
+}
+
+static void
+addsock( curl_socket_t    sockfd,
+         int              action,
+         struct tr_web  * g )
+{
+    struct tr_web_sockinfo * f = tr_new0( struct tr_web_sockinfo, 1 );
+    dbgmsg( "creating a sockinfo %p for fd %d", f, sockfd );
+    setsock( sockfd, action, g, f );
+    curl_multi_assign( g->multi, sockfd, f );
 }
 
 /* CURLMOPT_SOCKETFUNCTION */
 static int
 sock_cb( CURL            * e UNUSED,
-         curl_socket_t     fd,
-         int               action,
-         void            * vweb,
-         void            * unused UNUSED)
+         curl_socket_t     s,
+         int               what,
+         void            * vg,
+         void            * vf)
 {
-    struct tr_web * web = vweb;
-    dbgmsg( "sock_cb: action is %d, fd is %d", action, (int)fd );
+    struct tr_web * g = vg;
+    struct tr_web_sockinfo * f = vf;
+    dbgmsg( "sock_cb: what is %d, sockinfo is %p", what, f );
 
-    if( action == CURL_POLL_REMOVE )
-    {
-        purgeSockinfo( web, fd );
-    }
+    if( what == CURL_POLL_REMOVE )
+        remsock( f );
+    else if( !f )
+        addsock( s, what, g );
     else
-    {
-        struct tr_web_sockinfo * sockinfo = getSockinfo( web, fd, TRUE );
-        const int kind = EV_PERSIST
-                       | (( action & CURL_POLL_IN ) ? EV_READ : 0 )
-                       | (( action & CURL_POLL_OUT ) ? EV_WRITE : 0 );
-        dbgmsg( "setsock: fd is %d, curl action is %d, libevent action is %d", fd, action, kind );
-        assert( tr_amInEventThread( web->session ) );
-        assert( kind != EV_PERSIST );
-
-        /* clear any old polling on this fd */
-        clearSockinfoEvent( sockinfo );
-
-        /* set the new polling on this fd */
-        dbgmsg( "enabling (libevent %d, libcurl %d) polling on sockinfo %p, fd %d", action, kind, sockinfo, fd );
-        event_set( &sockinfo->ev, fd, kind, event_cb, web );
-        event_add( &sockinfo->ev, NULL );
-        sockinfo->evset = TRUE;
-    }
+        setsock( s, what, g, f );
 
     return 0;
 }
@@ -490,7 +448,6 @@ tr_webRun( tr_session         * session,
 tr_web*
 tr_webInit( tr_session * session )
 {
-    CURLMcode mcode;
     static int curlInited = FALSE;
     tr_web * web;
 
@@ -509,14 +466,10 @@ tr_webInit( tr_session * session )
     web->timer_ms = DEFAULT_TIMER_MSEC; /* overwritten by multi_timer_cb() */
 
     evtimer_set( &web->timer_event, timer_cb, web );
-    mcode = curl_multi_setopt( web->multi, CURLMOPT_SOCKETDATA, web );
-    tr_assert( mcode == CURLM_OK, "curl_mutli_setopt() failed: %d (%s)", mcode, curl_multi_strerror( mcode ) );
-    mcode = curl_multi_setopt( web->multi, CURLMOPT_SOCKETFUNCTION, sock_cb );
-    tr_assert( mcode == CURLM_OK, "curl_mutli_setopt() failed: %d (%s)", mcode, curl_multi_strerror( mcode ) );
-    mcode = curl_multi_setopt( web->multi, CURLMOPT_TIMERDATA, web );
-    tr_assert( mcode == CURLM_OK, "curl_mutli_setopt() failed: %d (%s)", mcode, curl_multi_strerror( mcode ) );
-    mcode = curl_multi_setopt( web->multi, CURLMOPT_TIMERFUNCTION, multi_timer_cb );
-    tr_assert( mcode == CURLM_OK, "curl_mutli_setopt() failed: %d (%s)", mcode, curl_multi_strerror( mcode ) );
+    curl_multi_setopt( web->multi, CURLMOPT_SOCKETDATA, web );
+    curl_multi_setopt( web->multi, CURLMOPT_SOCKETFUNCTION, sock_cb );
+    curl_multi_setopt( web->multi, CURLMOPT_TIMERDATA, web );
+    curl_multi_setopt( web->multi, CURLMOPT_TIMERFUNCTION, multi_timer_cb );
 
     return web;
 }

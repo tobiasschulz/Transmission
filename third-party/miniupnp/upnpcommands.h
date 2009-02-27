@@ -1,4 +1,4 @@
-/* $Id: upnpcommands.h,v 1.16 2008/10/14 18:05:28 nanard Exp $ */
+/* $Id: upnpcommands.h,v 1.14 2008/09/25 18:02:50 nanard Exp $ */
 /* Miniupnp project : http://miniupnp.free.fr/
  * Author : Thomas Bernard
  * Copyright (c) 2005-2008 Thomas Bernard
@@ -86,8 +86,6 @@ UPNP_GetLinkLayerMaxBitRates(const char* controlURL,
 							unsigned int * bitrateUp);
 
 /* UPNP_AddPortMapping()
- * if desc is NULL, it will be defaulted to "libminiupnpc"
- * remoteHost is usually NULL because IGD don't support it.
  *
  * Return values :
  * 0 : SUCCESS
@@ -116,12 +114,9 @@ UPNP_AddPortMapping(const char * controlURL, const char * servicetype,
 				    const char * inPort,
 					const char * inClient,
 					const char * desc,
-                    const char * proto,
-                    const char * remoteHost);
+                    const char * proto);
 
 /* UPNP_DeletePortMapping()
- * Use same argument values as what was used for AddPortMapping().
- * remoteHost is usually NULL because IGD don't support it.
  * Return Values :
  * 0 : SUCCESS
  * NON ZERO : error. Either an UPnP error code or an undefined error.
@@ -131,8 +126,7 @@ UPNP_AddPortMapping(const char * controlURL, const char * servicetype,
  * 714 NoSuchEntryInArray - The specified value does not exist in the array */
 LIBSPEC int
 UPNP_DeletePortMapping(const char * controlURL, const char * servicetype,
-                       const char * extPort, const char * proto,
-                       const char * remoteHost);
+                       const char * extPort, const char * proto);
 
 /* UPNP_GetPortMappingNumberOfEntries()
  * not supported by all routers */

@@ -1,44 +1,36 @@
 #include <stdio.h> /* fprintf */
 #include <string.h> /* strcmp */
 #include "transmission.h"
-#include "ConvertUTF.h" /* tr_utf8_validate*/
 #include "platform.h"
 #include "utils.h"
 #include "crypto.h"
 
-#undef VERBOSE
+#define VERBOSE 0
 #define NUM_LOOPS 1
 #define SPEED_TEST 0
 
 #if SPEED_TEST
- #define VERBOSE
+ #undef VERBOSE
+ #define VERBOSE 0
  #undef NUM_LOOPS
  #define NUM_LOOPS 200
 #endif
 
 static int test = 0;
 
-#ifdef VERBOSE
-  #define check( A ) \
+#define check( A ) \
     { \
         ++test; \
         if( A ){ \
-            fprintf( stderr, "PASS test #%d (%s, %d)\n", test, __FILE__, __LINE__ ); \
+            if( VERBOSE ) \
+                fprintf( stderr, "PASS test #%d (%s, %d)\n", test, __FILE__,\
+                         __LINE__ );\
         } else { \
-            fprintf( stderr, "FAIL test #%d (%s, %d)\n", test, __FILE__, __LINE__ ); \
+            fprintf( stderr, "FAIL test #%d (%s, %d)\n", test, __FILE__,\
+                     __LINE__ ); \
             return test; \
         } \
     }
-#else
-  #define check( A ) \
-    { \
-        ++test; \
-        if( !( A ) ){ \
-            fprintf( stderr, "FAIL test #%d (%s, %d)\n", test, __FILE__, __LINE__ ); \
-            return test; \
-        } \
-    }
-#endif
 
 static int
 test_bitfields( void )
@@ -143,88 +135,6 @@ test_buildpath( void )
     return 0;
 }
 
-static int
-test_utf8( void )
-{
-    const char * in;
-    char * out;
-    tr_bool err;
-
-    in = "hello world";
-    out = tr_utf8clean( in, -1, &err );
-    check( err == FALSE )
-    check( out != NULL )
-    check( !strcmp( out, in ) )
-    tr_free( out );
-
-    in = "hello world";
-    out = tr_utf8clean( in, 5, &err );
-    check( err == FALSE )
-    check( out != NULL )
-    check( !strcmp( out, "hello" ) )
-    tr_free( out );
-
-    /* this version is not utf-8 */
-    in = "“Û‰ÌÓ ·˚Ú¸ ¡Ó„ÓÏ";
-    out = tr_utf8clean( in, 17, &err );
-    check( out != NULL )
-    check( err != 0 )
-    check( strlen( out ) == 17 )
-    check( tr_utf8_validate( out, -1, NULL ) )
-    tr_free( out );
-
-    /* same string, but utf-8 clean */
-    in = "√í√∞√≥√§√≠√Æ √°√ª√≤√º √Å√Æ√£√Æ√¨";
-    out = tr_utf8clean( in, -1, &err );
-    check( out != NULL )
-    check( !err );
-    check( tr_utf8_validate( out, -1, NULL ) )
-    check ( !strcmp( in, out ) )
-    tr_free( out );
-
-    return 0;
-}
-
-static int
-test_numbers( void )
-{
-    int i;
-    int count;
-    int * numbers;
-
-    numbers = tr_parseNumberRange( "1-10,13,16-19", -1, &count );
-    check( count == 15 );
-    check( numbers != NULL );
-    check( numbers[0] == 1 );
-    check( numbers[5] == 6 );
-    check( numbers[9] == 10 );
-    check( numbers[10] == 13 );
-    check( numbers[11] == 16 );
-    check( numbers[14] == 19 );
-    tr_free( numbers );
-
-    numbers = tr_parseNumberRange( "1-5,3-7,2-6", -1, &count );
-    check( count == 7 );
-    check( numbers != NULL );
-    for( i=0; i<count; ++i )
-        check( numbers[i] == i+1 );
-    tr_free( numbers );
-
-    numbers = tr_parseNumberRange( "1-Hello", -1, &count );
-    check( count == 0 );
-    check( numbers == NULL );
-
-    numbers = tr_parseNumberRange( "1-", -1, &count );
-    check( count == 0 );
-    check( numbers == NULL );
-
-    numbers = tr_parseNumberRange( "Hello", -1, &count );
-    check( count == 0 );
-    check( numbers == NULL );
-
-    return 0;
-}
-
 int
 main( void )
 {
@@ -234,7 +144,8 @@ main( void )
     int   l;
 
     /* base64 */
-    out = tr_base64_encode( "YOYO!", -1, &len );
+    in = "YOYO!";
+    out = tr_base64_encode( in, -1, &len );
     check( out );
     check( !strcmp( out, "WU9ZTyE=\n" ) );
     check( len == 9 );
@@ -248,10 +159,6 @@ main( void )
     if( ( i = test_strstrip( ) ) )
         return i;
     if( ( i = test_buildpath( ) ) )
-        return i;
-    if( ( i = test_utf8( ) ) )
-        return i;
-    if( ( i = test_numbers( ) ) )
         return i;
 
     /* test that tr_cryptoRandInt() stays in-bounds */

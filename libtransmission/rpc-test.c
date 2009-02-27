@@ -5,31 +5,24 @@
 #include "rpcimpl.h"
 #include "utils.h"
 
-#undef VERBOSE
+#define VERBOSE 0
 
 static int test = 0;
 
-#ifdef VERBOSE
-  #define check( A ) \
+#define check( A ) \
     { \
         ++test; \
         if( A ){ \
-            fprintf( stderr, "PASS test #%d (%s, %d)\n", test, __FILE__, __LINE__ ); \
+            if( VERBOSE ) \
+                fprintf( stderr, "PASS test #%d (%s, %d)\n", test, __FILE__,\
+                         __LINE__ );\
         } else { \
-            fprintf( stderr, "FAIL test #%d (%s, %d)\n", test, __FILE__, __LINE__ ); \
+            if( VERBOSE ) \
+                fprintf( stderr, "FAIL test #%d (%s, %d)\n", test, __FILE__,\
+                         __LINE__ );\
             return test; \
         } \
     }
-#else
-  #define check( A ) \
-    { \
-        ++test; \
-        if( !( A ) ){ \
-            fprintf( stderr, "FAIL test #%d (%s, %d)\n", test, __FILE__, __LINE__ ); \
-            return test; \
-        } \
-    }
-#endif
 
 static int
 test_list( void )

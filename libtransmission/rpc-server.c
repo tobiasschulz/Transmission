@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -47,20 +47,16 @@
 
 struct tr_rpc_server
 {
-    tr_bool            isEnabled;
-    tr_bool            isPasswordEnabled;
-    tr_bool            isWhitelistEnabled;
-    tr_port            port;
+    unsigned int       isEnabled          : 1;
+    unsigned int       isPasswordEnabled  : 1;
+    unsigned int       isWhitelistEnabled : 1;
+    uint16_t           port;
     struct evhttp *    httpd;
-    tr_session *       session;
+    tr_handle *        session;
     char *             username;
     char *             password;
     char *             whitelistStr;
     tr_list *          whitelist;
-
-#ifdef HAVE_ZLIB
-    z_stream           stream;
-#endif
 };
 
 #define dbgmsg( ... ) \
@@ -80,14 +76,13 @@ send_simple_response( struct evhttp_request * req,
                       const char *            text )
 {
     const char *      code_text = tr_webGetResponseStr( code );
-    struct evbuffer * body = tr_getBuffer( );
+    struct evbuffer * body = evbuffer_new( );
 
     evbuffer_add_printf( body, "<h1>%d: %s</h1>", code, code_text );
     if( text )
         evbuffer_add_printf( body, "%s", text );
     evhttp_send_reply( req, code, code_text, body );
-
-    tr_releaseBuffer( body );
+    evbuffer_free( body );
 }
 
 static const char*
@@ -155,10 +150,10 @@ handle_upload( struct evhttp_request * req,
                     const char * body = strstr( text, "\r\n\r\n" );
                     if( body )
                     {
-                        char * b64;
+                        char *  b64, *json, *freeme;
+                        int     json_len;
                         size_t  body_len;
                         tr_benc top, *args;
-                        struct evbuffer * json = tr_getBuffer( );
 
                         body += 4; /* walk past the \r\n\r\n */
                         body_len = part_len - ( body - text );
@@ -172,13 +167,13 @@ handle_upload( struct evhttp_request * req,
                         b64 = tr_base64_encode( body, body_len, NULL );
                         tr_bencDictAddStr( args, "metainfo", b64 );
                         tr_bencDictAddInt( args, "paused", paused );
-                        tr_bencSaveAsJSON( &top, json );
-                        tr_rpc_request_exec_json( server->session,
-                                                  EVBUFFER_DATA( json ),
-                                                  EVBUFFER_LENGTH( json ),
-                                                  NULL, NULL );
+                        json = tr_bencSaveAsJSON( &top, &json_len );
+                        freeme = tr_rpc_request_exec_json( server->session,
+                                                           json, json_len,
+                                                           NULL );
 
-                        tr_releaseBuffer( json );
+                        tr_free( freeme );
+                        tr_free( json );
                         tr_free( b64 );
                         tr_bencFree( &top );
                     }
@@ -226,7 +221,6 @@ mimetype_guess( const char * path )
 
 static void
 add_response( struct evhttp_request * req,
-              struct tr_rpc_server *  server,
               struct evbuffer *       out,
               const void *            content,
               size_t                  content_len )
@@ -245,22 +239,28 @@ add_response( struct evhttp_request * req,
     else
     {
         int state;
+        z_stream stream;
 
-        server->stream.next_in = (Bytef*) content;
-        server->stream.avail_in = content_len;
+        stream.zalloc = (alloc_func) Z_NULL;
+        stream.zfree = (free_func) Z_NULL;
+        stream.opaque = (voidpf) Z_NULL;
+        deflateInit( &stream, Z_BEST_COMPRESSION );
+
+        stream.next_in = (Bytef*) content;
+        stream.avail_in = content_len;
 
         /* allocate space for the raw data and call deflate() just once --
          * we won't use the deflated data if it's longer than the raw data,
          * so it's okay to let deflate() run out of output buffer space */
         evbuffer_expand( out, content_len );
-        server->stream.next_out = EVBUFFER_DATA( out );
-        server->stream.avail_out = content_len;
+        stream.next_out = EVBUFFER_DATA( out );
+        stream.avail_out = content_len;
 
-        state = deflate( &server->stream, Z_FINISH );
+        state = deflate( &stream, Z_FINISH );
 
         if( state == Z_STREAM_END )
         {
-            EVBUFFER_LENGTH( out ) = content_len - server->stream.avail_out;
+            EVBUFFER_LENGTH( out ) = content_len - stream.avail_out;
 
             /* http://carsten.codimi.de/gzip.yaws/
                It turns out that some browsers expect deflated data without
@@ -286,14 +286,13 @@ add_response( struct evhttp_request * req,
             evbuffer_add( out, content, content_len );
         }
 
-        deflateReset( &server->stream );
+        deflateEnd( &stream );
     }
 #endif
 }
 
 static void
 serve_file( struct evhttp_request * req,
-            struct tr_rpc_server *  server,
             const char *            filename )
 {
     if( req->type != EVHTTP_REQ_GET )
@@ -320,13 +319,13 @@ serve_file( struct evhttp_request * req,
             struct evbuffer * out;
 
             errno = error;
-            out = tr_getBuffer( );
+            out = evbuffer_new( );
             evhttp_add_header( req->output_headers, "Content-Type",
                                mimetype_guess( filename ) );
-            add_response( req, server, out, content, content_len );
+            add_response( req, out, content, content_len );
             evhttp_send_reply( req, HTTP_OK, "OK", out );
 
-            tr_releaseBuffer( out );
+            evbuffer_free( out );
             tr_free( content );
         }
     }
@@ -367,61 +366,47 @@ handle_clutch( struct evhttp_request * req,
                        TR_PATH_DELIMITER_STR,
                        subpath && *subpath ? subpath : "index.html" );
 
-        serve_file( req, server, filename );
+        serve_file( req, filename );
 
         tr_free( filename );
         tr_free( subpath );
     }
 }
 
-struct rpc_response_data
-{
-    struct evhttp_request * req;
-    struct tr_rpc_server  * server;
-};
-
-static void
-rpc_response_func( tr_session      * session UNUSED,
-                   const char      * response,
-                   size_t            response_len,
-                   void            * user_data )
-{
-    struct rpc_response_data * data = user_data;
-    struct evbuffer * buf = tr_getBuffer( );
-
-    add_response( data->req, data->server, buf, response, response_len );
-    evhttp_add_header( data->req->output_headers,
-                           "Content-Type", "application/json; charset=UTF-8" );
-    evhttp_send_reply( data->req, HTTP_OK, "OK", buf );
-
-    tr_releaseBuffer( buf );
-    tr_free( data );
-}
-
-
 static void
 handle_rpc( struct evhttp_request * req,
-            struct tr_rpc_server  * server )
+            struct tr_rpc_server *  server )
 {
-    struct rpc_response_data * data = tr_new0( struct rpc_response_data, 1 );
+    int               len = 0;
+    char *            out = NULL;
+    struct evbuffer * buf;
 
-    data->req = req;
-    data->server = server;
-    
     if( req->type == EVHTTP_REQ_GET )
     {
         const char * q;
         if( ( q = strchr( req->uri, '?' ) ) )
-            tr_rpc_request_exec_uri( server->session, q+1, -1, rpc_response_func, data );
+            out = tr_rpc_request_exec_uri( server->session,
+                                           q + 1,
+                                           strlen( q + 1 ),
+                                           &len );
     }
     else if( req->type == EVHTTP_REQ_POST )
     {
-        tr_rpc_request_exec_json( server->session,
-                                  EVBUFFER_DATA( req->input_buffer ),
-                                  EVBUFFER_LENGTH( req->input_buffer ),
-                                  rpc_response_func, data );
+        out = tr_rpc_request_exec_json( server->session,
+                                        EVBUFFER_DATA( req->input_buffer ),
+                                        EVBUFFER_LENGTH( req->input_buffer ),
+                                        &len );
     }
 
+    buf = evbuffer_new( );
+    add_response( req, buf, out, len );
+    evhttp_add_header( req->output_headers, "Content-Type",
+                       "application/json; charset=UTF-8" );
+    evhttp_send_reply( req, HTTP_OK, "OK", buf );
+
+    /* cleanup */
+    evbuffer_free( buf );
+    tr_free( out );
 }
 
 static tr_bool
@@ -549,14 +534,14 @@ onEnabledChanged( void * vserver )
 
 void
 tr_rpcSetEnabled( tr_rpc_server * server,
-                  tr_bool         isEnabled )
+                  int             isEnabled )
 {
-    server->isEnabled = isEnabled;
+    server->isEnabled = isEnabled != 0;
 
     tr_runInEventThread( server->session, onEnabledChanged, server );
 }
 
-tr_bool
+int
 tr_rpcIsEnabled( const tr_rpc_server * server )
 {
     return server->isEnabled;
@@ -576,7 +561,7 @@ restartServer( void * vserver )
 
 void
 tr_rpcSetPort( tr_rpc_server * server,
-               tr_port         port )
+               uint16_t        port )
 {
     if( server->port != port )
     {
@@ -587,7 +572,7 @@ tr_rpcSetPort( tr_rpc_server * server,
     }
 }
 
-tr_port
+uint16_t
 tr_rpcGetPort( const tr_rpc_server * server )
 {
     return server->port;
@@ -633,12 +618,12 @@ tr_rpcGetWhitelist( const tr_rpc_server * server )
 
 void
 tr_rpcSetWhitelistEnabled( tr_rpc_server  * server,
-                           tr_bool          isEnabled )
+                           int              isEnabled )
 {
     server->isWhitelistEnabled = isEnabled != 0;
 }
 
-tr_bool
+int
 tr_rpcGetWhitelistEnabled( const tr_rpc_server * server )
 {
     return server->isWhitelistEnabled;
@@ -680,13 +665,13 @@ tr_rpcGetPassword( const tr_rpc_server * server )
 
 void
 tr_rpcSetPasswordEnabled( tr_rpc_server * server,
-                          tr_bool          isEnabled )
+                          int             isEnabled )
 {
-    server->isPasswordEnabled = isEnabled;
-    dbgmsg( "setting 'password enabled' to %d", (int)isEnabled );
+    server->isPasswordEnabled = isEnabled != 0;
+    dbgmsg( "setting 'password enabled' to %d", isEnabled );
 }
 
-tr_bool
+int
 tr_rpcIsPasswordEnabled( const tr_rpc_server * server )
 {
     return server->isPasswordEnabled;
@@ -705,9 +690,6 @@ closeServer( void * vserver )
     stopServer( s );
     while(( tmp = tr_list_pop_front( &s->whitelist )))
         tr_free( tmp );
-#ifdef HAVE_ZLIB
-    deflateEnd( &s->stream );
-#endif
     tr_free( s->whitelistStr );
     tr_free( s->username );
     tr_free( s->password );
@@ -722,61 +704,37 @@ tr_rpcClose( tr_rpc_server ** ps )
 }
 
 tr_rpc_server *
-tr_rpcInit( tr_session  * session,
-            tr_benc * settings )
+tr_rpcInit( tr_handle *  session,
+            int          isEnabled,
+            uint16_t     port,
+            int          isWhitelistEnabled,
+            const char * whitelist,
+            int          isPasswordEnabled,
+            const char * username,
+            const char * password )
 {
     tr_rpc_server * s;
-    tr_bool found;
-    int64_t i;
-    const char *str;
 
     s = tr_new0( tr_rpc_server, 1 );
     s->session = session;
-
-    found = tr_bencDictFindInt( settings, TR_PREFS_KEY_RPC_ENABLED, &i );
-    assert( found );
-    s->isEnabled = i != 0;
-
-    found = tr_bencDictFindInt( settings, TR_PREFS_KEY_RPC_PORT, &i );
-    assert( found );
-    s->port = i;
-
-    found = tr_bencDictFindInt( settings, TR_PREFS_KEY_RPC_WHITELIST_ENABLED, &i );
-    assert( found );
-    s->isWhitelistEnabled = i != 0;
-
-    found = tr_bencDictFindInt( settings, TR_PREFS_KEY_RPC_AUTH_REQUIRED, &i );
-    assert( found );
-    s->isPasswordEnabled = i != 0;
-
-    found = tr_bencDictFindStr( settings, TR_PREFS_KEY_RPC_WHITELIST, &str );
-    assert( found );
-    tr_rpcSetWhitelist( s, str ? str : "127.0.0.1" );
-
-    found = tr_bencDictFindStr( settings, TR_PREFS_KEY_RPC_USERNAME, &str );
-    assert( found );
-    s->username = tr_strdup( str );
-
-    found = tr_bencDictFindStr( settings, TR_PREFS_KEY_RPC_PASSWORD, &str );
-    assert( found );
-    s->password = tr_strdup( str );
-
-#ifdef HAVE_ZLIB
-    s->stream.zalloc = (alloc_func) Z_NULL;
-    s->stream.zfree = (free_func) Z_NULL;
-    s->stream.opaque = (voidpf) Z_NULL;
-    deflateInit( &s->stream, Z_BEST_COMPRESSION );
-#endif
-
-    if( s->isEnabled )
-    {
-        tr_ninf( MY_NAME, _( "Serving RPC and Web requests on port %d" ), (int) s->port );
+    s->port = port;
+    s->username = tr_strdup( username );
+    s->password = tr_strdup( password );
+    s->isWhitelistEnabled = isWhitelistEnabled != 0;
+    s->isPasswordEnabled = isPasswordEnabled != 0;
+    s->isEnabled = isEnabled != 0;
+    tr_rpcSetWhitelist( s, whitelist ? whitelist : TR_DEFAULT_RPC_WHITELIST );
+    if( isEnabled )
         tr_runInEventThread( session, startServer, s );
 
-        if( s->isWhitelistEnabled )
+    if( isEnabled )
+    {
+        tr_ninf( MY_NAME, _( "Serving RPC and Web requests on port %d" ), (int)port );
+
+        if( isWhitelistEnabled )
             tr_ninf( MY_NAME, _( "Whitelist enabled" ) );
 
-        if( s->isPasswordEnabled )
+        if( isPasswordEnabled )
             tr_ninf( MY_NAME, _( "Password required" ) );
     }
 

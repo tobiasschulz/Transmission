@@ -182,20 +182,14 @@ removeResponse( GtkDialog * dialog,
     g_free( data );
 }
 
-struct count_data
-{
-    int incomplete;
-    int connected;
-};
-
 static void
-countBusyTorrents( gpointer gtor, gpointer gdata )
+countBusyTorrents( gpointer gtor,
+                   gpointer busyCount )
 {
     const tr_stat * stat = tr_torrent_stat( gtor );
-    struct count_data * data = gdata;
 
-    if( stat->leftUntilDone ) ++data->incomplete;
-    if( stat->peersConnected ) ++data->connected;
+    if( stat->leftUntilDone || stat->peersConnected )
+        ++( *(int*)busyCount );
 }
 
 void
@@ -205,11 +199,11 @@ confirmRemove( GtkWindow * parent,
                gboolean    delete_files )
 {
     GtkWidget *         d;
-    const int           count = g_slist_length( torrents );
-    struct count_data   counts;
-    const char        * primary_text;
-    GString           * secondary_text;
     struct DeleteData * dd;
+    int                 busyCount;
+    const int           count = g_slist_length( torrents );
+    const char *        primary_text;
+    const char *        secondary_text;
 
     if( !count )
         return;
@@ -219,11 +213,10 @@ confirmRemove( GtkWindow * parent,
     dd->torrents = torrents;
     dd->delete_files = delete_files;
 
-    counts.incomplete = 0;
-    counts.connected = 0;
-    g_slist_foreach( torrents, countBusyTorrents, &counts );
+    busyCount = 0;
+    g_slist_foreach( torrents, countBusyTorrents, &busyCount );
 
-    if( !counts.incomplete && !counts.connected && !delete_files ) /* don't prompt boring torrents */
+    if( !busyCount && !delete_files ) /* don't prompt boring torrents */
     {
         removeTorrents( dd );
         g_free( dd );
@@ -231,50 +224,23 @@ confirmRemove( GtkWindow * parent,
     }
 
     if( !delete_files )
-    {
-        primary_text = ngettext( "Remove torrent?",
-                                 "Remove torrents?",
+        primary_text = ngettext( "Remove torrent?", "Remove torrents?",
                                  count );
-    }
     else
-    {
         primary_text = ngettext( "Delete this torrent's downloaded files?",
                                  "Delete these torrents' downloaded files?",
                                  count );
-    }
 
-    secondary_text = g_string_new( NULL );
-
-    if( !counts.incomplete && !counts.connected )
-    {
-        /* boring -- no secondary text needed */
-    }
-    else if( count == counts.incomplete )
-    {
-        g_string_assign( secondary_text, ngettext( "This torrent has not finished downloading.",
-                                                   "These torrents have not finished downloading.",
-                                                   count ) );
-    }
-    else if( count == counts.connected )
-    {
-        g_string_assign( secondary_text, ngettext( "This torrent is connected to peers.",
-                                                   "These torrents are connected to peers.",
-                                                   count ) );
-    }
+    if( busyCount > 1 )
+        secondary_text = _(
+            "Some of these torrents are incomplete or connected to peers." );
+    else if( busyCount == 0 )
+        secondary_text = NULL;
     else
-    {
-        if( counts.connected )
-            g_string_append( secondary_text, ngettext( "One of these torrents is connected to peers.",
-                                                       "Some of these torrents are connected to peers.",
-                                                       counts.connected ) );
-        if( counts.connected && counts.incomplete )
-            g_string_append( secondary_text, "\n" );
- 
-        if( counts.incomplete )
-            g_string_assign( secondary_text, ngettext( "One of these torrents has not finished downloading.",
-                                                       "Some of these torrents have not finished downloading.",
-                                                       counts.incomplete ) );
-    }
+        secondary_text = ngettext(
+            "This torrent is incomplete or connected to peers.",
+            "One of these torrents is incomplete or connected to peers.",
+            count );
 
     d = gtk_message_dialog_new_with_markup( parent,
                                             GTK_DIALOG_DESTROY_WITH_PARENT,
@@ -282,9 +248,9 @@ confirmRemove( GtkWindow * parent,
                                             GTK_BUTTONS_NONE,
                                             "<big><b>%s</b></big>",
                                             primary_text );
-    if( secondary_text->len )
+    if( secondary_text )
         gtk_message_dialog_format_secondary_markup( GTK_MESSAGE_DIALOG( d ),
-                                                    "%s", secondary_text->str );
+                                                    "%s", secondary_text );
     gtk_dialog_add_buttons( GTK_DIALOG( d ),
                             GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
                             ( delete_files ? GTK_STOCK_DELETE :
@@ -298,6 +264,5 @@ confirmRemove( GtkWindow * parent,
                                              -1 );
     g_signal_connect( d, "response", G_CALLBACK( removeResponse ), dd );
     gtk_widget_show_all( d );
-
-    g_string_free( secondary_text, TRUE );
 }
+

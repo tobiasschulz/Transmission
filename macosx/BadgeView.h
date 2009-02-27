@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,7 +27,7 @@
 
 @interface BadgeView : NSView
 {
-    tr_session * fLib;
+    tr_handle * fLib;
     
     NSDictionary * fAttributes;
     
@@ -35,7 +35,7 @@
     BOOL fQuitting;
 }
 
-- (id) initWithFrame: (NSRect) frame lib: (tr_session *) lib;
+- (id) initWithFrame: (NSRect) frame lib: (tr_handle *) lib;
 
 - (BOOL) setRatesWithDownload: (CGFloat) downloadRate upload: (CGFloat) uploadRate;
 - (void) setQuitting;

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2009 Transmission authors and contributors
+ * Copyright (c) 2006-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -25,8 +25,11 @@
 #import "TorrentCell.h"
 #import "TorrentTableView.h"
 #import "GroupsController.h"
+#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
+#import "NSBezierPathAdditions.h"
 #import "ProgressGradients.h"
+#import "CTGradient.h"
 
 #define BAR_HEIGHT 12.0f
 
@@ -97,7 +100,7 @@
         [paragraphStyle release];
         
         fBluePieceColor = [[NSColor colorWithCalibratedRed: 0.0f green: 0.4f blue: 0.8f alpha: 1.0f] retain];
-        fBarBorderColor = [[NSColor colorWithCalibratedWhite: 0.0f alpha: 0.2f] retain];
+        fBarBorderColor = [[NSColor colorWithDeviceWhite: 0.0f alpha: 0.2f] retain];
     }
 	return self;
 }
@@ -291,7 +294,8 @@
     }
     else;
     
-    [controlView updateTrackingAreas];
+    if ([NSApp isOnLeopardOrBetter])
+        [controlView updateTrackingAreas];
     
     return YES;
 }
@@ -375,7 +379,7 @@
 {
     Torrent * torrent = [self representedObject];
     
-    const BOOL minimal = [fDefaults boolForKey: @"SmallView"];
+    BOOL minimal = [fDefaults boolForKey: @"SmallView"];
     
     //group coloring
     NSRect iconRect = [self iconRectForBounds: cellFrame];
@@ -395,21 +399,20 @@
                 * darkGroupColor = [groupColor blendedColorWithFraction: 0.2f ofColor: [NSColor whiteColor]];
         
         //border
-        NSBezierPath * bp = [NSBezierPath bezierPathWithRoundedRect: groupRect xRadius: radius yRadius: radius];
+        NSBezierPath * bp = [NSBezierPath bezierPathWithRoundedRect: groupRect radius: radius];
         [darkGroupColor set];
         [bp setLineWidth: 2.0f];
         [bp stroke];
         
         //inside
-        bp = [NSBezierPath bezierPathWithRoundedRect: groupRect xRadius: radius yRadius: radius];
-        NSGradient * gradient = [[NSGradient alloc] initWithStartingColor: [groupColor blendedColorWithFraction: 0.7f
+        bp = [NSBezierPath bezierPathWithRoundedRect: groupRect radius: radius];
+        CTGradient * gradient = [CTGradient gradientWithBeginningColor: [groupColor blendedColorWithFraction: 0.7f
                                     ofColor: [NSColor whiteColor]] endingColor: darkGroupColor];
-        [gradient drawInBezierPath: bp angle: 90.0f];
-        [gradient release];
+        [gradient fillBezierPath: bp angle: 90.0f];
     }
     
     //error image
-    const BOOL error = [torrent isError];
+    BOOL error = [torrent isError];
     if (error && !fErrorImage)
     {
         fErrorImage = [NSImage imageNamed: @"Error.png"];
@@ -432,8 +435,12 @@
     
     //text color
     NSColor * titleColor, * statusColor;
-    if ([self backgroundStyle] == NSBackgroundStyleDark)
-        titleColor = statusColor = [NSColor whiteColor];
+    if ([self isHighlighted]
+        && [[self highlightColorWithFrame: cellFrame inView: controlView] isEqual: [NSColor alternateSelectedControlColor]])
+    {
+        titleColor = [NSColor whiteColor];
+        statusColor = [NSColor whiteColor];
+    }
     else
     {
         titleColor = [NSColor controlTextColor];
@@ -582,7 +589,7 @@
             noIncludeRect.origin.x += barRect.size.width - rightNoIncludeWidth;
             noIncludeRect.size.width = rightNoIncludeWidth;
             
-            [[ProgressGradients progressLightGrayGradient] drawInRect: noIncludeRect angle: 90];
+            [[ProgressGradients progressLightGrayGradient] fillRect: noIncludeRect angle: 90];
         }
         
         if (rightWidth > 0)
@@ -599,7 +606,7 @@
                     notAvailableRect.origin.x += leftWidth + rightWidth;
                     notAvailableRect.size.width = notAvailableWidth;
                     
-                    [[ProgressGradients progressRedGradient] drawInRect: notAvailableRect angle: 90];
+                    [[ProgressGradients progressRedGradient] fillRect: notAvailableRect angle: 90];
                 }
             }
             
@@ -609,7 +616,7 @@
                 includeRect.origin.x += leftWidth;
                 includeRect.size.width = rightWidth;
                 
-                [[ProgressGradients progressWhiteGradient] drawInRect: includeRect angle: 90];
+                [[ProgressGradients progressWhiteGradient] fillRect: includeRect angle: 90];
             }
         }
     }
@@ -622,7 +629,7 @@
         if ([torrent isActive])
         {
             if ([torrent isChecking])
-                [[ProgressGradients progressYellowGradient] drawInRect: completeRect angle: 90];
+                [[ProgressGradients progressYellowGradient] fillRect: completeRect angle: 90];
             else if ([torrent isSeeding])
             {
                 NSInteger ratioLeftWidth = leftWidth * (1.0f - [torrent progressStopRatio]);
@@ -634,30 +641,30 @@
                     ratioLeftRect.origin.x += leftWidth;
                     ratioLeftRect.size.width = ratioLeftWidth;
                     
-                    [[ProgressGradients progressLightGreenGradient] drawInRect: ratioLeftRect angle: 90];
+                    [[ProgressGradients progressLightGreenGradient] fillRect: ratioLeftRect angle: 90];
                 }
                 
                 if (leftWidth > 0)
                 {
                     completeRect.size.width = leftWidth;
                     
-                    [[ProgressGradients progressGreenGradient] drawInRect: completeRect angle: 90];
+                    [[ProgressGradients progressGreenGradient] fillRect: completeRect angle: 90];
                 }
             }
             else
-                [[ProgressGradients progressBlueGradient] drawInRect: completeRect angle: 90];
+                [[ProgressGradients progressBlueGradient] fillRect: completeRect angle: 90];
         }
         else
         {
             if ([torrent waitingToStart])
             {
                 if ([torrent progressLeft] <= 0.0f)
-                    [[ProgressGradients progressDarkGreenGradient] drawInRect: completeRect angle: 90];
+                    [[ProgressGradients progressDarkGreenGradient] fillRect: completeRect angle: 90];
                 else
-                    [[ProgressGradients progressDarkBlueGradient] drawInRect: completeRect angle: 90];
+                    [[ProgressGradients progressDarkBlueGradient] fillRect: completeRect angle: 90];
             }
             else
-                [[ProgressGradients progressGrayGradient] drawInRect: completeRect angle: 90];
+                [[ProgressGradients progressGrayGradient] fillRect: completeRect angle: 90];
         }
     }
 }
@@ -784,7 +791,7 @@
             return NSLocalizedString(@"Pause the transfer", "Torrent Table -> tooltip");
         else
         {
-            if ([[NSApp currentEvent] modifierFlags] & NSAlternateKeyMask)
+            if ([[NSApp currentEvent] modifierFlags] & NSAlternateKeyMask && [fDefaults boolForKey: @"Queue"])
                 return NSLocalizedString(@"Resume the transfer right away", "Torrent cell -> button info");
             else if ([torrent waitingToStart])
                 return NSLocalizedString(@"Stop waiting to start", "Torrent cell -> button info");

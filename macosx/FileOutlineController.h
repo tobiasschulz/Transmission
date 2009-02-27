@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2008-2009 Transmission authors and contributors
+ * Copyright (c) 2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -30,18 +30,13 @@
 @interface FileOutlineController : NSObject
 {
     Torrent * fTorrent;
-    NSArray * fFileList;
     
     IBOutlet FileOutlineView * fOutline;
-    
-    NSString * fFilterText;
 }
 
 - (FileOutlineView *) outlineView;
 
 - (void) setTorrent: (Torrent *) torrent;
-
-- (void) setFilterText: (NSString *) text;
 
 - (void) reloadData;
 

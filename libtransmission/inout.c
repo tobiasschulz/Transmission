@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -71,37 +71,30 @@ readOrWriteBytes( const tr_torrent * tor,
 {
     const tr_info * info = &tor->info;
     const tr_file * file = &info->files[fileIndex];
-    tr_preallocation_mode preallocationMode;
 
     typedef size_t ( *iofunc )( int, void *, size_t );
-    iofunc          func = ioMode == TR_IO_READ ? (iofunc)read : (iofunc)write;
+    iofunc          func = ioMode ==
+                           TR_IO_READ ? (iofunc)read : (iofunc)write;
+    char          * path;
     struct stat     sb;
     int             fd = -1;
     int             err;
     int             fileExists;
 
-    assert( tor->downloadDir && *tor->downloadDir );
     assert( fileIndex < info->fileCount );
     assert( !file->length || ( fileOffset < file->length ) );
     assert( fileOffset + buflen <= file->length );
 
-    {
-        char path[MAX_PATH_LENGTH];
-        tr_snprintf( path, sizeof( path ), "%s%c%s", tor->downloadDir, TR_PATH_DELIMITER, file->name );
-        fileExists = !stat( path, &sb );
-    }
+    path = tr_buildPath( tor->downloadDir, file->name, NULL );
+    fileExists = !stat( path, &sb );
+    tr_free( path );
 
     if( !file->length )
         return 0;
 
-    if( ( file->dnd ) || ( ioMode != TR_IO_WRITE ) )
-        preallocationMode = TR_PREALLOCATE_NONE;
-    else
-        preallocationMode = tor->session->preallocationMode;
-
     if( ( ioMode == TR_IO_READ ) && !fileExists ) /* does file exist? */
         err = errno;
-    else if( ( fd = tr_fdFileCheckout ( tor->downloadDir, file->name, ioMode == TR_IO_WRITE, preallocationMode, file->length ) ) < 0 )
+    else if( ( fd = tr_fdFileCheckout ( tor->downloadDir, file->name, ioMode == TR_IO_WRITE, !file->dnd, file->length ) ) < 0 )
         err = errno;
     else if( tr_lseek( fd, (int64_t)fileOffset, SEEK_SET ) == -1 )
         err = errno;
@@ -178,9 +171,11 @@ readOrWritePiece( const tr_torrent * tor,
     while( buflen && !err )
     {
         const tr_file * file = &info->files[fileIndex];
-        const uint64_t  bytesThisPass = MIN( buflen, file->length - fileOffset );
+        const uint64_t  bytesThisPass = MIN( buflen,
+                                             file->length - fileOffset );
 
-        err = readOrWriteBytes( tor, ioMode, fileIndex, fileOffset, buf, bytesThisPass );
+        err = readOrWriteBytes( tor, ioMode,
+                                fileIndex, fileOffset, buf, bytesThisPass );
         buf += bytesThisPass;
         buflen -= bytesThisPass;
         ++fileIndex;
@@ -216,42 +211,31 @@ tr_ioWrite( const tr_torrent * tor,
 *****
 ****/
 
-static tr_bool
+static int
 recalculateHash( const tr_torrent * tor,
                  tr_piece_index_t   pieceIndex,
-                 void             * buffer,
-                 size_t             buflen,
                  uint8_t *          setme )
 {
     size_t   bytesLeft;
     uint32_t offset = 0;
-    tr_bool  success = TRUE;
-    uint8_t  stackbuf[MAX_STACK_ARRAY_SIZE];
+    int      success = TRUE;
     SHA_CTX  sha;
 
-    /* fallback buffer */
-    if( ( buffer == NULL ) || ( buflen < 1 ) )
-    {
-        buffer = stackbuf;
-        buflen = sizeof( stackbuf );
-    }
-
-    assert( tor != NULL );
+    assert( tor );
+    assert( setme );
     assert( pieceIndex < tor->info.pieceCount );
-    assert( buffer != NULL );
-    assert( buflen > 0 );
-    assert( setme != NULL );
 
     SHA1_Init( &sha );
     bytesLeft = tr_torPieceCountBytes( tor, pieceIndex );
 
     while( bytesLeft )
     {
-        const int len = MIN( bytesLeft, buflen );
-        success = !tr_ioRead( tor, pieceIndex, offset, len, buffer );
+        uint8_t   buf[8192];
+        const int len = MIN( bytesLeft, sizeof( buf ) );
+        success = !tr_ioRead( tor, pieceIndex, offset, len, buf );
         if( !success )
             break;
-        SHA1_Update( &sha, buffer, len );
+        SHA1_Update( &sha, buf, len );
         offset += len;
         bytesLeft -= len;
     }
@@ -262,14 +246,12 @@ recalculateHash( const tr_torrent * tor,
     return success;
 }
 
-tr_bool
-tr_ioTestPiece( const tr_torrent  * tor,
-                tr_piece_index_t    pieceIndex,
-                void              * buffer,
-                size_t              buflen )
+int
+tr_ioTestPiece( const tr_torrent * tor,
+                int                pieceIndex )
 {
     uint8_t hash[SHA_DIGEST_LENGTH];
-
-    return recalculateHash( tor, pieceIndex, buffer, buflen, hash )
-           && !memcmp( hash, tor->info.pieces[pieceIndex].hash, SHA_DIGEST_LENGTH );
+    const int recalculated = recalculateHash( tor, pieceIndex, hash );
+    return recalculated && !memcmp( hash, tor->info.pieces[pieceIndex].hash, SHA_DIGEST_LENGTH );
 }
+

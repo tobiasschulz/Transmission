@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -25,10 +25,11 @@
 #import "DragOverlayWindow.h"
 #import "DragOverlayView.h"
 #import "NSStringAdditions.h"
+#import "metainfo.h"
 
 @implementation DragOverlayWindow
 
-- (id) initWithLib: (tr_session *) lib forWindow: (NSWindow *) window
+- (id) initWithLib: (tr_handle *) lib forWindow: (NSWindow *) window
 {
     if ((self = ([super initWithContentRect: NSMakeRect(0, 0, 1.0, 1.0) styleMask: NSBorderlessWindowMask
                     backing: NSBackingStoreBuffered defer: NO])))
@@ -81,7 +82,9 @@
     BOOL folder;
     NSInteger fileCount = 0;
     
-    for (NSString * file in files)
+    NSString * file;
+    NSEnumerator * enumerator = [files objectEnumerator];
+    while ((file = [enumerator nextObject]))
     {
         if ([[file pathExtension] caseInsensitiveCompare: @"torrent"] == NSOrderedSame)
         {

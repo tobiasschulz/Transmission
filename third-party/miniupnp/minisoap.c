@@ -1,4 +1,4 @@
-/* $Id: minisoap.c,v 1.16 2008/10/11 16:39:29 nanard Exp $ */
+/* $Id: minisoap.c,v 1.15 2008/02/17 17:57:07 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005 Thomas Bernard
@@ -19,7 +19,6 @@
 #include <sys/socket.h>
 #endif
 #include "minisoap.h"
-#include "miniupnpcstrings.h"
 
 /* only for malloc */
 #include <stdlib.h>
@@ -93,7 +92,7 @@ int soapPostSubmit(int fd,
                        "POST %s HTTP/1.1\r\n"
 /*                       "POST %s HTTP/1.0\r\n"*/
 	                   "Host: %s%s\r\n"
-					   "User-Agent: " OS_STRING ", UPnP/1.0, MiniUPnPc/" MINIUPNPC_VERSION_STRING "\r\n"
+					   "User-Agent: POSIX, UPnP/1.0, miniUPnPc/1.0\r\n"
 	                   "Content-Length: %d\r\n"
 					   "Content-Type: text/xml\r\n"
 					   "SOAPAction: \"%s\"\r\n"

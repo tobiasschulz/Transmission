@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -23,7 +23,6 @@
 
 #include "crypto.h" /* tr_sha1 */
 #include "transmission.h"
-#include "session.h"
 #include "bencode.h"
 #include "makemeta.h"
 #include "platform.h" /* threads, locks */
@@ -114,7 +113,7 @@ builderFileCompare( const void * va,
 }
 
 tr_metainfo_builder*
-tr_metaInfoBuilderCreate( tr_session * session,
+tr_metaInfoBuilderCreate( tr_handle *  handle,
                           const char * topFile )
 {
     int                   i;
@@ -123,7 +122,7 @@ tr_metaInfoBuilderCreate( tr_session * session,
     tr_metainfo_builder * ret = tr_new0( tr_metainfo_builder, 1 );
 
     ret->top = tr_strdup( topFile );
-    ret->handle = session;
+    ret->handle = handle;
     {
         struct stat sb;
         stat( topFile, &sb );
@@ -345,9 +344,9 @@ makeInfoDict( tr_benc *             dict,
                                              builder->fileCount );
         for( i = 0; i < builder->fileCount; ++i )
         {
-            tr_benc * d = tr_bencListAddDict( list, 2 );
-            tr_benc * length = tr_bencDictAdd( d, "length" );
-            tr_benc * pathVal = tr_bencDictAdd( d, "path" );
+            tr_benc * dict = tr_bencListAddDict( list, 2 );
+            tr_benc * length = tr_bencDictAdd( dict, "length" );
+            tr_benc * pathVal = tr_bencDictAdd( dict, "path" );
             getFileInfo( builder->top, &builder->files[i], length, pathVal );
         }
     }
@@ -445,29 +444,29 @@ static tr_metainfo_builder * queue = NULL;
 static tr_thread *           workerThread = NULL;
 
 static tr_lock*
-getQueueLock( tr_session * session )
+getQueueLock( tr_handle * h )
 {
     static tr_lock * lock = NULL;
-    tr_globalLock( session );
 
+    tr_globalLock( h );
     if( !lock )
         lock = tr_lockNew( );
+    tr_globalUnlock( h );
 
-    tr_globalUnlock( session );
     return lock;
 }
 
 static void
 makeMetaWorkerFunc( void * user_data )
 {
-    tr_session * session = user_data;
+    tr_handle * handle = (tr_handle *) user_data;
 
     for( ; ; )
     {
         tr_metainfo_builder * builder = NULL;
 
         /* find the next builder to process */
-        tr_lock * lock = getQueueLock( session );
+        tr_lock *             lock = getQueueLock ( handle );
         tr_lockLock( lock );
         if( queue )
         {

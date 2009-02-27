@@ -128,7 +128,7 @@ view_row_activated( GtkTreeView       * tree_view UNUSED,
                     GtkTreeViewColumn * column    UNUSED,
                     gpointer            user_data UNUSED )
 {
-    action_activate( "show-torrent-properties" );
+    action_activate( "show-torrent-details" );
 }
 
 static gboolean is_row_visible( GtkTreeModel *,
@@ -498,17 +498,16 @@ onAskTrackerQueryTooltip( GtkWidget *            widget UNUSED,
 ***/
 
 GtkWidget *
-tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
+tr_window_new( GtkUIManager * ui_manager,
+               TrCore *       core )
 {
     int           i, n;
     const char *  pch;
     PrivateData * p;
-    GtkWidget   *mainmenu, *toolbar, *filter, *list, *status;
     GtkWidget *   vbox, *w, *self, *h, *c, *s, *image, *menu;
     GtkWindow *   win;
     GSList *      l;
     GSList *      toggles;
-
     const char *  filter_names[FILTER_MODE_QTY] = {
         /* show all torrents */
         N_( "A_ll" ),
@@ -538,18 +537,20 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
     gtk_window_set_title( win, g_get_application_name( ) );
     gtk_window_set_role( win, "tr-main" );
     gtk_window_set_default_size( win,
-                                 pref_int_get( PREF_KEY_MAIN_WINDOW_WIDTH ),
-                                 pref_int_get( PREF_KEY_MAIN_WINDOW_HEIGHT ) );
+                                pref_int_get( PREF_KEY_MAIN_WINDOW_WIDTH ),
+                                pref_int_get( PREF_KEY_MAIN_WINDOW_HEIGHT ) );
     gtk_window_move( win, pref_int_get( PREF_KEY_MAIN_WINDOW_X ),
-                     pref_int_get( PREF_KEY_MAIN_WINDOW_Y ) );
-    gtk_window_add_accel_group( win, gtk_ui_manager_get_accel_group( ui_mgr ) );
+                    pref_int_get( PREF_KEY_MAIN_WINDOW_Y ) );
+    gtk_window_add_accel_group( win,
+                               gtk_ui_manager_get_accel_group( ui_manager ) );
 
     /* window's main container */
     vbox = gtk_vbox_new ( FALSE, 0 );
     gtk_container_add ( GTK_CONTAINER( self ), vbox );
 
     /* main menu */
-    w = mainmenu = action_get_widget( "/main-window-menu" );
+    w = action_get_widget( "/main-window-menu" );
+    gtk_box_pack_start( GTK_BOX( vbox ), w, FALSE, FALSE, 0 );
     w = action_get_widget( "/main-window-menu/torrent-menu/update-tracker" );
 #if GTK_CHECK_VERSION( 2, 12, 0 )
     g_signal_connect( w, "query-tooltip",
@@ -557,11 +558,12 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
 #endif
 
     /* toolbar */
-    w = toolbar = p->toolbar = action_get_widget( "/main-window-toolbar" );
+    w = p->toolbar = action_get_widget( "/main-window-toolbar" );
+    gtk_box_pack_start( GTK_BOX( vbox ), w, FALSE, FALSE, 0 );
 
     /* filter */
     toggles = NULL;
-    h = filter = p->filter = gtk_hbox_new( FALSE, 0 );
+    h = p->filter = gtk_hbox_new( FALSE, 0 );
     gtk_container_set_border_width( GTK_CONTAINER( h ), GUI_PAD_SMALL );
     for( i = 0; i < FILTER_MODE_QTY; ++i )
     {
@@ -588,7 +590,11 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
                                             s ), SEXY_ICON_ENTRY_PRIMARY,
                                         TRUE );
     gtk_box_pack_end( GTK_BOX( h ), s, FALSE, FALSE, 0 );
+    gtk_box_pack_start( GTK_BOX( vbox ), h, FALSE, FALSE, 0 );
     g_signal_connect( s, "changed", G_CALLBACK( filter_entry_changed ), p );
+
+    w = gtk_hseparator_new( );
+    gtk_box_pack_start( GTK_BOX( vbox ), w, FALSE, FALSE, 0 );
 
     /* status menu */
     menu = p->status_menu = gtk_menu_new( );
@@ -611,7 +617,7 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
     }
 
     /* status */
-    h = status = p->status = gtk_hbox_new( FALSE, GUI_PAD );
+    h = p->status = gtk_hbox_new( FALSE, GUI_PAD );
     gtk_container_set_border_width( GTK_CONTAINER( h ), GUI_PAD );
     w = p->gutter_lb = gtk_label_new( "N Torrents" );
     gtk_box_pack_start( GTK_BOX( h ), w, 0, 0, 0 );
@@ -638,6 +644,7 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
     gtk_box_pack_end( GTK_BOX( h ), w, FALSE, FALSE, 0 );
     g_signal_connect( w, "button-release-event",
                       G_CALLBACK( onYinYangReleased ), p );
+    gtk_box_pack_start( GTK_BOX( vbox ), h, FALSE, FALSE, 0 );
 
     menu = gtk_menu_new( );
     l = NULL;
@@ -646,46 +653,27 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
         const char * name = _( filter_text_names[i] );
         GtkWidget *  w = gtk_radio_menu_item_new_with_label ( l, name );
         l = gtk_radio_menu_item_get_group( GTK_RADIO_MENU_ITEM( w ) );
-        g_object_set_data( G_OBJECT( w ), FILTER_TEXT_MODE_KEY,
-                           GINT_TO_POINTER( i ) );
-        g_signal_connect( w, "toggled",
-                          G_CALLBACK( filter_text_toggled_cb ), p );
+        g_object_set_data( G_OBJECT(
+                              w ), FILTER_TEXT_MODE_KEY, GINT_TO_POINTER( i ) );
+        g_signal_connect( w, "toggled", G_CALLBACK(
+                              filter_text_toggled_cb ), p );
         gtk_menu_shell_append( GTK_MENU_SHELL( menu ), w );
         gtk_widget_show( w );
     }
-    g_signal_connect( s, "icon-released",
-                      G_CALLBACK( entry_icon_released ), menu );
+    g_signal_connect( s, "icon-released", G_CALLBACK(
+                          entry_icon_released ), menu );
 
     /* workarea */
     p->view = makeview( p, core );
-    w = list = p->scroll = gtk_scrolled_window_new( NULL, NULL );
-    gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW( w ),
-                                    GTK_POLICY_NEVER, GTK_POLICY_AUTOMATIC );
-    gtk_scrolled_window_set_shadow_type( GTK_SCROLLED_WINDOW( w ),
-                                         GTK_SHADOW_IN );
+    w = p->scroll = gtk_scrolled_window_new( NULL, NULL );
+    gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW(
+                                        w ), GTK_POLICY_NEVER,
+                                    GTK_POLICY_AUTOMATIC );
+    gtk_scrolled_window_set_shadow_type( GTK_SCROLLED_WINDOW(
+                                             w ), GTK_SHADOW_IN );
     gtk_container_add( GTK_CONTAINER( w ), p->view );
-
-    /* layout the widgets */
-    {
-        const char * str = pref_string_get( PREF_KEY_MAIN_WINDOW_LAYOUT_ORDER );
-        char ** tokens = g_strsplit( str, ",", -1 );
-        for( i=0; tokens && tokens[i]; ++i )
-        {
-            const char * key = tokens[i];
-
-            if( !strcmp( key, "menu" ) )
-                gtk_box_pack_start( GTK_BOX( vbox ), mainmenu, FALSE, FALSE, 0 );
-            else if( !strcmp( key, "toolbar" ) )
-                gtk_box_pack_start( GTK_BOX( vbox ), toolbar, FALSE, FALSE, 0 );
-            else if( !strcmp( key, "filter" ) )
-                gtk_box_pack_start( GTK_BOX( vbox ), filter, FALSE, FALSE, 0 );
-            else if( !strcmp( key, "list" ) )
-                gtk_box_pack_start( GTK_BOX( vbox ), list, TRUE, TRUE, 0 );
-            else if( !strcmp( key, "statusbar" ) )
-                gtk_box_pack_start( GTK_BOX( vbox ), status, FALSE, FALSE, 0 );
-        }
-        g_strfreev( tokens );
-    }
+    gtk_box_pack_start( GTK_BOX( vbox ), w, TRUE, TRUE, 0 );
+    gtk_container_set_focus_child( GTK_CONTAINER( vbox ), w );
 
     /* show all but the window */
     gtk_widget_show_all( vbox );
@@ -751,7 +739,7 @@ updateStats( PrivateData * p )
         tr_sessionGetStats( session, &stats );
         tr_strlsize( up, stats.uploadedBytes, sizeof( up ) );
         tr_strlsize( down, stats.downloadedBytes, sizeof( down ) );
-        /* Translators: "size|" is here for disambiguation.  Please remove it from your translation.
+        /* Translators: do not translate the "size|" disambiguation prefix.
            %1$s is the size of the data we've downloaded
            %2$s is the size of the data we've uploaded */
         g_snprintf( buf, sizeof( buf ), Q_(
@@ -762,7 +750,7 @@ updateStats( PrivateData * p )
         tr_sessionGetCumulativeStats( session, &stats );
         tr_strlsize( up, stats.uploadedBytes, sizeof( up ) );
         tr_strlsize( down, stats.downloadedBytes, sizeof( down ) );
-        /* Translators: "size|" is here for disambiguation.  Please remove it from your translation.
+        /* Translators: do not translate the "size|" disambiguation prefix.
            %1$s is the size of the data we've downloaded
            %2$s is the size of the data we've uploaded */
         g_snprintf( buf, sizeof( buf ), Q_(
