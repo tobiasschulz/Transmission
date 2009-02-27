@@ -162,11 +162,11 @@ notifyInMainThread( gpointer user_data )
 }
 
 static void
-completenessChangedCallback( tr_torrent       * tor,
+completenessChangedCallback( tr_torrent       * tor UNUSED,
                              tr_completeness    completeness,
                              void *             user_data )
 {
-    if( ( completeness != TR_LEECH ) && ( tr_torrentStat( tor )->sizeWhenDone != 0 ) )
+    if( completeness == TR_CP_COMPLETE )
         g_idle_add( notifyInMainThread, user_data );
 }
 
@@ -189,16 +189,20 @@ tr_torrent_new_preexisting( tr_torrent * tor )
 TrTorrent *
 tr_torrent_new_ctor( tr_session   * session,
                      tr_ctor      * ctor,
-                     int          * errcode )
+                     char        ** err )
 {
     tr_torrent * tor;
+    int          errcode;
     uint8_t      doTrash = FALSE;
+
+    errcode = -1;
+    *err = NULL;
 
     /* let the gtk client handle the removal, since libT
      * doesn't have any concept of the glib trash API */
     tr_ctorGetDeleteSource( ctor, &doTrash );
     tr_ctorSetDeleteSource( ctor, FALSE );
-    tor = tr_torrentNew( session, ctor, errcode );
+    tor = tr_torrentNew( session, ctor, &errcode );
 
     if( tor && doTrash )
     {
@@ -208,10 +212,39 @@ tr_torrent_new_ctor( tr_session   * session,
 
         /* #1294: don't delete the source .torrent file if it's our internal copy */
         if( !is_internal )
-            tr_file_trash_or_remove( source );
+            tr_file_trash_or_unlink( source );
     }
 
-    return tor ? maketorrent( tor ) : NULL;
+    if( !tor )
+    {
+        const char * filename = tr_ctorGetSourceFile( ctor );
+        if( !filename )
+            filename = "(null)";
+
+        switch( errcode )
+        {
+            case TR_EINVALID:
+                *err =
+                    g_strdup_printf( _(
+                                         "File \"%s\" isn't a valid torrent" ),
+                                     filename );
+                break;
+
+            case TR_EDUPLICATE:
+                *err = g_strdup_printf( _(
+                                            "File \"%s\" is already open" ),
+                                        filename );
+                break;
+
+            default:
+                *err = g_strdup( filename );
+                break;
+        }
+
+        return NULL;
+    }
+
+    return maketorrent( tor );
 }
 
 char *
@@ -285,7 +318,24 @@ tr_torrent_set_remove_flag( TrTorrent * gtor,
 void
 tr_torrent_delete_files( TrTorrent * gtor )
 {
-    tr_torrentDeleteLocalData( tr_torrent_handle( gtor ), tr_file_trash_or_remove );
+    tr_file_index_t i;
+    const tr_info * info = tr_torrent_info( gtor );
+    const char *    stop =
+        tr_torrentGetDownloadDir( tr_torrent_handle( gtor ) );
+
+    for( i = 0; info && i < info->fileCount; ++i )
+    {
+        char * file = g_build_filename( stop, info->files[i].name, NULL );
+        while( strcmp( stop, file ) && strlen( stop ) < strlen( file ) )
+        {
+            char * swap = g_path_get_dirname( file );
+            tr_file_trash_or_unlink( file );
+            g_free( file );
+            file = swap;
+        }
+
+        g_free( file );
+    }
 }
 
 void

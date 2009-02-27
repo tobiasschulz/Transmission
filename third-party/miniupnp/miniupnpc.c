@@ -1,4 +1,4 @@
-/* $Id: miniupnpc.c,v 1.57 2008/12/18 17:46:36 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.55 2008/09/25 18:02:50 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas BERNARD
  * copyright (c) 2005-2007 Thomas Bernard
@@ -8,19 +8,13 @@
 #include <stdlib.h>
 #include <string.h>
 #ifdef WIN32
-/* Win32 Specific includes and defines */
 #include <winsock2.h>
 #include <Ws2tcpip.h>
 #include <io.h>
 #define snprintf _snprintf
-#if defined(_MSC_VER) && (_MSC_VER >= 1400)
-#define strncasecmp _memicmp
-#else
 #define strncasecmp memicmp
-#endif
 #define MAXHOSTNAMELEN 64
 #else
-/* Standard POSIX includes */
 #include <unistd.h>
 #include <sys/socket.h>
 #include <sys/types.h>
@@ -45,8 +39,6 @@
 #endif
 
 #define SOAPPREFIX "s"
-#define SERVICEPREFIX "u"
-#define SERVICEPREFIX2 'u'
 
 /* root description parsing */
 void parserootdesc(const char * buffer, int bufsize, struct IGDdatas * data)
@@ -61,7 +53,7 @@ void parserootdesc(const char * buffer, int bufsize, struct IGDdatas * data)
 	parser.datafunc = IGDdata;
 	parser.attfunc = 0;
 	parsexml(&parser);
-#ifdef DEBUG
+#ifndef NDEBUG
 	printIGD(data);
 #endif
 }
@@ -158,8 +150,8 @@ int simpleUPnPcommand(int s, const char * url, const char * service,
 						  "xmlns:" SOAPPREFIX "=\"http://schemas.xmlsoap.org/soap/envelope/\" "
 						  SOAPPREFIX ":encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
 						  "<" SOAPPREFIX ":Body>"
-						  "<" SERVICEPREFIX ":%s xmlns:" SERVICEPREFIX "=\"%s\">"
-						  "</" SERVICEPREFIX ":%s>"
+						  "<m:%s xmlns:m=\"%s\">"
+						  "</m:%s>"
 						  "</" SOAPPREFIX ":Body></" SOAPPREFIX ":Envelope>"
 					 	  "\r\n", action, service, action);
 	}
@@ -174,7 +166,7 @@ int simpleUPnPcommand(int s, const char * url, const char * service,
 						"xmlns:" SOAPPREFIX "=\"http://schemas.xmlsoap.org/soap/envelope/\" "
 						SOAPPREFIX ":encodingStyle=\"http://schemas.xmlsoap.org/soap/encoding/\">"
 						"<" SOAPPREFIX ":Body>"
-						"<" SERVICEPREFIX ":%s xmlns:" SERVICEPREFIX "=\"%s\">",
+						"<m:%s xmlns:m=\"%s\">",
 						action, service);
 		p = soapbody + soapbodylen;
 		while(args->elt)
@@ -206,7 +198,7 @@ int simpleUPnPcommand(int s, const char * url, const char * service,
 		}
 		*(p++) = '<';
 		*(p++) = '/';
-		*(p++) = SERVICEPREFIX2;
+		*(p++) = 'm';
 		*(p++) = ':';
 		pe = action;
 		while(*pe)

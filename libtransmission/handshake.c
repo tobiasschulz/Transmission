@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@transmissionbt.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -20,7 +20,6 @@
 #include <event.h>
 
 #include "transmission.h"
-#include "session.h"
 #include "bencode.h"
 #include "clients.h"
 #include "crypto.h"
@@ -59,10 +58,7 @@ enum
     VC_LENGTH                      = 8,
     KEY_LEN                        = 96,
     CRYPTO_PROVIDE_PLAINTEXT       = 1,
-    CRYPTO_PROVIDE_CRYPTO          = 2,
-
-    /* how long to wait before giving up on a handshake */
-    HANDSHAKE_TIMEOUT_MSEC         = 60 * 1000
+    CRYPTO_PROVIDE_CRYPTO          = 2
 };
 
 
@@ -109,7 +105,6 @@ struct tr_handshake
     uint8_t               peer_id[PEER_ID_LEN];
     handshakeDoneCB       doneCB;
     void *                doneUserData;
-    tr_timer *            timeout;
 };
 
 /**
@@ -232,7 +227,7 @@ buildHandshakeMessage( tr_handshake * handshake,
 }
 
 static int tr_handshakeDone( tr_handshake * handshake,
-                             tr_bool        isConnected );
+                             int            isConnected );
 
 enum
 {
@@ -318,7 +313,7 @@ sendYa( tr_handshake * handshake )
 {
     int               len;
     const uint8_t *   public_key;
-    struct evbuffer * outbuf = tr_getBuffer( );
+    struct evbuffer * outbuf = evbuffer_new( );
     uint8_t           pad_a[PadA_MAXLEN];
 
     /* add our public key (Ya) */
@@ -337,7 +332,7 @@ sendYa( tr_handshake * handshake )
     tr_peerIoWriteBuf( handshake->io, outbuf, FALSE );
 
     /* cleanup */
-    tr_releaseBuffer( outbuf );
+    evbuffer_free( outbuf );
 }
 
 static uint32_t
@@ -430,7 +425,7 @@ readYb( tr_handshake *    handshake,
 
     /* now send these: HASH('req1', S), HASH('req2', SKEY) xor HASH('req3', S),
      * ENCRYPT(VC, crypto_provide, len(PadC), PadC, len(IA)), ENCRYPT(IA) */
-    outbuf = tr_getBuffer( );
+    outbuf = evbuffer_new( );
 
     /* HASH('req1', S) */
     {
@@ -460,7 +455,6 @@ readYb( tr_handshake *    handshake,
     {
         uint8_t vc[VC_LENGTH] = { 0, 0, 0, 0, 0, 0, 0, 0 };
 
-        tr_peerIoWriteBuf( handshake->io, outbuf, FALSE );
         tr_cryptoEncryptInit( handshake->crypto );
         tr_peerIoSetEncryption( handshake->io, PEER_ENCRYPTION_RC4 );
 
@@ -488,7 +482,7 @@ readYb( tr_handshake *    handshake,
     tr_peerIoWriteBuf( handshake->io, outbuf, FALSE );
 
     /* cleanup */
-    tr_releaseBuffer( outbuf );
+    evbuffer_free( outbuf );
     return READ_LATER;
 }
 
@@ -848,17 +842,19 @@ readCryptoProvide( tr_handshake *    handshake,
     tr_sha1( req3, "req3", 4, handshake->mySecret, KEY_LEN, NULL );
     for( i = 0; i < SHA_DIGEST_LENGTH; ++i )
         obfuscatedTorrentHash[i] = req2[i] ^ req3[i];
-    if(( tor = tr_torrentFindFromObfuscatedHash( handshake->session, obfuscatedTorrentHash )))
+    if( ( tor =
+             tr_torrentFindFromObfuscatedHash( handshake->session,
+                                               obfuscatedTorrentHash ) ) )
     {
-        const tr_bool clientIsSeed = tr_torrentIsSeed( tor );
-        const tr_bool peerIsSeed = tr_peerMgrPeerIsSeed( tor, tr_peerIoGetAddress( handshake->io, NULL ) );
         dbgmsg( handshake, "got INCOMING connection's encrypted handshake for torrent [%s]",
                 tor->info.name );
         tr_peerIoSetTorrentHash( handshake->io, tor->info.hash );
-
-        if( clientIsSeed && peerIsSeed )
+        if( !tr_torrentAllowsPex( tor )
+          && tr_peerMgrPeerIsSeed( handshake->session->peerMgr,
+                                  tor->info.hash,
+                                  tr_peerIoGetAddress( handshake->io, NULL ) ) )
         {
-            dbgmsg( handshake, "another seed tried to reconnect to us!" );
+            dbgmsg( handshake, "a peer has tried to reconnect to us!" );
             return tr_handshakeDone( handshake, FALSE );
         }
     }
@@ -922,7 +918,7 @@ readIA( tr_handshake *    handshake,
     **/
 
     tr_cryptoEncryptInit( handshake->crypto );
-    outbuf = tr_getBuffer( );
+    outbuf = evbuffer_new( );
 
     dbgmsg( handshake, "sending vc" );
     /* send VC */
@@ -942,7 +938,7 @@ readIA( tr_handshake *    handshake,
     else
     {
         dbgmsg( handshake, "peer didn't offer an encryption mode we like." );
-        tr_releaseBuffer( outbuf );
+        evbuffer_free( outbuf );
         return tr_handshakeDone( handshake, FALSE );
     }
 
@@ -957,10 +953,7 @@ readIA( tr_handshake *    handshake,
 
     /* maybe de-encrypt our connection */
     if( crypto_select == CRYPTO_PROVIDE_PLAINTEXT )
-    {
-        tr_peerIoWriteBuf( handshake->io, outbuf, FALSE );
         tr_peerIoSetEncryption( handshake->io, PEER_ENCRYPTION_NONE );
-    }
 
     dbgmsg( handshake, "sending handshake" );
     /* send our handshake */
@@ -974,7 +967,7 @@ readIA( tr_handshake *    handshake,
 
     /* send it out */
     tr_peerIoWriteBuf( handshake->io, outbuf, FALSE );
-    tr_releaseBuffer( outbuf );
+    evbuffer_free( outbuf );
 
     /* now await the handshake */
     setState( handshake, AWAITING_PAYLOAD_STREAM );
@@ -1082,7 +1075,7 @@ canRead( struct tr_peerIo * io, void * arg, size_t * piece )
 
 static int
 fireDoneFunc( tr_handshake * handshake,
-              tr_bool        isConnected )
+              int            isConnected )
 {
     const uint8_t * peer_id = isConnected && handshake->havePeerID
                               ? handshake->peer_id
@@ -1097,20 +1090,18 @@ fireDoneFunc( tr_handshake * handshake,
     return success;
 }
 
-static void
+void
 tr_handshakeFree( tr_handshake * handshake )
 {
     if( handshake->io )
-        tr_peerIoUnref( handshake->io ); /* balanced by the ref in tr_handshakeNew */
-
-    tr_timerFree( &handshake->timeout );
+        tr_peerIoFree( handshake->io );
 
     tr_free( handshake );
 }
 
 static int
 tr_handshakeDone( tr_handshake * handshake,
-                  tr_bool        isOK )
+                  int            isOK )
 {
     tr_bool success;
 
@@ -1118,8 +1109,6 @@ tr_handshakeDone( tr_handshake * handshake,
     tr_peerIoSetIOFuncs( handshake->io, NULL, NULL, NULL, NULL );
 
     success = fireDoneFunc( handshake, isOK );
-
-    tr_handshakeFree( handshake );    
 
     return success ? READ_LATER : READ_ERR;
 }
@@ -1166,13 +1155,6 @@ gotError( tr_peerIo  * io UNUSED,
 ***
 **/
 
-static int
-handshakeTimeout( void * handshake )
-{
-    tr_handshakeAbort( handshake );
-    return FALSE;
-}
-
 tr_handshake*
 tr_handshakeNew( tr_peerIo *        io,
                  tr_encryption_mode encryptionMode,
@@ -1188,11 +1170,8 @@ tr_handshakeNew( tr_peerIo *        io,
     handshake->doneCB = doneCB;
     handshake->doneUserData = doneUserData;
     handshake->session = tr_peerIoGetSession( io );
-    handshake->timeout = tr_timerNew( handshake->session, handshakeTimeout, handshake, HANDSHAKE_TIMEOUT_MSEC );
 
-    tr_peerIoRef( io ); /* balanced by the unref in tr_handshakeFree */
     tr_peerIoSetIOFuncs( handshake->io, canRead, NULL, gotError, handshake );
-    tr_peerIoSetEncryption( io, PEER_ENCRYPTION_NONE );
 
     if( tr_peerIoIsIncoming( handshake->io ) )
         setReadState( handshake, AWAITING_HANDSHAKE );

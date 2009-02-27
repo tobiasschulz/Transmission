@@ -11,7 +11,7 @@ Menu = {
 	context: {
 		
 		menu_style: {
-			width: '310px',
+			width: '210px',
 			backgroundColor: '#fff',
 			border: 'none',
 			padding: '5px 0',

@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -32,8 +32,7 @@ enum
     TR_FR_MAX_PEERS      = ( 1 << 10 ),
     TR_FR_ADDED_DATE     = ( 1 << 11 ),
     TR_FR_DONE_DATE      = ( 1 << 12 ),
-    TR_FR_ACTIVITY_DATE  = ( 1 << 13 ),
-    TR_FR_RATIOLIMIT     = ( 1 << 14 )
+    TR_FR_ACTIVITY_DATE  = ( 1 << 13 )
 };
 
 /**

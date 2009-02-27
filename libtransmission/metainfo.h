@@ -22,10 +22,6 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#ifndef __TRANSMISSION__
-#error only libtransmission should #include this header.
-#endif
-
 #ifndef TR_METAINFO_H
 #define TR_METAINFO_H 1
 
@@ -37,15 +33,17 @@ extern "C" {
 
 struct tr_benc;
 
-int  tr_metainfoParse( const tr_session     * session,
-                       tr_info              * info,
+int  tr_metainfoParse( const tr_handle *      handle,
+                       tr_info *              info,
                        const struct tr_benc * benc );
 
-void tr_metainfoRemoveSaved( const tr_session * session,
-                             const tr_info    * info );
+void tr_metainfoFree( tr_info * inf );
 
-void tr_metainfoMigrate( tr_session * session,
-                         tr_info    * inf );
+void tr_metainfoRemoveSaved( const tr_handle * handle,
+                             const tr_info *   info );
+
+void tr_metainfoMigrate( tr_handle * handle,
+                         tr_info *   inf );
 
 #ifdef __cplusplus
 }

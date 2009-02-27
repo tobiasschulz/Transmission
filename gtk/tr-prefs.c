@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -35,36 +35,53 @@
 void
 tr_prefs_init_global( void )
 {
+    int          i;
+    char         pw[32];
     const char * str;
+    const char * pool = "abcdefghijklmnopqrstuvwxyz"
+                        "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
+                        "1234567890";
+    GRand *      rand;
 
     cf_check_older_configs( );
 
-#ifdef HAVE_GIO
+#if HAVE_GIO
     str = NULL;
     if( !str ) str = g_get_user_special_dir( G_USER_DIRECTORY_DESKTOP );
-    if( !str ) str = tr_getDefaultDownloadDir( );
-    mkdir_p( str, 0777 );
+    if( !str ) str = g_get_home_dir( );
     pref_string_set_default ( PREF_KEY_DIR_WATCH, str );
     pref_flag_set_default   ( PREF_KEY_DIR_WATCH_ENABLED, FALSE );
 #endif
 
+    pref_int_set_default    ( PREF_KEY_PEER_SOCKET_TOS,
+                              TR_DEFAULT_PEER_SOCKET_TOS );
     pref_flag_set_default   ( PREF_KEY_INHIBIT_HIBERNATION, FALSE );
+    pref_flag_set_default   ( PREF_KEY_BLOCKLIST_ENABLED, TRUE );
     pref_flag_set_default   ( PREF_KEY_BLOCKLIST_UPDATES_ENABLED, TRUE );
 
     pref_string_set_default ( PREF_KEY_OPEN_DIALOG_FOLDER, g_get_home_dir( ) );
+
+    pref_int_set_default    ( PREF_KEY_MAX_PEERS_GLOBAL,
+                              TR_DEFAULT_GLOBAL_PEER_LIMIT );
+    pref_int_set_default    ( PREF_KEY_MAX_PEERS_PER_TORRENT, 50 );
 
     pref_flag_set_default   ( PREF_KEY_TOOLBAR, TRUE );
     pref_flag_set_default   ( PREF_KEY_FILTERBAR, TRUE );
     pref_flag_set_default   ( PREF_KEY_STATUSBAR, TRUE );
     pref_flag_set_default   ( PREF_KEY_SHOW_TRAY_ICON, FALSE );
-    pref_flag_set_default   ( PREF_KEY_SHOW_DESKTOP_NOTIFICATION, TRUE );
     pref_string_set_default ( PREF_KEY_STATUSBAR_STATS, "total-ratio" );
 
+    pref_flag_set_default   ( PREF_KEY_DL_LIMIT_ENABLED, FALSE );
+    pref_int_set_default    ( PREF_KEY_DL_LIMIT, 100 );
+    pref_flag_set_default   ( PREF_KEY_UL_LIMIT_ENABLED, FALSE );
+    pref_int_set_default    ( PREF_KEY_UL_LIMIT, 50 );
     pref_flag_set_default   ( PREF_KEY_SCHED_LIMIT_ENABLED, FALSE );
     pref_int_set_default    ( PREF_KEY_SCHED_BEGIN,    60 * 23 ); /* 11pm */
     pref_int_set_default    ( PREF_KEY_SCHED_END,      60 * 7 );  /* 7am */
-    pref_int_set_default    ( PREF_KEY_SCHED_DL_LIMIT, 200 );   /* 2x the other limit */
-    pref_int_set_default    ( PREF_KEY_SCHED_UL_LIMIT, 100 );   /* 2x the other limit */
+    pref_int_set_default    ( PREF_KEY_SCHED_DL_LIMIT, 200 );   /* 2x the other
+                                                                  limit */
+    pref_int_set_default    ( PREF_KEY_SCHED_UL_LIMIT, 100 );   /* 2x the other
+                                                                  limit */
 
     pref_flag_set_default   ( PREF_KEY_OPTIONS_PROMPT, TRUE );
 
@@ -72,17 +89,34 @@ tr_prefs_init_global( void )
     pref_int_set_default    ( PREF_KEY_MAIN_WINDOW_WIDTH, 300 );
     pref_int_set_default    ( PREF_KEY_MAIN_WINDOW_X, 50 );
     pref_int_set_default    ( PREF_KEY_MAIN_WINDOW_Y, 50 );
-    pref_string_set_default ( PREF_KEY_MAIN_WINDOW_LAYOUT_ORDER, "menu,toolbar,filter,list,statusbar" );
+
+    pref_string_set_default ( PREF_KEY_PROXY_SERVER, "" );
+    pref_int_set_default    ( PREF_KEY_PROXY_PORT, TR_DEFAULT_PROXY_PORT );
+    pref_int_set_default    ( PREF_KEY_PROXY_TYPE, TR_DEFAULT_PROXY_TYPE );
+    pref_flag_set_default   ( PREF_KEY_PROXY_SERVER_ENABLED,
+                              TR_DEFAULT_PROXY_ENABLED );
+    pref_flag_set_default   ( PREF_KEY_PROXY_AUTH_ENABLED,
+                              TR_DEFAULT_PROXY_AUTH_ENABLED );
+    pref_string_set_default ( PREF_KEY_PROXY_USERNAME, "" );
+    pref_string_set_default ( PREF_KEY_PROXY_PASSWORD, "" );
 
     str = NULL;
 #if GLIB_CHECK_VERSION( 2, 14, 0 )
     if( !str ) str = g_get_user_special_dir( G_USER_DIRECTORY_DOWNLOAD );
 #endif
-    if( !str ) str = tr_getDefaultDownloadDir( );
-    mkdir_p( str, 0777 );
-    pref_string_set_default ( TR_PREFS_KEY_DOWNLOAD_DIR, str );
+    if( !str ) str = g_get_home_dir( );
+    pref_string_set_default ( PREF_KEY_DOWNLOAD_DIR, str );
 
+    pref_int_set_default    ( PREF_KEY_PORT, TR_DEFAULT_PORT );
+
+    pref_flag_set_default   ( PREF_KEY_PORT_FORWARDING, TRUE );
+    pref_flag_set_default   ( PREF_KEY_PEX, TR_DEFAULT_PEX_ENABLED );
     pref_flag_set_default   ( PREF_KEY_ASKQUIT, TRUE );
+    pref_flag_set_default   ( PREF_KEY_ENCRYPTION, TR_DEFAULT_ENCRYPTION );
+    pref_flag_set_default   ( PREF_KEY_LAZY_BITFIELD,
+                              TR_DEFAULT_LAZY_BITFIELD_ENABLED );
+
+    pref_int_set_default    ( PREF_KEY_MSGLEVEL, TR_MSG_INF );
 
     pref_string_set_default ( PREF_KEY_SORT_MODE, "sort-by-name" );
     pref_flag_set_default   ( PREF_KEY_SORT_REVERSED, FALSE );
@@ -90,6 +124,24 @@ tr_prefs_init_global( void )
 
     pref_flag_set_default   ( PREF_KEY_START, TRUE );
     pref_flag_set_default   ( PREF_KEY_TRASH_ORIGINAL, FALSE );
+
+    pref_flag_set_default   ( PREF_KEY_RPC_ENABLED, TR_DEFAULT_RPC_ENABLED );
+    pref_int_set_default    ( PREF_KEY_RPC_PORT, TR_DEFAULT_RPC_PORT );
+    pref_string_set_default ( PREF_KEY_RPC_WHITELIST, TR_DEFAULT_RPC_WHITELIST );
+    pref_flag_set_default   ( PREF_KEY_RPC_WHITELIST_ENABLED,
+                              TR_DEFAULT_RPC_WHITELIST_ENABLED  );
+
+    rand = g_rand_new ( );
+    for( i = 0; i < 16; ++i )
+        pw[i] = pool[g_rand_int_range ( rand, 0, strlen( pool ) )];
+    g_rand_free ( rand );
+
+    pw[16] = '\0';
+    pref_string_set_default( PREF_KEY_RPC_USERNAME, "transmission" );
+    pref_string_set_default( PREF_KEY_RPC_PASSWORD, pw );
+    pref_flag_set_default  ( PREF_KEY_RPC_AUTH_ENABLED, FALSE );
+
+    pref_save( );
 }
 
 /**
@@ -147,7 +199,6 @@ struct spin_idle_data
 {
     gpointer    core;
     GTimer *    last_change;
-    gboolean    isDouble;
 };
 
 static void
@@ -171,17 +222,9 @@ spun_cb_idle( gpointer spin )
     {
         /* update the core */
         const char * key = g_object_get_data( o, PREF_KEY );
-        if (data->isDouble)
-        {
-            const double value = gtk_spin_button_get_value( GTK_SPIN_BUTTON( spin ) );
-            tr_core_set_pref_double( TR_CORE( data->core ), key, value );
-        }
-        else
-        {
-            const int    value = gtk_spin_button_get_value_as_int(
-                                 GTK_SPIN_BUTTON( spin ) );
-            tr_core_set_pref_int( TR_CORE( data->core ), key, value );
-        }
+        const int    value = gtk_spin_button_get_value_as_int(
+             GTK_SPIN_BUTTON( spin ) );
+        tr_core_set_pref_int( TR_CORE( data->core ), key, value );
 
         /* cleanup */
         g_object_set_data( o, IDLE_DATA, NULL );
@@ -194,8 +237,7 @@ spun_cb_idle( gpointer spin )
 
 static void
 spun_cb( GtkSpinButton * w,
-         gpointer        core,
-         gboolean        isDouble )
+         gpointer        core )
 {
     /* user may be spinning through many values, so let's hold off
        for a moment to keep from flooding the core with changes */
@@ -207,26 +249,11 @@ spun_cb( GtkSpinButton * w,
         data = g_new( struct spin_idle_data, 1 );
         data->core = core;
         data->last_change = g_timer_new( );
-        data->isDouble = isDouble;
         g_object_set_data_full( o, IDLE_DATA, data, spin_idle_data_free );
         g_object_ref( G_OBJECT( o ) );
         g_timeout_add( 100, spun_cb_idle, w );
     }
     g_timer_start( data->last_change );
-}
-
-static void
-spun_cb_int( GtkSpinButton * w,
-             gpointer        core )
-{
-    spun_cb( w, core, FALSE );
-}
-
-static void
-spun_cb_double( GtkSpinButton * w,
-                gpointer        core )
-{
-    spun_cb( w, core, TRUE );
 }
 
 static GtkWidget*
@@ -242,24 +269,7 @@ new_spin_button( const char * key,
                                 key ), g_free );
     gtk_spin_button_set_digits( GTK_SPIN_BUTTON( w ), 0 );
     gtk_spin_button_set_value( GTK_SPIN_BUTTON( w ), pref_int_get( key ) );
-    g_signal_connect( w, "value-changed", G_CALLBACK( spun_cb_int ), core );
-    return w;
-}
-
-static GtkWidget*
-new_spin_button_double( const char * key,
-                       gpointer      core,
-                       double        low,
-                       double        high,
-                       double        step )
-{
-    GtkWidget * w = gtk_spin_button_new_with_range( low, high, step );
-
-    g_object_set_data_full( G_OBJECT( w ), PREF_KEY, g_strdup(
-                                key ), g_free );
-    gtk_spin_button_set_digits( GTK_SPIN_BUTTON( w ), 2 );
-    gtk_spin_button_set_value( GTK_SPIN_BUTTON( w ), pref_double_get( key ) );
-    g_signal_connect( w, "value-changed", G_CALLBACK( spun_cb_double ), core );
+    g_signal_connect( w, "value-changed", G_CALLBACK( spun_cb ), core );
     return w;
 }
 
@@ -365,7 +375,7 @@ torrentPage( GObject * core )
     w = new_check_button( s, PREF_KEY_TRASH_ORIGINAL, core );
     hig_workarea_add_wide_control( t, &row, w );
 
-    w = new_path_chooser_button( TR_PREFS_KEY_DOWNLOAD_DIR, core );
+    w = new_path_chooser_button( PREF_KEY_DOWNLOAD_DIR, core );
     hig_workarea_add_row( t, &row, _( "_Destination folder:" ), w, NULL );
 
     hig_workarea_finish( t, &row );
@@ -393,10 +403,6 @@ desktopPage( GObject * core )
 
     s = _( "Show _icon in the desktop Notification Area" );
     w = new_check_button( s, PREF_KEY_SHOW_TRAY_ICON, core );
-    hig_workarea_add_wide_control( t, &row, w );
-
-    s = _( "Show desktop _notifications" );
-    w = new_check_button( s, PREF_KEY_SHOW_DESKTOP_NOTIFICATION, core );
     hig_workarea_add_wide_control( t, &row, w );
 
     hig_workarea_finish( t, &row );
@@ -504,7 +510,7 @@ onEncryptionToggled( GtkToggleButton * w,
                     ? TR_ENCRYPTION_REQUIRED
                     : TR_ENCRYPTION_PREFERRED;
 
-    tr_core_set_pref_int( TR_CORE( core ), TR_PREFS_KEY_ENCRYPTION, val );
+    tr_core_set_pref_int( TR_CORE( core ), PREF_KEY_ENCRYPTION, val );
 }
 
 static GtkWidget*
@@ -524,7 +530,7 @@ peerPage( GObject * core )
     t = hig_workarea_create( );
     hig_workarea_add_section_title( t, &row, _( "Blocklist" ) );
 
-    w = new_check_button( "", TR_PREFS_KEY_BLOCKLIST_ENABLED, core );
+    w = new_check_button( "", PREF_KEY_BLOCKLIST_ENABLED, core );
     updateBlocklistText( w, TR_CORE( core ) );
     h = gtk_hbox_new( FALSE, GUI_PAD_BIG );
     gtk_box_pack_start( GTK_BOX( h ), w, TRUE, TRUE, 0 );
@@ -547,10 +553,11 @@ peerPage( GObject * core )
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title( t, &row, _( "Limits" ) );
 
-    w = new_spin_button( TR_PREFS_KEY_PEER_LIMIT_GLOBAL, core, 1, 3000, 5 );
+    w = new_spin_button( PREF_KEY_MAX_PEERS_GLOBAL, core, 1, 3000, 5 );
     hig_workarea_add_row( t, &row, _( "Maximum peers _overall:" ), w, NULL );
-    w = new_spin_button( TR_PREFS_KEY_PEER_LIMIT_TORRENT, core, 1, 300, 5 );
-    hig_workarea_add_row( t, &row, _( "Maximum peers per _torrent:" ), w, NULL );
+    w = new_spin_button( PREF_KEY_MAX_PEERS_PER_TORRENT, core, 1, 300, 5 );
+    hig_workarea_add_row( t, &row, _(
+                              "Maximum peers per _torrent:" ), w, NULL );
 
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title ( t, &row, _( "Options" ) );
@@ -558,13 +565,14 @@ peerPage( GObject * core )
     s = _( "_Ignore unencrypted peers" );
     w = gtk_check_button_new_with_mnemonic( s );
     gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( w ),
-                                  pref_int_get( TR_PREFS_KEY_ENCRYPTION ) ==
+                                  pref_int_get(
+                                      PREF_KEY_ENCRYPTION ) ==
                                   TR_ENCRYPTION_REQUIRED );
     g_signal_connect( w, "toggled", G_CALLBACK( onEncryptionToggled ), core );
     hig_workarea_add_wide_control( t, &row, w );
 
     s = _( "Use peer e_xchange" );
-    w = new_check_button( s, TR_PREFS_KEY_PEX_ENABLED, core );
+    w = new_check_button( s, PREF_KEY_PEX, core );
     hig_workarea_add_wide_control( t, &row, w );
 
     hig_workarea_finish( t, &row );
@@ -640,7 +648,7 @@ refreshWhitelist( struct remote_page * page )
 
     g_string_truncate( gstr, gstr->len - 1 ); /* remove the trailing comma */
 
-    tr_core_set_pref( page->core, TR_PREFS_KEY_RPC_WHITELIST, gstr->str );
+    tr_core_set_pref( page->core, PREF_KEY_RPC_WHITELIST, gstr->str );
 
     g_string_free( gstr, TRUE );
 }
@@ -749,7 +757,7 @@ static void
 onLaunchClutchCB( GtkButton * w UNUSED,
                   gpointer data UNUSED )
 {
-    int    port = pref_int_get( TR_PREFS_KEY_RPC_PORT );
+    int    port = pref_int_get( PREF_KEY_RPC_PORT );
     char * url = g_strdup_printf( "http://localhost:%d/transmission/web",
                                   port );
 
@@ -776,26 +784,26 @@ webPage( GObject * core )
 
     /* "enabled" checkbutton */
     s = _( "_Enable web interface" );
-    w = new_check_button( s, TR_PREFS_KEY_RPC_ENABLED, core );
+    w = new_check_button( s, PREF_KEY_RPC_ENABLED, core );
     page->rpc_tb = GTK_TOGGLE_BUTTON( w );
     g_signal_connect( w, "clicked", G_CALLBACK( onRPCToggled ), page );
     h = gtk_hbox_new( FALSE, GUI_PAD_BIG );
     gtk_box_pack_start( GTK_BOX( h ), w, TRUE, TRUE, 0 );
-    w = gtr_button_new_from_stock( GTK_STOCK_OPEN, _( "_Open web interface" ) );
+    w = gtk_button_new_from_stock( GTK_STOCK_OPEN );
     page->widgets = g_slist_append( page->widgets, w );
     g_signal_connect( w, "clicked", G_CALLBACK( onLaunchClutchCB ), NULL );
     gtk_box_pack_start( GTK_BOX( h ), w, FALSE, FALSE, 0 );
     hig_workarea_add_wide_control( t, &row, h );
 
     /* port */
-    w = new_spin_button( TR_PREFS_KEY_RPC_PORT, core, 0, 65535, 1 );
+    w = new_spin_button( PREF_KEY_RPC_PORT, core, 0, 65535, 1 );
     page->widgets = g_slist_append( page->widgets, w );
     w = hig_workarea_add_row( t, &row, _( "Listening _port:" ), w, NULL );
     page->widgets = g_slist_append( page->widgets, w );
 
     /* require authentication */
     s = _( "_Require username" );
-    w = new_check_button( s, TR_PREFS_KEY_RPC_AUTH_REQUIRED, core );
+    w = new_check_button( s, PREF_KEY_RPC_AUTH_ENABLED, core );
     hig_workarea_add_wide_control( t, &row, w );
     page->auth_tb = GTK_TOGGLE_BUTTON( w );
     page->widgets = g_slist_append( page->widgets, w );
@@ -803,14 +811,14 @@ webPage( GObject * core )
 
     /* username */
     s = _( "_Username:" );
-    w = new_entry( TR_PREFS_KEY_RPC_USERNAME, core );
+    w = new_entry( PREF_KEY_RPC_USERNAME, core );
     page->auth_widgets = g_slist_append( page->auth_widgets, w );
     w = hig_workarea_add_row( t, &row, s, w, NULL );
     page->auth_widgets = g_slist_append( page->auth_widgets, w );
 
     /* password */
     s = _( "Pass_word:" );
-    w = new_entry( TR_PREFS_KEY_RPC_PASSWORD, core );
+    w = new_entry( PREF_KEY_RPC_PASSWORD, core );
     gtk_entry_set_visibility( GTK_ENTRY( w ), FALSE );
     page->auth_widgets = g_slist_append( page->auth_widgets, w );
     w = hig_workarea_add_row( t, &row, s, w, NULL );
@@ -818,7 +826,7 @@ webPage( GObject * core )
 
     /* require authentication */
     s = _( "Only allow the following IP _addresses to connect:" );
-    w = new_check_button( s, TR_PREFS_KEY_RPC_WHITELIST_ENABLED, core );
+    w = new_check_button( s, PREF_KEY_RPC_WHITELIST_ENABLED, core );
     hig_workarea_add_wide_control( t, &row, w );
     page->whitelist_tb = GTK_TOGGLE_BUTTON( w );
     page->widgets = g_slist_append( page->widgets, w );
@@ -826,7 +834,7 @@ webPage( GObject * core )
 
     /* access control list */
     {
-        const char *        val = pref_string_get( TR_PREFS_KEY_RPC_WHITELIST );
+        const char *        val = pref_string_get( PREF_KEY_RPC_WHITELIST );
         GtkTreeModel *      m = whitelist_tree_model_new( val );
         GtkTreeViewColumn * c;
         GtkCellRenderer *   r;
@@ -911,8 +919,10 @@ static void
 refreshProxySensitivity( struct ProxyPage * p )
 {
     GSList *       l;
-    const gboolean proxy_enabled = pref_flag_get( TR_PREFS_KEY_PROXY_ENABLED );
-    const gboolean proxy_auth_enabled = pref_flag_get( TR_PREFS_KEY_PROXY_AUTH_ENABLED );
+    const gboolean proxy_enabled = pref_flag_get(
+        PREF_KEY_PROXY_SERVER_ENABLED );
+    const gboolean proxy_auth_enabled = pref_flag_get(
+        PREF_KEY_PROXY_AUTH_ENABLED );
 
     for( l = p->proxy_widgets; l != NULL; l = l->next )
         gtk_widget_set_sensitive( GTK_WIDGET( l->data ), proxy_enabled );
@@ -963,9 +973,11 @@ onProxyTypeChanged( GtkComboBox * w,
     if( gtk_combo_box_get_active_iter( w, &iter ) )
     {
         struct ProxyPage * page = gpage;
-        int type = TR_PROXY_HTTP;
-        gtk_tree_model_get( gtk_combo_box_get_model( w ), &iter, 1, &type, -1 );
-        tr_core_set_pref_int( TR_CORE( page->core ), TR_PREFS_KEY_PROXY_TYPE, type );
+        int                type = TR_PROXY_HTTP;
+        gtk_tree_model_get( gtk_combo_box_get_model(
+                                w ), &iter, 1, &type, -1 );
+        tr_core_set_pref_int( TR_CORE(
+                                  page->core ), PREF_KEY_PROXY_TYPE, type );
     }
 }
 
@@ -986,17 +998,17 @@ trackerPage( GObject * core )
     hig_workarea_add_section_title ( t, &row, _( "Tracker Proxy" ) );
 
     s = _( "Connect to tracker via a pro_xy" );
-    w = new_check_button( s, TR_PREFS_KEY_PROXY_ENABLED, core );
+    w = new_check_button( s, PREF_KEY_PROXY_SERVER_ENABLED, core );
     g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
     hig_workarea_add_wide_control( t, &row, w );
 
     s = _( "Proxy _server:" );
-    w = new_entry( TR_PREFS_KEY_PROXY, core );
+    w = new_entry( PREF_KEY_PROXY_SERVER, core );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
     w = hig_workarea_add_row( t, &row, s, w, NULL );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
-    w = new_spin_button( TR_PREFS_KEY_PROXY_PORT, core, 0, 65535, 1 );
+    w = new_spin_button( PREF_KEY_PROXY_PORT, core, 0, 65535, 1 );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
     w = hig_workarea_add_row( t, &row, _( "Proxy _port:" ), w, NULL );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
@@ -1006,8 +1018,10 @@ trackerPage( GObject * core )
     w = gtk_combo_box_new_with_model( m );
     r = gtk_cell_renderer_text_new( );
     gtk_cell_layout_pack_start( GTK_CELL_LAYOUT( w ), r, TRUE );
-    gtk_cell_layout_set_attributes( GTK_CELL_LAYOUT( w ), r, "text", 0, NULL );
-    gtk_combo_box_set_active( GTK_COMBO_BOX( w ), pref_int_get( TR_PREFS_KEY_PROXY_TYPE ) );
+    gtk_cell_layout_set_attributes( GTK_CELL_LAYOUT(
+                                        w ), r, "text", 0, NULL );
+    gtk_combo_box_set_active( GTK_COMBO_BOX( w ),
+                             pref_int_get( PREF_KEY_PROXY_TYPE ) );
     g_signal_connect( w, "changed", G_CALLBACK( onProxyTypeChanged ), page );
     g_object_unref( G_OBJECT( m ) );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
@@ -1015,19 +1029,19 @@ trackerPage( GObject * core )
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
     s = _( "_Authentication is required" );
-    w = new_check_button( s, TR_PREFS_KEY_PROXY_AUTH_ENABLED, core );
+    w = new_check_button( s, PREF_KEY_PROXY_AUTH_ENABLED, core );
     g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
     hig_workarea_add_wide_control( t, &row, w );
     page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
 
     s = _( "_Username:" );
-    w = new_entry( TR_PREFS_KEY_PROXY_USERNAME, core );
+    w = new_entry( PREF_KEY_PROXY_USERNAME, core );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
     w = hig_workarea_add_row( t, &row, s, w, NULL );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
 
     s = _( "Pass_word:" );
-    w = new_entry( TR_PREFS_KEY_RPC_PASSWORD, core );
+    w = new_entry( PREF_KEY_PROXY_PASSWORD, core );
     gtk_entry_set_visibility( GTK_ENTRY( w ), FALSE );
     page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
     w = hig_workarea_add_row( t, &row, s, w, NULL );
@@ -1151,23 +1165,18 @@ bandwidthPage( GObject * core )
     hig_workarea_add_section_title( t, &row, _( "Limits" ) );
 
     s = _( "Limit _download speed (KB/s):" );
-    w = new_check_button( s, TR_PREFS_KEY_DSPEED_ENABLED, core );
-    w2 = new_spin_button( TR_PREFS_KEY_DSPEED, core, 0, INT_MAX, 5 );
-    gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_DSPEED_ENABLED ) );
+    w = new_check_button( s, PREF_KEY_DL_LIMIT_ENABLED, core );
+    w2 = new_spin_button( PREF_KEY_DL_LIMIT, core, 0, INT_MAX, 5 );
+    gtk_widget_set_sensitive( GTK_WIDGET( w2 ),
+                             pref_flag_get( PREF_KEY_DL_LIMIT_ENABLED ) );
     g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
     hig_workarea_add_row_w( t, &row, w, w2, NULL );
 
     s = _( "Limit _upload speed (KB/s):" );
-    w = new_check_button( s, TR_PREFS_KEY_USPEED_ENABLED, core );
-    w2 = new_spin_button( TR_PREFS_KEY_USPEED, core, 0, INT_MAX, 5 );
-    gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_USPEED_ENABLED ) );
-    g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
-    hig_workarea_add_row_w( t, &row, w, w2, NULL );
-
-    s = _( "_Stop seeding when a torrent's ratio reaches:" );
-    w = new_check_button( s, TR_PREFS_KEY_RATIO_ENABLED, core );
-    w2 = new_spin_button_double( TR_PREFS_KEY_RATIO, core, .5, INT_MAX, .05 );
-    gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_RATIO_ENABLED ) );
+    w = new_check_button( s, PREF_KEY_UL_LIMIT_ENABLED, core );
+    w2 = new_spin_button( PREF_KEY_UL_LIMIT, core, 0, INT_MAX, 5 );
+    gtk_widget_set_sensitive( GTK_WIDGET( w2 ),
+                             pref_flag_get( PREF_KEY_UL_LIMIT_ENABLED ) );
     g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
     hig_workarea_add_row_w( t, &row, w, w2, NULL );
 
@@ -1192,12 +1201,15 @@ bandwidthPage( GObject * core )
 
     w = new_spin_button( PREF_KEY_SCHED_DL_LIMIT, core, 0, INT_MAX, 5 );
     page->sched_widgets = g_slist_append( page->sched_widgets, w );
-    l = hig_workarea_add_row( t, &row, _( "Limit d_ownload speed (KB/s):" ), w, NULL );
+    l = hig_workarea_add_row( t, &row, _(
+                                  "Limit d_ownload speed (KB/s):" ), w,
+                              NULL );
     page->sched_widgets = g_slist_append( page->sched_widgets, l );
 
     w = new_spin_button( PREF_KEY_SCHED_UL_LIMIT, core, 0, INT_MAX, 5 );
     page->sched_widgets = g_slist_append( page->sched_widgets, w );
-    l = hig_workarea_add_row( t, &row, _( "Limit u_pload speed (KB/s):" ), w, NULL );
+    l = hig_workarea_add_row( t, &row, _(
+                                  "Limit u_pload speed (KB/s):" ), w, NULL );
     page->sched_widgets = g_slist_append( page->sched_widgets, l );
 
     hig_workarea_finish( t, &row );
@@ -1287,7 +1299,7 @@ onCorePrefsChanged( TrCore * core UNUSED,
                     const char *  key,
                     gpointer      gdata )
 {
-    if( !strcmp( key, TR_PREFS_KEY_PEER_PORT ) )
+    if( !strcmp( key, PREF_KEY_PORT ) )
     {
         struct network_page_data * ndata = gdata;
         struct test_port_data *    data;
@@ -1342,7 +1354,7 @@ networkPage( GObject * core )
     hig_workarea_add_section_title( t, &row, _( "Incoming Peers" ) );
 
     h = gtk_hbox_new( FALSE, GUI_PAD_BIG );
-    w2 = new_spin_button( TR_PREFS_KEY_PEER_PORT, core, 1, 65535, 1 );
+    w2 = new_spin_button( PREF_KEY_PORT, core, 1, 65535, 1 );
     gtk_box_pack_start( GTK_BOX( h ), w2, FALSE, FALSE, 0 );
     data->label = l = gtk_label_new( NULL );
     gtk_misc_set_alignment( GTK_MISC( l ), 0.0f, 0.5f );
@@ -1352,12 +1364,13 @@ networkPage( GObject * core )
     g_object_set_data( G_OBJECT( l ), "tr-port-spin", w2 );
     g_object_set_data( G_OBJECT( l ), "session",
                       tr_core_session( TR_CORE( core ) ) );
-    data->id = g_signal_connect( TR_CORE( core ), "prefs-changed",
+    data->id = g_signal_connect( TR_CORE(
+                                     core ), "prefs-changed",
                                  G_CALLBACK( onCorePrefsChanged ), data );
-    onCorePrefsChanged( NULL, TR_PREFS_KEY_PEER_PORT, data );
+    onCorePrefsChanged( NULL, PREF_KEY_PORT, data );
 
     s = _( "Use UPnP or NAT-PMP port _forwarding from my router" );
-    w = new_check_button( s, TR_PREFS_KEY_PORT_FORWARDING, core );
+    w = new_check_button( s, PREF_KEY_PORT_FORWARDING, core );
     hig_workarea_add_wide_control( t, &row, w );
 
     hig_workarea_finish( t, &row );

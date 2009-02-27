@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2009 Transmission authors and contributors
+ * Copyright (c) 2006-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,8 @@
 #import <transmission.h>
 
 @class FileListNode;
+
+#define INVALID -99
 
 typedef enum
 {
@@ -58,14 +60,16 @@ typedef enum
     NSString * fNameString, * fHashString;
     
     tr_file_stat * fFileStat;
-    NSArray * fFileList, * fFlatFileList;
+    NSArray * fFileList;
     
     NSIndexSet * fPreviousFinishedIndexes;
     NSDate * fPreviousFinishedIndexesDate;
     
+    CGFloat fRatioLimit;
+    NSInteger fRatioSetting;
     BOOL fFinishedSeeding, fWaitToStart, fStalled;
     
-    NSInteger fGroupValue;
+    NSInteger fOrderValue, fGroupValue;
     
     BOOL fAddedTrackers;
     
@@ -73,9 +77,9 @@ typedef enum
 }
 
 - (id) initWithPath: (NSString *) path location: (NSString *) location deleteTorrentFile: (torrentFileState) torrentDelete
-        lib: (tr_session *) lib;
-- (id) initWithTorrentStruct: (tr_torrent *) torrentStruct location: (NSString *) location lib: (tr_session *) lib;
-- (id) initWithHistory: (NSDictionary *) history lib: (tr_session *) lib;
+        lib: (tr_handle *) lib;
+- (id) initWithTorrentStruct: (tr_torrent *) torrentStruct location: (NSString *) location lib: (tr_handle *) lib;
+- (id) initWithHistory: (NSDictionary *) history lib: (tr_handle *) lib;
 
 - (NSDictionary *) history;
 
@@ -103,11 +107,11 @@ typedef enum
 - (void) resetCache;
 
 - (CGFloat) ratio;
-- (tr_ratiolimit) ratioSetting;
-- (void) setRatioSetting: (tr_ratiolimit) setting;
+- (NSInteger) ratioSetting;
+- (void) setRatioSetting: (NSInteger) setting;
 - (CGFloat) ratioLimit;
 - (void) setRatioLimit: (CGFloat) limit;
-- (BOOL) seedRatioSet;
+- (CGFloat) actualStopRatio; //returns INVALID if will not stop
 - (CGFloat) progressStopRatio;
 
 - (tr_speedlimit) speedMode: (BOOL) upload;
@@ -150,7 +154,6 @@ typedef enum
 - (NSString *) scrapeResponse;
 
 - (NSMutableArray *) allTrackers: (BOOL) separators;
-- (NSArray *) allTrackersFlat;
 - (BOOL) updateAllTrackersForAdd: (NSMutableArray *) trackers;
 - (void) updateAllTrackersForRemove: (NSMutableArray *) trackers;
 - (BOOL) hasAddedTrackers;
@@ -176,6 +179,7 @@ typedef enum
 - (CGFloat) checkingProgress;
 
 - (NSInteger) eta;
+- (NSInteger) etaRatio;
 
 - (CGFloat) notAvailableDesired;
 
@@ -225,6 +229,9 @@ typedef enum
 - (uint64_t) failedHash;
 - (CGFloat) swarmSpeed;
 
+- (NSInteger) orderValue;
+- (void) setOrderValue: (NSInteger) orderValue;
+
 - (NSInteger) groupValue;
 - (void) setGroupValue: (NSInteger) groupValue;
 - (NSInteger) groupOrderValue;
@@ -233,7 +240,6 @@ typedef enum
 - (NSArray *) fileList;
 - (NSInteger) fileCount;
 - (void) updateFileStat;
-- (NSArray *) flatFileList;
 
 //methods require fileStats to have been updated recently to be accurate
 - (CGFloat) fileProgress: (FileListNode *) node;

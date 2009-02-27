@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@transmissionbt.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -26,7 +26,7 @@ typedef struct tr_handshake tr_handshake;
 /* returns true on success, false on error */
 typedef tr_bool ( *handshakeDoneCB )( struct tr_handshake * handshake,
                                       struct tr_peerIo *    io,
-                                      tr_bool               isConnected,
+                                      int                   isConnected,
                                       const uint8_t *       peerId,
                                       void *                userData );
 
@@ -37,6 +37,8 @@ tr_handshake *         tr_handshakeNew( struct tr_peerIo * io,
 
 const tr_address *     tr_handshakeGetAddr( const struct tr_handshake  * handshake,
                                             tr_port                    * port );
+
+void                   tr_handshakeFree( tr_handshake * handshake );
 
 void                   tr_handshakeAbort( tr_handshake * handshake );
 

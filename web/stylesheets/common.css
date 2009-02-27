@@ -113,15 +113,7 @@ li#remove div div.toolbar_image, li#remove.disabled div:active div.toolbar_image
 	background-position: left -32px;
 }
 
-li#removedata div div.toolbar_image, li#removedata.disabled div:active div.toolbar_image {
-	background-position: left -32px;
-}
-
 li#remove div:active div.toolbar_image {
-	background-position: right -32px;
-}
-
-li#removedata div:active div.toolbar_image {
 	background-position: right -32px;
 }
 
@@ -734,7 +726,7 @@ div#upload_container div.dialog_window div.dialog_message label {
 
 div#upload_container div.dialog_window div.dialog_message input {
 	width: 249px;
-	margin: 3px 0 0 0;
+	margin: 10px 0 0 0;
 	display: block;
 }
 
@@ -845,6 +837,52 @@ div#prefs_container div#pref_error {
 	height: 20px;
 	line-height: 20px;
 	background-color: #FFEFEF;
+}
+
+/*--------------------------------------
+ *
+ * U N S U P P O R T E D   B R O W S E R
+ *
+ *--------------------------------------*/
+
+div#unsupported_browser {
+	position: absolute;
+	top: 0px;
+	left: 0px;
+	margin: 0px;
+	width: 100%;
+	height: 100%;
+	z-index: 3;
+	text-align: center;
+	background: #fff;
+}
+
+div#unsupported_browser div.dialog_window {
+	position: relative;
+	top: 150px;
+	width: 450px;
+	height: 250px;
+	margin: 0 auto;
+	border: 1px solid #979797;
+}
+
+div#unsupported_browser div.dialog_window img {
+	margin: 10px;
+}
+
+div#unsupported_browser div.dialog_window img.logo {
+	display: block;
+	margin: 20px auto 0;
+}
+
+div#unsupported_browser div.dialog_window h2 {
+	margin: 40px auto 0;
+	width: 305px;
+}
+
+div#unsupported_browser div.dialog_window p {
+	clear: both;
+	font-size: 1.4em;
 }
 
 /*--------------------------------------

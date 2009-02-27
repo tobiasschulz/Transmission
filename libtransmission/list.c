@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -158,63 +158,3 @@ tr_list_size( const tr_list * list )
     return size;
 }
 
-
-
-/*
- * Double-linked list with easy memory management and fast
- * insert/remove operations
- */
-
-void
-__tr_list_init( struct __tr_list * head )
-{
-    head->next = head;
-    head->prev = head;
-}
-
-void
-__tr_list_insert( struct __tr_list * list,
-		  struct __tr_list * prev,
-		  struct __tr_list * next)
-{
-    next->prev = list;
-    list->next = next;
-    list->prev = prev;
-    prev->next = list;
-}
-
-void
-__tr_list_splice( struct __tr_list * prev,
-		  struct __tr_list * next)
-{
-    next->prev = prev;
-    prev->next = next;
-}
-
- 
-void
-__tr_list_append( struct __tr_list * head,
-		  struct __tr_list * list)
-{
-    __tr_list_insert( list, head->prev, head );
-}
-
-void
-__tr_list_remove( struct __tr_list * head )
-{
-    __tr_list_splice( head->prev, head->next );
-    head->next = head->prev = NULL;
-}
-
-void
-__tr_list_destroy( struct __tr_list * head,
-                   __tr_list_free_t   func)
-{
-    while ( head->next != head )
-    {
-        struct __tr_list * list = head->next;
-        __tr_list_splice( list->prev, list->next );
-
-        func( list );
-    }
-}

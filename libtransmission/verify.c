@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2007-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2007-2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -34,18 +34,20 @@ struct verify_node
 };
 
 static void
-fireCheckDone( tr_torrent * tor, tr_verify_done_cb verify_done_cb )
+fireCheckDone( tr_torrent *      torrent,
+               tr_verify_done_cb verify_done_cb )
 {
-    assert( tr_isTorrent( tor ) );
-
     if( verify_done_cb )
-        verify_done_cb( tor );
+        verify_done_cb( torrent );
 }
 
 static struct verify_node currentNode;
-static tr_list * verifyList = NULL;
-static tr_thread * verifyThread = NULL;
-static int stopCurrent = FALSE;
+
+static tr_list *          verifyList = NULL;
+
+static tr_thread *        verifyThread = NULL;
+
+static int                stopCurrent = FALSE;
 
 static tr_lock*
 getVerifyLock( void )
@@ -58,11 +60,9 @@ getVerifyLock( void )
 }
 
 static int
-checkFile( tr_torrent      * tor,
-           void            * buffer,
-           size_t            buflen,
-           tr_file_index_t   fileIndex,
-           int             * abortFlag )
+checkFile( tr_torrent *    tor,
+           tr_file_index_t fileIndex,
+           int *           abortFlag )
 {
     tr_piece_index_t i;
     int              changed = FALSE;
@@ -84,9 +84,10 @@ checkFile( tr_torrent      * tor,
         }
         else if( !tr_torrentIsPieceChecked( tor, i ) )
         {
-            const int wasComplete = tr_cpPieceIsComplete( &tor->completion, i );
+            const int      wasComplete = tr_cpPieceIsComplete(
+                tor->completion, i );
 
-            if( tr_ioTestPiece( tor, i, buffer, buflen ) ) /* yay */
+            if( tr_ioTestPiece( tor, i ) ) /* yay */
             {
                 tr_torrentSetHasPiece( tor, i, TRUE );
                 if( !wasComplete )
@@ -118,13 +119,12 @@ checkFile( tr_torrent      * tor,
 static void
 verifyThreadFunc( void * unused UNUSED )
 {
-    for( ;; )
+    for( ; ; )
     {
         int                  changed = 0;
         tr_file_index_t      i;
-        tr_torrent         * tor;
+        tr_torrent *         tor;
         struct verify_node * node;
-        void               * buffer;
 
         tr_lockLock( getVerifyLock( ) );
         stopCurrent = FALSE;
@@ -141,15 +141,13 @@ verifyThreadFunc( void * unused UNUSED )
         tr_free( node );
         tr_lockUnlock( getVerifyLock( ) );
 
-        tr_torinf( tor, _( "Verifying torrent" ) );
-        assert( tr_isTorrent( tor ) );
         tor->verifyState = TR_VERIFY_NOW;
-        buffer = tr_new( uint8_t, tor->info.pieceSize );
+
+        tr_torinf( tor, _( "Verifying torrent" ) );
         for( i = 0; i < tor->info.fileCount && !stopCurrent; ++i )
-            changed |= checkFile( tor, buffer, tor->info.pieceSize, i, &stopCurrent );
-        tr_free( buffer );
+            changed |= checkFile( tor, i, &stopCurrent );
+
         tor->verifyState = TR_VERIFY_NONE;
-        assert( tr_isTorrent( tor ) );
 
         if( !stopCurrent )
         {
@@ -168,8 +166,6 @@ tr_verifyAdd( tr_torrent *      tor,
               tr_verify_done_cb verify_done_cb )
 {
     const int uncheckedCount = tr_torrentCountUncheckedPieces( tor );
-
-    assert( tr_isTorrent( tor ) );
 
     if( !uncheckedCount )
     {
@@ -212,8 +208,6 @@ tr_verifyInProgress( const tr_torrent * tor )
     tr_lock * lock = getVerifyLock( );
     tr_lockLock( lock );
 
-    assert( tr_isTorrent( tor ) );
-
     found = ( tor == currentNode.torrent )
          || ( tr_list_find( verifyList, tor, compareVerifyByTorrent ) != NULL );
 
@@ -225,9 +219,8 @@ void
 tr_verifyRemove( tr_torrent * tor )
 {
     tr_lock * lock = getVerifyLock( );
-    tr_lockLock( lock );
 
-    assert( tr_isTorrent( tor ) );
+    tr_lockLock( lock );
 
     if( tor == currentNode.torrent )
     {

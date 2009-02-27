@@ -52,40 +52,24 @@ struct tr_metainfo_lookup
     char *  filename;
 };
 
-struct tr_address;
 struct tr_bandwidth;
 
-struct tr_session
+struct tr_handle
 {
     tr_bool                      isPortSet;
-    tr_bool                      isPortRandom;
     tr_bool                      isPexEnabled;
     tr_bool                      isBlocklistEnabled;
     tr_bool                      isProxyEnabled;
     tr_bool                      isProxyAuthEnabled;
     tr_bool                      isClosed;
-    tr_bool                      isWaiting;
     tr_bool                      useLazyBitfield;
-    tr_bool                      isRatioLimited;
 
     tr_bool                      isSpeedLimited[2];
     int                          speedLimit[2];
-    int                          magicNumber;
 
     tr_encryption_mode           encryptionMode;
 
-    tr_preallocation_mode        preallocationMode;
-
     struct tr_event_handle *     events;
-
-    uint16_t                     peerLimitPerTorrent;
-    uint16_t                     openFileLimit;
-
-    int                          uploadSlotsPerTorrent;
-
-    tr_port                      peerPort;
-    tr_port                      randomPortLow;
-    tr_port                      randomPortHigh;
 
     int                          proxyPort;
     int                          peerSocketTOS;
@@ -94,6 +78,7 @@ struct tr_session
     tr_torrent *                 torrentList;
 
     char *                       tag;
+
     char *                       configDir;
     char *                       downloadDir;
     char *                       resumeDir;
@@ -129,9 +114,7 @@ struct tr_session
     int so_rcvbuf;
 
     /* monitors the "global pool" speeds */
-    struct tr_bandwidth        * bandwidth;
-
-    double                       desiredRatio;
+    struct tr_bandwidth       * bandwidth;
 };
 
 const char * tr_sessionFindTorrentFile( const tr_session * session,
@@ -141,23 +124,16 @@ void         tr_sessionSetTorrentFile( tr_session * session,
                                        const char * hashString,
                                        const char * filename );
 
-tr_bool      tr_sessionIsAddressBlocked( const tr_session        * session,
-                                         const struct tr_address * addr );
+struct in_addr;
+
+int          tr_sessionIsAddressBlocked( const tr_session *     session,
+                                         const struct in_addr * addr );
+
 
 void         tr_globalLock( tr_session * );
 
 void         tr_globalUnlock( tr_session * );
 
-tr_bool      tr_globalIsLocked( const tr_session * );
-
-enum
-{
-    SESSION_MAGIC_NUMBER = 3845
-};
-
-static inline tr_bool tr_isSession( const tr_session * session )
-{
-    return ( session != NULL ) && ( session->magicNumber == SESSION_MAGIC_NUMBER );
-}
+int          tr_globalIsLocked( const tr_session * );
 
 #endif

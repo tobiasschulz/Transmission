@@ -1,14 +1,12 @@
 dnl convention: -TR MAJOR MINOR MAINT STATUS - (each a single char)
-dnl STATUS: "X" for prerelease beta builds,
+dnl STATUS: "X" for prerelease test builds,
 dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
-m4_define([user_agent_prefix],[1.51+])
-m4_define([peer_id_prefix],[-TR151Z-])
+m4_define([user_agent_prefix],[1.42])
+m4_define([peer_id_prefix],[-TR1420-])
 
-AC_INIT([transmission],
-        [user_agent_prefix],
-        [http://trac.transmissionbt.com/newticket])
+AC_INIT([transmission],[user_agent_prefix],[http://trac.transmissionbt.com/newticket])
 AC_SUBST(USERAGENT_PREFIX,[user_agent_prefix])
 AC_SUBST(PEERID_PREFIX,[peer_id_prefix])
 
@@ -19,26 +17,11 @@ AC_CONFIG_SRCDIR(libtransmission/transmission.h)
 AM_INIT_AUTOMAKE([1.9 tar-ustar])
 AC_PROG_LIBTOOL
 
-if test m4_substr(peer_id_prefix,6,1) = "0"; then
-  supported_build=yes
-  if test "x$GCC" = "xyes" ; then
-    CFLAGS="$CFLAGS -g -O3 -funroll-loops "
-    CXXFLAGS="$CXXFLAGS -g -O3 -funroll-loops "
-  fi
-  AC_DEFINE(TR_STABLE_RELEASE, 1, [Define to 1 if this is a stable release of Transmission])
-else
-  supported_build=no
-  if test "x$GCC" = "xyes" ; then
-    CFLAGS="$CFLAGS -g -O0"
-    CXXFLAGS="$CXXFLAGS -g -O0"
-  fi
-  if test m4_substr(peer_id_prefix,6,1) = "X"; then
-    AC_DEFINE(TR_BETA_RELEASE, 1, [Define to 1 if this is a beta release of Transmission])
-  else
-    AC_DEFINE(TR_NIGHTLY_RELEASE, 1, [Define to 1 if this is a nightly release of Transmission])
-  fi
+if test m4_substr(peer_id_prefix,6,1) = "Z"; then
+  AC_DEFINE(TR_UNSTABLE, 1, [Define to 1 if this is an unstable version of Transmission])
+  TR_UNSTABLE=yes
 fi
-AM_CONDITIONAL(TR_UNSTABLE, test "x$supported_build" = "xno")
+AM_CONDITIONAL(TR_UNSTABLE, test "x$TR_UNSTABLE" = "xyes")
 
 OPENSSL_MINIMUM=0.9.4
 CURL_MINIMUM=7.16.3
@@ -46,7 +29,7 @@ GIO_MINIMUM=2.15.5
 GLIB_MINIMUM=2.6.0
 GTK_MINIMUM=2.6.0
 WX_MINIMUM=2.6.0
-LIBNOTIFY_MINIMUM=0.4.3
+LIBNOTIFY_MINIMUM=0.4.4
 DBUS_GLIB_MINIMUM=0.70
 AC_SUBST(OPENSSL_MINIMUM)
 AC_SUBST(CURL_MINIMUM)
@@ -59,23 +42,9 @@ AC_SUBST(DBUS_GLIB_MINIMUM)
 
 AC_PROG_CC
 AC_PROG_CXX
-AC_C_INLINE
 if test "x$GCC" = "xyes" ; then
-
-    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -W -Wpointer-arith -Wformat-security -Wcast-align -Wundef -Wcast-align -Wstrict-prototypes -Wmissing-declarations -Wmissing-format-attribute -Wredundant-decls -Wnested-externs -Wunused-parameter -Wwrite-strings"
-
-    dnl figure out gcc version
-    AC_MSG_CHECKING([gcc version])
-    GCC_VERSION=`$CC -dumpversion`
-    GCC_MAJOR=`echo $GCC_VERSION | cut -d . -f1`
-    GCC_MINOR=`echo $GCC_VERSION | cut -d . -f2`
-    GCC_VERSION_NUM=`(expr $GCC_MAJOR "*" 100 + $GCC_MINOR) 2>/dev/null`
-
-    AC_MSG_RESULT($GCC_VERSION)
-    if test $GCC_VERSION_NUM -ge 304; then
-        dnl these were added in 3.4
-        CFLAGS="$CFLAGS -Wextra -Wdeclaration-after-statement -Winit-self"
-    fi
+    CFLAGS="-g -Wall -Wformat-security -W -Wmissing-prototypes -Wdeclaration-after-statement -O3 -funroll-loops"
+    CXXFLAGS="-g -Wall -Wformat-security -W -O3 -funroll-loops"
 fi
 
 AC_HEADER_STDC
@@ -100,18 +69,6 @@ AC_PATH_ZLIB
 
 AC_SYS_LARGEFILE
 
-
-dnl ----------------------------------------------------------------------------
-dnl
-dnl posix_fadvise
-
-dnl can posix_fadvise be used
-AC_CHECK_DECLS(posix_fadvise, [], [], [
-#define _XOPEN_SOURCE 600
-#include <fcntl.h>])
-AC_CHECK_FUNCS([posix_fadvise])
-
-
 dnl ----------------------------------------------------------------------------
 dnl
 dnl va_copy
@@ -127,6 +84,7 @@ AC_TRY_LINK([#include <stdarg.h>], [va_list ap1, ap2; va_copy(ap1, ap2);],
         AC_MSG_RESULT([memcpy])]
     )
 ])
+
 
 dnl ----------------------------------------------------------------------------
 dnl
@@ -150,7 +108,7 @@ PKG_CHECK_MODULES(GTK,
                   [have_gtk=yes],
                   [have_gtk=no])
 AC_ARG_ENABLE([gtk],
-              AS_HELP_STRING([--enable-gtk],[build gtk client]),
+              AC_HELP_STRING([--enable-gtk],[build gtk client]),
               [want_gtk=${enableval}],
               [want_gtk=${have_gtk}])
 build_gtk=no
@@ -215,26 +173,15 @@ if test "x$build_gtk" = "xyes"; then
     fi
 fi
 
-AC_ARG_ENABLE([nls], 
-              AS_HELP_STRING([--enable-nls],[enable native language support]),,
-              [enable_nls=yes])
+AC_CHECK_HEADERS([libintl.h])
+IT_PROG_INTLTOOL([0.23],[no-xml])
+GETTEXT_PACKAGE=transmission
+AC_SUBST(GETTEXT_PACKAGE)
+AC_DEFINE_UNQUOTED([GETTEXT_PACKAGE],["$GETTEXT_PACKAGE"],[Gettext package])
+AM_GLIB_GNU_GETTEXT
+transmissionlocaledir='${prefix}/${DATADIRNAME}/locale'
+AC_SUBST(transmissionlocaledir)
 
-if test "x$build_gtk" = "xyes" -a  "x$enable_nls" = "xno" ; then
-    AC_MSG_ERROR("The gtk client cannot be built without nls support.  Try adding either --enable-nls or --disable-gtk" )
-fi
-
-use_nls=no
-if test "x$enable_nls" = "xyes" ; then
-    use_nls=yes
-    IT_PROG_INTLTOOL([0.23],[no-xml])
-    AC_CHECK_HEADERS([libintl.h])
-    GETTEXT_PACKAGE=transmission
-    AC_SUBST(GETTEXT_PACKAGE)
-    AC_DEFINE_UNQUOTED([GETTEXT_PACKAGE],["$GETTEXT_PACKAGE"],[Gettext package])
-    AM_GLIB_GNU_GETTEXT
-    transmissionlocaledir='${prefix}/${DATADIRNAME}/locale'
-    AC_SUBST(transmissionlocaledir)
-fi
 
 dnl ----------------------------------------------------------------------------
 dnl
@@ -242,9 +189,9 @@ dnl  wxWidgets detection for the wxWidgets client
 
 build_wx=no
 AC_ARG_ENABLE([wx],
-              AS_HELP_STRING([--enable-wx],[build wxWidgets client]),
+              AC_HELP_STRING([--enable-wx],[build wxWidgets client]),
               [want_wx=${enableval}],
-              [want_wx=no])
+              [want_wx=maybe])
 if test "x$want_wx" != "xno"; then
     AM_OPTIONS_WXCONFIG
     AM_PATH_WXCONFIG($WX_MINIMUM,[have_wx=yes],[have_wx=no])
@@ -263,6 +210,7 @@ dnl
 dnl  platform-specific stuff.
 
 AC_CANONICAL_HOST
+have_beos="no"
 have_darwin="no"
 have_msw="no"
 case $host_os in
@@ -280,6 +228,32 @@ case $host_os in
      fi
      AC_CHECK_TOOL(WINDRES, windres)
      ;;
+
+  *beos*)
+    have_beos="yes"
+    RELEASE=`uname -r`
+    case $RELEASE in
+      6.*|5.0.4) # Zeta or R5 / BONE beta 7
+        ;;
+      5.0*)       # R5 / net_server
+        CPPFLAGS="$CPPFLAGS -DBEOS_NETSERVER"
+        ;;
+      *)
+        AC_MSG_ERROR("Unsupported BeOS version")
+        ;;
+    esac
+    GCCVER=`$CC -dumpversion`
+    case $GCCVER in
+      2.95.3*|3*|4*)
+        ;;
+      2.9*)
+        BEOS_OLDCC=yes
+        ;;
+      *)
+        AC_MSG_ERROR("Unsupported gcc version")
+        ;;
+    esac
+    ;;
 
   *darwin*)
     have_darwin="yes"
@@ -299,25 +273,34 @@ EOF
 
 esac
 
+AC_ARG_ENABLE([beos],
+              [AC_HELP_STRING([--enable-beos],[build OS X client])],
+              [build_beos=${enableval}],
+              [build_beos=${have_beos}])
+AM_CONDITIONAL([BUILD_BEOS],[test "x$build_beos" = "xyes"])
+
 AC_ARG_ENABLE([cli],
-              [AS_HELP_STRING([--enable-cli],[build command-line client])],
+              [AC_HELP_STRING([--enable-cli],[build command-line client])],
               [build_cli=${enableval}],
               [build_cli="yes"])
 AM_CONDITIONAL([BUILD_CLI],[test "x$build_cli" = "xyes"])
 
 AC_ARG_ENABLE([mac],
-              [AS_HELP_STRING([--enable-mac],[build OS X client])],
+              [AC_HELP_STRING([--enable-mac],[build OS X client])],
               [build_mac=${enableval}],
               [build_mac=${have_darwin}])
 AM_CONDITIONAL([BUILD_MAC],[test "x$build_mac" = "xyes"])
 
 AC_ARG_ENABLE([daemon],
-              [AS_HELP_STRING([--enable-daemon],[build daemon])],
+              [AC_HELP_STRING([--enable-daemon],[build daemon])],
               [build_daemon=${enableval}],
               [build_daemon="yes"])
 AM_CONDITIONAL([BUILD_DAEMON],[test "x$build_daemon" = "xyes"])
 
 
+if test "x$have_beos" = "xyes"; then
+    AC_DEFINE([HAVE_BEOS], 1)
+fi
 if test "x$have_darwin" = "xyes"; then
     AC_DEFINE([HAVE_DARWIN], 1)
 fi
@@ -332,6 +315,7 @@ dnl  Generate the output
 
 AC_CONFIG_FILES([Makefile
                  transmission.spec
+                 beos/Makefile
                  cli/Makefile
                  daemon/Makefile
                  doc/Makefile
@@ -357,6 +341,7 @@ Configuration:
         Compiler:                   ${CXX}
         Build Command-Line client:  ${build_cli}
         Build Daemon:               ${build_daemon}
+        Build BeOS client:          ${build_beos}
         Build GTK+ client:          ${build_gtk}
           ... gio support:          ${use_gio}
           ... dbus-glib support:    ${use_dbus_glib}

@@ -1,5 +1,5 @@
 /*
- * This file Copyright (C) 2008-2009 Charles Kerr <charles@transmissionbt.com>
+ * This file Copyright (C) 2008 Charles Kerr <charles@rebelbase.com>
  *
  * This file is licensed by the GPL version 2.  Works owned by the
  * Transmission project are granted a special exemption to clause 2(b)
@@ -17,7 +17,6 @@
 #include <sys/types.h>
 
 #include "transmission.h"
-#include "session.h"
 #include "natpmp.h"
 #include "net.h"
 #include "peer-io.h"
@@ -39,9 +38,9 @@ struct tr_shared
     tr_port_forwarding    natpmpStatus;
     tr_port_forwarding    upnpStatus;
 
-    tr_bool               shouldChange;
-    tr_socketList       * bindSockets;
-    tr_port               publicPort;
+    int                   bindPort;
+    int                   bindSocket;
+    int                   publicPort;
 
     tr_timer            * pulseTimer;
 
@@ -85,10 +84,10 @@ getNatStateStr( int state )
 static void
 natPulse( tr_shared * s )
 {
-    const tr_port port = s->publicPort;
-    const int     isEnabled = s->isEnabled && !s->isShuttingDown;
-    int           oldStatus;
-    int           newStatus;
+    const int port = s->publicPort;
+    const int isEnabled = s->isEnabled && !s->isShuttingDown;
+    int       oldStatus;
+    int       newStatus;
 
     oldStatus = tr_sharedTraversalStatus( s );
     s->natpmpStatus = tr_natpmpPulse( s->natpmp, port, isEnabled );
@@ -101,92 +100,67 @@ natPulse( tr_shared * s )
                 getNatStateStr( newStatus ) );
 }
 
-/*
- * Callbacks for socket list
- */
-static void
-closeCb( int * const socket,
-         tr_address * const addr,
-         void * const userData )
-{
-    tr_shared * s = ( tr_shared * )userData;
-    if( *socket >= 0 )
-    {
-        tr_ninf( getKey( ), _( "Closing port %d on %s" ), s->publicPort,
-                tr_ntop_non_ts( addr ) );
-        tr_netClose( *socket );
-    }
-}
-
-static void
-acceptCb( int        * const socket,
-          tr_address * const addr UNUSED,
-          void       * const userData )
-{
-    tr_shared * s = ( tr_shared * )userData;
-    tr_address clientAddr;
-    tr_port clientPort;
-    int clientSocket;
-    clientSocket = tr_netAccept( s->session, *socket, &clientAddr, &clientPort );
-    if( clientSocket > 0 )
-    {
-        tr_deepLog( __FILE__, __LINE__, NULL,
-                   "New INCOMING connection %d (%s)",
-                   clientSocket, tr_peerIoAddrStr( &clientAddr, clientPort ) );
-        
-        tr_peerMgrAddIncoming( s->session->peerMgr, &clientAddr, clientPort,
-                              clientSocket );
-    }
-}
-
-static void
-bindCb( int * const socket,
-        tr_address * const addr,
-        void * const userData )
-{
-    tr_shared * s = ( tr_shared * )userData;
-    *socket = tr_netBindTCP( addr, s->publicPort, FALSE );
-    if( *socket >= 0 )
-    {
-        tr_ninf( getKey( ),
-                _( "Opened port %d on %s to listen for incoming peer connections" ),
-                s->publicPort, tr_ntop_non_ts( addr ) );
-        listen( *socket, 10 );
-    }
-    else
-    {
-        tr_nerr( getKey( ),
-                _(
-                  "Couldn't open port %d on %s to listen for incoming peer connections (errno %d - %s)" ),
-                s->publicPort, tr_ntop_non_ts( addr ), errno, tr_strerror( errno ) );
-    }
-}
-
 static void
 incomingPeersPulse( tr_shared * s )
 {
-    if( s->shouldChange )
+    if( s->bindSocket >= 0 && ( s->bindPort != s->publicPort ) )
     {
-        tr_socketListForEach( s->bindSockets, &closeCb, s );
-        s->shouldChange = FALSE;
-        if( s->publicPort > 0 )
-            tr_socketListForEach( s->bindSockets, &bindCb, s );
+        tr_ninf( getKey( ), _( "Closing port %d" ), s->bindPort );
+        tr_netClose( s->bindSocket );
+        s->bindSocket = -1;
     }
-    
-    /* (jhujhiti):
-     * This has been changed from a loop that will end when the listener queue
-     * is exhausted to one that will only check for one connection at a time.
-     * I think it unlikely that we get many more than one connection in the
-     * time between pulses (currently one second). However, just to be safe,
-     * I have increased the length of the listener queue from 5 to 10
-     * (see acceptCb() above). */
-    tr_socketListForEach( s->bindSockets, &acceptCb, s );
+
+    if( ( s->publicPort > 0 ) && ( s->bindPort != s->publicPort ) )
+    {
+        int socket;
+        errno = 0;
+        socket = tr_netBindTCP( s->publicPort );
+        if( socket >= 0 )
+        {
+            tr_ninf( getKey( ),
+                     _(
+                         "Opened port %d to listen for incoming peer connections" ),
+                     s->publicPort );
+            s->bindPort = s->publicPort;
+            s->bindSocket = socket;
+            listen( s->bindSocket, 5 );
+        }
+        else
+        {
+            tr_nerr( getKey( ),
+                    _(
+                        "Couldn't open port %d to listen for incoming peer connections (errno %d - %s)" ),
+                    s->publicPort, errno, tr_strerror( errno ) );
+            s->bindPort = -1;
+            s->bindSocket = -1;
+        }
+    }
+
+    for( ; ; ) /* check for new incoming peer connections */
+    {
+        int            socket;
+        uint16_t       port;
+        struct in_addr addr;
+
+        if( s->bindSocket < 0 )
+            break;
+
+        socket = tr_netAccept( s->session, s->bindSocket, &addr, &port );
+        if( socket < 0 )
+            break;
+
+        tr_deepLog( __FILE__, __LINE__, NULL,
+                   "New INCOMING connection %d (%s)",
+                   socket, tr_peerIoAddrStr( &addr, port ) );
+
+        tr_peerMgrAddIncoming( s->session->peerMgr, &addr, port, socket );
+    }
 }
 
 static int
 sharedPulse( void * vshared )
 {
-    tr_bool keepPulsing = 1;
+    int         keepPulsing = 1;
     tr_shared * shared = vshared;
 
     natPulse( shared );
@@ -199,8 +173,7 @@ sharedPulse( void * vshared )
     {
         tr_ninf( getKey( ), _( "Stopped" ) );
         tr_timerFree( &shared->pulseTimer );
-        tr_socketListForEach( shared->bindSockets, &closeCb, shared );
-        tr_socketListFree( shared->bindSockets );
+        tr_netClose( shared->bindSocket );
         tr_natpmpClose( shared->natpmp );
         tr_upnpClose( shared->upnp );
         shared->session->shared = NULL;
@@ -215,37 +188,21 @@ sharedPulse( void * vshared )
 ****
 ***/
 
-static tr_socketList *
-setupBindSockets( tr_port port )
-{
-    tr_bool hasIPv6 = tr_net_hasIPv6( port );
-    tr_socketList * socks = NULL;
-    if( hasIPv6 )
-        socks = tr_socketListNew( &tr_in6addr_any );
-
-    if( socks )
-        tr_socketListAppend( socks, &tr_inaddr_any );
-    else
-        socks = tr_socketListNew( &tr_inaddr_any );
-    return socks; /* Because the dryer gremlins won't */
-}
-
 tr_shared *
 tr_sharedInit( tr_session  * session,
-               tr_bool       isEnabled,
-               tr_port       publicPort )
+               int           isEnabled,
+               int           publicPort )
 {
     tr_shared * s = tr_new0( tr_shared, 1 );
 
     s->session      = session;
     s->publicPort   = publicPort;
-    s->shouldChange = TRUE;
-    s->bindSockets  = setupBindSockets( publicPort );
-    s->shouldChange = TRUE;
+    s->bindPort     = -1;
+    s->bindSocket   = -1;
     s->natpmp       = tr_natpmpInit( );
     s->upnp         = tr_upnpInit( );
     s->pulseTimer   = tr_timerNew( session, sharedPulse, s, 1000 );
-    s->isEnabled    = isEnabled;
+    s->isEnabled    = isEnabled ? 1 : 0;
     s->upnpStatus   = TR_PORT_UNMAPPED;
     s->natpmpStatus = TR_PORT_UNMAPPED;
 
@@ -259,30 +216,31 @@ tr_sharedShuttingDown( tr_shared * s )
 }
 
 void
-tr_sharedSetPort( tr_shared * s, tr_port  port )
+tr_sharedSetPort( tr_shared * s,
+                  int         port )
 {
     tr_torrent * tor = NULL;
 
-    s->publicPort   = port;
-    s->shouldChange = TRUE;
+    s->publicPort = port;
 
     while( ( tor = tr_torrentNext( s->session, tor ) ) )
         tr_torrentChangeMyPort( tor );
 }
 
-tr_port
+int
 tr_sharedGetPeerPort( const tr_shared * s )
 {
     return s->publicPort;
 }
 
 void
-tr_sharedTraversalEnable( tr_shared * s, tr_bool isEnabled )
+tr_sharedTraversalEnable( tr_shared * s,
+                          int         isEnabled )
 {
     s->isEnabled = isEnabled;
 }
 
-tr_bool
+int
 tr_sharedTraversalIsEnabled( const tr_shared * s )
 {
     return s->isEnabled;

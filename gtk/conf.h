@@ -22,30 +22,38 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
+/**
+***
+**/
+
 #ifndef TG_CONF_H
 #define TG_CONF_H
 
-#include <inttypes.h>
-#include <libtransmission/transmission.h>
+int64_t     pref_int_get( const char * key );
 
-int64_t          pref_int_get           ( const char * key );
-void             pref_int_set           ( const char * key, int64_t value );
-void             pref_int_set_default   ( const char * key, int64_t value );
+void        pref_int_set( const char * key,
+                          int64_t      value );
 
-double           pref_double_get        ( const char * key );
-void             pref_double_set        ( const char * key, double value );
-void             pref_double_set_default( const char * key, double value );
+void        pref_int_set_default( const char * key,
+                                  int64_t      value );
 
-gboolean         pref_flag_get          ( const char * key );
-void             pref_flag_set          ( const char * key, gboolean value );
-void             pref_flag_set_default  ( const char * key, gboolean value );
+gboolean    pref_flag_get( const char * key );
 
-const char*      pref_string_get        ( const char * key );
-void             pref_string_set        ( const char * key, const char * value );
-void             pref_string_set_default( const char * key, const char * value );
+void        pref_flag_set( const char * key,
+                           gboolean     value );
 
-void             pref_save              ( tr_session * );
-struct tr_benc*  pref_get_all           ( void );
+void        pref_flag_set_default( const char * key,
+                                   gboolean     value );
+
+const char* pref_string_get( const char * key );
+
+void        pref_string_set( const char * key,
+                             const char * value );
+
+void        pref_string_set_default( const char * key,
+                                     const char * value );
+
+void        pref_save( void );
 
 /**
 ***

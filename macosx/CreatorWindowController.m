@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
  *****************************************************************************/
 
 #import "CreatorWindowController.h"
+#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "utils.h" //tr_httpIsValidURL
 
@@ -44,7 +45,7 @@
 
 @implementation CreatorWindowController
 
-+ (void) createTorrentFile: (tr_session *) handle
++ (void) createTorrentFile: (tr_handle *) handle
 {
     //get file/folder for torrent
     NSString * path;
@@ -55,13 +56,13 @@
     [creator showWindow: nil];
 }
 
-+ (void) createTorrentFile: (tr_session *) handle forFile: (NSString *) file
++ (void) createTorrentFile: (tr_handle *) handle forFile: (NSString *) file
 {
     CreatorWindowController * creator = [[self alloc] initWithHandle: handle path: file];
     [creator showWindow: nil];
 }
 
-- (id) initWithHandle: (tr_session *) handle path: (NSString *) path
+- (id) initWithHandle: (tr_handle *) handle path: (NSString *) path
 {
     if ((self = [super initWithWindowNibName: @"Creator"]))
     {
@@ -183,6 +184,13 @@
     
     fOpenTorrent = [fDefaults boolForKey: @"CreatorOpen"];
     [self updateEnableOpenCheckForTrackers];
+    
+    if (![NSApp isOnLeopardOrBetter])
+    {
+        [fTrackerAddRemoveControl sizeToFit];
+        [fTrackerAddRemoveControl setLabel: @"+" forSegment: TRACKER_ADD_TAG];
+        [fTrackerAddRemoveControl setLabel: @"-" forSegment: TRACKER_REMOVE_TAG];
+    }
 }
 
 - (void) dealloc
@@ -213,7 +221,7 @@
     [panel setMessage: NSLocalizedString(@"Select the name and location for the torrent file.",
                                         "Create torrent -> location sheet -> message")]; 
     
-    [panel setRequiredFileType: @"org.bittorrent.torrent"];
+    [panel setRequiredFileType: @"torrent"];
     [panel setCanSelectHiddenExtension: YES];
     
     [panel beginSheetForDirectory: [fLocation stringByDeletingLastPathComponent] file: [fLocation lastPathComponent]
@@ -232,7 +240,11 @@
             " that will add the address for you.", "Create torrent -> blank address -> message")];
         [alert addButtonWithTitle: NSLocalizedString(@"Create", "Create torrent -> blank address -> button")];
         [alert addButtonWithTitle: NSLocalizedString(@"Cancel", "Create torrent -> blank address -> button")];
-        [alert setShowsSuppressionButton: YES];
+        
+        if ([NSApp isOnLeopardOrBetter])
+            [alert setShowsSuppressionButton: YES];
+        else
+            [alert addButtonWithTitle: NSLocalizedString(@"Don't Alert Again", "Create torrent -> blank address -> button")];
 
         [alert beginSheetModalForWindow: [self window] modalDelegate: self
             didEndSelector: @selector(createBlankAddressAlertDidEnd:returnCode:contextInfo:) contextInfo: nil];
@@ -365,7 +377,7 @@
 
 - (void) createBlankAddressAlertDidEnd: (NSAlert *) alert returnCode: (NSInteger) returnCode contextInfo: (void *) contextInfo
 {
-    if ([[alert suppressionButton] state] == NSOnState)
+    if (([NSApp isOnLeopardOrBetter] ? [[alert suppressionButton] state] == NSOnState : returnCode == NSAlertThirdButtonReturn))
         [[NSUserDefaults standardUserDefaults] setBool: NO forKey: @"WarningCreatorBlankAddress"];
     
     [alert release];
@@ -456,12 +468,10 @@
                 else if (fInfo->result == TR_MAKEMETA_IO_WRITE)
                     [alert setInformativeText: [NSString stringWithFormat: NSLocalizedString(@"Could not write \"%s\": %s.",
                         "Create torrent -> failed -> warning"), fInfo->errfile, strerror(fInfo->my_errno)]];
-                else //invalid url should have been caught before creating
-                    [alert setInformativeText: [NSString stringWithFormat: @"%@ (%d)",
-                        NSLocalizedString(@"An unknown error has occurred.", "Create torrent -> failed -> warning"), fInfo->result]];
+                else; //invalid url should have been caught before creating
                 
                 [alert beginSheetModalForWindow: [self window] modalDelegate: self
-                    didEndSelector: @selector(failureSheetClosed:returnCode:contextInfo:) contextInfo: nil];
+                        didEndSelector: @selector(failureSheetClosed:returnCode:contextInfo:) contextInfo: nil];
         }
     }
     else

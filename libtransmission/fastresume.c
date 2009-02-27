@@ -22,17 +22,6 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-/*
- * NOTE: THIS FILE IS DEPRECATED
- *
- *  The fastresume file format is brittle and was replaced in Transmission 1.20
- *  with the benc-formatted ".resume" files implemented in resume.[ch].
- *
- *  This older format is kept only for reading older resume files for users
- *  who upgrade from older versions of Transmission, and may be removed
- *  after more time has passed.
- */  
-
 /***********************************************************************
  * Fast resume
  ***********************************************************************
@@ -63,9 +52,9 @@
 #include <unistd.h> /* unlink */
 
 #include "transmission.h"
-#include "session.h"
 #include "completion.h"
 #include "fastresume.h"
+#include "net.h"
 #include "peer-mgr.h"
 #include "platform.h"
 #include "resume.h" /* TR_FR_ bitwise enum */
@@ -293,7 +282,7 @@ parseProgress( tr_torrent *    tor,
         bitfield.byteCount = FR_BLOCK_BITFIELD_LEN( tor );
         bitfield.bitCount = bitfield.byteCount * 8;
         bitfield.bits = (uint8_t*) walk;
-        if( tr_cpBlockBitfieldSet( &tor->completion, &bitfield ) )
+        if( tr_cpBlockBitfieldSet( tor->completion, &bitfield ) )
             ret = TR_FR_PROGRESS;
         else {
             tr_torrentUncheck( tor );
@@ -307,7 +296,7 @@ parseProgress( tr_torrent *    tor,
         tr_piece_index_t i;
         for( i = 0; i < tor->info.pieceCount; ++i )
             if( !tr_torrentIsPieceChecked( tor, i ) )
-                tr_cpPieceRem( &tor->completion, i );
+                tr_cpPieceRem( tor->completion, i );
     }
 
     return ret;
@@ -323,12 +312,11 @@ parsePriorities( tr_torrent *    tor,
     if( len == (uint32_t)( 2 * tor->info.fileCount ) )
     {
         const size_t     n = tor->info.fileCount;
-        const uint8_t *  walk = buf;
+        const size_t     len = 2 * n;
         tr_file_index_t *dnd = NULL, dndCount = 0;
         tr_file_index_t *dl = NULL, dlCount = 0;
         size_t           i;
-
-        len = 2 * n;
+        const uint8_t *  walk = buf;
 
         /* set file priorities */
         for( i = 0; i < n; ++i )
@@ -426,7 +414,9 @@ parsePeers( tr_torrent *    tor,
         {
             tr_pex pex;
             readBytes( &pex, &buf, sizeof( tr_pex ) );
-            tr_peerMgrAddPex( tor, TR_PEER_FROM_CACHE, &pex );
+            tr_peerMgrAddPex( tor->session->peerMgr, tor->info.hash,
+                              TR_PEER_FROM_CACHE,
+                              &pex );
         }
 
         tr_tordbg( tor, "Loaded %d peers from resume file", count );
