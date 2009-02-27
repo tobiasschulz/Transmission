@@ -15,11 +15,11 @@
 #include <stdlib.h>
 #include <string.h> /* strcmp */
 
-#ifdef WIN32
- #include <direct.h> /* getcwd */
-#else
- #include <unistd.h> /* getcwd */
-#endif
+#ifdef WIN32 
+ #include <direct.h> /* getcwd */ 
+#else 
+ #include <unistd.h> /* getcwd */ 
+#endif 
 
 #include <libevent/event.h>
 
@@ -85,11 +85,6 @@ static tr_option opts[] =
     { 930, "peers",                "Set the current torrent(s)' maximum number of peers each", "pr", 1, "<max>" },
     { 931, "global-peers",         "Set the global maximum number of peers", "gpr", 1, "<max>" },
     { 'R', "remove-and-delete",    "Remove the current torrent(s) and delete local data", NULL, 0, NULL },
-    { 950, "seedratio",            "Let the current torrent(s) seed until a specific ratio", "sr", 1, "ratio" },
-    { 951, "seedratio-default",    "Let the current torrent(s) use the global seedratio settings", "srd", 0, NULL },
-    { 952, "no-seedratio",         "Let the current torrent(s) seed regardless of ratio", "SR", 0, NULL },
-    { 953, "global-seedratio",     "All torrents, unless overridden by a per-torrent setting, should seed until a specific ratio", "gsr", 1, "ratio" },
-    { 954, "no-global-seedratio",  "All torrents, unless overridden by a per-torrent setting, should seed regardless of ratio", "GSR", 0, NULL },
     { 's', "start",                "Start the current torrent(s)", "s",  0, NULL },
     { 'S', "stop",                 "Stop the current torrent(s)", "S",  0, NULL },
     { 't', "torrent",              "Set the current torrent(s)", "t",  1, "<torrent>" },
@@ -131,18 +126,18 @@ static int    debug = 0;
 static char * auth = NULL;
 static char * netrc = NULL;
 
-static char*
-tr_getcwd( void )
-{
-    char buf[2048];
-    *buf = '\0';
-#ifdef WIN32
-    _getcwd( buf, sizeof( buf ) );
-#else
-    getcwd( buf, sizeof( buf ) );
-#endif
-    return tr_strdup( buf );
-}
+static char* 
+tr_getcwd( void ) 
+{ 
+    char buf[2048]; 
+    *buf = '\0'; 
+#ifdef WIN32 
+    _getcwd( buf, sizeof( buf ) ); 
+#else 
+    getcwd( buf, sizeof( buf ) ); 
+#endif 
+    return tr_strdup( buf ); 
+} 
 
 static char*
 absolutify( const char * path )
@@ -272,8 +267,6 @@ static const char * details_keys[] = {
 };
 
 static const char * list_keys[] = {
-    "error",
-    "errorString",
     "eta",
     "id",
     "leftUntilDone",
@@ -461,8 +454,8 @@ readargs( int           argc,
                 break;
 
             case 'V':
-                fprintf( stderr, "Transmission %s\n", LONG_VERSION_STRING );
-                exit( 0 );
+		fprintf(stderr, "Transmission %s\n", LONG_VERSION_STRING);
+		exit(0);
                 break;
 
             case 'w': {
@@ -538,36 +531,6 @@ readargs( int           argc,
                 addIdArg( args, id );
                 fields = tr_bencDictAddList( args, "fields", 1 );
                 tr_bencListAddStr( fields, "peers" );
-                break;
-
-            case 950:
-                tr_bencDictAddStr( &top, "method", "torrent-set" );
-                tr_bencDictAddDouble( args, "ratio-limit", atof(optarg) );
-                tr_bencDictAddInt( args, "ratio-limit-mode", TR_RATIOLIMIT_SINGLE );
-                addIdArg( args, id );
-                break;
-
-            case 951:
-                tr_bencDictAddStr( &top, "method", "torrent-set" );
-                tr_bencDictAddInt( args, "ratio-limit-mode", TR_RATIOLIMIT_GLOBAL );
-                addIdArg( args, id );
-                break;
-
-            case 952:
-                tr_bencDictAddStr( &top, "method", "torrent-set" );
-                tr_bencDictAddInt( args, "ratio-limit-mode", TR_RATIOLIMIT_UNLIMITED );
-                addIdArg( args, id );
-                break;
-
-            case 953:
-                tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddDouble( args, "ratio-limit", atof(optarg) );
-                tr_bencDictAddInt( args, "ratio-limit-enabled", 1 );
-                break;
-
-            case 954:
-                tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddInt( args, "ratio-limit-enabled", 0 );
                 break;
 
             case TR_OPT_ERR:
@@ -751,24 +714,23 @@ getStatusString( tr_benc * t, char * buf, size_t buflen )
 
         case TR_STATUS_DOWNLOAD:
         case TR_STATUS_SEED: {
-	    int64_t fromUs = 0; 
-	    int64_t toUs = 0; 
- 	    tr_bencDictFindInt( t, "peersGettingFromUs", &fromUs ); 
- 	    tr_bencDictFindInt( t, "peersSendingToUs", &toUs ); 
- 	    if( fromUs && toUs ) 
- 	        tr_strlcpy( buf, "Up & Down", buflen ); 
- 	    else if( toUs ) 
- 	        tr_strlcpy( buf, "Downloading", buflen ); 
- 	    else if( fromUs ) { 
- 	        int64_t leftUntilDone = 0; 
- 	        tr_bencDictFindInt( t, "leftUntilDone", &leftUntilDone ); 
- 	        if( leftUntilDone > 0 )
- 	            tr_strlcpy( buf, "Uploading", buflen ); 
- 	        else
- 	            tr_strlcpy( buf, "Seeding", buflen ); 
- 	    } else {
- 	        tr_strlcpy( buf, "Idle", buflen ); 
-            }
+            int64_t fromUs = 0;
+            int64_t toUs = 0;
+            tr_bencDictFindInt( t, "peersGettingFromUs", &fromUs );
+            tr_bencDictFindInt( t, "peersSendingToUs", &toUs );
+            if( fromUs && toUs )
+                tr_strlcpy( buf, "Up & Down", buflen );
+            else if( toUs )
+                tr_strlcpy( buf, "Downloading", buflen );
+            else if( fromUs ) {
+                int64_t leftUntilDone = 0;
+                tr_bencDictFindInt( t, "leftUntilDone", &leftUntilDone );
+                if( leftUntilDone > 0 )
+                    tr_strlcpy( buf, "Uploading", buflen );
+                else
+                    tr_strlcpy( buf, "Seeding", buflen );
+            } else
+                tr_strlcpy( buf, "Idle", buflen );
             break;
         }
     }
@@ -830,6 +792,7 @@ printSession( tr_benc * top )
             printf( "  Uploadlimit enabled:   %s\n", ( i ? "Yes" : "No" ) );
         if( tr_bencDictFindInt( args, "speed-limit-up", &i ) )
             printf( "  Uploadlimit:   %6" PRId64 " KB/sec\n", i );
+		
     }
 }
 
@@ -1139,13 +1102,9 @@ printTorrentList( tr_benc * top )
       && ( tr_bencDictFindList( args, "torrents", &list ) ) )
     {
         int i, n;
-        int64_t total_up = 0, total_down = 0, total_size = 0;
-        char haveStr[32];
-
-        printf( "%-4s   %-4s  %9s  %-8s  %6s  %6s  %-5s  %-11s  %s\n",
+        printf( "%-4s  %-4s  %9s  %-8s  %6s  %6s  %-5s  %-11s  %s\n",
                 "ID", "Done", "Have", "ETA", "Up", "Down", "Ratio", "Status",
                 "Name" );
-
         for( i = 0, n = tr_bencListSize( list ); i < n; ++i )
         {
             int64_t      id, eta, status, up, down;
@@ -1166,9 +1125,8 @@ printTorrentList( tr_benc * top )
                 char etaStr[16];
                 char statusStr[64];
                 char ratioStr[32];
+                char haveStr[32];
                 char doneStr[8];
-                int64_t error;
-                char errorMark;
 
                 if( sizeWhenDone )
                     tr_snprintf( doneStr, sizeof( doneStr ), "%d%%", (int)( 100.0 * ( sizeWhenDone - leftUntilDone ) / sizeWhenDone ) );
@@ -1181,13 +1139,9 @@ printTorrentList( tr_benc * top )
                     etaToString( etaStr, sizeof( etaStr ), eta );
                 else
                     tr_snprintf( etaStr, sizeof( etaStr ), "Done" );
-                if( tr_bencDictFindInt( d, "error", &error ) && error )
-                    errorMark = '*';
-                else
-                    errorMark = ' ';
                 printf(
-                    "%4d%c  %4s  %9s  %-8s  %6.1f  %6.1f  %5s  %-11s  %s\n",
-                    (int)id, errorMark,
+                    "%4d  %4s  %9s  %-8s  %6.1f  %6.1f  %5s  %-11s  %s\n",
+                    (int)id,
                     doneStr,
                     haveStr,
                     etaStr,
@@ -1196,17 +1150,8 @@ printTorrentList( tr_benc * top )
                     strlratio2( ratioStr, ratio, sizeof( ratioStr ) ),
                     getStatusString( d, statusStr, sizeof( statusStr ) ),
                     name );
-
-                total_up += up;
-                total_down += up;
-                total_size += sizeWhenDone - leftUntilDone;
             }
         }
-
-        printf( "Sum:         %9s             %6.1f  %6.1f\n",
-                strlsize( haveStr, total_size, sizeof( haveStr ) ),
-                total_up / 1024.0,
-                total_down / 1024.0 );
     }
 }
 

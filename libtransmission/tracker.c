@@ -661,7 +661,7 @@ onScrapeResponse( tr_session * session,
                     t->scrapeIntervalSec = DEFAULT_SCRAPE_INTERVAL_SEC;
 
                 tr_ndbg( t->name,
-                         "Scrape successful. Rescraping in %d seconds.",
+                         "Scrape successful.  Rescraping in %d seconds.",
                          t->scrapeIntervalSec );
 
                 success = TRUE;
@@ -685,16 +685,16 @@ onScrapeResponse( tr_session * session,
     if( 200 <= responseCode && responseCode <= 299 )
     {
         const int interval = t->scrapeIntervalSec + t->randOffset;
-        dbgmsg( t->name, "Request succeeded. Rescraping in %d seconds",
+        dbgmsg( t->name, "request succeeded. rescraping in %d seconds",
                 interval );
-        tr_ndbg( t->name, "Request succeeded. Rescraping in %d seconds",
+        tr_ndbg( t->name, "request succeeded. rescraping in %d seconds",
                  interval );
         t->scrapeAt = time( NULL ) + interval;
     }
     else if( 300 <= responseCode && responseCode <= 399 )
     {
         const int interval = 5;
-        dbgmsg( t->name, "Got a redirect. Retrying in %d seconds", interval );
+        dbgmsg( t->name, "got a redirect. retrying in %d seconds", interval );
         t->scrapeAt = time( NULL ) + interval;
     }
     else
@@ -702,7 +702,7 @@ onScrapeResponse( tr_session * session,
         const int interval = t->retryScrapeIntervalSec + t->randOffset;
         dbgmsg(
             t->name,
-            "Tracker responded to scrape with %ld. Retrying in %d seconds.",
+            "Tracker responded to scrape with %ld.  Retrying in %d seconds.",
             responseCode,  interval );
         t->retryScrapeIntervalSec *= 2;
         t->scrapeAt = time( NULL ) + interval;
@@ -720,8 +720,7 @@ enum
     TR_REQ_STOPPED,
     TR_REQ_PAUSED,     /* BEP 21 */
     TR_REQ_REANNOUNCE,
-    TR_REQ_SCRAPE,
-    TR_NUM_REQ_TYPES
+    TR_REQ_SCRAPE
 };
 
 struct tr_tracker_request
@@ -836,33 +835,27 @@ createScrape( tr_session * session,
 
 struct tr_tracker_handle
 {
-    tr_bool     shutdownHint;
     int         runningCount;
     tr_timer *  pulseTimer;
 };
 
 static int trackerPulse( void * vsession );
 
-void
-tr_trackerSessionInit( tr_session * session )
+static void
+ensureGlobalsExist( tr_session * session )
 {
-    assert( tr_isSession( session ) );
-
-    session->tracker = tr_new0( struct tr_tracker_handle, 1 );
-    session->tracker->pulseTimer = tr_timerNew( session, trackerPulse, session, PULSE_INTERVAL_MSEC );
-    dbgmsg( NULL, "creating tracker timer" );
+    if( session->tracker == NULL )
+    {
+        session->tracker = tr_new0( struct tr_tracker_handle, 1 );
+        session->tracker->pulseTimer =
+            tr_timerNew( session, trackerPulse, session,
+                         PULSE_INTERVAL_MSEC );
+        dbgmsg( NULL, "creating tracker timer" );
+    }
 }
 
 void
 tr_trackerSessionClose( tr_session * session )
-{
-    assert( tr_isSession( session ) );
-
-    session->tracker->shutdownHint = TRUE;
-}
-
-static void
-tr_trackerSessionDestroy( tr_session * session )
 {
     if( session && session->tracker )
     {
@@ -881,19 +874,9 @@ static void
 invokeRequest( void * vreq )
 {
     struct tr_tracker_request * req = vreq;
-    tr_tracker * t;
+    tr_tracker * t = findTracker( req->session, req->torrentId );
 
-    assert( req != NULL );
-    assert( tr_isSession( req->session ) );
-    assert( req->torrentId >= 0 );
-    assert( req->reqtype >= 0 );
-    assert( req->reqtype < TR_NUM_REQ_TYPES );
-
-    dbgmsg( NULL, "invokeRequest got session %p, tracker %p", req->session, req->session->tracker );
-
-    t = findTracker( req->session, req->torrentId );
-
-    if( t != NULL )
+    if( t )
     {
         const time_t now = time( NULL );
 
@@ -910,7 +893,6 @@ invokeRequest( void * vreq )
         }
     }
 
-    assert( req->session->tracker != NULL );
     ++req->session->tracker->runningCount;
 
     tr_webRun( req->session,
@@ -925,10 +907,7 @@ static void
 enqueueScrape( tr_session * session,
                tr_tracker * tracker )
 {
-    struct tr_tracker_request * req;
-    assert( tr_isSession( session ) );
-
-    req = createScrape( session, tracker );
+    struct tr_tracker_request * req = createScrape( session, tracker );
     tr_runInEventThread( session, invokeRequest, req );
 }
 
@@ -937,10 +916,7 @@ enqueueRequest( tr_session * session,
                 tr_tracker * tracker,
                 int          reqtype )
 {
-    struct tr_tracker_request * req;
-    assert( tr_isSession( session ) );
-
-    req = createRequest( session, tracker, reqtype );
+    struct tr_tracker_request * req = createRequest( session, tracker, reqtype );
     tr_runInEventThread( session, invokeRequest, req );
 }
 
@@ -952,7 +928,7 @@ trackerPulse( void * vsession )
     tr_torrent *               tor;
     const time_t               now = time( NULL );
 
-    if( !th )
+    if( !session->tracker )
         return FALSE;
 
     if( th->runningCount )
@@ -987,16 +963,17 @@ trackerPulse( void * vsession )
                 th->runningCount );
 
     /* free the tracker manager if no torrents are left */
-    if(    ( th != NULL )
-        && ( th->shutdownHint != FALSE )
-        && ( th->runningCount < 1 )
-        && ( tr_sessionCountTorrents( session ) == 0 ) )
+    if( ( session->tracker )
+      && ( session->tracker->runningCount < 1 )
+      && ( tr_sessionCountTorrents( session ) == 0 ) )
     {
-        tr_trackerSessionDestroy( session );
-        return FALSE;
+        tr_trackerSessionClose( session );
     }
 
-    return TRUE;
+    /* if there are still running torrents (as indicated by
+     * the existence of the tracker manager) then keep the
+     * trackerPulse() timer alive */
+    return session->tracker != NULL;
 }
 
 static void
@@ -1057,6 +1034,8 @@ tr_trackerNew( const tr_torrent * torrent )
 {
     const tr_info * info = &torrent->info;
     tr_tracker *    t;
+
+    ensureGlobalsExist( torrent->session );
 
     t = tr_new0( tr_tracker, 1 );
     t->publisher                = TR_PUBLISHER_INIT;

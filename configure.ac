@@ -3,8 +3,8 @@ dnl STATUS: "X" for prerelease beta builds,
 dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
-m4_define([user_agent_prefix],[1.51+])
-m4_define([peer_id_prefix],[-TR151Z-])
+m4_define([user_agent_prefix],[1.50])
+m4_define([peer_id_prefix],[-TR1500-])
 
 AC_INIT([transmission],
         [user_agent_prefix],
@@ -21,17 +21,13 @@ AC_PROG_LIBTOOL
 
 if test m4_substr(peer_id_prefix,6,1) = "0"; then
   supported_build=yes
-  if test "x$GCC" = "xyes" ; then
-    CFLAGS="$CFLAGS -g -O3 -funroll-loops "
-    CXXFLAGS="$CXXFLAGS -g -O3 -funroll-loops "
-  fi
+  CFLAGS="$CFLAGS -g -O3 -funroll-loops "
+  CXXFLAGS="$CXXFLAGS -g -O3 -funroll-loops "
   AC_DEFINE(TR_STABLE_RELEASE, 1, [Define to 1 if this is a stable release of Transmission])
 else
   supported_build=no
-  if test "x$GCC" = "xyes" ; then
-    CFLAGS="$CFLAGS -g -O0"
-    CXXFLAGS="$CXXFLAGS -g -O0"
-  fi
+  CFLAGS="$CFLAGS -g -O0"
+  CXXFLAGS="$CXXFLAGS -g -O0"
   if test m4_substr(peer_id_prefix,6,1) = "X"; then
     AC_DEFINE(TR_BETA_RELEASE, 1, [Define to 1 if this is a beta release of Transmission])
   else
@@ -61,21 +57,8 @@ AC_PROG_CC
 AC_PROG_CXX
 AC_C_INLINE
 if test "x$GCC" = "xyes" ; then
-
-    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -W -Wpointer-arith -Wformat-security -Wcast-align -Wundef -Wcast-align -Wstrict-prototypes -Wmissing-declarations -Wmissing-format-attribute -Wredundant-decls -Wnested-externs -Wunused-parameter -Wwrite-strings"
-
-    dnl figure out gcc version
-    AC_MSG_CHECKING([gcc version])
-    GCC_VERSION=`$CC -dumpversion`
-    GCC_MAJOR=`echo $GCC_VERSION | cut -d . -f1`
-    GCC_MINOR=`echo $GCC_VERSION | cut -d . -f2`
-    GCC_VERSION_NUM=`(expr $GCC_MAJOR "*" 100 + $GCC_MINOR) 2>/dev/null`
-
-    AC_MSG_RESULT($GCC_VERSION)
-    if test $GCC_VERSION_NUM -ge 304; then
-        dnl these were added in 3.4
-        CFLAGS="$CFLAGS -Wextra -Wdeclaration-after-statement -Winit-self"
-    fi
+    CFLAGS="-std=gnu99 -ggdb3 -Wall -Wextra -Wredundant-decls -Wpointer-arith -Wformat-security -W -Wmissing-declarations -Wdeclaration-after-statement -Wcast-align -Winit-self -Wundef -Wnested-externs -Wmissing-format-attribute"
+    CXXFLAGS="-Wall -Wformat-security -W"
 fi
 
 AC_HEADER_STDC
@@ -99,18 +82,6 @@ PKG_CHECK_MODULES(LIBCURL, [libcurl >= $CURL_MINIMUM])
 AC_PATH_ZLIB
 
 AC_SYS_LARGEFILE
-
-
-dnl ----------------------------------------------------------------------------
-dnl
-dnl posix_fadvise
-
-dnl can posix_fadvise be used
-AC_CHECK_DECLS(posix_fadvise, [], [], [
-#define _XOPEN_SOURCE 600
-#include <fcntl.h>])
-AC_CHECK_FUNCS([posix_fadvise])
-
 
 dnl ----------------------------------------------------------------------------
 dnl

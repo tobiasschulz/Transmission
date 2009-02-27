@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -107,9 +107,9 @@
     const NSUInteger count = [priorities count];
     if (fHoverRow && count > 0)
     {
-        [super setSelected: [priorities containsObject: [NSNumber numberWithInteger: TR_PRI_LOW]] forSegment: 0];
-        [super setSelected: [priorities containsObject: [NSNumber numberWithInteger: TR_PRI_NORMAL]] forSegment: 1];
-        [super setSelected: [priorities containsObject: [NSNumber numberWithInteger: TR_PRI_HIGH]] forSegment: 2];
+        [super setSelected: [priorities containsObject: [NSNumber numberWithInt: TR_PRI_LOW]] forSegment: 0];
+        [super setSelected: [priorities containsObject: [NSNumber numberWithInt: TR_PRI_NORMAL]] forSegment: 1];
+        [super setSelected: [priorities containsObject: [NSNumber numberWithInt: TR_PRI_HIGH]] forSegment: 2];
         
         [super drawWithFrame: cellFrame inView: controlView];
     }
@@ -122,7 +122,7 @@
             image = [NSImage imageNamed: @"PriorityMixed.png"];
         else
         {
-            switch ([[priorities anyObject] integerValue])
+            switch ([[priorities anyObject] intValue])
             {
                 case TR_PRI_NORMAL:
                     image = [NSImage imageNamed: @"PriorityNormal.png"];

@@ -55,7 +55,7 @@
 				 <li><a href="#seeding" id="filter_seeding_link">Seeding</a></li>
 				 <li><a href="#paused" id="filter_paused_link">Paused</a></li>
 			</ul>
-                        <input type="search" id="torrent_search" placeholder="Filter" results="0" />
+			<input type="search" id="torrent_search" placeholder="Filter" results="0" />		
 		</div>
 		<div id="torrent_inspector" style="display:none;">
 			
@@ -172,7 +172,7 @@
 		</div>
 		
 		<div id="torrent_container">
-			<ul class="torrent_list" id="torrent_list"><li></li></ul>
+			<ul class="torrent_list" id="torrent_list"></ul>
 	</div>
 		
 		
@@ -193,7 +193,7 @@
 			<div class="dialog_window">
 				<h2 class="dialog_heading">Preferences</h2>
 				<div id="pref_error"></div>
-				<form action="" id="prefs_form">
+				<form id="prefs_form">
 					<div class="preference download_location">
 						<label class="category">Add transfers:</label>
 						<div class="formdiv">
@@ -331,15 +331,24 @@
 				</li>
 			</ul>
 		</div>
+
+		<div id="unsupported_browser" style="display:none;">
+			<div class="dialog_window">
+				<img class="logo" src="images/graphics/logo.png" alt="Transmission Logo" />
+				<h2>Sorry, your browser is not supported.</h2>
+				<p>We currently support the following browsers:</p>
+				<a href="http://www.mozilla.com/en-US/firefox/" title="Firefox"><img src="images/graphics/browser_firefox.gif" alt="Firefox" /></a>
+				<a href="http://www.apple.com/safari/" title="Safari"><img src="images/graphics/browser_safari.gif" alt="Safari" /></a>
+				<a href="http://www.opera.com/download/" title="Opera"><img src="images/graphics/browser_opera.gif" alt="Opera" /></a>
+			</div>
+		</div>
 		
 <div class="contextMenu" id="torrent_context_menu">
 			<ul>
 				<li id="context_pause_selected" class="disabled context_pause_selected">Pause Selected</li>
 				<li id="context_resume_selected" class="disabled context_resume_selected">Resume Selected</li>
 				<li id="context_remove">Remove From List...</li>
-				<li class="separator"></li>
 				<li id="context_removedata">Delete Data And Remove From List...</li>
-				<li class="separator"></li>
 				<li id="context_toggle_inspector">Show Inspector</li>
 				<li class="separator"></li>
 				<li id="context_select_all" class="context_select_all">Select All</li>

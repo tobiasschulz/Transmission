@@ -57,9 +57,7 @@ static GtkRadioActionEntry sort_radio_entries[] =
     { "sort-by-tracker",  NULL,        N_( "Sort by _Tracker" ),  NULL,
       NULL, 5 },
     { "sort-by-age",      NULL,        N_( "Sort by A_ge" ),      NULL,
-      NULL, 6 },
-    { "sort-by-eta",      NULL,        N_( "Sort by _ETA" ),      NULL,
-      NULL, 7 }
+      NULL, 6 }
 };
 
 static void
@@ -122,7 +120,6 @@ static GtkActionEntry        entries[] =
     { "verify-torrent", NULL, N_( "_Verify Local Data" ), NULL, NULL, G_CALLBACK( action_cb ) },
     { "pause-torrent", GTK_STOCK_MEDIA_PAUSE, N_( "_Pause" ), "<control>P", N_( "Pause torrent" ), G_CALLBACK( action_cb ) },
     { "pause-all-torrents", GTK_STOCK_MEDIA_PAUSE, N_( "_Pause All" ), NULL, N_( "Pause all torrents" ), G_CALLBACK( action_cb ) },
-    { "start-all-torrents", GTK_STOCK_MEDIA_PLAY, N_( "_Start All" ), NULL, N_( "Start all torrents" ), G_CALLBACK( action_cb ) },
     { "remove-torrent", GTK_STOCK_REMOVE, NULL, "Delete", N_( "Remove torrent" ), G_CALLBACK( action_cb ) },
     { "delete-torrent", GTK_STOCK_DELETE, N_( "_Delete Files and Remove" ), "<shift>Delete", NULL, G_CALLBACK( action_cb ) },
     { "new-torrent", GTK_STOCK_NEW, N_( "_New..." ), NULL, N_( "Create a torrent" ), G_CALLBACK( action_cb ) },

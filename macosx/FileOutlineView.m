@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -28,6 +28,7 @@
 #import "Torrent.h"
 #import "FileListNode.h"
 #import "QuickLookController.h"
+#import "CTGradient.h"
 
 @implementation FileOutlineView
 
@@ -46,15 +47,15 @@
     
     NSColor * endingColor = [NSColor colorWithCalibratedRed: 217.0/255.0 green: 250.0/255.0 blue: 211.0/255.0 alpha: 1.0];
     NSColor * beginningColor = [endingColor blendedColorWithFraction: 0.3 ofColor: [NSColor whiteColor]];
-    fHighPriorityGradient = [[NSGradient alloc] initWithStartingColor: beginningColor endingColor: endingColor];
+    fHighPriorityGradient = [[CTGradient gradientWithBeginningColor: beginningColor endingColor: endingColor] retain];
     
     endingColor = [NSColor colorWithCalibratedRed: 255.0/255.0 green: 243.0/255.0 blue: 206.0/255.0 alpha: 1.0];
     beginningColor = [endingColor blendedColorWithFraction: 0.3 ofColor: [NSColor whiteColor]];
-    fLowPriorityGradient = [[NSGradient alloc] initWithStartingColor: beginningColor endingColor: endingColor];
+    fLowPriorityGradient = [[CTGradient gradientWithBeginningColor: beginningColor endingColor: endingColor] retain];
     
     endingColor = [NSColor colorWithCalibratedRed: 225.0/255.0 green: 218.0/255.0 blue: 255.0/255.0 alpha: 1.0];
     beginningColor = [endingColor blendedColorWithFraction: 0.3 ofColor: [NSColor whiteColor]];
-    fMixedPriorityGradient = [[NSGradient alloc] initWithStartingColor: beginningColor endingColor: endingColor];
+    fMixedPriorityGradient = [[CTGradient gradientWithBeginningColor: beginningColor endingColor: endingColor] retain];
     
     fMouseRow = -1;
 }
@@ -126,7 +127,9 @@
 {
     [super updateTrackingAreas];
     
-    for (NSTrackingArea * area in [self trackingAreas])
+    NSEnumerator * enumerator = [[self trackingAreas] objectEnumerator];
+    NSTrackingArea * area;
+    while ((area = [enumerator nextObject]))
     {
         if ([area owner] == self && [[area userInfo] objectForKey: @"Row"])
             [self removeTrackingArea: area];
@@ -182,7 +185,7 @@
         
         if ([fTorrent checkForFiles: indexes] != NSOffState)
         {
-            NSGradient * gradient = nil;
+            CTGradient * gradient = nil;
             
             NSSet * priorities = [fTorrent filePrioritiesForIndexes: indexes];
             int count = [priorities count];
@@ -206,7 +209,7 @@
             {
                 NSRect rect = [self rectOfRow: row];
                 rect.size.height -= 1.0;
-                [gradient drawInRect: rect angle: 90];
+                [gradient fillRect: rect angle: 90];
             }
         }
     }

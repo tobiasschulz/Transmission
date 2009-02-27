@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
- *
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * 
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,32 +22,10 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
+//TIGER-ONLY
+
 #import <Cocoa/Cocoa.h>
 
-@interface GroupsPrefsController : NSObject
-{
-    IBOutlet NSTableView * fTableView;
-    IBOutlet NSSegmentedControl * fAddRemoveControl;
-    
-    IBOutlet NSColorWell * fSelectedColorView;
-    IBOutlet NSTextField * fSelectedColorNameField;
-    IBOutlet NSButton * fCustomLocationEnableCheck;
-    IBOutlet NSPopUpButton * fCustomLocationPopUp;
-    
-    IBOutlet NSButton * fAutoAssignRulesEnableCheck;
-    IBOutlet NSButton * fAutoAssignRulesEditButton;
-    
-    IBOutlet NSWindow * fGroupRulesSheetWindow;
-    IBOutlet NSPredicateEditor * fRuleEditor;
-}
+@interface MenuLabel : NSTextField
 
-- (void) addRemoveGroup: (id) sender;
-
-- (IBAction) toggleUseCustomDownloadLocation: (id) sender;
-- (IBAction) customDownloadLocationSheetShow: (id) sender;
-
-- (IBAction) toggleUseAutoAssignRules: (id) sender;
-- (IBAction) orderFrontRulesSheet: (id) sender;
-- (IBAction) cancelRules: (id) sender;
-- (IBAction) saveRules: (id) sender;
 @end

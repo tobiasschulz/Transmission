@@ -39,15 +39,12 @@
 #define KEY_PRIORITY        "priority"
 #define KEY_PROGRESS        "progress"
 #define KEY_SPEEDLIMIT      "speed-limit"
-#define KEY_RATIOLIMIT      "ratio-limit"
 #define KEY_UPLOADED        "uploaded"
 
 #define KEY_SPEEDLIMIT_DOWN_SPEED "down-speed"
 #define KEY_SPEEDLIMIT_DOWN_MODE  "down-mode"
 #define KEY_SPEEDLIMIT_UP_SPEED   "up-speed"
 #define KEY_SPEEDLIMIT_UP_MODE    "up-mode"
-#define KEY_RATIOLIMIT_RATIO      "ratio-limit"
-#define KEY_RATIOLIMIT_MODE       "ratio-mode"
 
 #define KEY_PROGRESS_MTIMES   "mtimes"
 #define KEY_PROGRESS_BITFIELD "bitfield"
@@ -258,18 +255,6 @@ saveSpeedLimits( tr_benc *          dict,
                       tr_torrentGetSpeedMode( tor, TR_UP ) );
 }
 
-static void
-saveRatioLimits( tr_benc *          dict,
-                 const tr_torrent * tor )
-{
-    tr_benc * d = tr_bencDictAddDict( dict, KEY_RATIOLIMIT, 4 );
-
-    tr_bencDictAddDouble( d, KEY_RATIOLIMIT_RATIO,
-                      tr_torrentGetRatioLimit( tor ) );
-    tr_bencDictAddInt( d, KEY_RATIOLIMIT_MODE,
-                      tr_torrentGetRatioMode( tor ) );
-}
-
 static uint64_t
 loadSpeedLimits( tr_benc *    dict,
                  tr_torrent * tor )
@@ -294,26 +279,6 @@ loadSpeedLimits( tr_benc *    dict,
     return ret;
 }
 
-static uint64_t
-loadRatioLimits( tr_benc *    dict,
-                 tr_torrent * tor )
-{
-    uint64_t  ret = 0;
-    tr_benc * d;
-
-    if( tr_bencDictFindDict( dict, KEY_RATIOLIMIT, &d ) )
-    {
-        int64_t i;
-        double dratio;
-          if( tr_bencDictFindDouble( d, KEY_RATIOLIMIT_RATIO, &dratio ) )
-            tr_torrentSetRatioLimit( tor, dratio );
-        if( tr_bencDictFindInt( d, KEY_RATIOLIMIT_MODE, &i ) )
-            tr_torrentSetRatioMode( tor, i );
-      ret = TR_FR_RATIOLIMIT;
-    }
-
-    return ret;
-}
 /***
 ****
 ***/
@@ -470,7 +435,6 @@ tr_torrentSaveResume( const tr_torrent * tor )
     saveDND( &top, tor );
     saveProgress( &top, tor );
     saveSpeedLimits( &top, tor );
-    saveRatioLimits( &top, tor );
 
     filename = getResumeFilename( tor );
     tr_bencSaveFile( filename, &top );
@@ -589,9 +553,6 @@ loadFromFile( tr_torrent * tor,
 
     if( fieldsToLoad & TR_FR_SPEEDLIMIT )
         fieldsLoaded |= loadSpeedLimits( &top, tor );
-    
-    if( fieldsToLoad & TR_FR_RATIOLIMIT )
-        fieldsLoaded |= loadRatioLimits( &top, tor );
 
     tr_bencFree( &top );
     tr_free( filename );

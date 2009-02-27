@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2008-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,16 +22,32 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#import <Cocoa/Cocoa.h>
+#import "NSBezierPathAdditions.h"
+#import "NSApplicationAdditions.h"
 
-@interface BonjourController : NSObject
+@implementation NSBezierPath (NSBezierPathAdditions)
+
++ (NSBezierPath *) bezierPathWithRoundedRect: (NSRect) rect radius: (CGFloat) radius
 {
-    NSNetService * fService;
+    if ([NSApp isOnLeopardOrBetter])
+        return [self bezierPathWithRoundedRect: rect xRadius: radius yRadius: radius];
+    
+    CGFloat minX = NSMinX(rect),
+            minY = NSMinY(rect),
+            maxX = NSMaxX(rect),
+            maxY = NSMaxY(rect),
+            midX = NSMidX(rect),
+            midY = NSMidY(rect);
+    
+    NSBezierPath * bp = [NSBezierPath bezierPath];
+    [bp moveToPoint: NSMakePoint(maxX, midY)];
+    [bp appendBezierPathWithArcFromPoint: NSMakePoint(maxX, maxY) toPoint: NSMakePoint(midX, maxY) radius: radius];
+    [bp appendBezierPathWithArcFromPoint: NSMakePoint(minX, maxY) toPoint: NSMakePoint(minX, midY) radius: radius];
+    [bp appendBezierPathWithArcFromPoint: NSMakePoint(minX, minY) toPoint: NSMakePoint(midX, minY) radius: radius];
+    [bp appendBezierPathWithArcFromPoint: NSMakePoint(maxX, minY) toPoint: NSMakePoint(maxX, midY) radius: radius];
+    [bp closePath];
+    
+    return bp;
 }
-
-+ (BonjourController *) defaultController;
-
-- (void) startWithPort: (NSInteger) port;
-- (void) stop;
 
 @end

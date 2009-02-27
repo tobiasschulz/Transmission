@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2008-2009 Transmission authors and contributors
+ * Copyright (c) 2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -41,7 +41,6 @@
     
     Torrent * fTorrent;
     NSString * fDestination;
-    BOOL fLockDestination;
     
     BOOL fDeleteTorrent, fDeleteEnable;
     NSInteger fGroupValue;
@@ -49,8 +48,8 @@
     NSTimer * fTimer;
 }
 
-- (id) initWithTorrent: (Torrent *) torrent destination: (NSString *) path lockDestination: (BOOL) lockDestination
-    controller: (Controller *) controller deleteTorrent: (torrentFileState) deleteTorrent;
+- (id) initWithTorrent: (Torrent *) torrent destination: (NSString *) path controller: (Controller *) controller
+        deleteTorrent: (torrentFileState) deleteTorrent;
 
 - (Torrent *) torrent;
 
@@ -64,5 +63,6 @@
 - (void) updateStatusField: (NSNotification *) notification;
 
 - (void) updateGroupMenu: (NSNotification *) notification;
+- (void) showGroupsWindow: (id) sender;
 
 @end

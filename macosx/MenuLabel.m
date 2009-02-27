@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
- *
- * Copyright (c) 2009 Transmission authors and contributors
+ * 
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,10 +22,14 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
-#import <Cocoa/Cocoa.h>
+#import "MenuLabel.h"
 
-@interface PredicateEditorRowTemplateAny : NSPredicateEditorRowTemplate
+@implementation MenuLabel
+
+- (void) mouseDown: (NSEvent *) event
 {
+    [NSMenu popUpContextMenu: [self menu] withEvent: event forView: self];
+    [super mouseDown: event];
 }
 
 @end

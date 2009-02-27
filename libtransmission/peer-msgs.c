@@ -587,7 +587,7 @@ updateFastSet( tr_peermsgs * msgs UNUSED )
 ***  INTEREST
 **/
 
-static tr_bool
+static int
 isPieceInteresting( const tr_peermsgs * msgs,
                     tr_piece_index_t    piece )
 {
@@ -599,7 +599,7 @@ isPieceInteresting( const tr_peermsgs * msgs,
 }
 
 /* "interested" means we'll ask for piece data if they unchoke us */
-static tr_bool
+static int
 isPeerInteresting( const tr_peermsgs * msgs )
 {
     tr_piece_index_t    i;
@@ -657,7 +657,7 @@ updateInterest( tr_peermsgs * msgs )
         fireNeedReq( msgs );
 }
 
-static tr_bool
+static int
 popNextRequest( tr_peermsgs *         msgs,
                 struct peer_request * setme )
 {
@@ -718,7 +718,7 @@ tr_peerMsgsHave( tr_peermsgs * msgs,
 ***
 **/
 
-static tr_bool
+static int
 reqIsValid( const tr_peermsgs * peer,
             uint32_t            index,
             uint32_t            offset,
@@ -727,7 +727,7 @@ reqIsValid( const tr_peermsgs * peer,
     return tr_torrentReqIsValid( peer->torrent, index, offset, length );
 }
 
-static tr_bool
+static int
 requestIsValid( const tr_peermsgs * msgs, const struct peer_request * req )
 {
     return reqIsValid( msgs, req->index, req->offset, req->length );
@@ -824,7 +824,7 @@ pumpRequestQueue( tr_peermsgs * msgs, const time_t now )
         fireNeedReq( msgs );
 }
 
-static TR_INLINE tr_bool
+static TR_INLINE int
 requestQueueIsFull( const tr_peermsgs * msgs )
 {
     const int req_max = msgs->maxActiveRequests;
@@ -841,6 +841,7 @@ tr_peerMsgsAddRequest( tr_peermsgs *    msgs,
 
     assert( msgs );
     assert( msgs->torrent );
+    assert( reqIsValid( msgs, index, offset, length ) );
 
     /**
     ***  Reasons to decline the request
@@ -852,15 +853,15 @@ tr_peerMsgsAddRequest( tr_peermsgs *    msgs,
         return TR_ADDREQ_CLIENT_CHOKED;
     }
 
+    /* peer doesn't have this piece */
+    if( !tr_bitfieldHas( msgs->peer->have, index ) )
+        return TR_ADDREQ_MISSING;
+
     /* peer's queue is full */
     if( requestQueueIsFull( msgs ) ) {
         dbgmsg( msgs, "declining request because we're full" );
         return TR_ADDREQ_FULL;
     }
-
-    /* peer doesn't have this piece */
-    if( !tr_bitfieldHas( msgs->peer->have, index ) )
-        return TR_ADDREQ_MISSING;
 
     /* have we already asked for this piece? */
     req.index = index;
@@ -1222,7 +1223,7 @@ peerMadeRequest( tr_peermsgs *               msgs,
         protocolSendReject( msgs, req );
 }
 
-static tr_bool
+static int
 messageLengthIsCorrect( const tr_peermsgs * msg, uint8_t id, uint32_t len )
 {
     switch( id )
@@ -1595,9 +1596,7 @@ didWrite( tr_peerIo * io UNUSED, size_t bytesWritten, int wasPieceData, void * v
 {
     tr_peermsgs * msgs = vmsgs;
     firePeerGotData( msgs, bytesWritten, wasPieceData );
-
-    if ( tr_isPeerIo( io ) && io->userData )
-        peerPulse( msgs );
+    peerPulse( msgs );
 }
 
 static ReadState

@@ -139,19 +139,6 @@ test1( void )
     return 0;
 }
 
-static int
-test2( void )
-{
-    tr_benc top;
-    const char * in = " ";
-    const int err = tr_jsonParse( in, strlen( in ), &top, NULL );
-
-    check( err );
-    check( !tr_bencIsDict( &top ) );
-
-    return 0;
-}
-
 int
 main( void )
 {
@@ -161,9 +148,6 @@ main( void )
         return i;
 
     if( ( i = test1( ) ) )
-        return i;
-
-    if( ( i = test2( ) ) )
         return i;
 
     return 0;

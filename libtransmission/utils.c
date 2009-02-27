@@ -332,17 +332,12 @@ tr_msg( const char * file,
             }
             else
             {
-                char timestr[64];
-
                 if( fp == NULL )
                     fp = stderr;
-
-                tr_getLogTimeStr( timestr, sizeof( timestr ) );
-
                 if( name )
-                    fprintf( fp, "[%s] %s: %s\n", timestr, name, buf );
+                    fprintf( fp, "%s: %s\n", name, buf );
                 else
-                    fprintf( fp, "[%s] %s\n", timestr, buf );
+                    fprintf( fp, "%s\n", buf );
                 fflush( fp );
             }
         }
@@ -1408,7 +1403,7 @@ parseNumberSection( const char * str, int len, struct number_range * setme )
     char * tmp = tr_strndup( str, len );
 
     errno = 0;
-    a = b = strtol( tmp, &end, 10 );
+    a = strtol( tmp, &end, 10 );
     if( errno || ( end == tmp ) ) {
         success = FALSE;
     } else if( *end != '-' ) {

@@ -71,7 +71,6 @@ tr_bool     tr_torrentIsPieceTransferAllowed( const tr_torrent * torrent,
                                               tr_direction       direction );
 
 
-
 #define tr_block( a, b ) _tr_block( tor, a, b )
 tr_block_index_t _tr_block( const tr_torrent * tor,
                             tr_piece_index_t   index,
@@ -186,9 +185,6 @@ struct tr_torrent
     tr_torrent_completeness_func *   completeness_func;
     void *                     completeness_func_user_data;
 
-    tr_torrent_ratio_limit_hit_func * ratio_limit_hit_func;
-    void *                     ratio_limit_hit_func_user_data;
-
     tr_bool                    isRunning;
     tr_bool                    isDeleting;
 
@@ -206,9 +202,6 @@ struct tr_torrent
     struct tr_bandwidth      * bandwidth;
 
     struct tr_torrent_peers  * torrentPeers;
-
-    double                     desiredRatio;
-    tr_ratiolimit              ratioLimitMode;
 };
 
 /* get the index of this piece's first block */

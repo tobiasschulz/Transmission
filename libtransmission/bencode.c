@@ -30,10 +30,6 @@
 #include "ptrarray.h"
 #include "utils.h" /* tr_new(), tr_free() */
 
-#ifndef ENODATA
- #define ENODATA EIO
-#endif
-
 /**
 ***
 **/
@@ -1469,17 +1465,16 @@ tr_bencSaveJSONFile( const char *    filename,
 ***/
 
 int
-tr_bencLoadFile( const char * filename, tr_benc * b )
+tr_bencLoadFile( const char * filename,
+                 tr_benc *    b )
 {
     int       err;
     size_t    contentLen;
     uint8_t * content;
 
     content = tr_loadFile( filename, &contentLen );
-    if( !content && errno )
+    if( !content )
         err = errno;
-    else if( !content )
-        err = ENODATA;
     else
         err = tr_bencLoad( content, contentLen, b, NULL );
 
@@ -1488,20 +1483,20 @@ tr_bencLoadFile( const char * filename, tr_benc * b )
 }
 
 int
-tr_bencLoadJSONFile( const char * filename, tr_benc * b )
+tr_bencLoadJSONFile( const char * filename,
+                     tr_benc *    b )
 {
     int        err;
     size_t     contentLen;
     uint8_t  * content;
 
     content = tr_loadFile( filename, &contentLen );
-    if( !content && errno )
+    if( !content )
         err = errno;
-    else if( !content )
-        err = ENODATA;
     else
         err = tr_jsonParse( content, contentLen, b, NULL );
 
     tr_free( content );
     return err;
 }
+
