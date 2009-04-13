@@ -27,6 +27,8 @@
 
 @class FileListNode;
 
+#define INVALID -99
+
 typedef enum
 {
     TORRENT_FILE_DELETE,
@@ -63,9 +65,11 @@ typedef enum
     NSIndexSet * fPreviousFinishedIndexes;
     NSDate * fPreviousFinishedIndexesDate;
     
+    CGFloat fRatioLimit;
+    NSInteger fRatioSetting;
     BOOL fFinishedSeeding, fWaitToStart, fStalled;
     
-    NSInteger fGroupValue;
+    NSInteger fOrderValue, fGroupValue;
     
     BOOL fAddedTrackers;
     
@@ -103,19 +107,17 @@ typedef enum
 - (void) resetCache;
 
 - (CGFloat) ratio;
-- (tr_ratiolimit) ratioSetting;
-- (void) setRatioSetting: (tr_ratiolimit) setting;
+- (NSInteger) ratioSetting;
+- (void) setRatioSetting: (NSInteger) setting;
 - (CGFloat) ratioLimit;
 - (void) setRatioLimit: (CGFloat) limit;
-- (BOOL) seedRatioSet;
+- (CGFloat) actualStopRatio; //returns INVALID if will not stop
 - (CGFloat) progressStopRatio;
 
-- (BOOL) usesSpeedLimit: (BOOL) upload;
-- (void) setUseSpeedLimit: (BOOL) use upload: (BOOL) upload;
+- (tr_speedlimit) speedMode: (BOOL) upload;
+- (void) setSpeedMode: (tr_speedlimit) mode upload: (BOOL) upload;
 - (NSInteger) speedLimit: (BOOL) upload;
 - (void) setSpeedLimit: (NSInteger) limit upload: (BOOL) upload;
-- (BOOL) usesGlobalSpeedLimit;
-- (void) setUseGlobalSpeedLimit: (BOOL) use;
 
 - (void) setMaxPeerConnect: (uint16_t) count;
 - (uint16_t) maxPeerConnect;
@@ -178,6 +180,7 @@ typedef enum
 - (CGFloat) checkingProgress;
 
 - (NSInteger) eta;
+- (NSInteger) etaRatio;
 
 - (CGFloat) notAvailableDesired;
 
@@ -226,6 +229,9 @@ typedef enum
 - (uint64_t) uploadedTotal;
 - (uint64_t) failedHash;
 - (CGFloat) swarmSpeed;
+
+- (NSInteger) orderValue;
+- (void) setOrderValue: (NSInteger) orderValue;
 
 - (NSInteger) groupValue;
 - (void) setGroupValue: (NSInteger) groupValue;

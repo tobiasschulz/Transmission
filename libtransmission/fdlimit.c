@@ -47,10 +47,6 @@
  #include <linux/falloc.h>
 #endif
 
-#ifdef HAVE_XFS_XFS_H
- #include <xfs/xfs.h>
-#endif
-
 #include <sys/types.h>
 #include <sys/stat.h>
 #ifdef HAVE_GETRLIMIT
@@ -83,6 +79,9 @@ enum
 {
     NOFILE_BUFFER = 512, /* the process' number of open files is
                             globalMaxPeers + NOFILE_BUFFER */
+
+    SYNC_INTERVAL = 15   /* (arbitrary number) how many seconds to go
+                            between fsync calls for files in heavy use */
 };
 
 struct tr_openfile
@@ -93,6 +92,7 @@ struct tr_openfile
     char       filename[MAX_PATH_LENGTH];
     int        fd;
     uint64_t   date;
+    time_t     syncAt;
 };
 
 struct tr_fd_s
@@ -158,39 +158,30 @@ preallocateFileFull( const char * filename, uint64_t length )
     int fd = open( filename, flags, 0666 );
     if( fd >= 0 )
     {
-# ifdef HAVE_XFS_XFS_H
-        if( !success && platform_test_xfs_fd( fd ) )
-        {
-            xfs_flock64_t fl;
-            fl.l_whence = 0;
-            fl.l_start = 0;
-            fl.l_len = length;
-            success = !xfsctl( NULL, fd, XFS_IOC_RESVSP64, &fl );
-        }
-# endif
-# ifdef SYS_DARWIN
-        if( !success )
-        {
-            fstore_t fst;
-            fst.fst_flags = F_ALLOCATECONTIG;
-            fst.fst_posmode = F_PEOFPOSMODE;
-            fst.fst_offset = 0;
-            fst.fst_length = length;
-            fst.fst_bytesalloc = 0;
-            success = !fcntl( fd, F_PREALLOCATE, &fst );
-        }
-# endif
+        
 # ifdef HAVE_FALLOCATE
-        if( !success )
-        {
-            success = !fallocate( fd, FALLOC_FL_KEEP_SIZE, 0, length );
-        }
-# endif
-# ifdef HAVE_POSIX_FALLOCATE
-        if( !success )
-        {
-            success = !posix_fallocate( fd, 0, length );
-        }
+
+        success = !fallocate( fd, FALLOC_FL_KEEP_SIZE, 0, length );
+
+# elif defined(HAVE_POSIX_FALLOCATE)
+
+        success = !posix_fallocate( fd, 0, length );
+
+# elif defined(SYS_DARWIN) 
+
+        fstore_t fst;
+        fst.fst_flags = F_ALLOCATECONTIG;
+        fst.fst_posmode = F_PEOFPOSMODE;
+        fst.fst_offset = 0;
+        fst.fst_length = length;
+        fst.fst_bytesalloc = 0;
+        success = !fcntl( fd, F_PREALLOCATE, &fst );
+
+# else
+
+        #warning no known method to preallocate files on this platform
+        success = 0;
+
 # endif
 
         close( fd );
@@ -199,39 +190,6 @@ preallocateFileFull( const char * filename, uint64_t length )
 #endif
 
     return success;
-}
-
-FILE*
-tr_open_file_for_reading( const char * filename, tr_bool sequential )
-{
-    int fd;
-    int flags;
-
-    /* build the flags */
-    flags = O_RDONLY;
-#ifdef O_SEQUENTIAL
-    if( sequential ) flags |= O_SEQUENTIAL;
-#endif
-#ifdef O_RANDOM
-    if( !sequential ) flags |= O_RANDOM
-#endif
-#ifdef O_BINARY
-    flags |= O_BINARY;
-#endif
-#ifdef O_LARGEFILE
-    flags |= O_LARGEFILE;
-#endif
-
-    /* open the file */
-    fd = open( filename, flags, 0666 );
-    if( fd < 0 )
-        return NULL;
-
-#ifdef HAVE_POSIX_FADVISE
-    posix_fadvise( fd, 0, 0, sequential ? POSIX_FADV_SEQUENTIAL : POSIX_FADV_RANDOM );
-#endif
-
-    return fdopen( fd, "r" );
 }
 
 /**
@@ -452,6 +410,7 @@ tr_fdFileCheckout( const char             * folder,
                 doWrite ? 'y' : 'n' );
         tr_strlcpy( o->filename, filename, sizeof( o->filename ) );
         o->isWritable = doWrite;
+        o->syncAt = time( NULL ) + SYNC_INTERVAL;
     }
 
     dbgmsg( "checking out '%s' in slot %d", filename, winner );
@@ -479,6 +438,15 @@ tr_fdFileReturn( int fd )
         o->isCheckedOut = 0;
         if( o->closeWhenDone )
             TrCloseFile( i );
+        else if( o->syncAt <= time( NULL ) ) {
+            dbgmsg( "fsync()ing file '%s' in slot #%d", o->filename, i );
+            fsync( o->fd );
+#ifdef HAVE_POSIX_FADVISE
+            /* TODO: test performance with and without this */
+            posix_fadvise( o->fd, 0, 0, POSIX_FADV_DONTNEED );
+#endif
+            o->syncAt = time( NULL ) + SYNC_INTERVAL;
+        }
 
         break;
     }

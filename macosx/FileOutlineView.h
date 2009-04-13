@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -25,12 +25,13 @@
 #import <Cocoa/Cocoa.h>
 
 @class Torrent;
+@class CTGradient;
 
 @interface FileOutlineView : NSOutlineView
 {
     Torrent * fTorrent;
     
-    NSGradient * fHighPriorityGradient, * fLowPriorityGradient, * fMixedPriorityGradient;
+    CTGradient * fHighPriorityGradient, * fLowPriorityGradient, * fMixedPriorityGradient;
     
     int fMouseRow;
 }

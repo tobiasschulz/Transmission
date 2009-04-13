@@ -38,21 +38,13 @@
 #define KEY_PEERS6          "peers6"
 #define KEY_PRIORITY        "priority"
 #define KEY_PROGRESS        "progress"
-#define KEY_SPEEDLIMIT_OLD  "speed-limit"
-#define KEY_SPEEDLIMIT_UP   "speed-limit-up"
-#define KEY_SPEEDLIMIT_DOWN "speed-limit-down"
-#define KEY_RATIOLIMIT      "ratio-limit"
+#define KEY_SPEEDLIMIT      "speed-limit"
 #define KEY_UPLOADED        "uploaded"
 
-#define KEY_SPEED                  "speed"
-#define KEY_USE_GLOBAL_SPEED_LIMIT "use-global-speed-limit"
-#define KEY_USE_SPEED_LIMIT        "use-speed-limit"
-#define KEY_SPEEDLIMIT_DOWN_SPEED  "down-speed"
-#define KEY_SPEEDLIMIT_DOWN_MODE   "down-mode"
-#define KEY_SPEEDLIMIT_UP_SPEED    "up-speed"
-#define KEY_SPEEDLIMIT_UP_MODE     "up-mode"
-#define KEY_RATIOLIMIT_RATIO       "ratio-limit"
-#define KEY_RATIOLIMIT_MODE        "ratio-mode"
+#define KEY_SPEEDLIMIT_DOWN_SPEED "down-speed"
+#define KEY_SPEEDLIMIT_DOWN_MODE  "down-mode"
+#define KEY_SPEEDLIMIT_UP_SPEED   "up-speed"
+#define KEY_SPEEDLIMIT_UP_MODE    "up-mode"
 
 #define KEY_PROGRESS_MTIMES   "mtimes"
 #define KEY_PROGRESS_BITFIELD "bitfield"
@@ -248,111 +240,45 @@ loadPriorities( tr_benc *    dict,
 ***/
 
 static void
-saveSingleSpeedLimit( tr_benc * d, const tr_torrent * tor, tr_direction dir )
+saveSpeedLimits( tr_benc *          dict,
+                 const tr_torrent * tor )
 {
-    tr_bencDictReserve( d, 3 );
-    tr_bencDictAddInt( d, KEY_SPEED, tr_torrentGetSpeedLimit( tor, dir ) );
-    tr_bencDictAddBool( d, KEY_USE_GLOBAL_SPEED_LIMIT, tr_torrentUsesSessionLimits( tor ) );
-    tr_bencDictAddBool( d, KEY_USE_SPEED_LIMIT, tr_torrentUsesSpeedLimit( tor, dir ) );
-}
+    tr_benc * d = tr_bencDictAddDict( dict, KEY_SPEEDLIMIT, 4 );
 
-static void
-saveSpeedLimits( tr_benc * dict, const tr_torrent * tor )
-{
-    saveSingleSpeedLimit( tr_bencDictAddDict( dict, KEY_SPEEDLIMIT_DOWN, 0 ), tor, TR_DOWN );
-    saveSingleSpeedLimit( tr_bencDictAddDict( dict, KEY_SPEEDLIMIT_UP, 0 ), tor, TR_UP );
-}
-
-static void
-saveRatioLimits( tr_benc * dict, const tr_torrent * tor )
-{
-    tr_benc * d = tr_bencDictAddDict( dict, KEY_RATIOLIMIT, 2 );
-    tr_bencDictAddReal( d, KEY_RATIOLIMIT_RATIO, tr_torrentGetRatioLimit( tor ) );
-    tr_bencDictAddInt( d, KEY_RATIOLIMIT_MODE, tr_torrentGetRatioMode( tor ) );
-}
-
-static void
-loadSingleSpeedLimit( tr_benc * d, tr_direction dir, tr_torrent * tor )
-{
-    int64_t i;
-    tr_bool boolVal;
-
-    if( tr_bencDictFindInt( d, KEY_SPEED, &i ) )
-        tr_torrentSetSpeedLimit( tor, dir, i );
-
-    if( tr_bencDictFindBool( d, KEY_USE_SPEED_LIMIT, &boolVal ) )
-        tr_torrentUseSpeedLimit( tor, dir, boolVal );
-
-    if( tr_bencDictFindBool( d, KEY_USE_GLOBAL_SPEED_LIMIT, &boolVal ) )
-        tr_torrentUseSessionLimits( tor, boolVal );
-}
-
-enum old_speed_modes
-{
-    TR_SPEEDLIMIT_GLOBAL,   /* only follow the overall speed limit */
-    TR_SPEEDLIMIT_SINGLE    /* only follow the per-torrent limit */
-};
-
-static uint64_t
-loadSpeedLimits( tr_benc * dict, tr_torrent * tor )
-{
-    uint64_t  ret = 0;
-    tr_benc * d;
-
-    if( tr_bencDictFindDict( dict, KEY_SPEEDLIMIT_UP, &d ) )
-    {
-        loadSingleSpeedLimit( d, TR_UP, tor );
-        ret = TR_FR_SPEEDLIMIT;
-    }
-    if( tr_bencDictFindDict( dict, KEY_SPEEDLIMIT_DOWN, &d ) )
-    {
-        loadSingleSpeedLimit( d, TR_DOWN, tor );
-        ret = TR_FR_SPEEDLIMIT;
-    }
-
-    /* older speedlimit structure */
-    if( !ret && tr_bencDictFindDict( dict, KEY_SPEEDLIMIT_OLD, &d ) )
-    {
-
-        int64_t i;
-        if( tr_bencDictFindInt( d, KEY_SPEEDLIMIT_DOWN_SPEED, &i ) )
-            tr_torrentSetSpeedLimit( tor, TR_DOWN, i );
-        if( tr_bencDictFindInt( d, KEY_SPEEDLIMIT_DOWN_MODE, &i ) ) {
-            tr_torrentUseSpeedLimit( tor, TR_DOWN, i==TR_SPEEDLIMIT_SINGLE );
-            tr_torrentUseSessionLimits( tor, i==TR_SPEEDLIMIT_GLOBAL );
-         }
-        if( tr_bencDictFindInt( d, KEY_SPEEDLIMIT_UP_SPEED, &i ) )
-            tr_torrentSetSpeedLimit( tor, TR_UP, i );
-        if( tr_bencDictFindInt( d, KEY_SPEEDLIMIT_UP_MODE, &i ) ) {
-            tr_torrentUseSpeedLimit( tor, TR_UP, i==TR_SPEEDLIMIT_SINGLE );
-            tr_torrentUseSessionLimits( tor, i==TR_SPEEDLIMIT_GLOBAL );
-        }
-        ret = TR_FR_SPEEDLIMIT;
-    }
-
-    return ret;
+    tr_bencDictAddInt( d, KEY_SPEEDLIMIT_DOWN_SPEED,
+                      tr_torrentGetSpeedLimit( tor, TR_DOWN ) );
+    tr_bencDictAddInt( d, KEY_SPEEDLIMIT_DOWN_MODE,
+                      tr_torrentGetSpeedMode( tor, TR_DOWN ) );
+    tr_bencDictAddInt( d, KEY_SPEEDLIMIT_UP_SPEED,
+                      tr_torrentGetSpeedLimit( tor, TR_UP ) );
+    tr_bencDictAddInt( d, KEY_SPEEDLIMIT_UP_MODE,
+                      tr_torrentGetSpeedMode( tor, TR_UP ) );
 }
 
 static uint64_t
-loadRatioLimits( tr_benc *    dict,
+loadSpeedLimits( tr_benc *    dict,
                  tr_torrent * tor )
 {
     uint64_t  ret = 0;
     tr_benc * d;
 
-    if( tr_bencDictFindDict( dict, KEY_RATIOLIMIT, &d ) )
+    if( tr_bencDictFindDict( dict, KEY_SPEEDLIMIT, &d ) )
     {
         int64_t i;
-        double dratio;
-        if( tr_bencDictFindReal( d, KEY_RATIOLIMIT_RATIO, &dratio ) )
-            tr_torrentSetRatioLimit( tor, dratio );
-        if( tr_bencDictFindInt( d, KEY_RATIOLIMIT_MODE, &i ) )
-            tr_torrentSetRatioMode( tor, i );
-      ret = TR_FR_RATIOLIMIT;
+        if( tr_bencDictFindInt( d, KEY_SPEEDLIMIT_DOWN_SPEED, &i ) )
+            tr_torrentSetSpeedLimit( tor, TR_DOWN, i );
+        if( tr_bencDictFindInt( d, KEY_SPEEDLIMIT_DOWN_MODE, &i ) )
+            tr_torrentSetSpeedMode( tor, TR_DOWN, i );
+        if( tr_bencDictFindInt( d, KEY_SPEEDLIMIT_UP_SPEED, &i ) )
+            tr_torrentSetSpeedLimit( tor, TR_UP, i );
+        if( tr_bencDictFindInt( d, KEY_SPEEDLIMIT_UP_MODE, &i ) )
+            tr_torrentSetSpeedMode( tor, TR_UP, i );
+        ret = TR_FR_SPEEDLIMIT;
     }
 
     return ret;
 }
+
 /***
 ****
 ***/
@@ -502,13 +428,13 @@ tr_torrentSaveResume( const tr_torrent * tor )
                        tor->uploadedPrev + tor->uploadedCur );
     tr_bencDictAddInt( &top, KEY_MAX_PEERS,
                        tor->maxConnectedPeers );
-    tr_bencDictAddBool( &top, KEY_PAUSED, !tor->isRunning );
+    tr_bencDictAddInt( &top, KEY_PAUSED,
+                       tor->isRunning ? 0 : 1 );
     savePeers( &top, tor );
     savePriorities( &top, tor );
     saveDND( &top, tor );
     saveProgress( &top, tor );
     saveSpeedLimits( &top, tor );
-    saveRatioLimits( &top, tor );
 
     filename = getResumeFilename( tor );
     tr_bencSaveFile( filename, &top );
@@ -526,7 +452,6 @@ loadFromFile( tr_torrent * tor,
     uint64_t     fieldsLoaded = 0;
     char *       filename;
     tr_benc      top;
-    tr_bool      boolVal;
 
     filename = getResumeFilename( tor );
 
@@ -587,9 +512,9 @@ loadFromFile( tr_torrent * tor,
     }
 
     if( ( fieldsToLoad & TR_FR_RUN )
-      && tr_bencDictFindBool( &top, KEY_PAUSED, &boolVal ) )
+      && tr_bencDictFindInt( &top, KEY_PAUSED, &i ) )
     {
-        tor->isRunning = !boolVal;
+        tor->isRunning = i ? 0 : 1;
         fieldsLoaded |= TR_FR_RUN;
     }
 
@@ -610,7 +535,7 @@ loadFromFile( tr_torrent * tor,
     if( ( fieldsToLoad & TR_FR_ACTIVITY_DATE )
       && tr_bencDictFindInt( &top, KEY_ACTIVITY_DATE, &i ) )
     {
-        tr_torrentSetActivityDate( tor, i );
+        tor->activityDate = i;
         fieldsLoaded |= TR_FR_ACTIVITY_DATE;
     }
 
@@ -628,9 +553,6 @@ loadFromFile( tr_torrent * tor,
 
     if( fieldsToLoad & TR_FR_SPEEDLIMIT )
         fieldsLoaded |= loadSpeedLimits( &top, tor );
-    
-    if( fieldsToLoad & TR_FR_RATIOLIMIT )
-        fieldsLoaded |= loadRatioLimits( &top, tor );
 
     tr_bencFree( &top );
     tr_free( filename );

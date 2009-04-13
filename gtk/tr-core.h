@@ -64,30 +64,26 @@ typedef struct TrCoreClass
 {
     GObjectClass    parent;
 
-    /* "blocklist-updated" signal with a callback type of
-        void (*callback )( TrCore*, int ruleCount, gpointer userData ). */
-    int blocklistSignal;
+    /* "blocklist" signal:
+       void  handler( TrCore *, const char *, gpointer userData ); */
+    int    blocksig;
 
-    /* "port-tested" signal with a callback type of
-       void( *callback )( TrCore*, gboolean isOpen, gpointer userData ). */
-    int portSignal;
+    /* "error" signal:
+       void handler( TrCore *, enum tr_core_err, const char *, gpointer ) */
+    int    errsig;
 
-    /* "error" signal with a callback type of
-       void( *callback )( TrCore*, enum tr_core_err, const char * humanReadable, gpointer userData ). */
-    int errsig;
-
-    /* "add-torrent-prompt" signal with a callback type of
-       void ( *callback)( TrCore *, gpointer ctor, gpointer userData )
+    /* "add-torrent-prompt" signal:
+       void handler( TrCore *, gpointer ctor, gpointer userData )
        The handler assumes ownership of ctor and must free when done */
-    int promptsig;
+    int    promptsig;
 
     /* "quit" signal:
        void handler( TrCore *, gpointer ) */
-    int quitsig;
+    int    quitsig;
 
     /* "prefs-changed" signal:
        void handler( TrCore *, int, gpointer ) */
-    int prefsig;
+    int    prefsig;
 }
 TrCoreClass;
 
@@ -141,13 +137,23 @@ void     tr_core_add_list( TrCore *    self,
 
 
 /** Add a torrent. */
-gboolean tr_core_add_file( TrCore*, const char * filename, gboolean * setme_success, GError **    err );
-/** Add a torrent. */
-void tr_core_add_torrent( TrCore*, TrTorrent* );
+gboolean tr_core_add_file(
+                 TrCore*,
+    const char * filename,
+    gboolean *
+                 setme_success,
+    GError **    err );
 
 /** Present the main window */
-gboolean tr_core_present_window( TrCore*, gboolean * setme_success, GError ** err ); 
+gboolean tr_core_present_window(
+              TrCore*,
+    gboolean *
+              setme_success,
+    GError ** err );
 
+/** Add a torrent. */
+void     tr_core_add_torrent( TrCore*,
+                              TrTorrent* );
 
 /**
  * Notifies listeners that torrents have been added.
@@ -161,33 +167,43 @@ void     tr_core_torrents_added( TrCore * self );
 
 /* we've gotten notice from RPC that a torrent has been destroyed;
    update our gui accordingly */
-void  tr_core_torrent_destroyed( TrCore * self, int torrentId );
+void     tr_core_torrent_destroyed( TrCore * self,
+                                    int      id );
 
 /* remove a torrent */
-void  tr_core_remove_torrent( TrCore * self, TrTorrent * gtor, int deleteFiles );
+void     tr_core_remove_torrent( TrCore *    self,
+                                 TrTorrent * gtor,
+                                 int         deleteFiles );
 
 /* update the model with current torrent status */
-void  tr_core_update( TrCore * self );
+void     tr_core_update( TrCore * self );
 
 /* emit the "quit" signal */
-void  tr_core_quit( TrCore * self );
+void     tr_core_quit( TrCore * self );
 
-/**
-***  Set a preference value, save the prefs file, and emit the "prefs-changed" signal
-**/
+/* emit the "blocklist changed" signal */
+void     tr_core_blocksig( TrCore *     core,
+                           gboolean     isDone,
+                           const char * status );
 
-void tr_core_set_pref     ( TrCore * self, const char * key, const char * val );
-void tr_core_set_pref_bool( TrCore * self, const char * key, gboolean val );
-void tr_core_set_pref_int ( TrCore * self, const char * key, int val );
-void tr_core_set_pref_double( TrCore * self, const char * key, double val );
+/* Set a preference value, save the prefs file, and emit the
+   "prefs-changed" signal */
+void     tr_core_set_pref( TrCore *     self,
+                           const char * key,
+                           const char * val );
 
-/**
-***
-**/
+/* Set a boolean preference value, save the prefs file, and emit the
+   "prefs-changed" signal */
+void     tr_core_set_pref_bool( TrCore *     self,
+                                const char * key,
+                                gboolean     val );
 
-void tr_core_port_test( TrCore * core );
+/* Set an integer preference value, save the prefs file, and emit the
+   "prefs-changed" signal */
+void     tr_core_set_pref_int( TrCore *     self,
+                               const char * key,
+                               int          val );
 
-void tr_core_blocklist_update( TrCore * core );
 
 /**
 ***

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2009 Transmission authors and contributors
+ * Copyright (c) 2005-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,7 @@
  *****************************************************************************/
 
 #import "NSStringAdditions.h"
-#import "utils.h"
+#import "NSApplicationAdditions.h"
 #import <transmission.h>
 
 @implementation NSString (NSStringAdditions)
@@ -93,12 +93,18 @@
 
 + (NSString *) stringForRatio: (CGFloat) ratio
 {
-    //N/A is different than libtransmission's
     if (ratio == TR_RATIO_NA)
         return NSLocalizedString(@"N/A", "No Ratio");
+    else if (ratio == TR_RATIO_INF)
+        return [NSString stringWithUTF8String: "\xE2\x88\x9E"];
+    else;
     
-    char buf[50];
-    return [NSString stringWithUTF8String: tr_strratio(buf, sizeof(buf), ratio, "\xE2\x88\x9E")];
+    if (ratio <= 9.995f) //0.00 to 9.99
+        return [NSString localizedStringWithFormat: @"%.2f", ratio];
+    else if (ratio <= 99.95f) //10.0 to 99.9
+        return [NSString localizedStringWithFormat: @"%.1f", ratio];
+    else //rest are single digit
+        return [NSString localizedStringWithFormat: @"%.0f", ratio];
 }
 
 + (NSString *) timeString: (uint64_t) seconds showSeconds: (BOOL) showSeconds
@@ -141,13 +147,15 @@
 
 - (NSComparisonResult) compareFinder: (NSString *) string
 {
-    const NSInteger comparisonOptions = NSCaseInsensitiveSearch | NSNumericSearch | NSWidthInsensitiveSearch | NSForcedOrderingSearch;
+    NSInteger comparisonOptions = [NSApp isOnLeopardOrBetter] ? (NSCaseInsensitiveSearch | NSNumericSearch
+                                                            | NSWidthInsensitiveSearch | NSForcedOrderingSearch)
+                                                        : (NSCaseInsensitiveSearch | NSNumericSearch);
     return [self compare: string options: comparisonOptions range: NSMakeRange(0, [self length]) locale: [NSLocale currentLocale]];
 }
 
 - (NSComparisonResult) compareNumeric: (NSString *) string
 {
-    const NSInteger comparisonOptions = NSNumericSearch | NSForcedOrderingSearch;
+    NSInteger comparisonOptions = [NSApp isOnLeopardOrBetter] ? (NSNumericSearch | NSForcedOrderingSearch) : NSNumericSearch;
     return [self compare: string options: comparisonOptions range: NSMakeRange(0, [self length]) locale: [NSLocale currentLocale]];
 }
 

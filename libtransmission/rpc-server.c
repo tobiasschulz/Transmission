@@ -29,7 +29,6 @@
 
 #include "transmission.h"
 #include "bencode.h"
-#include "crypto.h"
 #include "list.h"
 #include "platform.h"
 #include "rpcimpl.h"
@@ -172,7 +171,7 @@ handle_upload( struct evhttp_request * req,
                         tr_bencDictAddStr( &top, "method", "torrent-add" );
                         b64 = tr_base64_encode( body, body_len, NULL );
                         tr_bencDictAddStr( args, "metainfo", b64 );
-                        tr_bencDictAddBool( args, "paused", paused );
+                        tr_bencDictAddInt( args, "paused", paused );
                         tr_bencSaveAsJSON( &top, json );
                         tr_rpc_request_exec_json( server->session,
                                                   EVBUFFER_DATA( json ),
@@ -483,8 +482,7 @@ handle_request( struct evhttp_request * req,
         }
         else if( server->isPasswordEnabled
                  && ( !pass || !user || strcmp( server->username, user )
-                                     || !tr_ssha1_matches( server->password,
-                                                           pass ) ) )
+                                     || strcmp( server->password, pass ) ) )
         {
             evhttp_add_header( req->output_headers,
                                "WWW-Authenticate",
@@ -534,7 +532,6 @@ startServer( void * vserver )
         server->httpd = evhttp_new( tr_eventGetBase( server->session ) );
         evhttp_bind_socket( server->httpd, "0.0.0.0", server->port );
         evhttp_set_gencb( server->httpd, handle_request, server );
-
     }
 }
 
@@ -680,10 +677,7 @@ tr_rpcSetPassword( tr_rpc_server * server,
                    const char *    password )
 {
     tr_free( server->password );
-    if( *password != '{' )
-        server->password = tr_ssha1( password );
-    else
-        server->password = strdup( password );
+    server->password = tr_strdup( password );
     dbgmsg( "setting our Password to [%s]", server->password );
 }
 
@@ -742,28 +736,27 @@ tr_rpcInit( tr_session  * session,
 {
     tr_rpc_server * s;
     tr_bool found;
-    tr_bool boolVal;
     int64_t i;
     const char *str;
 
     s = tr_new0( tr_rpc_server, 1 );
     s->session = session;
 
-    found = tr_bencDictFindBool( settings, TR_PREFS_KEY_RPC_ENABLED, &boolVal );
+    found = tr_bencDictFindInt( settings, TR_PREFS_KEY_RPC_ENABLED, &i );
     assert( found );
-    s->isEnabled = boolVal;
+    s->isEnabled = i != 0;
 
     found = tr_bencDictFindInt( settings, TR_PREFS_KEY_RPC_PORT, &i );
     assert( found );
     s->port = i;
 
-    found = tr_bencDictFindBool( settings, TR_PREFS_KEY_RPC_WHITELIST_ENABLED, &boolVal );
+    found = tr_bencDictFindInt( settings, TR_PREFS_KEY_RPC_WHITELIST_ENABLED, &i );
     assert( found );
-    s->isWhitelistEnabled = boolVal;
+    s->isWhitelistEnabled = i != 0;
 
-    found = tr_bencDictFindBool( settings, TR_PREFS_KEY_RPC_AUTH_REQUIRED, &boolVal );
+    found = tr_bencDictFindInt( settings, TR_PREFS_KEY_RPC_AUTH_REQUIRED, &i );
     assert( found );
-    s->isPasswordEnabled = boolVal;
+    s->isPasswordEnabled = i != 0;
 
     found = tr_bencDictFindStr( settings, TR_PREFS_KEY_RPC_WHITELIST, &str );
     assert( found );
@@ -775,10 +768,7 @@ tr_rpcInit( tr_session  * session,
 
     found = tr_bencDictFindStr( settings, TR_PREFS_KEY_RPC_PASSWORD, &str );
     assert( found );
-    if( *str != '{' )
-        s->password = tr_ssha1( str );
-    else
-        s->password = strdup( str );
+    s->password = tr_strdup( str );
 
 #ifdef HAVE_ZLIB
     s->stream.zalloc = (alloc_func) Z_NULL;

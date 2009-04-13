@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2008-2009 Transmission authors and contributors
+ * Copyright (c) 2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -27,6 +27,8 @@
 #import "Controller.h"
 #import "GroupsController.h"
 #import "NSStringAdditions.h"
+#import "NSMenuAdditions.h"
+#import "NSApplicationAdditions.h"
 #import "ExpandedPathToIconTransformer.h"
 
 #define UPDATE_SECONDS 1.0
@@ -34,8 +36,6 @@
 @interface AddWindowController (Private)
 
 - (void) confirmAdd;
-
-- (void) setDestinationPath: (NSString *) destination;
 
 - (void) folderChoiceClosed: (NSOpenPanel *) openPanel returnCode: (NSInteger) code contextInfo: (void *) contextInfo;
 
@@ -48,15 +48,14 @@
 
 @implementation AddWindowController
 
-- (id) initWithTorrent: (Torrent *) torrent destination: (NSString *) path lockDestination: (BOOL) lockDestination
-    controller: (Controller *) controller deleteTorrent: (torrentFileState) deleteTorrent
+- (id) initWithTorrent: (Torrent *) torrent destination: (NSString *) path controller: (Controller *) controller
+        deleteTorrent: (torrentFileState) deleteTorrent
 {
     if ((self = [super initWithWindowNibName: @"AddWindow"]))
     {
         fTorrent = torrent;
         if (path)
             fDestination = [[path stringByExpandingTildeInPath] retain];
-        fLockDestination = lockDestination;
         
         fController = controller;
         
@@ -64,7 +63,7 @@
                             && [[NSUserDefaults standardUserDefaults] boolForKey: @"DeleteOriginalTorrent"]);
         fDeleteEnable = deleteTorrent == TORRENT_FILE_DEFAULT;
         
-        fGroupValue = [torrent groupValue];
+        fGroupValue = -1;
     }
     return self;
 }
@@ -91,7 +90,7 @@
     [self updateStatusField: nil];
     
     [self setGroupsMenu];
-    [fGroupPopUp selectItemWithTag: fGroupValue];
+    [fGroupPopUp selectItemWithTag: -1];
     
     [fStartCheck setState: [[NSUserDefaults standardUserDefaults] boolForKey: @"AutoStartDownload"] ? NSOnState : NSOffState];
     
@@ -99,7 +98,14 @@
     [fDeleteCheck setEnabled: fDeleteEnable];
     
     if (fDestination)
-        [self setDestinationPath: fDestination];
+    {
+        [fLocationField setStringValue: [fDestination stringByAbbreviatingWithTildeInPath]];
+        [fLocationField setToolTip: fDestination];
+        
+        ExpandedPathToIconTransformer * iconTransformer = [[ExpandedPathToIconTransformer alloc] init];
+        [fLocationImageView setImage: [iconTransformer transformedValue: fDestination]];
+        [iconTransformer release];
+    }
     else
     {
         [fLocationField setStringValue: @""];
@@ -163,7 +169,11 @@
         [alert setAlertStyle: NSWarningAlertStyle];
         [alert addButtonWithTitle: NSLocalizedString(@"Cancel", "Add torrent -> same name -> button")];
         [alert addButtonWithTitle: NSLocalizedString(@"Add", "Add torrent -> same name -> button")];
-        [alert setShowsSuppressionButton: YES];
+        
+        if ([NSApp isOnLeopardOrBetter])
+            [alert setShowsSuppressionButton: YES];
+        else
+            [alert addButtonWithTitle: NSLocalizedString(@"Don't Alert Again", "Add torrent -> same name -> button")];
         
         [alert beginSheetModalForWindow: [self window] modalDelegate: self
             didEndSelector: @selector(sameNameAlertDidEnd:returnCode:contextInfo:) contextInfo: nil];
@@ -226,6 +236,12 @@
     }
 }
 
+- (void) showGroupsWindow: (id) sender
+{
+    [fGroupPopUp selectItemWithTag: fGroupValue];
+    [fController showGroups: sender];
+}
+
 @end
 
 @implementation AddWindowController (Private)
@@ -236,7 +252,7 @@
     fTimer = nil;
     
     [fTorrent setWaitToStart: [fStartCheck state] == NSOnState];
-    [fTorrent setGroupValue: fGroupValue];
+    [fTorrent setGroupValue: [[fGroupPopUp selectedItem] tag]];
     
     if ([fDeleteCheck state] == NSOnState)
         [fTorrent trashTorrent];
@@ -247,31 +263,21 @@
     [fController askOpenConfirmed: self add: YES]; //ensure last, since it releases this controller
 }
 
-- (void) setDestinationPath: (NSString *) destination
-{
-    destination = [destination stringByExpandingTildeInPath];
-    if (!fDestination || ![fDestination isEqualToString: destination])
-    { 
-        [fDestination release];
-        fDestination = [destination retain];
-        
-        [fTorrent changeDownloadFolder: fDestination];
-    }
-    
-    [fLocationField setStringValue: [fDestination stringByAbbreviatingWithTildeInPath]];
-    [fLocationField setToolTip: fDestination];
-    
-    ExpandedPathToIconTransformer * iconTransformer = [[ExpandedPathToIconTransformer alloc] init];
-    [fLocationImageView setImage: [iconTransformer transformedValue: fDestination]];
-    [iconTransformer release];
-}
-
 - (void) folderChoiceClosed: (NSOpenPanel *) openPanel returnCode: (NSInteger) code contextInfo: (void *) contextInfo
 {
     if (code == NSOKButton)
     {
-        fLockDestination = NO;
-        [self setDestinationPath: [[openPanel filenames] objectAtIndex: 0]];
+        [fDestination release];
+        fDestination = [[[openPanel filenames] objectAtIndex: 0] retain];
+        
+        [fLocationField setStringValue: [fDestination stringByAbbreviatingWithTildeInPath]];
+        [fLocationField setToolTip: fDestination];
+        
+        ExpandedPathToIconTransformer * iconTransformer = [[ExpandedPathToIconTransformer alloc] init];
+        [fLocationImageView setImage: [iconTransformer transformedValue: fDestination]];
+        [iconTransformer release];
+        
+        [fTorrent changeDownloadFolder: fDestination];
     }
     else
     {
@@ -282,28 +288,24 @@
 
 - (void) setGroupsMenu
 {
+    NSMenu * menu = [fGroupPopUp menu];
+    
+    for (NSInteger i = [menu numberOfItems]-1 - 2; i >= 0; i--)
+        [menu removeItemAtIndex: i];
+        
     NSMenu * groupMenu = [[GroupsController groups] groupMenuWithTarget: self action: @selector(changeGroupValue:) isSmall: NO];
-    [fGroupPopUp setMenu: groupMenu];
+    [menu appendItemsFromMenu: groupMenu atIndexes: [NSIndexSet indexSetWithIndexesInRange:
+            NSMakeRange(0, [groupMenu numberOfItems])] atBottom: NO];
 }
 
 - (void) changeGroupValue: (id) sender
 {
-    NSInteger previousGroup = fGroupValue;
     fGroupValue = [sender tag];
-    
-    if (!fLockDestination)
-    {
-        if ([[GroupsController groups] usesCustomDownloadLocationForIndex: fGroupValue])
-            [self setDestinationPath: [[GroupsController groups] customDownloadLocationForIndex: fGroupValue]];
-        else if ([fDestination isEqualToString: [[GroupsController groups] customDownloadLocationForIndex: previousGroup]])
-            [self setDestinationPath: [[NSUserDefaults standardUserDefaults] stringForKey: @"DownloadFolder"]];
-        else;
-    }
 }
 
 - (void) sameNameAlertDidEnd: (NSAlert *) alert returnCode: (NSInteger) returnCode contextInfo: (void *) contextInfo
 {
-    if ([[alert suppressionButton] state] == NSOnState)
+    if (([NSApp isOnLeopardOrBetter] ? [[alert suppressionButton] state] == NSOnState : returnCode == NSAlertThirdButtonReturn))
         [[NSUserDefaults standardUserDefaults] setBool: NO forKey: @"WarningFolderDataSameName"];
     
     [alert release];

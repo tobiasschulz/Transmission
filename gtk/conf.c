@@ -163,22 +163,28 @@ tr_prefs_init_defaults( tr_benc * d )
     if( !str ) str = g_get_user_special_dir( G_USER_DIRECTORY_DESKTOP );
     if( !str ) str = tr_getDefaultDownloadDir( );
     tr_bencDictAddStr( d, PREF_KEY_DIR_WATCH, str );
-    tr_bencDictAddBool( d, PREF_KEY_DIR_WATCH_ENABLED, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_DIR_WATCH_ENABLED, FALSE );
 #endif
 
-    tr_bencDictAddBool( d, PREF_KEY_INHIBIT_HIBERNATION, FALSE );
-    tr_bencDictAddBool( d, PREF_KEY_BLOCKLIST_UPDATES_ENABLED, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_INHIBIT_HIBERNATION, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_BLOCKLIST_UPDATES_ENABLED, TRUE );
 
     tr_bencDictAddStr( d, PREF_KEY_OPEN_DIALOG_FOLDER, g_get_home_dir( ) );
 
-    tr_bencDictAddBool( d, PREF_KEY_TOOLBAR, TRUE );
-    tr_bencDictAddBool( d, PREF_KEY_FILTERBAR, TRUE );
-    tr_bencDictAddBool( d, PREF_KEY_STATUSBAR, TRUE );
-    tr_bencDictAddBool( d, PREF_KEY_SHOW_TRAY_ICON, FALSE );
-    tr_bencDictAddBool( d, PREF_KEY_SHOW_DESKTOP_NOTIFICATION, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_TOOLBAR, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_FILTERBAR, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_STATUSBAR, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_SHOW_TRAY_ICON, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_SHOW_DESKTOP_NOTIFICATION, TRUE );
     tr_bencDictAddStr( d, PREF_KEY_STATUSBAR_STATS, "total-ratio" );
 
-    tr_bencDictAddBool( d, PREF_KEY_OPTIONS_PROMPT, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_SCHED_LIMIT_ENABLED, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_SCHED_BEGIN,    60 * 23 ); /* 11pm */
+    tr_bencDictAddInt( d, PREF_KEY_SCHED_END,      60 * 7 );  /* 7am */
+    tr_bencDictAddInt( d, PREF_KEY_SCHED_DL_LIMIT, 200 );   /* 2x the other limit */
+    tr_bencDictAddInt( d, PREF_KEY_SCHED_UL_LIMIT, 100 );   /* 2x the other limit */
+
+    tr_bencDictAddInt( d, PREF_KEY_OPTIONS_PROMPT, TRUE );
 
     tr_bencDictAddInt( d, PREF_KEY_MAIN_WINDOW_HEIGHT, 500 );
     tr_bencDictAddInt( d, PREF_KEY_MAIN_WINDOW_WIDTH, 300 );
@@ -193,15 +199,14 @@ tr_prefs_init_defaults( tr_benc * d )
     if( !str ) str = tr_getDefaultDownloadDir( );
     tr_bencDictAddStr( d, TR_PREFS_KEY_DOWNLOAD_DIR, str );
 
-    tr_bencDictAddBool( d, PREF_KEY_ASKQUIT, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_ASKQUIT, TRUE );
 
-    tr_bencDictAddStr( d, PREF_KEY_FILTER_MODE, "show-all" );
     tr_bencDictAddStr( d, PREF_KEY_SORT_MODE, "sort-by-name" );
-    tr_bencDictAddBool( d, PREF_KEY_SORT_REVERSED, FALSE );
-    tr_bencDictAddBool( d, PREF_KEY_MINIMAL_VIEW, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_SORT_REVERSED, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_MINIMAL_VIEW, FALSE );
 
-    tr_bencDictAddBool( d, PREF_KEY_START, TRUE );
-    tr_bencDictAddBool( d, PREF_KEY_TRASH_ORIGINAL, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_START, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_TRASH_ORIGINAL, FALSE );
 }
 
 static char*
@@ -254,21 +259,6 @@ pref_int_set( const char * key,
     tr_bencDictAddInt( getPrefs( ), key, value );
 }
 
-double
-pref_double_get( const char * key )
-{
-    double d = 0.0;
-    tr_bencDictFindReal( getPrefs( ), key, &d );
-    return d;
-}
-
-void
-pref_double_set( const char * key,
-                 double       value )
-{
-    tr_bencDictAddReal( getPrefs( ), key, value );
-}
-
 /***
 ****
 ***/
@@ -276,9 +266,10 @@ pref_double_set( const char * key,
 gboolean
 pref_flag_get( const char * key )
 {
-    tr_bool boolVal;
-    tr_bencDictFindBool( getPrefs( ), key, &boolVal );
-    return boolVal != 0;
+    int64_t i;
+
+    tr_bencDictFindInt( getPrefs( ), key, &i );
+    return i != 0;
 }
 
 gboolean
@@ -302,7 +293,7 @@ void
 pref_flag_set( const char * key,
                gboolean     value )
 {
-    tr_bencDictAddBool( getPrefs( ), key, value );
+    pref_int_set( key, value != 0 );
 }
 
 /***

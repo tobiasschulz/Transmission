@@ -242,15 +242,6 @@ static TR_INLINE void tr_bandwidthHonorParentLimits ( tr_bandwidth        * band
     bandwidth->band[direction].honorParentLimits = isEnabled;
 }
 
-static TR_INLINE tr_bool tr_bandwidthAreParentLimitsHonored( tr_bandwidth  * bandwidth,
-                                                             tr_direction    direction )
-{
-    assert( tr_isBandwidth( bandwidth ) );
-    assert( tr_isDirection( direction ) );
-
-    return bandwidth->band[direction].honorParentLimits;
-}
-
 /******
 *******
 ******/

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -81,14 +81,16 @@
     BOOL folder;
     NSInteger fileCount = 0;
     
-    for (NSString * file in files)
+    NSString * file;
+    NSEnumerator * enumerator = [files objectEnumerator];
+    while ((file = [enumerator nextObject]))
     {
         if ([[file pathExtension] caseInsensitiveCompare: @"torrent"] == NSOrderedSame)
         {
             tr_ctor * ctor = tr_ctorNew(fLib);
             tr_ctorSetMetainfoFromFile(ctor, [file UTF8String]);
             tr_info info;
-            if (tr_torrentParse(ctor, &info) == TR_OK)
+            if (tr_torrentParse(fLib, ctor, &info) == TR_OK)
             {
                 count++;
                 size += info.totalSize;

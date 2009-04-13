@@ -49,9 +49,21 @@
 #include "util.h"
 
 char*
-tr_strlratio( char * buf, double ratio, size_t buflen )
+tr_strlratio( char * buf,
+              double ratio,
+              size_t buflen )
 {
-    return tr_strratio( buf, buflen, ratio, "\xE2\x88\x9E" );
+    if( (int)ratio == TR_RATIO_NA )
+        g_strlcpy( buf, _( "None" ), buflen );
+    else if( (int)ratio == TR_RATIO_INF )
+        g_strlcpy( buf, "\xE2\x88\x9E", buflen );
+    else if( ratio < 10.0 )
+        g_snprintf( buf, buflen, "%'.2f", ratio );
+    else if( ratio < 100.0 )
+        g_snprintf( buf, buflen, "%'.1f", ratio );
+    else
+        g_snprintf( buf, buflen, "%'.0f", ratio );
+    return buf;
 }
 
 #define KILOBYTE_FACTOR 1024.0

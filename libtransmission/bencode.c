@@ -47,10 +47,7 @@ isContainer( const tr_benc * val )
 static tr_bool
 isSomething( const tr_benc * val )
 {
-    return isContainer( val ) || tr_bencIsInt( val )
-                              || tr_bencIsString( val )
-                              || tr_bencIsReal( val )
-                              || tr_bencIsBool( val );
+    return isContainer( val ) || tr_bencIsInt( val ) || tr_bencIsString( val );
 }
 
 static void
@@ -160,7 +157,7 @@ static int
 makeroom( tr_benc * val,
           size_t    count )
 {
-    assert( TR_TYPE_LIST == val->type || TR_TYPE_DICT == val->type );
+    assert( TYPE_LIST == val->type || TYPE_DICT == val->type );
 
     if( val->val.l.count + count > val->val.l.alloc )
     {
@@ -196,8 +193,8 @@ getNode( tr_benc *     top,
     assert( parent );
 
     /* dictionary keys must be strings */
-    if( ( parent->type == TR_TYPE_DICT )
-      && ( type != TR_TYPE_STR )
+    if( ( parent->type == TYPE_DICT )
+      && ( type != TYPE_STR )
       && ( !( parent->val.l.count % 2 ) ) )
         return NULL;
 
@@ -237,7 +234,7 @@ tr_bencParseImpl( const void *     buf_in,
             if( ( err = tr_bencParseInt( buf, bufend, &end, &val ) ) )
                 return err;
 
-            node = getNode( top, parentStack, TR_TYPE_INT );
+            node = getNode( top, parentStack, TYPE_INT );
             if( !node )
                 return EILSEQ;
 
@@ -249,19 +246,19 @@ tr_bencParseImpl( const void *     buf_in,
         }
         else if( *buf == 'l' ) /* list */
         {
-            tr_benc * node = getNode( top, parentStack, TR_TYPE_LIST );
+            tr_benc * node = getNode( top, parentStack, TYPE_LIST );
             if( !node )
                 return EILSEQ;
-            tr_bencInit( node, TR_TYPE_LIST );
+            tr_bencInit( node, TYPE_LIST );
             tr_ptrArrayAppend( parentStack, node );
             ++buf;
         }
         else if( *buf == 'd' ) /* dict */
         {
-            tr_benc * node = getNode( top, parentStack, TR_TYPE_DICT );
+            tr_benc * node = getNode( top, parentStack, TYPE_DICT );
             if( !node )
                 return EILSEQ;
-            tr_bencInit( node, TR_TYPE_DICT );
+            tr_bencInit( node, TYPE_DICT );
             tr_ptrArrayAppend( parentStack, node );
             ++buf;
         }
@@ -294,7 +291,7 @@ tr_bencParseImpl( const void *     buf_in,
             if( ( err = tr_bencParseStr( buf, bufend, &end, &str, &str_len ) ) )
                 return err;
 
-            node = getNode( top, parentStack, TR_TYPE_STR );
+            node = getNode( top, parentStack, TYPE_STR );
             if( !node )
                 return EILSEQ;
 
@@ -368,7 +365,7 @@ dictIndexOf( const tr_benc * val,
         {
             const tr_benc * child = val->val.l.vals + i;
 
-            if( ( child->type == TR_TYPE_STR )
+            if( ( child->type == TYPE_STR )
               && ( child->val.s.i == len )
               && !memcmp( child->val.s.s, key, len ) )
                 return i;
@@ -409,27 +406,14 @@ tr_bencListChild( tr_benc * val,
     return ret;
 }
 
-static void
-tr_benc_warning( const char * err )
-{
-    fprintf( stderr, "warning: %s\n", err );
-}
-
 tr_bool
 tr_bencGetInt( const tr_benc * val,
                int64_t *       setme )
 {
-    tr_bool success = FALSE;
+    const int success = tr_bencIsInt( val );
 
-    if( !success && (( success = tr_bencIsInt( val ))))
-        if( setme )
-            *setme = val->val.i;
-
-    if( !success && (( success = tr_bencIsBool( val )))) {
-        tr_benc_warning( "reading bool as an int" );
-        if( setme )
-            *setme = val->val.b ? 1 : 0;
-    }
+    if( success && setme )
+        *setme = val->val.i;
 
     return success;
 }
@@ -442,58 +426,6 @@ tr_bencGetStr( const tr_benc * val,
 
     if( success )
         *setme = val->val.s.s;
-
-    return success;
-}
-
-tr_bool
-tr_bencGetBool( const tr_benc * val, tr_bool * setme )
-{
-    tr_bool success = FALSE;
-
-    if(( success = tr_bencIsBool( val )))
-        *setme = val->val.b;
-
-    if( !success && tr_bencIsInt( val ) )
-        if(( success = ( val->val.i==0 || val->val.i==1 ) ))
-            *setme = val->val.i!=0;
-
-    if( !success && tr_bencIsString( val ) )
-        if(( success = ( !strcmp(val->val.s.s,"true") || !strcmp(val->val.s.s,"false"))))
-            *setme = !strcmp(val->val.s.s,"true");
-
-    return success;
-}
-
-tr_bool
-tr_bencGetReal( const tr_benc * val, double * setme )
-{
-    tr_bool success = FALSE;
-
-    if( !success && (( success = tr_bencIsReal( val ))))
-        *setme = val->val.d;
-
-    if( !success && (( success = tr_bencIsInt( val ))))
-        *setme = val->val.i;
-
-    if( !success && tr_bencIsString(val) )
-    {
-        char * endptr;
-        char * locale; 
-        double d;
-
-        /* the json spec requires a '.' decimal point regardless of locale */
-        locale = tr_strdup( setlocale ( LC_NUMERIC, NULL ) );
-        setlocale( LC_NUMERIC, "POSIX" );
-        d  = strtod( val->val.s.s, &endptr );
-        setlocale( LC_NUMERIC, locale );
-        tr_free( locale );
-
-        if(( success = ( val->val.s.s != endptr ) && !*endptr ))
-            *setme = d;
-    }
-
-
     return success;
 }
 
@@ -504,15 +436,27 @@ tr_bencDictFindInt( tr_benc * dict, const char * key, int64_t * setme )
 }
 
 tr_bool
-tr_bencDictFindBool( tr_benc * dict, const char * key, tr_bool * setme )
+tr_bencDictFindDouble( tr_benc * dict, const char * key, double * setme )
 {
-    return tr_bencGetBool( tr_bencDictFind( dict, key ), setme );
+    const char * str;
+    const tr_bool success = tr_bencDictFindStr( dict, key, &str );
+
+    if( success && setme )
+        *setme = strtod( str, NULL );
+
+    return success;
 }
 
 tr_bool
-tr_bencDictFindReal( tr_benc * dict, const char * key, double * setme )
+tr_bencDictFindList( tr_benc * dict, const char * key, tr_benc ** setme )
 {
-    return tr_bencGetReal( tr_bencDictFind( dict, key ), setme );
+    return tr_bencDictFindType( dict, key, TYPE_LIST, setme );
+}
+
+tr_bool
+tr_bencDictFindDict( tr_benc * dict, const char * key, tr_benc ** setme )
+{
+    return tr_bencDictFindType( dict, key, TYPE_DICT, setme );
 }
 
 tr_bool
@@ -522,25 +466,13 @@ tr_bencDictFindStr( tr_benc *  dict, const char *  key, const char ** setme )
 }
 
 tr_bool
-tr_bencDictFindList( tr_benc * dict, const char * key, tr_benc ** setme )
-{
-    return tr_bencDictFindType( dict, key, TR_TYPE_LIST, setme );
-}
-
-tr_bool
-tr_bencDictFindDict( tr_benc * dict, const char * key, tr_benc ** setme )
-{
-    return tr_bencDictFindType( dict, key, TR_TYPE_DICT, setme );
-}
-
-tr_bool
 tr_bencDictFindRaw( tr_benc         * dict,
                     const char      * key,
                     const uint8_t  ** setme_raw,
                     size_t          * setme_len )
 {
     tr_benc * child;
-    const tr_bool found = tr_bencDictFindType( dict, key, TR_TYPE_STR, &child );
+    const tr_bool found = tr_bencDictFindType( dict, key, TYPE_STR, &child );
 
     if( found ) {
         *setme_raw = (uint8_t*) child->val.s.s;
@@ -559,7 +491,7 @@ tr_bencInitRaw( tr_benc *    val,
                 const void * src,
                 size_t       byteCount )
 {
-    tr_bencInit( val, TR_TYPE_STR );
+    tr_bencInit( val, TYPE_STR );
     val->val.s.i = byteCount;
     val->val.s.s = tr_memdup( src, byteCount );
 }
@@ -569,7 +501,7 @@ tr_bencInitStr( tr_benc *    val,
                 const void * str,
                 int          len )
 {
-    tr_bencInit( val, TR_TYPE_STR );
+    tr_bencInit( val, TYPE_STR );
 
     val->val.s.s = tr_strndup( str, len );
 
@@ -582,52 +514,43 @@ tr_bencInitStr( tr_benc *    val,
 }
 
 void
-tr_bencInitBool( tr_benc * b, int value )
+tr_bencInitInt( tr_benc * val,
+                int64_t   num )
 {
-    tr_bencInit( b, TR_TYPE_BOOL );
-    b->val.b = value != 0;
-}
-
-void
-tr_bencInitReal( tr_benc * b, double value )
-{
-    tr_bencInit( b, TR_TYPE_REAL );
-    b->val.d = value;
-}
-
-void
-tr_bencInitInt( tr_benc * b, int64_t value )
-{
-    tr_bencInit( b, TR_TYPE_INT );
-    b->val.i = value;
+    tr_bencInit( val, TYPE_INT );
+    val->val.i = num;
 }
 
 int
-tr_bencInitList( tr_benc * b, size_t reserveCount )
+tr_bencInitList( tr_benc * val,
+                 size_t    reserveCount )
 {
-    tr_bencInit( b, TR_TYPE_LIST );
-    return tr_bencListReserve( b, reserveCount );
+    tr_bencInit( val, TYPE_LIST );
+    return tr_bencListReserve( val, reserveCount );
 }
 
 int
-tr_bencListReserve( tr_benc * b, size_t count )
+tr_bencListReserve( tr_benc * val,
+                    size_t    count )
 {
-    assert( tr_bencIsList( b ) );
-    return makeroom( b, count );
+    assert( tr_bencIsList( val ) );
+    return makeroom( val, count );
 }
 
 int
-tr_bencInitDict( tr_benc * b, size_t reserveCount )
+tr_bencInitDict( tr_benc * val,
+                 size_t    reserveCount )
 {
-    tr_bencInit( b, TR_TYPE_DICT );
-    return tr_bencDictReserve( b, reserveCount );
+    tr_bencInit( val, TYPE_DICT );
+    return tr_bencDictReserve( val, reserveCount );
 }
 
 int
-tr_bencDictReserve( tr_benc * b, size_t reserveCount )
+tr_bencDictReserve( tr_benc * val,
+                    size_t    reserveCount )
 {
-    assert( tr_bencIsDict( b ) );
-    return makeroom( b, reserveCount * 2 );
+    assert( tr_bencIsDict( val ) );
+    return makeroom( val, reserveCount * 2 );
 }
 
 tr_benc *
@@ -644,7 +567,7 @@ tr_bencListAdd( tr_benc * list )
 
     item = &list->val.l.vals[list->val.l.count];
     list->val.l.count++;
-    tr_bencInit( item, TR_TYPE_INT );
+    tr_bencInit( item, TYPE_INT );
 
     return item;
 }
@@ -704,19 +627,21 @@ tr_bencDictAdd( tr_benc *    dict,
     tr_bencInitStr( keyval, key, -1 );
 
     itemval = dict->val.l.vals + dict->val.l.count++;
-    tr_bencInit( itemval, TR_TYPE_INT );
+    tr_bencInit( itemval, TYPE_INT );
 
     return itemval;
 }
 
-static tr_benc*
-dictFindOrAdd( tr_benc * dict, const char * key, int type )
+tr_benc*
+tr_bencDictAddInt( tr_benc *    dict,
+                   const char * key,
+                   int64_t      val )
 {
     tr_benc * child;
 
     /* see if it already exists, and if so, try to reuse it */
     if(( child = tr_bencDictFind( dict, key ))) {
-        if( !tr_bencIsType( child, type ) ) {
+        if( !tr_bencIsInt( child ) ) {
             tr_bencDictRemove( dict, key );
             child = NULL;
         }
@@ -726,32 +651,9 @@ dictFindOrAdd( tr_benc * dict, const char * key, int type )
     if( child == NULL )
         child = tr_bencDictAdd( dict, key );
 
-    return child;
-}
-
-tr_benc*
-tr_bencDictAddInt( tr_benc *    dict,
-                   const char * key,
-                   int64_t      val )
-{
-    tr_benc * child = dictFindOrAdd( dict, key, TR_TYPE_INT );
+    /* set it */
     tr_bencInitInt( child, val );
-    return child;
-}
 
-tr_benc*
-tr_bencDictAddBool( tr_benc * dict, const char * key, tr_bool val )
-{
-    tr_benc * child = dictFindOrAdd( dict, key, TR_TYPE_BOOL );
-    tr_bencInitBool( child, val );
-    return child;
-}
-
-tr_benc*
-tr_bencDictAddReal( tr_benc * dict, const char * key, double val )
-{
-    tr_benc * child = dictFindOrAdd( dict, key, TR_TYPE_REAL );
-    tr_bencInitReal( child, val );
     return child;
 }
 
@@ -778,6 +680,24 @@ tr_bencDictAddStr( tr_benc * dict, const char * key, const char * val )
     tr_bencInitStr( child, val, -1 );
 
     return child;
+}
+
+tr_benc*
+tr_bencDictAddDouble( tr_benc *    dict,
+                      const char * key,
+                      double       d )
+{
+    char buf[128];
+    char * locale;
+
+    /* the json spec requires a '.' decimal point regardless of locale */
+    locale = tr_strdup( setlocale ( LC_NUMERIC, NULL ) );
+    setlocale( LC_NUMERIC, "POSIX" );
+    tr_snprintf( buf, sizeof( buf ), "%f", d );
+    setlocale( LC_NUMERIC, locale );
+    tr_free( locale );
+
+    return tr_bencDictAddStr( dict, key, buf );
 }
 
 tr_benc*
@@ -950,8 +870,6 @@ typedef void ( *BencWalkFunc )( const tr_benc * val, void * user_data );
 struct WalkFuncs
 {
     BencWalkFunc    intFunc;
-    BencWalkFunc    boolFunc;
-    BencWalkFunc    realFunc;
     BencWalkFunc    stringFunc;
     BencWalkFunc    dictBeginFunc;
     BencWalkFunc    listBeginFunc;
@@ -999,30 +917,22 @@ bencWalk( const tr_benc *    top,
 
         if( val ) switch( val->type )
             {
-                case TR_TYPE_INT:
+                case TYPE_INT:
                     walkFuncs->intFunc( val, user_data );
                     break;
 
-                case TR_TYPE_BOOL:
-                    walkFuncs->boolFunc( val, user_data );
-                    break;
-
-                case TR_TYPE_REAL:
-                    walkFuncs->realFunc( val, user_data );
-                    break;
-
-                case TR_TYPE_STR:
+                case TYPE_STR:
                     walkFuncs->stringFunc( val, user_data );
                     break;
 
-                case TR_TYPE_LIST:
+                case TYPE_LIST:
                     if( val != node->val )
                         tr_ptrArrayAppend( &stack, nodeNew( val ) );
                     else
                         walkFuncs->listBeginFunc( val, user_data );
                     break;
 
-                case TR_TYPE_DICT:
+                case TYPE_DICT:
                     if( val != node->val )
                         tr_ptrArrayAppend( &stack, nodeNew( val ) );
                     else
@@ -1048,34 +958,6 @@ saveIntFunc( const tr_benc * val,
              void *          evbuf )
 {
     evbuffer_add_printf( evbuf, "i%" PRId64 "e", val->val.i );
-}
-
-static void
-saveBoolFunc( const tr_benc * val, void * evbuf )
-{
-    if( val->val.b )
-        evbuffer_add( evbuf, "i1e", 3 );
-    else
-        evbuffer_add( evbuf, "i0e", 3 );
-}
-
-static void
-saveRealFunc( const tr_benc * val, void * evbuf )
-{
-    char buf[128];
-    char * locale;
-    size_t len;
-
-    /* always use a '.' decimal point s.t. locale-hopping doesn't bite us */
-    locale = tr_strdup( setlocale ( LC_NUMERIC, NULL ) );
-    setlocale( LC_NUMERIC, "POSIX" );
-    tr_snprintf( buf, sizeof( buf ), "%f", val->val.d );
-    setlocale( LC_NUMERIC, locale );
-    tr_free( locale );
-
-    len = strlen( buf );
-    evbuffer_add_printf( evbuf, "%lu:", (unsigned long)len );
-    evbuffer_add( evbuf, buf, len );
 }
 
 static void
@@ -1118,8 +1000,6 @@ tr_bencSave( const tr_benc * top,
     struct evbuffer * out = tr_getBuffer( );
 
     walkFuncs.intFunc = saveIntFunc;
-    walkFuncs.boolFunc = saveBoolFunc;
-    walkFuncs.realFunc = saveRealFunc;
     walkFuncs.stringFunc = saveStringFunc;
     walkFuncs.dictBeginFunc = saveDictBeginFunc;
     walkFuncs.listBeginFunc = saveListBeginFunc;
@@ -1166,8 +1046,6 @@ tr_bencFree( tr_benc * val )
         struct WalkFuncs walkFuncs;
 
         walkFuncs.intFunc = freeDummyFunc;
-        walkFuncs.boolFunc = freeDummyFunc;
-        walkFuncs.realFunc = freeDummyFunc;
         walkFuncs.stringFunc = freeStringFunc;
         walkFuncs.dictBeginFunc = freeContainerBeginFunc;
         walkFuncs.listBeginFunc = freeContainerBeginFunc;
@@ -1215,7 +1093,7 @@ jsonChildFunc( struct jsonWalk * data )
 
         switch( parentState->bencType )
         {
-            case TR_TYPE_DICT:
+            case TYPE_DICT:
             {
                 const int i = parentState->childIndex++;
                 if( !( i % 2 ) )
@@ -1228,7 +1106,7 @@ jsonChildFunc( struct jsonWalk * data )
                 break;
             }
 
-            case TR_TYPE_LIST:
+            case TYPE_LIST:
             {
                 ++parentState->childIndex;
                 evbuffer_add( data->out, ", ", 2 );
@@ -1271,45 +1149,15 @@ jsonIntFunc( const tr_benc * val,
 }
 
 static void
-jsonBoolFunc( const tr_benc * val, void * vdata )
+jsonStringFunc( const tr_benc * val,
+                void *          vdata )
 {
-    struct jsonWalk * data = vdata;
+    struct jsonWalk *    data = vdata;
+    const unsigned char *it, *end;
 
-    if( val->val.b )
-        evbuffer_add( data->out, "true", 4 );
-    else
-        evbuffer_add( data->out, "false", 5 );
-
-    jsonChildFunc( data );
-}
-
-static void
-jsonRealFunc( const tr_benc * val, void * vdata )
-{
-    struct jsonWalk * data = vdata;
-    char * locale;
-
-    /* json requires a '.' decimal point regardless of locale */
-    locale = tr_strdup( setlocale ( LC_NUMERIC, NULL ) );
-    setlocale( LC_NUMERIC, "POSIX" );
-    evbuffer_add_printf( data->out, "%f", val->val.d );
-    setlocale( LC_NUMERIC, locale );
-    tr_free( locale );
-
-    jsonChildFunc( data );
-}
-
-static void
-jsonStringFunc( const tr_benc * val, void * vdata )
-{
-    struct jsonWalk * data = vdata;
-    const unsigned char * it = (const unsigned char *) val->val.s.s;
-    const unsigned char * end = it + val->val.s.i;
-
-    evbuffer_expand( data->out, val->val.s.i + 2 );
     evbuffer_add( data->out, "\"", 1 );
-
-    for( ; it!=end; ++it )
+    for( it = (const unsigned char*)val->val.s.s, end = it + val->val.s.i;
+         it != end; ++it )
     {
         switch( *it )
         {
@@ -1411,8 +1259,6 @@ tr_bencSaveAsJSON( const tr_benc * top, struct evbuffer * out )
     data.parents = NULL;
 
     walkFuncs.intFunc = jsonIntFunc;
-    walkFuncs.boolFunc = jsonBoolFunc;
-    walkFuncs.realFunc = jsonRealFunc;
     walkFuncs.stringFunc = jsonStringFunc;
     walkFuncs.dictBeginFunc = jsonDictBeginFunc;
     walkFuncs.listBeginFunc = jsonListBeginFunc;
@@ -1424,17 +1270,6 @@ tr_bencSaveAsJSON( const tr_benc * top, struct evbuffer * out )
         evbuffer_add_printf( out, "\n" );
 
     return (char*) EVBUFFER_DATA( out );
-}
-
-char*
-tr_bencToJSON( const tr_benc * top )
-{
-    char * ret;
-    struct evbuffer * buf = evbuffer_new( );
-    tr_bencSaveAsJSON( top, buf );
-    ret = tr_strndup( EVBUFFER_DATA( buf ), EVBUFFER_LENGTH( buf ) );
-    evbuffer_free( buf );
-    return ret;
 }
 
 /***
@@ -1483,33 +1318,22 @@ tr_bencMergeDicts( tr_benc * target, const tr_benc * source )
     {
         const char * key;
         const tr_benc * val;
-        tr_benc * t;
 
         if( tr_bencDictChild( source, i, &key, &val ) )
         {
-            if( tr_bencIsBool( val ) )
+            int64_t i64;
+            const char * str;
+            tr_benc * t;
+
+            if( tr_bencGetInt( val, &i64 ) )
             {
-                tr_bool boolVal;
-                tr_bencGetBool( val, &boolVal );
-                tr_bencDictAddBool( target, key, boolVal );
+                tr_bencDictRemove( target, key );
+                tr_bencDictAddInt( target, key, i64 );
             }
-            else if( tr_bencIsReal( val ) )
+            else if( tr_bencGetStr( val, &str ) )
             {
-                double realVal;
-                tr_bencGetReal( val, &realVal );
-                tr_bencDictAddReal( target, key, realVal );
-            }
-            else if( tr_bencIsInt( val ) )
-            {
-                int64_t intVal;
-                tr_bencGetInt( val, &intVal );
-                tr_bencDictAddInt( target, key, intVal );
-            }
-            else if( tr_bencIsString( val ) )
-            {
-                const char * strVal;
-                tr_bencGetStr( val, &strVal );
-                tr_bencDictAddStr( target, key, strVal );
+                tr_bencDictRemove( target, key );
+                tr_bencDictAddStr( target, key, str );
             }
             else if( tr_bencIsDict( val ) && tr_bencDictFindDict( target, key, &t ) )
             {
@@ -1517,6 +1341,7 @@ tr_bencMergeDicts( tr_benc * target, const tr_benc * source )
             }
             else
             {
+            
                 tr_dbg( "tr_bencMergeDicts skipping \"%s\"", key );
             }
         }

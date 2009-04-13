@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -26,6 +26,7 @@
 #import "FileOutlineView.h"
 #import "Torrent.h"
 #import "FileListNode.h"
+#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 
 #define PADDING_HORIZONAL 2.0f
@@ -139,24 +140,21 @@
     //icon
     [[self image] drawInRect: [self imageRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
     
-    NSColor * titleColor, * statusColor;
-    if ([self backgroundStyle] == NSBackgroundStyleDark)
-        titleColor = statusColor = [NSColor whiteColor];
-    else if ([[(FileOutlineView *)[self controlView] torrent] checkForFiles: [(FileListNode *)[self objectValue] indexes]] == NSOffState)
-        titleColor = statusColor = [NSColor disabledControlTextColor];
-    else
-    {
-        titleColor = [NSColor controlTextColor];
-        statusColor = [NSColor darkGrayColor];
-    }
-    
     //title
-    NSAttributedString * titleString = [self attributedTitleWithColor: titleColor];
+    NSColor * specialColor = nil;
+    if ([self isHighlighted]
+            && [[self highlightColorWithFrame: cellFrame inView: controlView] isEqual: [NSColor alternateSelectedControlColor]])
+        specialColor = [NSColor whiteColor];
+    else if ([[(FileOutlineView *)[self controlView] torrent] checkForFiles: [(FileListNode *)[self objectValue] indexes]] == NSOffState)
+        specialColor = [NSColor disabledControlTextColor];
+    else;
+    
+    NSAttributedString * titleString = [self attributedTitleWithColor: specialColor ? specialColor : [NSColor controlTextColor]];
     NSRect titleRect = [self rectForTitleWithString: titleString inBounds: cellFrame];
     [titleString drawInRect: titleRect];
     
     //status
-    NSAttributedString * statusString = [self attributedStatusWithColor: statusColor];
+    NSAttributedString * statusString = [self attributedStatusWithColor: specialColor ? specialColor : [NSColor darkGrayColor]];
     NSRect statusRect = [self rectForStatusWithString: statusString withTitleRect: titleRect inBounds: cellFrame];
     [statusString drawInRect: statusRect];
 }
@@ -226,8 +224,9 @@
     Torrent * torrent = [(FileOutlineView *)[self controlView] torrent];
     FileListNode * node = (FileListNode *)[self objectValue];
     
+    NSString * percentString;
     CGFloat progress = [torrent fileProgress: node];
-    NSString * percentString = progress == 1.0f ? @"100%" : [NSString localizedStringWithFormat: @"%.2f%%", progress * 100.0f];
+    percentString = progress == 1.0f ? @"100%" : [NSString localizedStringWithFormat: @"%.2f%%", progress * 100.0f];
     
     
     NSString * status = [NSString localizedStringWithFormat: NSLocalizedString(@"%@ of %@",

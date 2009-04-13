@@ -37,11 +37,11 @@ AM_LDFLAGS = \
 noinst_HEADERS = \
     actions.h \
     add-dialog.h \
+    blocklist.h \
     conf.h \
     details.h \
     dialogs.h \
     hig.h \
-    icons.h \
     file-list.h \
     lock.h \
     logo.h \
@@ -59,7 +59,6 @@ noinst_HEADERS = \
     tr-prefs.h \
     tr-torrent.h \
     tr-window.h \
-    turtles.h \
     ui.h \
     util.h
 
@@ -70,12 +69,12 @@ dbus_generated_sources = tr-core-dbus.h
 transmission_SOURCES = \
     actions.c \
     add-dialog.c \
+    blocklist.c \
     conf.c \
     details.c \
     dialogs.c \
     file-list.c \
     hig.c \
-    icons.c \
     main.c \
     makemeta-ui.c \
     msgwin.c \

@@ -1027,7 +1027,7 @@ peerCallbackFunc( void * vpeer, void * vevent, void * vt )
             const time_t now = time( NULL );
             tr_torrent * tor = t->tor;
 
-            tr_torrentSetActivityDate( tor, now );
+            tor->activityDate = now;
 
             if( e->wasPieceData )
                 tor->uploadedCur += e->length;
@@ -1042,8 +1042,6 @@ peerCallbackFunc( void * vpeer, void * vevent, void * vt )
                 if( e->wasPieceData )
                     a->piece_data_time = now;
             }
-
-            tor->needsSeedRatioCheck = TRUE;
 
             break;
         }
@@ -1062,8 +1060,7 @@ peerCallbackFunc( void * vpeer, void * vevent, void * vt )
         {
             const time_t now = time( NULL );
             tr_torrent * tor = t->tor;
-
-            tr_torrentSetActivityDate( tor, now );
+            tor->activityDate = now;
 
             /* only add this to downloadedCur if we got it from a peer --
              * webseeds shouldn't count against our ratio.  As one tracker
@@ -2420,7 +2417,6 @@ pumpAllPeers( tr_peerMgr * mgr )
 static int
 bandwidthPulse( void * vmgr )
 {
-    tr_torrent * tor = NULL;
     tr_peerMgr * mgr = vmgr;
     managerLock( mgr );
 
@@ -2430,14 +2426,6 @@ bandwidthPulse( void * vmgr )
     /* allocate bandwidth to the peers */
     tr_bandwidthAllocate( mgr->session->bandwidth, TR_UP, BANDWIDTH_PERIOD_MSEC );
     tr_bandwidthAllocate( mgr->session->bandwidth, TR_DOWN, BANDWIDTH_PERIOD_MSEC );
-
-    /* possibly stop torrents that have seeded enough */
-    while(( tor = tr_torrentNext( mgr->session, tor ))) {
-        if( tor->needsSeedRatioCheck ) {
-            tor->needsSeedRatioCheck = FALSE;
-            tr_torrentCheckSeedRatio( tor );
-        }
-    }
 
     managerUnlock( mgr );
     return TRUE;

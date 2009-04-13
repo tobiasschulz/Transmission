@@ -20,7 +20,6 @@
 #include "tr-prefs.h"
 #include "lock.h"
 #include "logo.h"
-#include "turtles.h"
 
 #define UNUSED G_GNUC_UNUSED
 
@@ -51,9 +50,7 @@ static GtkRadioActionEntry sort_radio_entries[] =
     { "sort-by-ratio",    NULL, N_( "Sort by _Ratio" ),    NULL, NULL, 3 },
     { "sort-by-state",    NULL, N_( "Sort by _State" ),    NULL, NULL, 4 },
     { "sort-by-tracker",  NULL, N_( "Sort by _Tracker" ),  NULL, NULL, 5 },
-    { "sort-by-age",      NULL, N_( "Sort by A_ge" ),      NULL, NULL, 6 },
-    { "sort-by-eta",      NULL, N_( "Sort by _ETA" ),      NULL, NULL, 7 },
-    { "sort-by-size",     NULL, N_( "Sort by Si_ze" ),     NULL, NULL, 8 }
+    { "sort-by-age",      NULL, N_( "Sort by A_ge" ),      NULL, NULL, 6 }
 };
 
 static void
@@ -140,9 +137,7 @@ BuiltinIconInfo;
 static const BuiltinIconInfo my_fallback_icons[] =
 {
     { tr_icon_logo, "transmission"      },
-    { tr_icon_lock, "transmission-lock" },
-    { blue_turtle,  "alt-speed-on"      },
-    { grey_turtle,  "alt-speed-off"     }
+    { tr_icon_lock, "transmission-lock" }
 };
 
 static void

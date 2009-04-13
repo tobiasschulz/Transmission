@@ -35,10 +35,6 @@ void        tr_ctorSetSave( tr_ctor * ctor,
 
 int         tr_ctorGetSave( const tr_ctor * ctor );
 
-void        tr_ctorInitTorrentPriorities( const tr_ctor * ctor, tr_torrent * tor );
-
-void        tr_ctorInitTorrentWanted( const tr_ctor * ctor, tr_torrent * tor );
-
 /**
 ***
 **/
@@ -75,7 +71,6 @@ tr_bool     tr_torrentIsPieceTransferAllowed( const tr_torrent * torrent,
                                               tr_direction       direction );
 
 
-
 #define tr_block( a, b ) _tr_block( tor, a, b )
 tr_block_index_t _tr_block( const tr_torrent * tor,
                             tr_piece_index_t   index,
@@ -94,6 +89,7 @@ uint64_t         tr_pieceOffset( const tr_torrent * tor,
 void             tr_torrentInitFilePriority( tr_torrent       * tor,
                                              tr_file_index_t    fileIndex,
                                              tr_priority_t      priority );
+
 
 int              tr_torrentCountUncheckedPieces( const tr_torrent * );
 
@@ -119,9 +115,6 @@ time_t*          tr_torrentGetMTimes( const tr_torrent  * tor,
 tr_torrent*      tr_torrentNext( tr_session  * session,
                                  tr_torrent  * current );
 
-void             tr_torrentCheckSeedRatio( tr_torrent * tor );
-
-
 
 typedef enum
 {
@@ -131,13 +124,12 @@ typedef enum
 }
 tr_verify_state;
 
-void             tr_torrentSetVerifyState( tr_torrent      * tor,
-                                           tr_verify_state   state );
-
 struct tr_torrent
 {
     tr_session *             session;
     tr_info                  info;
+
+    tr_speedlimit            speedLimitMode[2];
 
     struct tr_ratecontrol    swarmSpeed;
 
@@ -189,17 +181,12 @@ struct tr_torrent
     time_t                     activityDate;
     time_t                     doneDate;
     time_t                     startDate;
-    time_t                     anyDate;
 
     tr_torrent_completeness_func *   completeness_func;
     void *                     completeness_func_user_data;
 
-    tr_torrent_ratio_limit_hit_func * ratio_limit_hit_func;
-    void *                     ratio_limit_hit_func_user_data;
-
     tr_bool                    isRunning;
     tr_bool                    isDeleting;
-    tr_bool                    needsSeedRatioCheck;
 
     uint16_t                   maxConnectedPeers;
 
@@ -215,9 +202,6 @@ struct tr_torrent
     struct tr_bandwidth      * bandwidth;
 
     struct tr_torrent_peers  * torrentPeers;
-
-    double                     desiredRatio;
-    tr_ratiolimit              ratioLimitMode;
 };
 
 /* get the index of this piece's first block */

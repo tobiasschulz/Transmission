@@ -1,29 +1,5 @@
 NEWS file for Transmission <http://www.transmissionbt.com/>
 
-1.60 (2009/mm/dd)
-<http://trac.transmissionbt.com/query?milestone=1.60&group=component&groupdesc=1&order=severity>
-- All Platforms
-   + Random port, with optional randomization on startup
-   + Option for transfers to specify if they are included in the global bandwidth limits
-- Mac
-   + Requires Mac OS X 10.5 Leopard or newer
-   + Groups (moved to preferences) can be auto-assigned to transfers when adding based on multiple criteria
-   + Groups can have a default location when adding transfers
-   + The speed limit scheduler can now be applied to only specific days
-   + Bonjour support for the web interface
-   + File filter field in the inspector
-   + Option to include beta releases when auto-updating (using modified Sparkle 1.5)
-- GTK+
-   + Speed Limit: Second set of bandwidth limits that can be toggled or scheduled
-   + Show the file icon in the list
-   + Allow sorting of the torrent list by size and by ETA
-- Qt
-   + New beta Qt client
-- Daemon
-   + Watch folder for auto-adding torrents
-- Web Client 
-   + File selection and prioritization
-
 1.52 (2009/04/12)
 <http://trac.transmissionbt.com/query?milestone=1.52&group=component&groupdesc=1&order=severity>
 - Mac
@@ -63,12 +39,12 @@ NEWS file for Transmission <http://www.transmissionbt.com/>
    + Fix 1.42 error that made tracker announces slower over time
    + Fix a Mac-centric peer connection bug from 1.41
    + Use less CPU cycles when managing very fast peers
-   + Better handling of non-UTF-8 torrent files 
+   + Better handling of non-UTF-8 torrent files
    + When removing local data, only remove data from the torrent
    + Close potential DoS vulnerability in 1.41
    + Many other bugfixes
 - GTK+
-   + Various usability improvements 
+   + Various usability improvements
    + Better Gnome HIG compliance in the statusbar, properties dialog, and more
 - Daemon
    + Lots of new options added to transmission-remote
@@ -76,7 +52,7 @@ NEWS file for Transmission <http://www.transmissionbt.com/>
    + Make i18n support optional for cli and daemon clients
 - CLI
    + Support session.json settings, just as the Daemon and GTK+ clients do
-- Web Client 
+- Web Client
    + Torrents can now be added by URL
    + Add the ability to "remove local data" from the web client
 
@@ -144,6 +120,7 @@ NEWS file for Transmission <http://www.transmissionbt.com/>
    + Added the ability to get detailed peer information on torrents
    + Fix bug that didn't handle --config-dir and TRANSMISSION_HOME correctly
    + Windows portability
+
 
 1.34 (2008/09/16)
 <http://trac.transmissionbt.com/query?milestone=1.34&group=component&groupdesc=1&order=severity>
@@ -606,7 +583,7 @@ http://trac.transmissionbt.com/query?group=component&milestone=1.20
    + Reworked interface
    + Rate limits can be changed directly from the main window
    + Ability to automatically stop seeding at a given ratio
-   + Allows sorting of the transfers list
+   + Allows sorting of the tranfers list
    + Extended Info Inspector
    + Automatic updating with Sparkle
  - GTK+:

@@ -83,8 +83,6 @@ typedef struct
     GtkWidget *           dl_lb;
     GtkWidget *           stats_lb;
     GtkWidget *           gutter_lb;
-    GtkWidget *           alt_speed_image[2]; /* 0==off, 1==on */
-    GtkWidget *           alt_speed_button;
     GtkTreeSelection *    selection;
     GtkCellRenderer *     renderer;
     GtkTreeViewColumn *   column;
@@ -98,30 +96,8 @@ typedef struct
 }
 PrivateData;
 
-static const char*
-getFilterName( int mode )
-{
-    switch( mode )
-    {
-        case FILTER_MODE_ACTIVE:      return "show-active";
-        case FILTER_MODE_DOWNLOADING: return "show-downloading";
-        case FILTER_MODE_SEEDING:     return "show-seeding";
-        case FILTER_MODE_PAUSED:      return "show-paused";
-        default:                      return "show-active"; /* the fallback */
-    }
-}
-static int
-getFilterModeFromName( const char * name )
-{
-    if( !strcmp( name, "show-active"      ) ) return FILTER_MODE_ACTIVE;
-    if( !strcmp( name, "show-downloading" ) ) return FILTER_MODE_DOWNLOADING;
-    if( !strcmp( name, "show-seeding"     ) ) return FILTER_MODE_SEEDING;
-    if( !strcmp( name, "show-paused"      ) ) return FILTER_MODE_PAUSED;
-    return FILTER_MODE_ALL; /* the fallback */
-}
-
 #define PRIVATE_DATA_KEY "private-data"
-#define FILTER_MODE_KEY "tr-filter-mode"
+
 #define FILTER_TEXT_MODE_KEY "tr-filter-text-mode"
 
 static PrivateData*
@@ -216,9 +192,6 @@ makeview( PrivateData * p,
     return view;
 }
 
-static void syncAltSpeedButton( PrivateData * p );
-static void setFilter( PrivateData * p, int mode );
-
 static void
 prefsChanged( TrCore * core UNUSED,
               const char *  key,
@@ -233,10 +206,6 @@ prefsChanged( TrCore * core UNUSED,
          * its fixed-height mode values.  Unfortunately there's not an API call
          * for that, but it *does* revalidate when it thinks the style's been tweaked */
         g_signal_emit_by_name( p->view, "style-set", NULL, NULL );
-    }
-    else if( !strcmp( key, PREF_KEY_FILTER_MODE ) )
-    {
-        setFilter( p, getFilterModeFromName( pref_string_get( key ) ) );
     }
     else if( !strcmp( key, PREF_KEY_STATUSBAR ) )
     {
@@ -256,10 +225,6 @@ prefsChanged( TrCore * core UNUSED,
     else if( !strcmp( key, PREF_KEY_STATUSBAR_STATS ) )
     {
         tr_window_update( (TrWindow*)wind );
-    }
-    else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_ENABLED ) )
-    {
-        syncAltSpeedButton( p );
     }
 }
 
@@ -310,31 +275,6 @@ status_menu_toggled_cb( GtkCheckMenuItem * menu_item,
     }
 }
 
-static void
-syncAltSpeedButton( PrivateData * p )
-{
-    const char * tip;
-    const gboolean b = pref_flag_get( TR_PREFS_KEY_ALT_SPEED_ENABLED );
-    GtkWidget * w = p->alt_speed_button;
-
-    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( w ), b );
-
-    gtk_button_set_image( GTK_BUTTON( w ), p->alt_speed_image[b?1:0] );
-    gtk_button_set_alignment( GTK_BUTTON( w ), 0.5, 0.5 );
-
-    tip = b ? _( "Click to disable Speed Limit Mode" )
-            : _( "Click to enable Speed Limit Mode" );
-    gtr_widget_set_tooltip_text( w, tip );
-}
-
-static void
-alt_speed_toggled_cb( GtkToggleButton * button, gpointer vprivate )
-{
-    PrivateData * p = vprivate;
-    const gboolean b = gtk_toggle_button_get_active( button );
-    tr_core_set_pref_bool( p->core, TR_PREFS_KEY_ALT_SPEED_ENABLED,  b );
-}
-    
 /***
 ****  FILTER
 ***/
@@ -450,34 +390,25 @@ filter_text_toggled_cb( GtkCheckMenuItem * menu_item,
 }
 
 static void
-setFilter( PrivateData * p, int mode )
+filter_toggled_cb( GtkToggleButton * toggle,
+                   gpointer          vprivate )
 {
-    if( mode != (int)p->filter_mode )
-    {
-        int i;
+    int mode = -1;
+    PrivateData * p = vprivate;
 
-        /* refilter */
-        p->filter_mode = mode;
-        refilter( p );
-
-        /* update the prefs */
-        tr_core_set_pref( p->core, PREF_KEY_FILTER_MODE, getFilterName( mode ) );
-
-        /* update the togglebuttons */
-        for( i=0; i<FILTER_MODE_QTY; ++i )
-            gtk_toggle_button_set_active( p->filter_toggles[i], i==mode );
-    }
-}
-  
-
-static void
-filter_toggled_cb( GtkToggleButton * toggle, gpointer vprivate )
-{
     if( gtk_toggle_button_get_active( toggle ) )
     {
-        PrivateData * p = vprivate;
-        const int mode = GPOINTER_TO_UINT( g_object_get_data( G_OBJECT( toggle ), FILTER_MODE_KEY ) );
-        setFilter( p, mode );
+        int i;
+        for( i=0; i<FILTER_MODE_QTY; ++i )
+            if( p->filter_toggles[i] == toggle )
+                mode = i;
+            else
+                gtk_toggle_button_set_active( p->filter_toggles[i], FALSE );
+    }
+
+    if( mode >= 0 ) {
+        p->filter_mode = mode;
+        refilter( p );
     }
 }
 
@@ -559,22 +490,6 @@ onAskTrackerQueryTooltip( GtkWidget *            widget UNUSED,
 
 #endif
 
-static gboolean
-onAltSpeedToggledIdle( gpointer vp )
-{
-    PrivateData * p = vp;
-    gboolean b = tr_sessionUsesAltSpeed( tr_core_session( p->core ) );
-    tr_core_set_pref_bool( p->core, TR_PREFS_KEY_ALT_SPEED_ENABLED, b );
-
-    return FALSE;
-}
-
-static void
-onAltSpeedToggled( tr_session * s UNUSED, tr_bool isEnabled UNUSED, tr_bool byUser UNUSED, void * p )
-{
-    g_idle_add( onAltSpeedToggledIdle, p );
-}
-
 /***
 ****  PUBLIC
 ***/
@@ -607,6 +522,7 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
     };
 
     p = g_new0( PrivateData, 1 );
+    p->filter_mode = FILTER_MODE_ALL;
     p->filter_text_mode = FILTER_TEXT_MODE_NAME;
     p->filter_text = NULL;
 
@@ -646,23 +562,17 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
     {
         const char * mnemonic = _( filter_names[i] );
         w = gtk_toggle_button_new_with_mnemonic( mnemonic );
-        g_object_set_data( G_OBJECT( w ), FILTER_MODE_KEY, GINT_TO_POINTER( i ) );
         gtk_button_set_relief( GTK_BUTTON( w ), GTK_RELIEF_NONE );
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( w ), i == FILTER_MODE_ALL );
         p->filter_toggles[i] = GTK_TOGGLE_BUTTON( w );
         g_signal_connect( w, "toggled", G_CALLBACK( filter_toggled_cb ), p );
         gtk_box_pack_start( GTK_BOX( h ), w, FALSE, FALSE, 0 );
     }
-
     s = sexy_icon_entry_new( );
     sexy_icon_entry_add_clear_button( SEXY_ICON_ENTRY( s ) );
     image = gtk_image_new_from_stock( GTK_STOCK_FIND, GTK_ICON_SIZE_MENU );
-    sexy_icon_entry_set_icon( SEXY_ICON_ENTRY(
-                                 s ), SEXY_ICON_ENTRY_PRIMARY,
-                             GTK_IMAGE( image ) );
-    sexy_icon_entry_set_icon_highlight( SEXY_ICON_ENTRY(
-                                            s ), SEXY_ICON_ENTRY_PRIMARY,
-                                        TRUE );
+    sexy_icon_entry_set_icon( SEXY_ICON_ENTRY( s ), SEXY_ICON_ENTRY_PRIMARY, GTK_IMAGE( image ) );
+    sexy_icon_entry_set_icon_highlight( SEXY_ICON_ENTRY( s ), SEXY_ICON_ENTRY_PRIMARY, TRUE );
     gtk_box_pack_end( GTK_BOX( h ), s, FALSE, FALSE, 0 );
     g_signal_connect( s, "changed", G_CALLBACK( filter_entry_changed ), p );
 
@@ -688,17 +598,9 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
 
     /* status */
     h = status = p->status = gtk_hbox_new( FALSE, GUI_PAD );
-    gtk_container_set_border_width( GTK_CONTAINER( h ), GUI_PAD_SMALL );
-    p->alt_speed_image[0] = gtk_image_new_from_stock( "alt-speed-off", -1 );
-    p->alt_speed_image[1]  = gtk_image_new_from_stock( "alt-speed-on", -1 );
-    w = p->alt_speed_button = gtk_toggle_button_new( );
-    /*gtk_button_set_relief( GTK_BUTTON( w ), GTK_RELIEF_NONE );*/
-    g_object_ref( G_OBJECT( p->alt_speed_image[0] ) );
-    g_object_ref( G_OBJECT( p->alt_speed_image[1] ) );
-    g_signal_connect( w, "toggled", G_CALLBACK(alt_speed_toggled_cb ), p );
-    gtk_box_pack_start( GTK_BOX( h ), w, 0, 0, 0 );
+    gtk_container_set_border_width( GTK_CONTAINER( h ), GUI_PAD );
     w = p->gutter_lb = gtk_label_new( "N Torrents" );
-    gtk_box_pack_start( GTK_BOX( h ), w, 1, 1, GUI_PAD_BIG );
+    gtk_box_pack_start( GTK_BOX( h ), w, 0, 0, 0 );
     w = p->ul_lb = gtk_label_new( NULL );
     gtk_box_pack_end( GTK_BOX( h ), w, FALSE, FALSE, 0 );
     w = gtk_image_new_from_stock( GTK_STOCK_GO_UP, GTK_ICON_SIZE_MENU );
@@ -781,12 +683,8 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
     prefsChanged( core, PREF_KEY_STATUSBAR, self );
     prefsChanged( core, PREF_KEY_STATUSBAR_STATS, self );
     prefsChanged( core, PREF_KEY_TOOLBAR, self );
-    prefsChanged( core, PREF_KEY_FILTER_MODE, self );
-    prefsChanged( core, TR_PREFS_KEY_ALT_SPEED_ENABLED, self );
     p->pref_handler_id = g_signal_connect( core, "prefs-changed",
                                            G_CALLBACK( prefsChanged ), self );
-
-    tr_sessionSetAltSpeedFunc( tr_core_session( core ), onAltSpeedToggled, p );
 
     filter_entry_changed( GTK_EDITABLE( s ), p );
     return self;

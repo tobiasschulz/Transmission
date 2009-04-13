@@ -144,10 +144,7 @@ test2( void )
 {
     tr_benc top;
     const char * in = " ";
-    int err;
-
-    top.type = 0;
-    err = tr_jsonParse( in, strlen( in ), &top, NULL );
+    const int err = tr_jsonParse( in, strlen( in ), &top, NULL );
 
     check( err );
     check( !tr_bencIsDict( &top ) );

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2009 Transmission authors and contributors
+ * Copyright (c) 2005-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -46,7 +46,6 @@
     NSArray * fSelectedValues;
     
     IBOutlet NSMenu * fActionMenu, * fUploadMenu, * fDownloadMenu, * fRatioMenu;
-    IBOutlet NSMenuItem * fGlobalLimitItem;
     Torrent * fMenuTorrent;
     
     CGFloat fPiecesBarPercent;
@@ -77,7 +76,6 @@
 
 - (void) setQuickLimitMode: (id) sender;
 - (void) setQuickLimit: (id) sender;
-- (void) setGlobalLimit: (id) sender;
 
 - (void) setQuickRatioMode: (id) sender;
 - (void) setQuickRatio: (id) sender;
