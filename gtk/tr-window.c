@@ -73,25 +73,16 @@ filter_mode_t;
 
 typedef struct
 {
-    GtkWidget *           speedlimit_on_item[2];
-    GtkWidget *           speedlimit_off_item[2];
-    GtkWidget *           ratio_on_item;
-    GtkWidget *           ratio_off_item;
     GtkWidget *           scroll;
     GtkWidget *           view;
     GtkWidget *           toolbar;
     GtkWidget *           filter;
     GtkWidget *           status;
     GtkWidget *           status_menu;
-    GtkWidget *           ul_hbox;
-    GtkWidget *           dl_hbox;
     GtkWidget *           ul_lb;
     GtkWidget *           dl_lb;
     GtkWidget *           stats_lb;
     GtkWidget *           gutter_lb;
-    GtkWidget *           alt_speed_image[2]; /* 0==off, 1==on */
-    GtkWidget *           alt_speed_button;
-    GtkWidget *           options_menu;
     GtkTreeSelection *    selection;
     GtkCellRenderer *     renderer;
     GtkTreeViewColumn *   column;
@@ -105,30 +96,8 @@ typedef struct
 }
 PrivateData;
 
-static const char*
-getFilterName( int mode )
-{
-    switch( mode )
-    {
-        case FILTER_MODE_ACTIVE:      return "show-active";
-        case FILTER_MODE_DOWNLOADING: return "show-downloading";
-        case FILTER_MODE_SEEDING:     return "show-seeding";
-        case FILTER_MODE_PAUSED:      return "show-paused";
-        default:                      return "show-all"; /* the fallback */
-    }
-}
-static int
-getFilterModeFromName( const char * name )
-{
-    if( !strcmp( name, "show-active"      ) ) return FILTER_MODE_ACTIVE;
-    if( !strcmp( name, "show-downloading" ) ) return FILTER_MODE_DOWNLOADING;
-    if( !strcmp( name, "show-seeding"     ) ) return FILTER_MODE_SEEDING;
-    if( !strcmp( name, "show-paused"      ) ) return FILTER_MODE_PAUSED;
-    return FILTER_MODE_ALL; /* the fallback */
-}
-
 #define PRIVATE_DATA_KEY "private-data"
-#define FILTER_MODE_KEY "tr-filter-mode"
+
 #define FILTER_TEXT_MODE_KEY "tr-filter-text-mode"
 
 static PrivateData*
@@ -223,9 +192,6 @@ makeview( PrivateData * p,
     return view;
 }
 
-static void syncAltSpeedButton( PrivateData * p );
-static void setFilter( PrivateData * p, int mode );
-
 static void
 prefsChanged( TrCore * core UNUSED,
               const char *  key,
@@ -240,10 +206,6 @@ prefsChanged( TrCore * core UNUSED,
          * its fixed-height mode values.  Unfortunately there's not an API call
          * for that, but it *does* revalidate when it thinks the style's been tweaked */
         g_signal_emit_by_name( p->view, "style-set", NULL, NULL );
-    }
-    else if( !strcmp( key, PREF_KEY_FILTER_MODE ) )
-    {
-        setFilter( p, getFilterModeFromName( pref_string_get( key ) ) );
     }
     else if( !strcmp( key, PREF_KEY_STATUSBAR ) )
     {
@@ -263,10 +225,6 @@ prefsChanged( TrCore * core UNUSED,
     else if( !strcmp( key, PREF_KEY_STATUSBAR_STATS ) )
     {
         tr_window_update( (TrWindow*)wind );
-    }
-    else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_ENABLED ) )
-    {
-        syncAltSpeedButton( p );
     }
 }
 
@@ -317,31 +275,6 @@ status_menu_toggled_cb( GtkCheckMenuItem * menu_item,
     }
 }
 
-static void
-syncAltSpeedButton( PrivateData * p )
-{
-    const char * tip;
-    const gboolean b = pref_flag_get( TR_PREFS_KEY_ALT_SPEED_ENABLED );
-    GtkWidget * w = p->alt_speed_button;
-
-    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( w ), b );
-
-    gtk_button_set_image( GTK_BUTTON( w ), p->alt_speed_image[b?1:0] );
-    gtk_button_set_alignment( GTK_BUTTON( w ), 0.5, 0.5 );
-
-    tip = b ? _( "Click to disable Speed Limit Mode" )
-            : _( "Click to enable Speed Limit Mode" );
-    gtr_widget_set_tooltip_text( w, tip );
-}
-
-static void
-alt_speed_toggled_cb( GtkToggleButton * button, gpointer vprivate )
-{
-    PrivateData * p = vprivate;
-    const gboolean b = gtk_toggle_button_get_active( button );
-    tr_core_set_pref_bool( p->core, TR_PREFS_KEY_ALT_SPEED_ENABLED,  b );
-}
-    
 /***
 ****  FILTER
 ***/
@@ -457,34 +390,25 @@ filter_text_toggled_cb( GtkCheckMenuItem * menu_item,
 }
 
 static void
-setFilter( PrivateData * p, int mode )
+filter_toggled_cb( GtkToggleButton * toggle,
+                   gpointer          vprivate )
 {
-    if( mode != (int)p->filter_mode )
-    {
-        int i;
+    int mode = -1;
+    PrivateData * p = vprivate;
 
-        /* refilter */
-        p->filter_mode = mode;
-        refilter( p );
-
-        /* update the prefs */
-        tr_core_set_pref( p->core, PREF_KEY_FILTER_MODE, getFilterName( mode ) );
-
-        /* update the togglebuttons */
-        for( i=0; i<FILTER_MODE_QTY; ++i )
-            gtk_toggle_button_set_active( p->filter_toggles[i], i==mode );
-    }
-}
-  
-
-static void
-filter_toggled_cb( GtkToggleButton * toggle, gpointer vprivate )
-{
     if( gtk_toggle_button_get_active( toggle ) )
     {
-        PrivateData * p = vprivate;
-        const int mode = GPOINTER_TO_UINT( g_object_get_data( G_OBJECT( toggle ), FILTER_MODE_KEY ) );
-        setFilter( p, mode );
+        int i;
+        for( i=0; i<FILTER_MODE_QTY; ++i )
+            if( p->filter_toggles[i] == toggle )
+                mode = i;
+            else
+                gtk_toggle_button_set_active( p->filter_toggles[i], FALSE );
+    }
+
+    if( mode >= 0 ) {
+        p->filter_mode = mode;
+        refilter( p );
     }
 }
 
@@ -566,228 +490,6 @@ onAskTrackerQueryTooltip( GtkWidget *            widget UNUSED,
 
 #endif
 
-static gboolean
-onAltSpeedToggledIdle( gpointer vp )
-{
-    PrivateData * p = vp;
-    gboolean b = tr_sessionUsesAltSpeed( tr_core_session( p->core ) );
-    tr_core_set_pref_bool( p->core, TR_PREFS_KEY_ALT_SPEED_ENABLED, b );
-
-    return FALSE;
-}
-
-static void
-onAltSpeedToggled( tr_session * s UNUSED, tr_bool isEnabled UNUSED, tr_bool byUser UNUSED, void * p )
-{
-    g_idle_add( onAltSpeedToggledIdle, p );
-}
-
-/***
-****  Speed limit menu
-***/
-
-#define DIRECTION_KEY "direction-key"
-#define ENABLED_KEY "enabled-key"
-#define SPEED_KEY "speed-key"
-
-static void
-onSpeedToggled( GtkCheckMenuItem * check, gpointer vp ) 
-{
-    PrivateData * p = vp;
-    GObject * o = G_OBJECT( check );
-    gboolean isEnabled = g_object_get_data( o, ENABLED_KEY ) != 0;
-    tr_direction dir = GPOINTER_TO_INT( g_object_get_data( o, DIRECTION_KEY ) );
-    const char * key = dir == TR_UP ? TR_PREFS_KEY_USPEED_ENABLED
-                                    : TR_PREFS_KEY_DSPEED_ENABLED;
-
-    if( gtk_check_menu_item_get_active( check ) )
-        tr_core_set_pref_bool( p->core, key, isEnabled );
-}
-
-static void
-onSpeedSet( GtkCheckMenuItem * check, gpointer vp ) 
-{
-    const char * key;
-    PrivateData * p = vp;
-    GObject * o = G_OBJECT( check );
-    const int speed = GPOINTER_TO_INT( g_object_get_data( o, SPEED_KEY ) );
-    tr_direction dir = GPOINTER_TO_INT( g_object_get_data( o, DIRECTION_KEY ) );
-
-    key = dir==TR_UP ? TR_PREFS_KEY_USPEED : TR_PREFS_KEY_DSPEED;
-    tr_core_set_pref_int( p->core, key, speed );
-
-    key = dir==TR_UP ? TR_PREFS_KEY_USPEED_ENABLED : TR_PREFS_KEY_DSPEED_ENABLED;
-    tr_core_set_pref_bool( p->core, key, TRUE );
-}
-
-static GtkWidget*
-createSpeedMenu( PrivateData * p, tr_direction dir )
-{
-    int i, n;
-    GtkWidget *w, *m;
-    const int speeds[] = { 5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 250, 500, 750 };
-
-    m = gtk_menu_new( );
-
-    w = gtk_radio_menu_item_new_with_label( NULL, _( "Unlimited" ) );
-    p->speedlimit_off_item[dir] = w;
-    g_object_set_data( G_OBJECT( w ), DIRECTION_KEY, GINT_TO_POINTER( dir ) );
-    g_object_set_data( G_OBJECT( w ), ENABLED_KEY, GINT_TO_POINTER( FALSE ) );
-    g_signal_connect( w, "toggled", G_CALLBACK(onSpeedToggled), p );
-    gtk_menu_shell_append( GTK_MENU_SHELL( m ), w );
-
-    w = gtk_radio_menu_item_new_with_label_from_widget( GTK_RADIO_MENU_ITEM( w ), "" );
-    p->speedlimit_on_item[dir] = w;
-    g_object_set_data( G_OBJECT( w ), DIRECTION_KEY, GINT_TO_POINTER( dir ) );
-    g_object_set_data( G_OBJECT( w ), ENABLED_KEY, GINT_TO_POINTER( TRUE ) );
-    g_signal_connect( w, "toggled", G_CALLBACK(onSpeedToggled), p );
-    gtk_menu_shell_append( GTK_MENU_SHELL( m ), w );
-
-    w = gtk_separator_menu_item_new( );
-    gtk_menu_shell_append( GTK_MENU_SHELL( m ), w );
-
-    for( i=0, n=G_N_ELEMENTS(speeds); i<n; ++i )
-    {
-        char buf[128];
-        tr_strlspeed( buf, speeds[i], sizeof( buf ) );
-        w = gtk_menu_item_new_with_label( buf );
-        g_object_set_data( G_OBJECT( w ), DIRECTION_KEY, GINT_TO_POINTER( dir ) );
-        g_object_set_data( G_OBJECT( w ), SPEED_KEY, GINT_TO_POINTER( speeds[i] ) );
-        g_signal_connect( w, "activate", G_CALLBACK(onSpeedSet), p );
-        gtk_menu_shell_append( GTK_MENU_SHELL( m ), w );
-    }
-
-    return m;
-}
-
-/***
-****  Speed limit menu
-***/
-
-#define RATIO_KEY "stock-ratio-index"
-
-static const double stockRatios[] = { 0.25, 0.5, 0.75, 1, 1.5, 2, 3 };
-
-static void
-onRatioToggled( GtkCheckMenuItem * check, gpointer vp ) 
-{
-    PrivateData * p = vp;
-    if( gtk_check_menu_item_get_active( check ) )
-    {
-        gboolean f = g_object_get_data( G_OBJECT( check ), ENABLED_KEY ) != 0;
-        tr_core_set_pref_bool( p->core, TR_PREFS_KEY_RATIO_ENABLED, f );
-    }
-}
-static void
-onRatioSet( GtkCheckMenuItem * check, gpointer vp ) 
-{
-    PrivateData * p = vp;
-    int i = GPOINTER_TO_INT( g_object_get_data( G_OBJECT( check ), RATIO_KEY ) );
-    const double ratio = stockRatios[i];
-    tr_core_set_pref_double( p->core, TR_PREFS_KEY_RATIO, ratio );
-    tr_core_set_pref_bool  ( p->core, TR_PREFS_KEY_RATIO_ENABLED, TRUE );
-}
-
-static GtkWidget*
-createRatioMenu( PrivateData * p )
-{
-    int i, n;
-    GtkWidget *m, *w;
-
-    m = gtk_menu_new( );
-
-    w = gtk_radio_menu_item_new_with_label( NULL, _( "Seed Forever" ) );
-    p->ratio_off_item = w;
-    g_object_set_data( G_OBJECT( w ), ENABLED_KEY, GINT_TO_POINTER( FALSE ) );
-    g_signal_connect( w, "toggled", G_CALLBACK(onRatioToggled), p );
-    gtk_menu_shell_append( GTK_MENU_SHELL( m ), w );
-
-    w = gtk_radio_menu_item_new_with_label_from_widget( GTK_RADIO_MENU_ITEM( w ), "" );
-    p->ratio_on_item = w;
-    g_object_set_data( G_OBJECT( w ), ENABLED_KEY, GINT_TO_POINTER( TRUE ) );
-    g_signal_connect( w, "toggled", G_CALLBACK(onRatioToggled), p );
-    gtk_menu_shell_append( GTK_MENU_SHELL( m ), w );
-
-    w = gtk_separator_menu_item_new( );
-    gtk_menu_shell_append( GTK_MENU_SHELL( m ), w );
-
-    for( i=0, n=G_N_ELEMENTS(stockRatios); i<n; ++i )
-    {
-        char buf[128];
-        tr_strlratio( buf, stockRatios[i], sizeof( buf ) );
-        w = gtk_menu_item_new_with_label( buf );
-        g_object_set_data( G_OBJECT( w ), RATIO_KEY, GINT_TO_POINTER( i ) );
-        g_signal_connect( w, "activate", G_CALLBACK(onRatioSet), p );
-        gtk_menu_shell_append( GTK_MENU_SHELL( m ), w );
-    }
-
-    return m;
-}
-
-/***
-****  Option menu
-***/
-
-static GtkWidget*
-createOptionsMenu( PrivateData * p )
-{
-    GtkWidget * m;
-    GtkWidget * top = gtk_menu_new( );
-
-    m = gtk_menu_item_new_with_label( _( "Limit Download Speed" ) );
-    gtk_menu_item_set_submenu( GTK_MENU_ITEM( m ), createSpeedMenu( p, TR_DOWN ) );
-    gtk_menu_shell_append( GTK_MENU_SHELL( top ), m );
-
-    m = gtk_menu_item_new_with_label( _( "Limit Upload Speed" ) );
-    gtk_menu_item_set_submenu( GTK_MENU_ITEM( m ), createSpeedMenu( p, TR_UP ) );
-    gtk_menu_shell_append( GTK_MENU_SHELL( top ), m );
-
-    m = gtk_separator_menu_item_new( );
-    gtk_menu_shell_append( GTK_MENU_SHELL( top ), m );
-
-    m = gtk_menu_item_new_with_label( _( "Stop Seeding at Ratio" ) );
-    gtk_menu_item_set_submenu( GTK_MENU_ITEM( m ), createRatioMenu( p ) );
-    gtk_menu_shell_append( GTK_MENU_SHELL( top ), m );
-
-    gtk_widget_show_all( top );
-    return top;
-}
-
-static void
-onOptionsClicked( GtkButton * button UNUSED, gpointer vp )
-{
-    char buf1[512];
-    char buf2[512];
-    gboolean b;
-    GtkWidget * w;
-    PrivateData * p = vp;
-
-    w = p->speedlimit_on_item[TR_DOWN];
-    tr_strlspeed( buf1, pref_int_get( TR_PREFS_KEY_DSPEED ), sizeof( buf1 ) );
-    gtk_label_set_text( GTK_LABEL( gtk_bin_get_child( GTK_BIN( w ) ) ), buf1 );
-
-    b = pref_flag_get( TR_PREFS_KEY_DSPEED_ENABLED );
-    w = b ? p->speedlimit_on_item[TR_DOWN] : p->speedlimit_off_item[TR_DOWN];
-    gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM( w ), TRUE );
-
-    w = p->speedlimit_on_item[TR_UP];
-    tr_strlspeed( buf1, pref_int_get( TR_PREFS_KEY_USPEED ), sizeof( buf1 ) );
-    gtk_label_set_text( GTK_LABEL( gtk_bin_get_child( GTK_BIN( w ) ) ), buf1 );
-
-    b = pref_flag_get( TR_PREFS_KEY_USPEED_ENABLED );
-    w = b ? p->speedlimit_on_item[TR_UP] : p->speedlimit_off_item[TR_UP];
-    gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM( w ), TRUE );
-
-    tr_strlratio( buf1, pref_double_get( TR_PREFS_KEY_RATIO ), sizeof( buf1 ) );
-    g_snprintf( buf2, sizeof( buf2 ), _( "Stop at Ratio (%s)" ), buf1 );
-    gtk_label_set_text( GTK_LABEL( gtk_bin_get_child( GTK_BIN( p->ratio_on_item ) ) ), buf2 );
-
-    b = pref_flag_get( TR_PREFS_KEY_RATIO_ENABLED );
-    gtk_check_menu_item_set_active( GTK_CHECK_MENU_ITEM( b ? p->ratio_on_item : p->ratio_off_item ), TRUE );
-
-    gtk_menu_popup ( GTK_MENU( p->options_menu ), NULL, NULL, NULL, NULL, 0, gtk_get_current_event_time( ) );
-}
-
 /***
 ****  PUBLIC
 ***/
@@ -799,7 +501,7 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
     const char *  pch;
     PrivateData * p;
     GtkWidget   *mainmenu, *toolbar, *filter, *list, *status;
-    GtkWidget *   vbox, *w, *self, *h, *c, *s, *hbox, *image, *menu;
+    GtkWidget *   vbox, *w, *self, *h, *c, *s, *image, *menu;
     GtkWindow *   win;
     GSList *      l;
 
@@ -820,6 +522,7 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
     };
 
     p = g_new0( PrivateData, 1 );
+    p->filter_mode = FILTER_MODE_ALL;
     p->filter_text_mode = FILTER_TEXT_MODE_NAME;
     p->filter_text = NULL;
 
@@ -859,23 +562,17 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
     {
         const char * mnemonic = _( filter_names[i] );
         w = gtk_toggle_button_new_with_mnemonic( mnemonic );
-        g_object_set_data( G_OBJECT( w ), FILTER_MODE_KEY, GINT_TO_POINTER( i ) );
         gtk_button_set_relief( GTK_BUTTON( w ), GTK_RELIEF_NONE );
         gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( w ), i == FILTER_MODE_ALL );
         p->filter_toggles[i] = GTK_TOGGLE_BUTTON( w );
         g_signal_connect( w, "toggled", G_CALLBACK( filter_toggled_cb ), p );
         gtk_box_pack_start( GTK_BOX( h ), w, FALSE, FALSE, 0 );
     }
-
     s = sexy_icon_entry_new( );
     sexy_icon_entry_add_clear_button( SEXY_ICON_ENTRY( s ) );
     image = gtk_image_new_from_stock( GTK_STOCK_FIND, GTK_ICON_SIZE_MENU );
-    sexy_icon_entry_set_icon( SEXY_ICON_ENTRY(
-                                 s ), SEXY_ICON_ENTRY_PRIMARY,
-                             GTK_IMAGE( image ) );
-    sexy_icon_entry_set_icon_highlight( SEXY_ICON_ENTRY(
-                                            s ), SEXY_ICON_ENTRY_PRIMARY,
-                                        TRUE );
+    sexy_icon_entry_set_icon( SEXY_ICON_ENTRY( s ), SEXY_ICON_ENTRY_PRIMARY, GTK_IMAGE( image ) );
+    sexy_icon_entry_set_icon_highlight( SEXY_ICON_ENTRY( s ), SEXY_ICON_ENTRY_PRIMARY, TRUE );
     gtk_box_pack_end( GTK_BOX( h ), s, FALSE, FALSE, 0 );
     g_signal_connect( s, "changed", G_CALLBACK( filter_entry_changed ), p );
 
@@ -901,61 +598,32 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
 
     /* status */
     h = status = p->status = gtk_hbox_new( FALSE, GUI_PAD );
-    gtk_container_set_border_width( GTK_CONTAINER( h ), GUI_PAD_SMALL );
-
-        w = gtk_button_new( );
-        gtk_container_add( GTK_CONTAINER( w ), gtk_image_new_from_stock( "options", GTK_ICON_SIZE_SMALL_TOOLBAR ) );
-        gtk_box_pack_start( GTK_BOX( h ), w, 0, 0, 0 );
-        gtk_button_set_relief( GTK_BUTTON( w ), GTK_RELIEF_NONE );
-        p->options_menu = createOptionsMenu( p );
-        g_signal_connect( w, "clicked", G_CALLBACK(onOptionsClicked), p );
-
-        p->alt_speed_image[0] = gtk_image_new_from_stock( "alt-speed-off", -1 );
-        p->alt_speed_image[1]  = gtk_image_new_from_stock( "alt-speed-on", -1 );
-        w = p->alt_speed_button = gtk_toggle_button_new( );
-        gtk_button_set_relief( GTK_BUTTON( w ), GTK_RELIEF_NONE );
-        g_object_ref( G_OBJECT( p->alt_speed_image[0] ) );
-        g_object_ref( G_OBJECT( p->alt_speed_image[1] ) );
-        g_signal_connect( w, "toggled", G_CALLBACK(alt_speed_toggled_cb ), p );
-        gtk_box_pack_start( GTK_BOX( h ), w, 0, 0, 0 );
-
-        w = p->gutter_lb = gtk_label_new( "N Torrents" );
-        gtk_box_pack_start( GTK_BOX( h ), w, 1, 1, GUI_PAD_BIG );
-
-        hbox = p->ul_hbox = gtk_hbox_new( FALSE, GUI_PAD_SMALL );
-            w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
-            gtk_widget_set_size_request( w, GUI_PAD, 0u );
-            gtk_box_pack_start( GTK_BOX( hbox ), w, FALSE, FALSE, 0 );
-            w = gtk_image_new_from_stock( GTK_STOCK_GO_UP, GTK_ICON_SIZE_MENU );
-            gtk_box_pack_start( GTK_BOX( hbox ), w, FALSE, FALSE, 0 );
-            w = p->ul_lb = gtk_label_new( NULL );
-            gtk_box_pack_start( GTK_BOX( hbox ), w, FALSE, FALSE, 0 ); 
-        gtk_box_pack_end( GTK_BOX( h ), hbox, FALSE, FALSE, 0 );
-
-        hbox = p->dl_hbox = gtk_hbox_new( FALSE, GUI_PAD_SMALL );
-            w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
-            gtk_widget_set_size_request( w, GUI_PAD, 0u );
-            gtk_box_pack_start( GTK_BOX( hbox ), w, FALSE, FALSE, 0 );
-            w = gtk_image_new_from_stock( GTK_STOCK_GO_DOWN, GTK_ICON_SIZE_MENU );
-            gtk_box_pack_start( GTK_BOX( hbox ), w, FALSE, FALSE, 0 );
-            w = p->dl_lb = gtk_label_new( NULL );
-            gtk_box_pack_start( GTK_BOX( hbox ), w, FALSE, FALSE, 0 ); 
-        gtk_box_pack_end( GTK_BOX( h ), hbox, FALSE, FALSE, 0 );
-
-        hbox = gtk_hbox_new( FALSE, GUI_PAD_SMALL );
-            w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
-            gtk_widget_set_size_request( w, GUI_PAD, 0u );
-            gtk_box_pack_start( GTK_BOX( hbox ), w, FALSE, FALSE, 0 );
-            w = gtk_image_new_from_stock( GTK_STOCK_REFRESH, GTK_ICON_SIZE_MENU );
-            c = gtk_event_box_new( );
-            gtk_container_add( GTK_CONTAINER( c ), w );
-            w = c;
-            g_signal_connect( w, "button-release-event", G_CALLBACK( onYinYangReleased ), p );
-            gtk_box_pack_start( GTK_BOX( hbox ), w, FALSE, FALSE, 0 );
-            w = p->stats_lb = gtk_label_new( NULL );
-            gtk_box_pack_end( GTK_BOX( h ), w, FALSE, FALSE, 0 );
-        gtk_box_pack_end( GTK_BOX( h ), hbox, FALSE, FALSE, 0 );
-
+    gtk_container_set_border_width( GTK_CONTAINER( h ), GUI_PAD );
+    w = p->gutter_lb = gtk_label_new( "N Torrents" );
+    gtk_box_pack_start( GTK_BOX( h ), w, 0, 0, 0 );
+    w = p->ul_lb = gtk_label_new( NULL );
+    gtk_box_pack_end( GTK_BOX( h ), w, FALSE, FALSE, 0 );
+    w = gtk_image_new_from_stock( GTK_STOCK_GO_UP, GTK_ICON_SIZE_MENU );
+    gtk_box_pack_end( GTK_BOX( h ), w, FALSE, FALSE, 0 );
+    w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
+    gtk_widget_set_size_request( w, GUI_PAD, 0u );
+    gtk_box_pack_end( GTK_BOX( h ), w, FALSE, FALSE, 0 );
+    w = p->dl_lb = gtk_label_new( NULL );
+    gtk_box_pack_end( GTK_BOX( h ), w, FALSE, FALSE, 0 );
+    w = gtk_image_new_from_stock( GTK_STOCK_GO_DOWN, GTK_ICON_SIZE_MENU );
+    gtk_box_pack_end( GTK_BOX( h ), w, FALSE, FALSE, 0 );
+    w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
+    gtk_widget_set_size_request( w, GUI_PAD, 0u );
+    gtk_box_pack_end( GTK_BOX( h ), w, FALSE, FALSE, 0 );
+    w = p->stats_lb = gtk_label_new( NULL );
+    gtk_box_pack_end( GTK_BOX( h ), w, FALSE, FALSE, 0 );
+    w = gtk_image_new_from_stock( GTK_STOCK_REFRESH, GTK_ICON_SIZE_MENU );
+    c = gtk_event_box_new( );
+    gtk_container_add( GTK_CONTAINER( c ), w );
+    w = c;
+    gtk_box_pack_end( GTK_BOX( h ), w, FALSE, FALSE, 0 );
+    g_signal_connect( w, "button-release-event",
+                      G_CALLBACK( onYinYangReleased ), p );
 
     menu = gtk_menu_new( );
     l = NULL;
@@ -1015,12 +683,8 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
     prefsChanged( core, PREF_KEY_STATUSBAR, self );
     prefsChanged( core, PREF_KEY_STATUSBAR_STATS, self );
     prefsChanged( core, PREF_KEY_TOOLBAR, self );
-    prefsChanged( core, PREF_KEY_FILTER_MODE, self );
-    prefsChanged( core, TR_PREFS_KEY_ALT_SPEED_ENABLED, self );
     p->pref_handler_id = g_signal_connect( core, "prefs-changed",
                                            G_CALLBACK( prefsChanged ), self );
-
-    tr_sessionSetAltSpeedFunc( tr_core_session( core ), onAltSpeedToggled, p );
 
     filter_entry_changed( GTK_EDITABLE( s ), p );
     return self;
@@ -1037,17 +701,16 @@ updateTorrentCount( PrivateData * p )
         const int visibleCount = gtk_tree_model_iter_n_children(
             p->filter_model, NULL );
 
-        if( !torrentCount )
-            *buf = '\0';
-        else if( torrentCount != visibleCount )
+        if( torrentCount != visibleCount )
             g_snprintf( buf, sizeof( buf ),
                         ngettext( "%1$'d of %2$'d Torrent",
                                   "%1$'d of %2$'d Torrents",
                                   torrentCount ),
                         visibleCount, torrentCount );
         else
-            g_snprintf( buf, sizeof( buf ),
-                        ngettext( "%'d Torrent", "%'d Torrents", torrentCount ),
+            g_snprintf( buf, sizeof( buf ), ngettext( "%'d Torrent",
+                                                      "%'d Torrents",
+                                                      torrentCount ),
                         torrentCount );
         gtk_label_set_text( GTK_LABEL( p->gutter_lb ), buf );
     }
@@ -1113,12 +776,10 @@ updateSpeeds( PrivateData * p )
         d = tr_sessionGetPieceSpeed( session, TR_DOWN );
         tr_strlspeed( buf, d, sizeof( buf ) );
         gtk_label_set_text( GTK_LABEL( p->dl_lb ), buf );
-        g_object_set( p->dl_hbox, "visible", d>=0.01, NULL );
 
         d = tr_sessionGetPieceSpeed( session, TR_UP );
         tr_strlspeed( buf, d, sizeof( buf ) );
         gtk_label_set_text( GTK_LABEL( p->ul_lb ), buf );
-        g_object_set( p->ul_hbox, "visible", d>=0.01, NULL );
     }
 }
 

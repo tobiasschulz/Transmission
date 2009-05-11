@@ -31,16 +31,10 @@
 #include <libtransmission/utils.h>
 #include <libtransmission/version.h>
 
-#include "watch.h"
-
 #define MY_NAME "transmission-daemon"
 
-#define PREF_KEY_DIR_WATCH          "watch-dir"
-#define PREF_KEY_DIR_WATCH_ENABLED  "watch-dir-enabled"
-
-
-static tr_bool closing = FALSE;
-static tr_session * mySession = NULL;
+static int           closing = FALSE;
+static tr_session  * mySession = NULL;
 
 /***
 ****  Config File
@@ -64,8 +58,6 @@ static const struct tr_option options[] =
     { 'a', "allowed", "Allowed IP addresses.  (Default: " TR_DEFAULT_RPC_WHITELIST ")", "a", 1, "<list>" },
     { 'b', "blocklist", "Enable peer blocklists", "b", 0, NULL },
     { 'B', "no-blocklist", "Disable peer blocklists", "B", 0, NULL },
-    { 'c', "watch-dir", "Directory to watch for new .torrent files", "c", 1, "<directory>" },
-    { 'C', "no-watch-dir", "Disable the watch-dir", "C", 0, NULL },
     { 'd', "dump-settings", "Dump the settings and exit", "d", 0, NULL },
     { 'f', "foreground", "Run in the foreground instead of daemonizing", "f", 0, NULL },
     { 'g', "config-dir", "Where to look for configuration files", "g", 1, "<path>" },
@@ -84,9 +76,6 @@ static const struct tr_option options[] =
     { 910, "encryption-required",  "Encrypt all peer connections", "er", 0, NULL },
     { 911, "encryption-preferred", "Prefer encrypted peer connections", "ep", 0, NULL },
     { 912, "encryption-tolerated", "Prefer unencrypted peer connections", "et", 0, NULL },
-    { 'i', "bind-address-ipv4", "Where to listen for peer connections", "i", 1, "<ipv4 address>" },
-    { 'I', "bind-address-ipv6", "Where to listen for peer connections", "I", 1, "<ipv6 address" },
-    { 'r', "rpc-bind-address", "Where to listen for RPC connections", "r", 1, "<ipv4 address>" },
     { 0, NULL, NULL, NULL, 0, NULL }
 };
 
@@ -183,34 +172,18 @@ getConfigDir( int argc, const char ** argv )
     return configDir;
 }
 
-static void
-onFileAdded( tr_session * session, const char * dir, const char * file )
-{
-    if( strstr( file, ".torrent" ) != NULL )
-    {
-        char * filename = tr_buildPath( dir, file, NULL );
-        tr_ctor * ctor = tr_ctorNew( session );
-
-        int err = tr_ctorSetMetainfoFromFile( ctor, filename );
-        if( !err )
-            tr_torrentNew( ctor, &err );
-
-        tr_ctorFree( ctor );
-        tr_free( filename );
-    }
-}
 
 int
-main( int argc, char ** argv )
+main( int     argc,
+      char ** argv )
 {
     int c;
+    int64_t i;
     const char * optarg;
     tr_benc settings;
-    tr_bool boolVal;
     tr_bool foreground = FALSE;
     tr_bool dumpSettings = FALSE;
     const char * configDir = NULL;
-    dtr_watchdir * watchdir = NULL;
 
     signal( SIGINT, gotsig );
     signal( SIGTERM, gotsig );
@@ -224,23 +197,18 @@ main( int argc, char ** argv )
     tr_bencInitDict( &settings, 0 );
     configDir = getConfigDir( argc, (const char**)argv );
     tr_sessionLoadSettings( &settings, configDir, MY_NAME );
-    tr_bencDictAddBool( &settings, TR_PREFS_KEY_RPC_ENABLED, TRUE );
+    tr_bencDictAddInt( &settings, TR_PREFS_KEY_RPC_ENABLED, 1 );
 
     /* overwrite settings from the comamndline */
     tr_optind = 1;
     while(( c = tr_getopt( getUsage(), argc, (const char**)argv, options, &optarg ))) {
         switch( c ) {
             case 'a': tr_bencDictAddStr( &settings, TR_PREFS_KEY_RPC_WHITELIST, optarg );
-                      tr_bencDictAddBool( &settings, TR_PREFS_KEY_RPC_WHITELIST_ENABLED, TRUE );
+                      tr_bencDictAddInt( &settings, TR_PREFS_KEY_RPC_WHITELIST_ENABLED, 1 );
                       break;
-            case 'b': tr_bencDictAddBool( &settings, TR_PREFS_KEY_BLOCKLIST_ENABLED, TRUE );
+            case 'b': tr_bencDictAddInt( &settings, TR_PREFS_KEY_BLOCKLIST_ENABLED, 1 );
                       break;
-            case 'B': tr_bencDictAddBool( &settings, TR_PREFS_KEY_BLOCKLIST_ENABLED, FALSE );
-                      break;
-            case 'c': tr_bencDictAddStr( &settings, PREF_KEY_DIR_WATCH, optarg );
-                      tr_bencDictAddBool( &settings, PREF_KEY_DIR_WATCH_ENABLED, TRUE );
-                      break;
-            case 'C': tr_bencDictAddBool( &settings, PREF_KEY_DIR_WATCH_ENABLED, FALSE );
+            case 'B': tr_bencDictAddInt( &settings, TR_PREFS_KEY_BLOCKLIST_ENABLED, 0 );
                       break;
             case 'd': dumpSettings = TRUE;
                       break;
@@ -253,9 +221,9 @@ main( int argc, char ** argv )
 		      exit( 0 );
             case 'p': tr_bencDictAddInt( &settings, TR_PREFS_KEY_RPC_PORT, atoi( optarg ) );
                       break;
-            case 't': tr_bencDictAddBool( &settings, TR_PREFS_KEY_RPC_AUTH_REQUIRED, TRUE );
+            case 't': tr_bencDictAddInt( &settings, TR_PREFS_KEY_RPC_AUTH_REQUIRED, 1 );
                       break;
-            case 'T': tr_bencDictAddBool( &settings, TR_PREFS_KEY_RPC_AUTH_REQUIRED, FALSE );
+            case 'T': tr_bencDictAddInt( &settings, TR_PREFS_KEY_RPC_AUTH_REQUIRED, 0 );
                       break;
             case 'u': tr_bencDictAddStr( &settings, TR_PREFS_KEY_RPC_USERNAME, optarg );
                       break;
@@ -265,9 +233,9 @@ main( int argc, char ** argv )
                       break;
             case 'P': tr_bencDictAddInt( &settings, TR_PREFS_KEY_PEER_PORT, atoi( optarg ) );
                       break;
-            case 'm': tr_bencDictAddBool( &settings, TR_PREFS_KEY_PORT_FORWARDING, TRUE );
+            case 'm': tr_bencDictAddInt( &settings, TR_PREFS_KEY_PORT_FORWARDING, 1 );
                       break;
-            case 'M': tr_bencDictAddBool( &settings, TR_PREFS_KEY_PORT_FORWARDING, FALSE );
+            case 'M': tr_bencDictAddInt( &settings, TR_PREFS_KEY_PORT_FORWARDING, 0 );
                       break;
             case 'L': tr_bencDictAddInt( &settings, TR_PREFS_KEY_PEER_LIMIT_GLOBAL, atoi( optarg ) );
                       break;
@@ -278,15 +246,6 @@ main( int argc, char ** argv )
             case 911: tr_bencDictAddInt( &settings, TR_PREFS_KEY_ENCRYPTION, TR_ENCRYPTION_PREFERRED );
                       break;
             case 912: tr_bencDictAddInt( &settings, TR_PREFS_KEY_ENCRYPTION, TR_CLEAR_PREFERRED );
-                      break;
-            case 'i':
-                      tr_bencDictAddStr( &settings, TR_PREFS_KEY_BIND_ADDRESS_IPV4, optarg );
-                      break;
-            case 'I':
-                      tr_bencDictAddStr( &settings, TR_PREFS_KEY_BIND_ADDRESS_IPV6, optarg );
-                      break;
-            case 'r':
-                      tr_bencDictAddStr( &settings, TR_PREFS_KEY_RPC_BIND_ADDRESS, optarg );
                       break;
             default:  showUsage( );
                       break;
@@ -313,23 +272,8 @@ main( int argc, char ** argv )
     /* start the session */
     mySession = tr_sessionInit( "daemon", configDir, FALSE, &settings );
 
-    if( tr_bencDictFindBool( &settings, TR_PREFS_KEY_RPC_AUTH_REQUIRED, &boolVal ) && boolVal )
+    if( tr_bencDictFindInt( &settings, TR_PREFS_KEY_RPC_AUTH_REQUIRED, &i ) && i!=0 )
         tr_ninf( MY_NAME, "requiring authentication" );
-
-    /* maybe add a watchdir */
-    {
-        const char * dir;
-
-        if( tr_bencDictFindBool( &settings, PREF_KEY_DIR_WATCH_ENABLED, &boolVal )
-            && boolVal
-            && tr_bencDictFindStr( &settings, PREF_KEY_DIR_WATCH, &dir )
-            && dir
-            && *dir )
-        {
-            tr_inf( "Watching \"%s\" for new .torrent files", dir );
-            watchdir = dtr_watchdir_new( mySession, dir, onFileAdded );
-        }
-    }
 
     /* load the torrents */
     {
@@ -340,15 +284,11 @@ main( int argc, char ** argv )
     }
 
     while( !closing )
-    {
         tr_wait( 1000 ); /* sleep one second */
-        dtr_watchdir_update( watchdir );
-    }
 
     /* shutdown */
     printf( "Closing transmission session..." );
     tr_sessionSaveSettings( mySession, configDir, &settings );
-    dtr_watchdir_free( watchdir );
     tr_sessionClose( mySession );
     printf( " done.\n" );
 

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2009 Transmission authors and contributors
+ * Copyright (c) 2006-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -68,13 +68,10 @@
     NSViewAnimation * fWebSeedTableAnimation;
     
     IBOutlet FileOutlineController * fFileController;
-    IBOutlet NSSearchField * fFileFilterField;
     
-    IBOutlet NSPopUpButton * fPriorityPopUp, * fRatioPopUp;
-    IBOutlet NSButton * fUploadLimitCheck, * fDownloadLimitCheck, * fGlobalLimitCheck;
-    IBOutlet NSTextField * fUploadLimitField, * fDownloadLimitField, * fRatioLimitField,
-                        * fUploadLimitLabel, * fDownloadLimitLabel, * fPeersConnectLabel,
-                        * fPeersConnectField;
+    IBOutlet NSPopUpButton * fRatioPopUp, * fUploadLimitPopUp, * fDownloadLimitPopUp;
+    IBOutlet NSTextField * fUploadLimitField, * fDownloadLimitField, * fRatioLimitField, * fPeersConnectField,
+                        * fUploadLimitLabel, * fDownloadLimitLabel, * fPeersConnectLabel;
     
     NSString * fInitialString;
 }
@@ -101,16 +98,11 @@
 - (void) revealTorrentFile: (id) sender;
 - (void) revealDataFile: (id) sender;
 
-- (void) setFileFilterText: (id) sender;
-
-- (void) setUseSpeedLimit: (id) sender;
+- (void) setSpeedMode: (id) sender;
 - (void) setSpeedLimit: (id) sender;
-- (void) setUseGlobalSpeedLimit: (id) sender;
 
 - (void) setRatioSetting: (id) sender;
 - (void) setRatioLimit: (id) sender;
-
-- (void) setPriority: (id) sender;
 
 - (void) setPeersConnectLimit: (id) sender;
 

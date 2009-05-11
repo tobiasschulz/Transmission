@@ -32,7 +32,6 @@
 #endif
 
 #include "transmission.h"
-#include "fdlimit.h"
 #include "ConvertUTF.h"
 #include "list.h"
 #include "utils.h"
@@ -179,8 +178,8 @@ tr_freeMessageList( tr_msg_list * list )
 ***
 **/
 
-struct tm *
-tr_localtime_r( const time_t *_clock, struct tm *_result )
+static struct tm *
+tr_localtime_r( time_t *_clock, struct tm *_result )
 {
 #ifdef HAVE_LOCALTIME_R
     return localtime_r( _clock, _result );
@@ -289,11 +288,13 @@ tr_msgLoggingIsActive( int level )
 }
 
 void
-tr_msg( const char * file, int line,
-        int level, const char * name,
-        const char * fmt, ... )
+tr_msg( const char * file,
+        int          line,
+        int          level,
+        const char * name,
+        const char * fmt,
+        ... )
 {
-    const int err = errno; /* message logging shouldn't affect errno */
     FILE * fp;
     tr_msgInit( );
     tr_lockLock( messageLock );
@@ -348,7 +349,6 @@ tr_msg( const char * file, int line,
     }
 
     tr_lockUnlock( messageLock );
-    errno = err;
 }
 
 /***
@@ -465,10 +465,9 @@ uint8_t *
 tr_loadFile( const char * path,
              size_t *     size )
 {
-    uint8_t * buf;
+    uint8_t *    buf;
     struct stat  sb;
-    int fd;
-    ssize_t n;
+    FILE *       file;
     const char * err_fmt = _( "Couldn't read \"%1$s\": %2$s" );
 
     /* try to stat the file */
@@ -489,36 +488,34 @@ tr_loadFile( const char * path,
     }
 
     /* Load the torrent file into our buffer */
-    fd = tr_open_file_for_scanning( path );
-    if( fd < 0 )
+    file = fopen( path, "rb" );
+    if( !file )
     {
         const int err = errno;
         tr_err( err_fmt, path, tr_strerror( errno ) );
         errno = err;
         return NULL;
     }
-    buf = malloc( sb.st_size + 1 );
+    buf = malloc( sb.st_size );
     if( !buf )
     {
         const int err = errno;
         tr_err( err_fmt, path, _( "Memory allocation failed" ) );
-        tr_close_file( fd );
+        fclose( file );
         errno = err;
         return NULL;
     }
-    n = read( fd, buf, sb.st_size );
-    if( n == -1 )
+    if( fread( buf, sb.st_size, 1, file ) != 1 )
     {
         const int err = errno;
         tr_err( err_fmt, path, tr_strerror( errno ) );
-        tr_close_file( fd );
+        fclose( file );
         free( buf );
         errno = err;
         return NULL;
     }
 
-    tr_close_file( fd );
-    buf[ sb.st_size ] = '\0';
+    fclose( file );
     *size = sb.st_size;
     return buf;
 }
@@ -1529,40 +1526,4 @@ tr_parseNumberRange( const char * str_in, int len, int * setmeCount )
     /* return the result */
     *setmeCount = n;
     return uniq;
-}
-
-/***
-****
-***/
-
-static void
-printf_double_without_rounding( char * buf, int buflen, double d, int places )
-{
-    char * pch;
-    char tmp[128];
-    int len;
-    tr_snprintf( tmp, sizeof( tmp ), "%'.64f", d );
-    pch = tmp;
-    while( isdigit( *pch ) ) ++pch; /* walk to the decimal point */
-    ++pch; /* walk over the decimal point */
-    pch += places;
-    len = MIN( buflen - 1, pch - tmp );
-    memcpy( buf, tmp, len );
-    buf[len] = '\0';
-}
-
-char*
-tr_strratio( char * buf, size_t buflen, double ratio, const char * infinity )
-{
-    if( (int)ratio == TR_RATIO_NA )
-        tr_strlcpy( buf, _( "None" ), buflen );
-    else if( (int)ratio == TR_RATIO_INF )
-        tr_strlcpy( buf, infinity, buflen );
-    else if( ratio < 10.0 )
-        printf_double_without_rounding( buf, buflen, ratio, 2 );
-    else if( ratio < 100.0 )
-        printf_double_without_rounding( buf, buflen, ratio, 1 );
-    else
-        tr_snprintf( buf, buflen, "%'.0f", ratio );
-    return buf;
 }

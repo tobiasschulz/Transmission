@@ -42,6 +42,7 @@
 
 #include "actions.h"
 #include "add-dialog.h"
+#include "blocklist.h"
 #include "conf.h"
 #include "details.h"
 #include "dialogs.h"
@@ -58,14 +59,22 @@
 #include "util.h"
 #include "ui.h"
 
+#include <libtransmission/transmission.h>
+#include <libtransmission/version.h>
+
 #define MY_NAME "transmission"
 
-#define REFRESH_INTERVAL_SECONDS 2
+/* interval in milliseconds to update the torrent list display */
+#define UPDATE_INTERVAL         1666
+
+/* interval in milliseconds to check for stopped torrents and update display */
+#define EXIT_CHECK_INTERVAL     500
 
 #if GTK_CHECK_VERSION( 2, 8, 0 )
  #define SHOW_LICENSE
 static const char * LICENSE =
-    "Most of Transmission is covered by the MIT license."
+    "The Transmission binaries and most of its source code is distributed "
+    "license. "
     "\n\n"
     "Some files are copyrighted by Charles Kerr and are covered by "
     "the GPL version 2.  Works owned by the Transmission project "
@@ -96,18 +105,19 @@ static const char * LICENSE =
 
 struct cbdata
 {
-    gboolean            isIconified;
-    gboolean            isClosing;
-    guint               timer;
-    gpointer            icon;
-    GtkWindow         * wind;
-    TrCore            * core;
-    GtkWidget         * msgwin;
-    GtkWidget         * prefs;
-    GSList            * errqueue;
-    GSList            * dupqueue;
-    GtkTreeSelection  * sel;
-    GtkWidget         * details;
+    unsigned int  isIconified : 1;
+    unsigned int  isClosing   : 1;
+    guint         timer;
+    gpointer      icon;
+    GtkWindow *   wind;
+    TrCore *      core;
+    GtkWidget *   msgwin;
+    GtkWidget *   prefs;
+    GSList *      errqueue;
+    GSList *      dupqueue;
+    GHashTable *  tor2details;
+    GHashTable *  details2tor;
+    GtkTreeSelection * sel;
 };
 
 #define CBDATA_PTR "callback-data-pointer"
@@ -137,7 +147,10 @@ static void           gotdrag( GtkWidget *       widget,
                                guint             time,
                                gpointer          gdata );
 
-static void coreerr( TrCore *, guint, const char *, struct cbdata * );
+static void           coreerr( TrCore *         core,
+                               enum tr_core_err code,
+                               const char *     msg,
+                               gpointer         gdata );
 
 static void           onAddTorrent( TrCore *,
                                     tr_ctor *,
@@ -169,10 +182,10 @@ accumulateStatusForeach( GtkTreeModel *      model,
 
     gtk_tree_model_get( model, iter, MC_ACTIVITY, &activity, -1 );
 
-    if( activity == TR_STATUS_STOPPED )
-        ++counts->inactiveCount;
-    else
+    if( TR_STATUS_IS_ACTIVE( activity ) )
         ++counts->activeCount;
+    else
+        ++counts->inactiveCount;
 }
 
 static void
@@ -187,7 +200,7 @@ accumulateCanUpdateForeach( GtkTreeModel *      model,
 }
 
 static void
-refreshActions( struct cbdata * data )
+refreshTorrentActions( struct cbdata * data )
 {
     int canUpdate;
     struct counts_data counts;
@@ -203,6 +216,7 @@ refreshActions( struct cbdata * data )
     action_sensitize( "delete-torrent", counts.totalCount != 0 );
     action_sensitize( "verify-torrent", counts.totalCount != 0 );
     action_sensitize( "open-torrent-folder", counts.totalCount == 1 );
+    action_sensitize( "show-torrent-properties", counts.totalCount == 1 );
 
     canUpdate = 0;
     gtk_tree_selection_selected_foreach( s, accumulateCanUpdateForeach, &canUpdate );
@@ -226,41 +240,9 @@ refreshActions( struct cbdata * data )
 }
 
 static void
-refreshDetailsDialog( struct cbdata * data )
-{
-    GtkTreeSelection * s = tr_window_get_selection( data->wind );
-    GtkTreeModel * model;
-    GSList * ids = NULL;
-    GList * selrows = NULL;
-    GList * l;
-
-    if( data->details == NULL )
-        return;
-
-    /* build a list of the selected torrents' ids */
-    s = tr_window_get_selection( data->wind );
-    for( selrows=l=gtk_tree_selection_get_selected_rows(s,&model); l; l=l->next ) {
-        GtkTreeIter iter;
-        if( gtk_tree_model_get_iter( model, &iter, l->data ) ) {
-            tr_torrent * tor;
-            gtk_tree_model_get( model, &iter, MC_TORRENT_RAW, &tor, -1 );
-            ids = g_slist_append( ids, GINT_TO_POINTER( tr_torrentId( tor ) ) );
-        }
-    }
-
-    torrent_inspector_set_torrents( data->details, ids );
-
-    /* cleanup */
-    g_slist_free( ids );
-    g_list_foreach( selrows, (GFunc)gtk_tree_path_free, NULL );
-    g_list_free( selrows );
-}
-
-static void
 selectionChangedCB( GtkTreeSelection * s UNUSED, gpointer data )
 {
-    refreshActions( data );
-    refreshDetailsDialog( data );
+    refreshTorrentActions( data );
 }
 
 static void
@@ -384,6 +366,8 @@ main( int     argc,
     };
 
     cbdata = g_new0( struct cbdata, 1 );
+    cbdata->tor2details = g_hash_table_new( g_str_hash, g_str_equal );
+    cbdata->details2tor = g_hash_table_new( g_direct_hash, g_direct_equal );
 
     /* bind the gettext domain */
     setlocale( LC_ALL, "" );
@@ -459,8 +443,6 @@ main( int     argc,
 
         /* initialize the libtransmission session */
         session = tr_sessionInit( "gtk", configDir, TRUE, pref_get_all( ) );
-        pref_flag_set( TR_PREFS_KEY_ALT_SPEED_ENABLED, tr_sessionUsesAltSpeed( session ) );
-        pref_int_set( TR_PREFS_KEY_PEER_PORT, tr_sessionGetPeerPort( session ) );
         cbdata->core = tr_core_new( session );
 
         /* create main window now to be a parent to any error dialogs */
@@ -469,11 +451,7 @@ main( int     argc,
 
         appsetup( win, argfiles, cbdata, startpaused, startminimized );
         tr_sessionSetRPCCallback( session, onRPCChanged, cbdata );
-
-        /* on startup, check & see if it's time to update the blocklist */
-        if( pref_flag_get( PREF_KEY_BLOCKLIST_UPDATES_ENABLED )
-            && ( time( NULL ) - pref_int_get( "blocklist-date" ) > ( 60 * 60 * 24 * 7 ) ) )
-                tr_core_blocklist_update( cbdata->core );
+        gtr_blocklist_maybe_autoupdate( cbdata->core );
 
         gtk_main( );
     }
@@ -486,6 +464,96 @@ main( int     argc,
     }
 
     return 0;
+}
+
+static gboolean
+updateScheduledLimits( gpointer data )
+{
+    tr_session *    tr = data;
+    static gboolean last_state = FALSE;
+    gboolean        in_sched_state = FALSE;
+
+    if( !pref_flag_get( PREF_KEY_SCHED_LIMIT_ENABLED ) )
+    {
+        in_sched_state = FALSE;
+    }
+    else
+    {
+        const int  begin_time = pref_int_get( PREF_KEY_SCHED_BEGIN );
+        const int  end_time = pref_int_get( PREF_KEY_SCHED_END );
+        time_t     t;
+        struct tm *tm;
+        int        cur_time;
+
+        time( &t );
+        tm = localtime ( &t );
+        cur_time = ( tm->tm_hour * 60 ) + tm->tm_min;
+
+        if( end_time >= begin_time )
+        {
+            if( ( cur_time >= begin_time ) && ( cur_time <= end_time ) )
+                in_sched_state = TRUE;
+        }
+        else
+        {
+            if( ( cur_time >= begin_time ) || ( cur_time <= end_time ) )
+                in_sched_state = TRUE;
+        }
+    }
+
+    if( last_state != in_sched_state )
+    {
+        if( in_sched_state )
+        {
+            int limit;
+
+            tr_inf ( _( "Beginning to use scheduled bandwidth limits" ) );
+
+            tr_sessionSetSpeedLimitEnabled( tr, TR_DOWN, TRUE );
+            limit = pref_int_get( PREF_KEY_SCHED_DL_LIMIT );
+            tr_sessionSetSpeedLimit( tr, TR_DOWN, limit );
+            tr_sessionSetSpeedLimitEnabled( tr, TR_UP, TRUE );
+            limit = pref_int_get( PREF_KEY_SCHED_UL_LIMIT );
+            tr_sessionSetSpeedLimit( tr, TR_UP, limit );
+        }
+        else
+        {
+            gboolean b;
+            int      limit;
+
+            tr_inf ( _( "Ending use of scheduled bandwidth limits" ) );
+
+            b = pref_flag_get( TR_PREFS_KEY_DSPEED_ENABLED );
+            tr_sessionSetSpeedLimitEnabled( tr, TR_DOWN, b );
+            limit = pref_int_get( TR_PREFS_KEY_DSPEED );
+            tr_sessionSetSpeedLimit( tr, TR_DOWN, limit );
+            b = pref_flag_get( TR_PREFS_KEY_USPEED_ENABLED );
+            tr_sessionSetSpeedLimitEnabled( tr, TR_UP, b );
+            limit = pref_int_get( TR_PREFS_KEY_USPEED );
+            tr_sessionSetSpeedLimit( tr, TR_UP, limit );
+        }
+
+        last_state = in_sched_state;
+    }
+    else if( in_sched_state )
+    {
+        static int old_dl_limit = 0, old_ul_limit = 0;
+        int        dl_limit = pref_int_get( PREF_KEY_SCHED_DL_LIMIT );
+        int        ul_limit = pref_int_get( PREF_KEY_SCHED_UL_LIMIT );
+
+        if( ( dl_limit != old_dl_limit ) || ( ul_limit != old_ul_limit ) )
+        {
+            tr_sessionSetSpeedLimitEnabled( tr, TR_DOWN, TRUE );
+            tr_sessionSetSpeedLimit( tr, TR_DOWN, dl_limit );
+            tr_sessionSetSpeedLimitEnabled( tr, TR_UP, TRUE );
+            tr_sessionSetSpeedLimit( tr, TR_UP, ul_limit );
+
+            old_dl_limit = dl_limit;
+            old_ul_limit = ul_limit;
+        }
+    }
+
+    return TRUE;
 }
 
 static void
@@ -537,8 +605,12 @@ appsetup( TrWindow *      wind,
     prefschanged( cbdata->core, PREF_KEY_SHOW_TRAY_ICON, cbdata );
 
     /* start model update timer */
-    cbdata->timer = gtr_timeout_add_seconds( REFRESH_INTERVAL_SECONDS, updatemodel, cbdata );
+    cbdata->timer = g_timeout_add( UPDATE_INTERVAL, updatemodel, cbdata );
     updatemodel( cbdata );
+
+    /* start scheduled rate timer */
+    updateScheduledLimits ( tr_core_session( cbdata->core ) );
+    gtr_timeout_add_seconds( 60, updateScheduledLimits, tr_core_session( cbdata->core ) );
 
     /* either show the window or iconify it */
     if( !isIconified )
@@ -610,7 +682,7 @@ rowChangedCB( GtkTreeModel  * model UNUSED,
 {
     struct cbdata * data = gdata;
     if( gtk_tree_selection_path_is_selected ( data->sel, path ) )
-        refreshActions( gdata );
+        refreshTorrentActions( gdata );
 }
 
 static void
@@ -629,7 +701,7 @@ winsetup( struct cbdata * cbdata,
     model = tr_core_model( cbdata->core );
     g_signal_connect( model, "row-changed", G_CALLBACK( rowChangedCB ), cbdata );
     g_signal_connect( wind, "delete-event", G_CALLBACK( winclose ), cbdata );
-    refreshActions( cbdata );
+    refreshTorrentActions( cbdata );
 
     setupdrag( GTK_WIDGET( wind ), cbdata );
 }
@@ -642,8 +714,6 @@ quitThreadFunc( gpointer gdata )
     tr_core_close( cbdata->core );
 
     /* shutdown the gui */
-    if( cbdata->details )
-        gtk_widget_destroy( GTK_WIDGET( cbdata->details ) );
     if( cbdata->prefs )
         gtk_widget_destroy( GTK_WIDGET( cbdata->prefs ) );
     if( cbdata->wind )
@@ -651,16 +721,22 @@ quitThreadFunc( gpointer gdata )
     g_object_unref( cbdata->core );
     if( cbdata->icon )
         g_object_unref( cbdata->icon );
-    if( cbdata->errqueue ) {
+    if( cbdata->errqueue )
+    {
         g_slist_foreach( cbdata->errqueue, (GFunc)g_free, NULL );
         g_slist_free( cbdata->errqueue );
     }
-    if( cbdata->dupqueue ) {
+    if( cbdata->dupqueue )
+    {
         g_slist_foreach( cbdata->dupqueue, (GFunc)g_free, NULL );
         g_slist_free( cbdata->dupqueue );
     }
+
+    g_hash_table_destroy( cbdata->details2tor );
+    g_hash_table_destroy( cbdata->tor2details );
     g_free( cbdata );
 
+    /* exit the gtk main loop */
     gtk_main_quit( );
     return NULL;
 }
@@ -675,8 +751,8 @@ do_exit_cb( GtkWidget *w  UNUSED,
 static void
 wannaquit( void * vdata )
 {
-    GtkWidget *r, *p, *b, *w, *c;
-    struct cbdata *cbdata = vdata;
+    GtkWidget *     r, * p, * b, * w, *c;
+    struct cbdata * cbdata = vdata;
 
     /* stop the update timer */
     if( cbdata->timer )
@@ -711,7 +787,8 @@ wannaquit( void * vdata )
     w = gtr_button_new_from_stock( GTK_STOCK_QUIT, _( "_Quit Now" ) );
     g_signal_connect( w, "clicked", G_CALLBACK( do_exit_cb ), NULL );
     gtk_container_add( GTK_CONTAINER( b ), w );
-    gtk_table_attach( GTK_TABLE( p ), b, 1, 2, 2, 3, GTK_FILL, GTK_FILL, 0, 10 );
+    gtk_table_attach( GTK_TABLE(
+                          p ), b, 1, 2, 2, 3, GTK_FILL, GTK_FILL, 0, 10 );
 
     gtk_widget_show_all( r );
 
@@ -880,8 +957,13 @@ showTorrentErrors( struct cbdata * cbdata )
 }
 
 static void
-coreerr( TrCore * core UNUSED, guint code, const char * msg, struct cbdata * c )
+coreerr( TrCore * core    UNUSED,
+         enum tr_core_err code,
+         const char *     msg,
+         gpointer         gdata )
 {
+    struct cbdata * c = gdata;
+
     switch( code )
     {
         case TR_EINVALID:
@@ -957,6 +1039,10 @@ prefschanged( TrCore * core UNUSED,
     {
         tr_setMessageLevel( pref_int_get( key ) );
     }
+    else if( !strcmp( key, TR_PREFS_KEY_PEER_PORT_RANDOM_ENABLED ) )
+    {
+        /* FIXME */
+    }
     else if( !strcmp( key, TR_PREFS_KEY_PEER_PORT ) )
     {
         tr_sessionSetPeerPort( tr, pref_int_get( key ) );
@@ -977,7 +1063,7 @@ prefschanged( TrCore * core UNUSED,
     }
     else if( !strcmp( key, TR_PREFS_KEY_DSPEED_ENABLED ) )
     {
-        tr_sessionLimitSpeed( tr, TR_DOWN, pref_flag_get( key ) );
+        tr_sessionSetSpeedLimitEnabled( tr, TR_DOWN, pref_flag_get( key ) );
     }
     else if( !strcmp( key, TR_PREFS_KEY_DSPEED ) )
     {
@@ -985,19 +1071,15 @@ prefschanged( TrCore * core UNUSED,
     }
     else if( !strcmp( key, TR_PREFS_KEY_USPEED_ENABLED ) )
     {
-        tr_sessionLimitSpeed( tr, TR_UP, pref_flag_get( key ) );
+        tr_sessionSetSpeedLimitEnabled( tr, TR_UP, pref_flag_get( key ) );
     }
     else if( !strcmp( key, TR_PREFS_KEY_USPEED ) )
     {
         tr_sessionSetSpeedLimit( tr, TR_UP, pref_int_get( key ) );
     }
-    else if( !strcmp( key, TR_PREFS_KEY_RATIO_ENABLED ) )
+    else if( !strncmp( key, "sched-", 6 ) )
     {
-        tr_sessionSetRatioLimited( tr, pref_flag_get( key ) );
-    }
-    else if( !strcmp( key, TR_PREFS_KEY_RATIO ) )
-    {
-        tr_sessionSetRatioLimit( tr, pref_double_get( key ) );
+        updateScheduledLimits( tr );
     }
     else if( !strcmp( key, TR_PREFS_KEY_PORT_FORWARDING ) )
     {
@@ -1063,37 +1145,9 @@ prefschanged( TrCore * core UNUSED,
     {
         tr_sessionSetProxyPort( tr, pref_int_get( key ) );
     }
-    else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_UP ) )
+    else if( !strcmp( key, TR_PREFS_KEY_RPC_PASSWORD ) )
     {
-        tr_sessionSetAltSpeed( tr, TR_UP, pref_int_get( key ) );
-    }
-    else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_DOWN ) )
-    {
-        tr_sessionSetAltSpeed( tr, TR_DOWN, pref_int_get( key ) );
-    }
-    else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_ENABLED ) )
-    {
-        tr_sessionUseAltSpeed( tr, pref_flag_get( key ) );
-    }
-    else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_TIME_BEGIN ) )
-    {
-        tr_sessionSetAltSpeedBegin( tr, pref_int_get( key ) );
-    }
-    else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_TIME_END ) )
-    {
-        tr_sessionSetAltSpeedEnd( tr, pref_int_get( key ) );
-    }
-    else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_TIME_ENABLED ) )
-    {
-        tr_sessionUseAltSpeedTime( tr, pref_flag_get( key ) );
-    }
-    else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_TIME_DAY ) )
-    {
-        tr_sessionSetAltSpeedDay( tr, pref_int_get( key ) );
-    }
-    else if( !strcmp( key, TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START ) )
-    {
-        tr_sessionSetPeerPortRandomOnStart( tr, pref_flag_get( key ) );
+        tr_sessionSetProxyPassword( tr, pref_string_get( key ) );
     }
 }
 
@@ -1113,7 +1167,7 @@ updatemodel( gpointer gdata )
             tr_window_update( data->wind );
 
         /* update the actions */
-        refreshActions( data );
+        refreshTorrentActions( data );
     }
 
     return !done;
@@ -1204,6 +1258,18 @@ updateTrackerForeach( GtkTreeModel *      model,
 }
 
 static void
+detailsClosed( gpointer  user_data,
+               GObject * details )
+{
+    struct cbdata * data = user_data;
+    gpointer        hashString = g_hash_table_lookup( data->details2tor,
+                                                      details );
+
+    g_hash_table_remove( data->details2tor, details );
+    g_hash_table_remove( data->tor2details, hashString );
+}
+
+static void
 openFolderForeach( GtkTreeModel *           model,
                    GtkTreePath  * path      UNUSED,
                    GtkTreeIter *            iter,
@@ -1214,6 +1280,34 @@ openFolderForeach( GtkTreeModel *           model,
     gtk_tree_model_get( model, iter, MC_TORRENT, &gtor, -1 );
     tr_torrent_open_folder( gtor );
     g_object_unref( G_OBJECT( gtor ) );
+}
+
+static void
+showInfoForeach( GtkTreeModel *      model,
+                 GtkTreePath  * path UNUSED,
+                 GtkTreeIter *       iter,
+                 gpointer            user_data )
+{
+    const char *    hashString;
+    struct cbdata * data = user_data;
+    TrTorrent *     tor = NULL;
+    GtkWidget *     w;
+
+    gtk_tree_model_get( model, iter, MC_TORRENT, &tor, -1 );
+    hashString = tr_torrent_info( tor )->hashString;
+    w = g_hash_table_lookup( data->tor2details, hashString );
+    if( w != NULL )
+        gtk_window_present( GTK_WINDOW( w ) );
+    else
+    {
+        w = torrent_inspector_new( GTK_WINDOW( data->wind ), tor );
+        gtk_widget_show( w );
+        g_hash_table_insert( data->tor2details, (gpointer)hashString, w );
+        g_hash_table_insert( data->details2tor, w, (gpointer)hashString );
+        g_object_weak_ref( G_OBJECT( w ), detailsClosed, data );
+    }
+
+    g_object_unref( G_OBJECT( tor ) );
 }
 
 static void
@@ -1330,12 +1424,8 @@ doAction( const char * action_name, gpointer user_data )
     }
     else if( !strcmp( action_name, "show-torrent-properties" ) )
     {
-        if( data->details == NULL ) {
-            data->details = torrent_inspector_new( GTK_WINDOW( data->wind ), data->core );
-            g_object_add_weak_pointer( G_OBJECT( data->details ), (gpointer*)&data->details );
-        }
-        refreshDetailsDialog( data );
-        gtk_widget_show( data->details );
+        GtkTreeSelection * s = tr_window_get_selection( data->wind );
+        gtk_tree_selection_selected_foreach( s, showInfoForeach, data );
     }
     else if( !strcmp( action_name, "update-tracker" ) )
     {
@@ -1421,3 +1511,4 @@ doAction( const char * action_name, gpointer user_data )
     if( changed )
         updatemodel( data );
 }
+

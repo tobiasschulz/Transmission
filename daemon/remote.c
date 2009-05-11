@@ -80,7 +80,6 @@ static tr_option opts[] =
     { 'n', "auth",                 "Set authentication info", "n",  1, "<username:password>" },
     { 'N', "netrc",                "Set authentication info from a .netrc file", "N",  1, "<filename>" },
     { 'p', "port",                 "Port for incoming peers (Default: " TR_DEFAULT_PEER_PORT_STR ")", "p", 1, "<port>" },
-    { 'P', "random-port",          "Random port for incomping peers", "P", 0, NULL },
     { 900, "priority-high",        "Set the files' priorities as high", "ph", 1, "<files>" },
     { 901, "priority-normal",      "Set the files' priorities as normal", "pn", 1, "<files>" },
     { 902, "priority-low",         "Set the files' priorities as low", "pl", 1, "<files>" },
@@ -88,11 +87,6 @@ static tr_option opts[] =
     { 930, "peers",                "Set the current torrent(s)' maximum number of peers each", "pr", 1, "<max>" },
     { 931, "global-peers",         "Set the global maximum number of peers", "gpr", 1, "<max>" },
     { 'R', "remove-and-delete",    "Remove the current torrent(s) and delete local data", NULL, 0, NULL },
-    { 950, "seedratio",            "Let the current torrent(s) seed until a specific ratio", "sr", 1, "ratio" },
-    { 951, "seedratio-default",    "Let the current torrent(s) use the global seedratio settings", "srd", 0, NULL },
-    { 952, "no-seedratio",         "Let the current torrent(s) seed regardless of ratio", "SR", 0, NULL },
-    { 953, "global-seedratio",     "All torrents, unless overridden by a per-torrent setting, should seed until a specific ratio", "gsr", 1, "ratio" },
-    { 954, "no-global-seedratio",  "All torrents, unless overridden by a per-torrent setting, should seed regardless of ratio", "GSR", 0, NULL },
     { 's', "start",                "Start the current torrent(s)", "s",  0, NULL },
     { 'S', "stop",                 "Stop the current torrent(s)", "S",  0, NULL },
     { 't', "torrent",              "Set the current torrent(s)", "t",  1, "<torrent>" },
@@ -192,16 +186,8 @@ addIdArg( tr_benc *    args,
     }
     if( strcmp( id, "all" ) )
     {
-        const char * pch;
-        tr_bool isList = strchr(id,',') || strchr(id,'-');
-        tr_bool isNum = TRUE;
-        for( pch=id; isNum && *pch; ++pch )
-            if( !isdigit( *pch ) )
-                isNum = FALSE;
-        if( isNum || isList )
-            tr_rpc_parse_list_str( tr_bencDictAdd( args, "ids" ), id, strlen( id ) );
-        else
-            tr_bencDictAddStr( args, "ids", id ); /* it's a torrent sha hash */
+        tr_rpc_parse_list_str( tr_bencDictAdd( args,
+                                               "ids" ), id, strlen( id ) );
     }
 }
 
@@ -279,7 +265,6 @@ static const char * details_keys[] = {
     "timesCompleted",
     "totalSize",
     "uploadedEver",
-    "pieces",
     "webseeds",
     "webseedsSendingToUs"
 };
@@ -357,12 +342,12 @@ readargs( int           argc,
             case 'd':
                 tr_bencDictAddStr( &top, "method", "session-set" );
                 tr_bencDictAddInt( args, "speed-limit-down", numarg( optarg ) );
-                tr_bencDictAddBool( args, "speed-limit-down-enabled", TRUE );
+                tr_bencDictAddInt( args, "speed-limit-down-enabled", 1 );
                 break;
 
             case 'D':
                 tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddBool( args, "speed-limit-down-enabled", FALSE );
+                tr_bencDictAddInt( args, "speed-limit-down-enabled", 0 );
                 break;
 
             case 'f':
@@ -408,12 +393,12 @@ readargs( int           argc,
 
             case 'm':
                 tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddBool( args, "port-forwarding-enabled", TRUE );
+                tr_bencDictAddInt( args, "port-forwarding-enabled", 1 );
                 break;
 
             case 'M':
                 tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddBool( args, "port-forwarding-enabled", FALSE );
+                tr_bencDictAddInt( args, "port-forwarding-enabled", 0 );
                 break;
 
             case 'n':
@@ -428,12 +413,7 @@ readargs( int           argc,
 
             case 'p':
                 tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddInt( args, TR_PREFS_KEY_PEER_PORT, numarg( optarg ) );
-                break;
-
-            case 'P':
-                tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddBool( args, TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, TRUE);
+                tr_bencDictAddInt( args, "port", numarg( optarg ) );
                 break;
 
             case 'r':
@@ -444,7 +424,7 @@ readargs( int           argc,
             case 'R':
                 tr_bencDictAddStr( &top, "method", "torrent-remove" );
                 addIdArg( args, id );
-                tr_bencDictAddBool( args, "delete-local-data", TRUE );
+                tr_bencDictAddInt( args, "delete-local-data", 1 );
                 break;
 
             case 's':
@@ -465,12 +445,12 @@ readargs( int           argc,
             case 'u':
                 tr_bencDictAddStr( &top, "method", "session-set" );
                 tr_bencDictAddInt( args, "speed-limit-up", numarg( optarg ) );
-                tr_bencDictAddBool( args, "speed-limit-up-enabled", TRUE );
+                tr_bencDictAddInt( args, "speed-limit-up-enabled", 1 );
                 break;
 
             case 'U':
                 tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddBool( args, "speed-limit-up-enabled", FALSE );
+                tr_bencDictAddInt( args, "speed-limit-up-enabled", 0 );
                 break;
 
             case 'v':
@@ -486,19 +466,19 @@ readargs( int           argc,
             case 'w': {
                 char * path = absolutify( optarg );
                 tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddStr( args, TR_PREFS_KEY_DOWNLOAD_DIR, path );
+                tr_bencDictAddStr( args, "download-dir", path );
                 tr_free( path );
                 break;
             }
 
             case 'x':
                 tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddBool( args, TR_PREFS_KEY_PEX_ENABLED, TRUE );
+                tr_bencDictAddInt( args, "pex-allowed", 1 );
                 break;
 
             case 'X':
                 tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddBool( args, TR_PREFS_KEY_PEX_ENABLED, FALSE );
+                tr_bencDictAddInt( args, "pex-allowed", 0 );
                 break;
 
             case 900:
@@ -521,17 +501,17 @@ readargs( int           argc,
 
             case 910:
                 tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddStr( args, TR_PREFS_KEY_ENCRYPTION, "required" );
+                tr_bencDictAddStr( args, "encryption", "required" );
                 break;
 
             case 911:
                 tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddStr( args, TR_PREFS_KEY_ENCRYPTION, "preferred" );
+                tr_bencDictAddStr( args, "encryption", "preferred" );
                 break;
 
             case 912:
                 tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddStr( args, TR_PREFS_KEY_ENCRYPTION, "tolerated" );
+                tr_bencDictAddStr( args, "encryption", "tolerated" );
                 break;
 
             case 920:
@@ -547,7 +527,7 @@ readargs( int           argc,
 
             case 931:
                 tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddInt( args, TR_PREFS_KEY_PEER_LIMIT_GLOBAL, atoi(optarg) );
+                tr_bencDictAddInt( args, "peer-limit", atoi(optarg) );
                 break;
 
             case 940:
@@ -556,36 +536,6 @@ readargs( int           argc,
                 addIdArg( args, id );
                 fields = tr_bencDictAddList( args, "fields", 1 );
                 tr_bencListAddStr( fields, "peers" );
-                break;
-
-            case 950:
-                tr_bencDictAddStr( &top, "method", "torrent-set" );
-                tr_bencDictAddReal( args, "seedRatioLimit", atof(optarg) );
-                tr_bencDictAddInt( args, "seedRatioMode", TR_RATIOLIMIT_SINGLE );
-                addIdArg( args, id );
-                break;
-
-            case 951:
-                tr_bencDictAddStr( &top, "method", "torrent-set" );
-                tr_bencDictAddInt( args, "seedRatioMode", TR_RATIOLIMIT_GLOBAL );
-                addIdArg( args, id );
-                break;
-
-            case 952:
-                tr_bencDictAddStr( &top, "method", "torrent-set" );
-                tr_bencDictAddInt( args, "seedRatioMode", TR_RATIOLIMIT_UNLIMITED );
-                addIdArg( args, id );
-                break;
-
-            case 953:
-                tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddReal( args, "seedRatioLimit", atof(optarg) );
-                tr_bencDictAddBool( args, "seedRatioLimited", TRUE );
-                break;
-
-            case 954:
-                tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddBool( args, "seedRatioLimited", FALSE );
                 break;
 
             case TR_OPT_ERR:
@@ -612,7 +562,10 @@ readargs( int           argc,
 
 /* [host:port] or [host] or [port] */
 static void
-getHostAndPort( int * argc, char ** argv, char ** host, int * port )
+getHostAndPort( int *   argc,
+                char ** argv,
+                char ** host,
+                int *   port )
 {
     if( *argv[1] != '-' )
     {
@@ -675,7 +628,17 @@ etaToString( char *  buf,
 static char*
 strlratio2( char * buf, double ratio, size_t buflen )
 {
-    return tr_strratio( buf, buflen, ratio, "Inf" );
+    if( (int)ratio == TR_RATIO_NA )
+        tr_strlcpy( buf, "None", buflen );
+    else if( (int)ratio == TR_RATIO_INF )
+        tr_strlcpy( buf, "Inf", buflen );
+    else if( ratio < 10.0 )
+        tr_snprintf( buf, buflen, "%'.2f", ratio );
+    else if( ratio < 100.0 )
+        tr_snprintf( buf, buflen, "%'.1f", ratio );
+    else
+        tr_snprintf( buf, buflen, "%'.0f", ratio );
+    return buf;
 }
 
 static char*
@@ -746,7 +709,7 @@ getStatusString( tr_benc * t, char * buf, size_t buflen )
                              ? "Will Verify"
                              : "Verifying";
             double percent;
-            if( tr_bencDictFindReal( t, "recheckProgress", &percent ) )
+            if( tr_bencDictFindDouble( t, "recheckProgress", &percent ) )
                 tr_snprintf( buf, buflen, "%s (%.0f%%)", str, floor(percent*100.0) );
             else
                 tr_strlcpy( buf, str, buflen );
@@ -756,23 +719,23 @@ getStatusString( tr_benc * t, char * buf, size_t buflen )
 
         case TR_STATUS_DOWNLOAD:
         case TR_STATUS_SEED: {
-	    int64_t fromUs = 0; 
-	    int64_t toUs = 0; 
- 	    tr_bencDictFindInt( t, "peersGettingFromUs", &fromUs ); 
- 	    tr_bencDictFindInt( t, "peersSendingToUs", &toUs ); 
- 	    if( fromUs && toUs ) 
- 	        tr_strlcpy( buf, "Up & Down", buflen ); 
- 	    else if( toUs ) 
- 	        tr_strlcpy( buf, "Downloading", buflen ); 
- 	    else if( fromUs ) { 
- 	        int64_t leftUntilDone = 0; 
- 	        tr_bencDictFindInt( t, "leftUntilDone", &leftUntilDone ); 
- 	        if( leftUntilDone > 0 )
- 	            tr_strlcpy( buf, "Uploading", buflen ); 
- 	        else
- 	            tr_strlcpy( buf, "Seeding", buflen ); 
- 	    } else {
- 	        tr_strlcpy( buf, "Idle", buflen ); 
+            int64_t fromUs = 0;
+            int64_t toUs = 0;
+            tr_bencDictFindInt( t, "peersGettingFromUs", &fromUs );
+            tr_bencDictFindInt( t, "peersSendingToUs", &toUs );
+            if( fromUs && toUs )
+                tr_strlcpy( buf, "Up & Down", buflen );
+            else if( toUs )
+                tr_strlcpy( buf, "Downloading", buflen );
+            else if( fromUs ) {
+                int64_t leftUntilDone = 0;
+                tr_bencDictFindInt( t, "leftUntilDone", &leftUntilDone );
+                if( leftUntilDone > 0 )
+                    tr_strlcpy( buf, "Uploading", buflen );
+                else
+                    tr_strlcpy( buf, "Seeding", buflen );
+            } else {
+                tr_strlcpy( buf, "Idle", buflen );
             }
             break;
         }
@@ -801,7 +764,6 @@ printSession( tr_benc * top )
     {
         const char * str;
         int64_t      i;
-        tr_bool      boolVal;
 
         printf( "VERSION\n" );
         if( tr_bencDictFindStr( args,  "version", &str ) )
@@ -817,23 +779,23 @@ printSession( tr_benc * top )
             printf( "  Download directory: %s\n", str );
         if( tr_bencDictFindInt( args, "port", &i ) )
             printf( "  Listenport: %" PRId64 "\n", i );
-        if( tr_bencDictFindBool( args, "port-forwarding-enabled", &boolVal ) )
-            printf( "  Portforwarding enabled: %s\n", ( boolVal ? "Yes" : "No" ) );
-        if( tr_bencDictFindBool( args, "pex-allowed", &boolVal ) )
-            printf( "  Peer exchange allowed: %s\n", ( boolVal ? "Yes" : "No" ) );
+        if( tr_bencDictFindInt( args, "port-forwarding-enabled", &i ) )
+            printf( "  Portforwarding enabled: %s\n", ( i ? "Yes" : "No" ) );
+        if( tr_bencDictFindInt( args, "pex-allowed", &i ) )
+            printf( "  Peer exchange allowed: %s\n", ( i ? "Yes" : "No" ) );
         if( tr_bencDictFindStr( args,  "encryption", &str ) )
             printf( "  Encryption: %s\n", str );
         printf( "\n" );
 
         printf( "LIMITS\n" );
-        if( tr_bencDictFindInt( args, TR_PREFS_KEY_PEER_LIMIT_GLOBAL, &i ) )
+        if( tr_bencDictFindInt( args, "peer-limit", &i ) )
             printf( "  Peer limit: %" PRId64 "\n", i );
-        if( tr_bencDictFindBool( args, "speed-limit-down-enabled", &boolVal ) )
-            printf( "  Downloadlimit enabled: %s\n", ( boolVal ? "Yes" : "No" ) );
+        if( tr_bencDictFindInt( args, "speed-limit-down-enabled", &i ) )
+            printf( "  Downloadlimit enabled: %s\n", ( i ? "Yes" : "No" ) );
         if( tr_bencDictFindInt( args, "speed-limit-down", &i ) )
             printf( "  Downloadlimit: %6" PRId64 " KB/sec\n", i );
-        if( tr_bencDictFindBool( args, "speed-limit-up-enabled", &boolVal ) )
-            printf( "  Uploadlimit enabled:   %s\n", ( boolVal ? "Yes" : "No" ) );
+        if( tr_bencDictFindInt( args, "speed-limit-up-enabled", &i ) )
+            printf( "  Uploadlimit enabled:   %s\n", ( i ? "Yes" : "No" ) );
         if( tr_bencDictFindInt( args, "speed-limit-up", &i ) )
             printf( "  Uploadlimit:   %6" PRId64 " KB/sec\n", i );
     }
@@ -853,14 +815,11 @@ printDetails( tr_benc * top )
         {
             tr_benc *    t = tr_bencListChild( torrents, ti );
             tr_benc *    l;
-            const uint8_t * raw;
-            size_t       rawlen;
             const char * str;
             char         buf[512];
             char         buf2[512];
             int64_t      i, j, k;
             tr_bool      isStopped;
-            tr_bool      boolVal;
 
             isStopped = tr_bencDictFindInt( t, "status", &i ) && (i==TR_STATUS_STOPPED);
 
@@ -1005,8 +964,8 @@ printDetails( tr_benc * top )
                 const time_t tt = i;
                 printf( "  Date created: %s", ctime( &tt ) );
             }
-            if( tr_bencDictFindBool( t, "isPrivate", &boolVal ) )
-                printf( "  Public torrent: %s\n", ( boolVal ? "No" : "Yes" ) );
+            if( tr_bencDictFindInt( t, "isPrivate", &i ) )
+                printf( "  Public torrent: %s\n", ( i ? "No" : "Yes" ) );
             if( tr_bencDictFindStr( t, "comment", &str ) && str && *str )
                 printf( "  Comment: %s\n", str );
             if( tr_bencDictFindStr( t, "creator", &str ) && str && *str )
@@ -1015,23 +974,6 @@ printDetails( tr_benc * top )
                 printf( "  Piece Count: %" PRId64 "\n", i );
             if( tr_bencDictFindInt( t, "pieceSize", &i ) )
                 printf( "  Piece Size: %" PRId64 "\n", i );
-            printf( "\n" );
-
-            printf("PIECES\n  ");
-            if( tr_bencDictFindRaw( t, "pieces", &raw, &rawlen ) && tr_bencDictFindInt( t, "pieceCount", &j ) ) {
-                int len;
-                char * str = tr_base64_decode( raw, rawlen, &len );
-                for( i=k=0; k<len; ++k ) {
-                    int e;
-                    for( e=0; i<j && e<8; ++e, ++i )
-                        printf( str[k] & (1<<(7-e)) ? "1" : "0" );
-                    printf( " " );
-                    if( !(i%64) )
-                        printf( "\n  " );
-                }
-                tr_free( str );
-            }
-            printf( "\n" );
         }
     }
 }
@@ -1120,7 +1062,7 @@ printPeersImpl( tr_benc * peers )
 
         if( tr_bencDictFindStr( d, "address", &address )
           && tr_bencDictFindStr( d, "clientName", &client )
-          && tr_bencDictFindReal( d, "progress", &progress )
+          && tr_bencDictFindDouble( d, "progress", &progress )
           && tr_bencDictFindStr( d, "flagStr", &flagstr )
           && tr_bencDictFindInt( d, "rateToClient", &rateToClient )
           && tr_bencDictFindInt( d, "rateToPeer", &rateToPeer ) )
@@ -1171,7 +1113,6 @@ printTorrentList( tr_benc * top )
         printf( "%-4s   %-4s  %9s  %-8s  %6s  %6s  %-5s  %-11s  %s\n",
                 "ID", "Done", "Have", "ETA", "Up", "Down", "Ratio", "Status",
                 "Name" );
-
         for( i = 0, n = tr_bencListSize( list ); i < n; ++i )
         {
             int64_t      id, eta, status, up, down;
@@ -1187,7 +1128,7 @@ printTorrentList( tr_benc * top )
               && tr_bencDictFindInt( d, "rateUpload", &up )
               && tr_bencDictFindInt( d, "sizeWhenDone", &sizeWhenDone )
               && tr_bencDictFindInt( d, "status", &status )
-              && tr_bencDictFindReal( d, "uploadRatio", &ratio ) )
+              && tr_bencDictFindDouble( d, "uploadRatio", &ratio ) )
             {
                 char etaStr[16];
                 char statusStr[64];
@@ -1229,7 +1170,7 @@ printTorrentList( tr_benc * top )
             }
         }
 
-        printf( "Sum:         %9s            %6.1f  %6.1f\n",
+        printf( "Sum:         %9s             %6.1f  %6.1f\n",
                 strlsize( haveStr, total_size, sizeof( haveStr ) ),
                 total_up / 1024.0,
                 total_down / 1024.0 );

@@ -458,18 +458,6 @@ int tr_ptr2int( void* );
 
 void* tr_int2ptr( int );
 
-/**
- * @param buf the buffer to write the string to
- * @param buflef buf's size
- * @param ratio the ratio to convert to a string
- * @param the string represntation of "infinity"
- */
-char* tr_strratio( char * buf, size_t buflen, double ratio, const char * infinity );
-
-struct tm * tr_localtime_r( const time_t *_clock, struct tm *_result );
-
-
-
 #ifdef __cplusplus
 }
 #endif

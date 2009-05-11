@@ -28,8 +28,5 @@ LDADD = \
     $(OPENSSL_LIBS) \
     $(PTHREAD_LIBS) -lm
 
-noinst_HEADERS = \
-    watch.h
-
-transmission_daemon_SOURCES = daemon.c watch.c
+transmission_daemon_SOURCES = daemon.c
 transmission_remote_SOURCES = remote.c

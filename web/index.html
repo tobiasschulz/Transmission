@@ -29,6 +29,7 @@
 			 <ul>    
 				 <li id="open"><div id="open_link"><div class="toolbar_image"></div>Open</div></li>
 				 <li id="remove" class="disabled"><div id="remove_link"><div class="toolbar_image"></div>Remove</div></li>
+				 <li class="divider">&nbsp;</li>
 				 <li id="removedata" class="disabled"><div id="removedata_link"><div class="toolbar_image"></div>Remove Data</div></li>
 				 <li class="divider">&nbsp;</li>
 				 <li id="pause_selected" class="disabled"><div id="pause_selected_link"><div class="toolbar_image"></div>Pause</div></li>
@@ -61,7 +62,6 @@
 			<div id="inspector_tabs">
 				<div class="inspector_tab selected" id="inspector_tab_info"><a href="#info"><img src="images/buttons/info_general.png" alt="Information"/></a></div>
 				<div class="inspector_tab" id="inspector_tab_activity"><a href="#activity"><img src="images/buttons/info_activity.png" alt="Activity"/></a></div>
-				<div class="inspector_tab" id="inspector_tab_files"><a href="#files"><img src="images/buttons/info_files.png" alt="Files"/></a></div>
 			</div>
 			
 			<div id="inspector_header">
@@ -169,11 +169,6 @@
 					</div>
 				</div><!-- class="inspector_group"-->
 			</div><!-- id="inspector_tab_activity_container" -->
-
-			<div style="display:none;" class="inspector_container" id="inspector_tab_files_container">
-				<span id="inspector_file_list"></span>
-			</div><!-- id="inspector_tab_files_container" -->
-
 		</div>
 		
 		<div id="torrent_container">
@@ -341,11 +336,9 @@
 			<ul>
 				<li id="context_pause_selected" class="disabled context_pause_selected">Pause Selected</li>
 				<li id="context_resume_selected" class="disabled context_resume_selected">Resume Selected</li>
-				<li class="separator"></li>
 				<li id="context_remove">Remove From List...</li>
-				<li id="context_removedata">Trash Data & Remove From List...</li>
 				<li class="separator"></li>
-				<li id="context_verify">Verify Local Data</li>
+				<li id="context_removedata">Delete Data And Remove From List...</li>
 				<li class="separator"></li>
 				<li id="context_toggle_inspector">Show Inspector</li>
 				<li class="separator"></li>
@@ -354,6 +347,6 @@
 			</ul>
 		</div>
 		
-		<iframe name="torrent_upload_frame" id="torrent_upload_frame" src="about:blank" ></iframe>
+		<iframe name="torrent_upload_frame" id="torrent_upload_frame" src="about:blank" />
 	</body>
 </html>

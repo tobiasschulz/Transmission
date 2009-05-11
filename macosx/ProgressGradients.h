@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -22,19 +22,21 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
+@class CTGradient;
+
 @interface ProgressGradients : NSObject
 
-+ (NSGradient *) progressGradientForRed: (CGFloat) redComponent green: (CGFloat) greenComponent blue: (CGFloat) blueComponent;
++ (CTGradient *) progressGradientForRed: (CGFloat) redComponent green: (CGFloat) greenComponent blue: (CGFloat) blueComponent;
 
-+ (NSGradient *) progressWhiteGradient;
-+ (NSGradient *) progressGrayGradient;
-+ (NSGradient *) progressLightGrayGradient;
-+ (NSGradient *) progressBlueGradient;
-+ (NSGradient *) progressDarkBlueGradient;
-+ (NSGradient *) progressGreenGradient;
-+ (NSGradient *) progressLightGreenGradient;
-+ (NSGradient *) progressDarkGreenGradient;
-+ (NSGradient *) progressRedGradient;
-+ (NSGradient *) progressYellowGradient;
++ (CTGradient *) progressWhiteGradient;
++ (CTGradient *) progressGrayGradient;
++ (CTGradient *) progressLightGrayGradient;
++ (CTGradient *) progressBlueGradient;
++ (CTGradient *) progressDarkBlueGradient;
++ (CTGradient *) progressGreenGradient;
++ (CTGradient *) progressLightGreenGradient;
++ (CTGradient *) progressDarkGreenGradient;
++ (CTGradient *) progressRedGradient;
++ (CTGradient *) progressYellowGradient;
 
 @end

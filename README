@@ -4,7 +4,7 @@ README for Transmission
 Transmission is a fast, easy, and free BitTorrent client.
 
 It runs on Mac OS X (Cocoa interface) and
-Linux/NetBSD/FreeBSD/OpenBSD (GTK+ and Qt interfaces).
+Linux/NetBSD/FreeBSD/OpenBSD (GTK+ interface).
 
 Visit http://www.transmissionbt.com/ for more information.
 
@@ -42,8 +42,3 @@ Building Transmission from SVN (Updating):
     $ make -s
     $ su (if necessary for the next line)
     $ make install
-
-
-
-Notes for building on Solaris' C compiler:  User av reports success with
-this invocation: ./configure CC=c99 CXX=CC CFLAGS='-D__EXTENSIONS__ -mt'

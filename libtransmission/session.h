@@ -39,7 +39,6 @@
  #endif
 #endif
 
-#include "bencode.h"
 
 typedef enum { TR_NET_OK, TR_NET_ERROR, TR_NET_WAIT } tr_tristate_t;
 
@@ -67,26 +66,9 @@ struct tr_session
     tr_bool                      isClosed;
     tr_bool                      isWaiting;
     tr_bool                      useLazyBitfield;
-    tr_bool                      isRatioLimited;
 
-    tr_benc                      removedTorrents;
-    
+    tr_bool                      isSpeedLimited[2];
     int                          speedLimit[2];
-    tr_bool                      speedLimitEnabled[2];
-
-    int                          altSpeed[2];
-    tr_bool                      altSpeedEnabled;
-
-    int                          altSpeedTimeBegin;
-    int                          altSpeedTimeEnd;
-    tr_sched_day                 altSpeedTimeDay;
-    tr_bool                      altSpeedTimeEnabled;
-    tr_bool                      altSpeedChangedByUser;
-
-    tr_altSpeedFunc            * altCallback;
-    void                       * altCallbackUserData;
-
-
     int                          magicNumber;
 
     tr_encryption_mode           encryptionMode;
@@ -139,8 +121,6 @@ struct tr_session
     struct tr_metainfo_lookup *  metainfoLookup;
     int                          metainfoLookupCount;
 
-    struct event               * altTimer;
-
     /* the size of the output buffer for peer connections */
     int so_sndbuf;
 
@@ -148,14 +128,8 @@ struct tr_session
     int so_rcvbuf;
 
     /* monitors the "global pool" speeds */
-    struct tr_bandwidth        * bandwidth;
-
-    double                       desiredRatio;
+    struct tr_bandwidth       * bandwidth;
 };
-
-tr_bool      tr_sessionGetActiveSpeedLimit( const tr_session  * session,
-                                            tr_direction        dir,
-                                            int               * setme );
 
 const char * tr_sessionFindTorrentFile( const tr_session * session,
                                         const char *       hashString );
@@ -166,6 +140,7 @@ void         tr_sessionSetTorrentFile( tr_session * session,
 
 tr_bool      tr_sessionIsAddressBlocked( const tr_session        * session,
                                          const struct tr_address * addr );
+
 
 void         tr_globalLock( tr_session * );
 

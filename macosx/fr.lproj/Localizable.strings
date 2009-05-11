@@ -54,7 +54,6 @@
 "%d incoming" = "%d entrante";
 
 /* Action menu -> upload/download limit */
-
 "%d KB/s" = "%d Ko/s";
 
 /* Status bar transfer count */
@@ -169,8 +168,8 @@
 /* Groups -> Button */
 "All Groups" = "Tous les groupes";
 
-/* Create torrent -> failed -> warning */
-"An unknown error has occurred." = "Une erreur inconnue est survenue";
+/* Torrent disk space alert -> button */
+"Always Download" = "Toujours télécharger";
 
 /* All toolbar item -> label */
 "Apply All" = "Appliquer à tous";
@@ -262,6 +261,9 @@
 /* Message window -> save button */
 "Clear" = "Effacer";
 
+/* Groups -> color button */
+"Color" = "Couleur";
+
 /* Blocklist -> message */
 "Connecting to site" = "Connexion au site";
 
@@ -314,6 +316,17 @@
 
 /* Torrent disk space alert -> button */
 "Do not check disk space again" = "Ne plus vérifier l'espace disque";
+
+/* Open duplicate alert -> button
+   Create torrent -> blank address -> button
+   Remove built-in tracker alert -> button
+   Add torrent -> same name -> button
+   Stats reset -> button */
+
+
+
+
+"Don't Alert Again" = "Ne pas redemander";
 
 /* files tab -> tooltip */
 "Don't Download" = "Ne pas télécharger";
@@ -576,9 +589,6 @@
 /* Groups -> Name */
 "Orange" = "Orange";
 
-/* Inspector -> Peers tab -> table row tooltip */
-"Partial Seed" = "Seedeur partiel";
-
 /* All toolbar item -> palette label */
 "Pause / Resume All" = "Arrêter / Reprendre tous";
 
@@ -618,13 +628,13 @@
 "Port" = "Port";
 
 /* Preferences -> Network -> port status */
-"Port check site is down" = "Vérification impossible";
+"Port check site is down" = "Le site de vérif. est indisponible";
 
 /* Preferences -> Network -> port status */
-"Port is closed" = "Port fermé";
+"Port is closed" = "Le port est fermé";
 
 /* Preferences -> Network -> port status */
-"Port is open" = "Port ouvert";
+"Port is open" = "Le port est ouvert";
 
 /* file table -> header tool tip
    File Outline -> Menu */
@@ -669,6 +679,7 @@
 
 /* Dock Badger -> quit message
    Dock Badger -> quit */
+
 "Quitting" = "Quitte";
 
 /* Stats window -> label
@@ -800,9 +811,6 @@
 
 /* View menu -> Status Bar */
 "Show Status Bar" = "Afficher la barre de status";
-
-/* Status Bar -> speed tooltip */
-"Speed Limit" = "Limite de vitesse";
 
 /* Growl notification title */
 "Speed Limit Auto Disabled" = "Mode vitesse limitée : Auto-désactivé";
@@ -943,13 +951,13 @@
 "Torrent Inspector" = "Inspecteur de torrent";
 
 /* Status Bar -> speed tooltip */
-"Total download rate" = "Vitesse de téléchargement totale";
+"Total download speed" = "Vitesse de téléchargement totale";
 
 /* stats total */
 "Total N/A" = "Total N/A";
 
 /* Status Bar -> speed tooltip */
-"Total upload rate" = "Vitesse d'émission totale";
+"Total upload speed" = "Vitesse d'émission totale";
 
 /* Inspector -> title */
 "Tracker" = "Trackeur";
@@ -967,9 +975,6 @@
 
 /* File Outline -> Menu */
 "Uncheck Selected" = "Décocher sélectionnés";
-
-/* Status Bar -> speed tooltip */
-"unlimited" = "illimitée";
 
 /* Torrent -> error string unreadable */
 "unreadable error" = "erreur illisible";

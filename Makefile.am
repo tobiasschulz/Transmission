@@ -14,6 +14,9 @@ endif
 if BUILD_MAC
   MAC_DIR = macosx
 endif
+if BUILD_WX
+  WX_DIR = wx
+endif
 
 SUBDIRS = \
   doc \
@@ -23,11 +26,11 @@ SUBDIRS = \
   $(CLI_DIR) \
   $(BEOS_DIR) \
   $(GTK_DIR) \
-  $(MAC_DIR)
+  $(MAC_DIR) \
+  $(WX_DIR)
 
 EXTRA_DIST = \
   web \
-  qt \
   NEWS \
   AUTHORS \
   COPYING \
@@ -92,10 +95,7 @@ clutch_buttons_DATA = \
   web/images/buttons/toolbar_buttons.png \
   web/images/buttons/info_general.png \
   web/images/buttons/torrent_buttons.png \
-  web/images/buttons/info_activity.png \
-  web/images/buttons/file_priority_buttons.png \
-  web/images/buttons/file_wanted_buttons.png \
-  web/images/buttons/info_files.png
+  web/images/buttons/info_activity.png
 
 DISTCLEANFILES = \
   intltool-extract \

@@ -69,8 +69,6 @@ typedef struct tr_peerIo
      * for reading or writing */
     tr_bool               hasFinishedConnecting;
 
-    tr_priority_t         priority;
-
     int                   pendingEvents;
 
     int                   magicNumber;

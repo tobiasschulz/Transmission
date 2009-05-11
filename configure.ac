@@ -3,8 +3,8 @@ dnl STATUS: "X" for prerelease beta builds,
 dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
-m4_define([user_agent_prefix],[1.60+])
-m4_define([peer_id_prefix],[-TR160Z-])
+m4_define([user_agent_prefix],[1.53])
+m4_define([peer_id_prefix],[-TR1530-])
 
 AC_INIT([transmission],
         [user_agent_prefix],
@@ -61,21 +61,7 @@ AC_PROG_CC
 AC_PROG_CXX
 AC_C_INLINE
 if test "x$GCC" = "xyes" ; then
-
-    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -W -Wpointer-arith -Wformat-security -Wcast-align -Wundef -Wcast-align -Wstrict-prototypes -Wmissing-declarations -Wmissing-format-attribute -Wredundant-decls -Wnested-externs -Wunused-parameter -Wwrite-strings"
-
-    dnl figure out gcc version
-    AC_MSG_CHECKING([gcc version])
-    GCC_VERSION=`$CC -dumpversion`
-    GCC_MAJOR=`echo $GCC_VERSION | cut -d . -f1`
-    GCC_MINOR=`echo $GCC_VERSION | cut -d . -f2`
-    GCC_VERSION_NUM=`(expr $GCC_MAJOR "*" 100 + $GCC_MINOR) 2>/dev/null`
-
-    AC_MSG_RESULT($GCC_VERSION)
-    if test $GCC_VERSION_NUM -ge 304; then
-        dnl these were added in 3.4
-        CFLAGS="$CFLAGS -Wextra -Wdeclaration-after-statement -Winit-self"
-    fi
+  CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -Wextra -Wredundant-decls -Wpointer-arith -Wformat-security -W -Wmissing-declarations -Wdeclaration-after-statement -Wcast-align -Winit-self -Wundef -Wnested-externs -Wmissing-format-attribute"
 fi
 
 AC_HEADER_STDC
@@ -99,55 +85,6 @@ PKG_CHECK_MODULES(LIBCURL, [libcurl >= $CURL_MINIMUM])
 AC_PATH_ZLIB
 
 AC_SYS_LARGEFILE
-
-
-dnl ----------------------------------------------------------------------------
-dnl
-dnl posix_fadvise
-
-dnl can posix_fadvise be used
-AC_CHECK_DECLS(posix_fadvise, [], [], [
-#define _XOPEN_SOURCE 600
-#include <fcntl.h>])
-AC_CHECK_FUNCS([posix_fadvise])
-
-
-dnl ----------------------------------------------------------------------------
-dnl
-dnl file monitoring for the daemon
-
-AC_CHECK_HEADER([sys/inotify.h], 
-                [AC_CHECK_FUNC([inotify_init],[have_inotify="yes"],[have_inotify="no"])], 
-                [have_inotify="no"]) 
-AC_ARG_WITH([inotify], 
-            [AS_HELP_STRING([--with-inotify],[Enable inotify support (default=auto)])], 
-            [want_inotify=${enableval}], 
-            [want_inotify=${have_inotify}]) 
-if test "x$want_inotify" = "xyes" ; then 
-    if test "x$have_inotify" = "xyes"; then 
-      AC_DEFINE([WITH_INOTIFY],[1]) 
-    else 
-      AC_MSG_ERROR("inotify not found!") 
-    fi 
-fi 
- 
-AC_CHECK_HEADER([sys/event.h], 
-                [AC_CHECK_FUNC([kqueue],[have_kqueue="yes"],[have_kqueue="no"])], 
-                [have_kqueue="no"]) 
-AC_ARG_WITH([kqueue], 
-            [AS_HELP_STRING([--with-kqueue],[Enable kqueue support (default=auto)])], 
-            [want_kqueue=${enableval}], 
-            [want_kqueue=${have_kqueue}]) 
-if test "x$want_kqueue" = "xyes" ; then 
-    if test "x$have_kqueue" = "xyes"; then 
-      AC_DEFINE([WITH_KQUEUE],[1]) 
-    else 
-      AC_MSG_ERROR("kqueue not found!") 
-    fi 
-fi 
-
-AC_CHECK_HEADERS([xfs/xfs.h])
-
 
 dnl ----------------------------------------------------------------------------
 dnl
@@ -273,6 +210,27 @@ if test "x$enable_nls" = "xyes" ; then
     AC_SUBST(transmissionlocaledir)
 fi
 
+dnl ----------------------------------------------------------------------------
+dnl
+dnl  wxWidgets detection for the wxWidgets client
+
+build_wx=no
+AC_ARG_ENABLE([wx],
+              AS_HELP_STRING([--enable-wx],[build wxWidgets client]),
+              [want_wx=${enableval}],
+              [want_wx=no])
+if test "x$want_wx" != "xno"; then
+    AM_OPTIONS_WXCONFIG
+    AM_PATH_WXCONFIG($WX_MINIMUM,[have_wx=yes],[have_wx=no])
+    if test "x$have_wx" = "xyes"; then
+        build_wx=yes
+    elif test "x$want_wx" = "xyes"; then 
+        AC_MSG_ERROR("wxWidgets not found!")
+    fi
+fi
+AM_CONDITIONAL([BUILD_WX],[test "x$build_wx" = "xyes"])
+
+
 
 dnl ----------------------------------------------------------------------------
 dnl
@@ -356,6 +314,8 @@ AC_CONFIG_FILES([Makefile
                  third-party/miniupnp/Makefile
                  third-party/libnatpmp/Makefile
                  macosx/Makefile
+                 wx/Makefile
+                 wx/images/Makefile
                  gtk/Makefile
                  gtk/icons/Makefile
                  po/Makefile.in])
@@ -376,5 +336,6 @@ Configuration:
           ... dbus-glib support:    ${use_dbus_glib}
           ... libnotify support:    ${use_libnotify}
         Build OS X client:          ${build_mac}
+        Build wxWidgets client:     ${build_wx}
 
 "

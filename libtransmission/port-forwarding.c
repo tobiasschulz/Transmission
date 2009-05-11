@@ -44,7 +44,6 @@ struct tr_shared
     tr_port               publicPort;
 
     tr_timer            * pulseTimer;
-    tr_timer            * recheckTimer;
 
     tr_upnp             * upnp;
     tr_natpmp           * natpmp;
@@ -84,7 +83,7 @@ getNatStateStr( int state )
 }
 
 static void
-natPulse( tr_shared * s, tr_bool doPortCheck )
+natPulse( tr_shared * s )
 {
     const tr_port port = s->publicPort;
     const int     isEnabled = s->isEnabled && !s->isShuttingDown;
@@ -93,7 +92,7 @@ natPulse( tr_shared * s, tr_bool doPortCheck )
 
     oldStatus = tr_sharedTraversalStatus( s );
     s->natpmpStatus = tr_natpmpPulse( s->natpmp, port, isEnabled );
-    s->upnpStatus = tr_upnpPulse( s->upnp, port, isEnabled, doPortCheck );
+    s->upnpStatus = tr_upnpPulse( s->upnp, port, isEnabled );
     newStatus = tr_sharedTraversalStatus( s );
 
     if( newStatus != oldStatus )
@@ -187,10 +186,10 @@ incomingPeersPulse( tr_shared * s )
 static int
 sharedPulse( void * vshared )
 {
-    tr_bool keepPulsing = TRUE;
+    tr_bool keepPulsing = 1;
     tr_shared * shared = vshared;
 
-    natPulse( shared, FALSE );
+    natPulse( shared );
 
     if( !shared->isShuttingDown )
     {
@@ -200,30 +199,14 @@ sharedPulse( void * vshared )
     {
         tr_ninf( getKey( ), _( "Stopped" ) );
         tr_timerFree( &shared->pulseTimer );
-        tr_timerFree( &shared->recheckTimer );
         tr_socketListForEach( shared->bindSockets, &closeCb, shared );
         tr_socketListFree( shared->bindSockets );
         tr_natpmpClose( shared->natpmp );
         tr_upnpClose( shared->upnp );
         shared->session->shared = NULL;
         tr_free( shared );
-        keepPulsing = FALSE;
+        keepPulsing = 0;
     }
-
-    return keepPulsing;
-}
-
-static int
-recheckPulse( void * vshared )
-{
-    tr_bool keepPulsing = TRUE;
-    tr_shared * shared = vshared;
-
-    tr_ninf( getKey( ), _( "Checking to see if port %d is still open" ), shared->publicPort );
-    natPulse( shared, TRUE );
-
-    if( shared->isShuttingDown )
-        keepPulsing = FALSE;
 
     return keepPulsing;
 }
@@ -232,22 +215,36 @@ recheckPulse( void * vshared )
 ****
 ***/
 
+static tr_socketList *
+setupBindSockets( tr_port port )
+{
+    tr_bool hasIPv6 = tr_net_hasIPv6( port );
+    tr_socketList * socks = NULL;
+    if( hasIPv6 )
+        socks = tr_socketListNew( &tr_in6addr_any );
+
+    if( socks )
+        tr_socketListAppend( socks, &tr_inaddr_any );
+    else
+        socks = tr_socketListNew( &tr_inaddr_any );
+    return socks; /* Because the dryer gremlins won't */
+}
+
 tr_shared *
 tr_sharedInit( tr_session  * session,
                tr_bool       isEnabled,
-               tr_port       publicPort,
-               tr_socketList * socks )
+               tr_port       publicPort )
 {
     tr_shared * s = tr_new0( tr_shared, 1 );
 
     s->session      = session;
     s->publicPort   = publicPort;
-    s->bindSockets  = socks;
+    s->shouldChange = TRUE;
+    s->bindSockets  = setupBindSockets( publicPort );
     s->shouldChange = TRUE;
     s->natpmp       = tr_natpmpInit( );
     s->upnp         = tr_upnpInit( );
     s->pulseTimer   = tr_timerNew( session, sharedPulse, s, 1000 );
-    s->recheckTimer = tr_timerNew( session, recheckPulse, s, 1000*60*20 ); /* 20 minutes */
     s->isEnabled    = isEnabled;
     s->upnpStatus   = TR_PORT_UNMAPPED;
     s->natpmpStatus = TR_PORT_UNMAPPED;
@@ -297,8 +294,3 @@ tr_sharedTraversalStatus( const tr_shared * s )
     return MAX( s->natpmpStatus, s->upnpStatus );
 }
 
-const tr_socketList *
-tr_sharedGetBindSockets( const tr_shared * shared )
-{
-    return shared->bindSockets;
-}

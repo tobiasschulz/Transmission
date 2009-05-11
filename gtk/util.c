@@ -42,7 +42,6 @@
 
 #include <libtransmission/transmission.h> /* TR_RATIO_NA, TR_RATIO_INF */
 #include <libtransmission/utils.h> /* tr_inf */
-#include <libtransmission/version.h> /* tr_inf */
 
 #include "conf.h"
 #include "hig.h"
@@ -50,9 +49,21 @@
 #include "util.h"
 
 char*
-tr_strlratio( char * buf, double ratio, size_t buflen )
+tr_strlratio( char * buf,
+              double ratio,
+              size_t buflen )
 {
-    return tr_strratio( buf, buflen, ratio, "\xE2\x88\x9E" );
+    if( (int)ratio == TR_RATIO_NA )
+        g_strlcpy( buf, _( "None" ), buflen );
+    else if( (int)ratio == TR_RATIO_INF )
+        g_strlcpy( buf, "\xE2\x88\x9E", buflen );
+    else if( ratio < 10.0 )
+        g_snprintf( buf, buflen, "%'.2f", ratio );
+    else if( ratio < 100.0 )
+        g_snprintf( buf, buflen, "%'.1f", ratio );
+    else
+        g_snprintf( buf, buflen, "%'.0f", ratio );
+    return buf;
 }
 
 #define KILOBYTE_FACTOR 1024.0
@@ -197,15 +208,6 @@ gtr_localtime( time_t time )
         *eoln = '\0';
 
     return g_locale_to_utf8( buf, -1, NULL, NULL, NULL );
-}
-
-char *
-gtr_localtime2( char * buf, time_t time, size_t buflen )
-{
-    char * tmp = gtr_localtime( time );
-    g_strlcpy( buf, tmp, buflen );
-    g_free( tmp );
-    return buf;
 }
 
 int

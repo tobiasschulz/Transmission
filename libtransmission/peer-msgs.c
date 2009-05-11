@@ -38,7 +38,6 @@
 #include "torrent.h"
 #include "trevent.h"
 #include "utils.h"
-#include "version.h"
 
 /**
 ***

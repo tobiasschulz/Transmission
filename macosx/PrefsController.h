@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2009 Transmission authors and contributors
+ * Copyright (c) 2005-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -32,7 +32,7 @@
     NSUserDefaults * fDefaults;
     BOOL fHasLoaded;
     
-    IBOutlet NSView * fGeneralView, * fTransfersView, * fBandwidthView, * fPeersView, * fNetworkView, * fRemoteView, * fGroupsView;
+    IBOutlet NSView * fGeneralView, * fTransfersView, * fBandwidthView, * fPeersView, * fNetworkView, * fRemoteView;
     
     NSString * fInitialString;
     
@@ -41,7 +41,6 @@
 
     IBOutlet NSTextField * fUploadField, * fDownloadField,
                         * fSpeedLimitUploadField, * fSpeedLimitDownloadField;
-    IBOutlet NSPopUpButton * fAutoSpeedDayTypePopUp;
     
     IBOutlet NSTextField * fPeersGlobalField, * fPeersTorrentField, * fBlocklistMessageField, * fBlocklistDateField;
     IBOutlet NSButton * fBlocklistEnableCheck;
@@ -61,17 +60,12 @@
     IBOutlet NSTableView * fRPCWhitelistTable;
     NSMutableArray * fRPCWhitelistArray;
     IBOutlet NSSegmentedControl * fRPCAddRemoveControl;
-    NSString * fRPCPassword;
 }
 
 + (void) setHandle: (tr_session *) handle;
 + (tr_session *) handle;
 
-- (void) setAutoUpdateToBeta: (id) sender;
-
 - (void) setPort: (id) sender;
-- (void) randomPort: (id) sender;
-- (void) setRandomPortOnStart: (id) sender;
 - (void) setNat: (id) sender;
 - (void) updatePortStatus;
 - (void) portCheckerDidFinishProbing: (PortChecker *) portChecker;
@@ -109,17 +103,12 @@
 - (void) setRatioStop: (id) sender;
 
 - (void) applySpeedSettings: (id) sender;
-- (void) applyAltSpeedSettings;
 
 - (void) updateLimitFields;
 - (void) setGlobalLimit: (id) sender;
 
 - (void) setSpeedLimit: (id) sender;
 - (void) setAutoSpeedLimit: (id) sender;
-- (void) setAutoSpeedLimitTime: (id) sender;
-- (void) setAutoSpeedLimitDay: (id) sender;
-+ (NSInteger) dateToTimeSum: (NSDate *) date;
-+ (NSDate *) timeSumToDate: (NSInteger) sum;
 
 - (void) setAutoImport: (id) sender;
 - (void) importFolderSheetShow: (id) sender;
@@ -144,7 +133,6 @@
 - (void) updateRPCPassword;
 - (void) setRPCPort: (id) sender;
 - (void) setRPCUseWhitelist: (id) sender;
-- (void) setRPCWebUIDiscovery: (id) sender;
 - (void) updateRPCWhitelist;
 - (void) addRemoveRPCIP: (id) sender;
 

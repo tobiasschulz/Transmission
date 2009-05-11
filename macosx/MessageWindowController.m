@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2009 Transmission authors and contributors
+ * Copyright (c) 2006-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,7 @@
 
 #import "MessageWindowController.h"
 #import "NSStringAdditions.h"
+#import "NSApplicationAdditions.h"
 #import <transmission.h>
 
 #define LEVEL_ERROR 0
@@ -66,7 +67,8 @@
     [[NSNotificationCenter defaultCenter] addObserver: self selector: @selector(resizeColumn)
         name: @"NSTableViewColumnDidResizeNotification" object: fMessageTable];
     
-    [window setContentBorderThickness: [[fMessageTable enclosingScrollView] frame].origin.y forEdge: NSMinYEdge];
+    if ([NSApp isOnLeopardOrBetter])
+        [window setContentBorderThickness: [[fMessageTable enclosingScrollView] frame].origin.y forEdge: NSMinYEdge];
     
     //initially sort peer table by date
     if ([[fMessageTable sortDescriptors] count] == 0)
@@ -158,13 +160,14 @@
         NSDictionary * message  = [NSDictionary dictionaryWithObjectsAndKeys:
                                     [NSString stringWithUTF8String: currentMessage->message], @"Message",
                                     [NSDate dateWithTimeIntervalSince1970: currentMessage->when], @"Date",
-                                    [NSNumber numberWithUnsignedInt: fIndex++], @"Index", //more accurate when sorting by date
+                                    [NSNumber numberWithUnsignedInt: fIndex], @"Index", //more accurate when sorting by date
                                     [NSNumber numberWithInt: currentMessage->level], @"Level",
                                     name, @"Name",
                                     [NSString stringWithUTF8String: currentMessage->file], @"File",
                                     [NSNumber numberWithInt: currentMessage->line], @"Line", nil];
                                 
         [fMessages addObject: message];
+        fIndex++;
     }
     
     tr_freeMessageList(messages);
@@ -232,9 +235,9 @@
     if (!fAttributes)
         fAttributes = [[[[column dataCell] attributedStringValue] attributesAtIndex: 0 effectiveRange: NULL] retain];
     
-    const CGFloat count = floorf([[[fMessages objectAtIndex: row] objectForKey: @"Message"] sizeWithAttributes: fAttributes].width
-                                / [column width]);
-    return [tableView rowHeight] * (count + 1.0);
+    CGFloat count = floorf([[[fMessages objectAtIndex: row] objectForKey: @"Message"] sizeWithAttributes: fAttributes].width
+                            / [column width]);
+    return [tableView rowHeight] * (count + 1.0f);
 }
 
 - (void) tableView: (NSTableView *) tableView sortDescriptorsDidChange: (NSArray *) oldDescriptors
@@ -258,7 +261,9 @@
     NSIndexSet * indexes = [fMessageTable selectedRowIndexes];
     NSMutableArray * messageStrings = [NSMutableArray arrayWithCapacity: [indexes count]];
     
-    for (NSDictionary * message in [fMessages objectsAtIndexes: indexes])
+    NSEnumerator * enumerator = [[fMessages objectsAtIndexes: indexes] objectEnumerator];
+    NSDictionary * message;
+    while ((message = [enumerator nextObject]))
         [messageStrings addObject: [self stringForMessage: message]];
     
     [pb setString: [messageStrings componentsJoinedByString: @"\n"] forType: NSStringPboardType];
@@ -312,7 +317,9 @@
     
     //create the text to output
     NSMutableArray * messageStrings = [NSMutableArray arrayWithCapacity: [fMessages count]];
-    for (NSDictionary * message in sortedMessages)
+    NSEnumerator * enumerator = [sortedMessages objectEnumerator];
+    NSDictionary * message;
+    while ((message = [enumerator nextObject]))
         [messageStrings addObject: [self stringForMessage: message]];
     
     NSString * fileString = [[messageStrings componentsJoinedByString: @"\n"] retain];

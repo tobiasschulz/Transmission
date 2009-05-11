@@ -30,12 +30,10 @@
 #define SHARED_H 1
 
 #include "transmission.h"
-#include "net.h"
 
 typedef struct tr_shared tr_shared;
 
-tr_shared* tr_sharedInit( tr_session*, tr_bool isEnabled, tr_port publicPort,
-                          tr_socketList * socks);
+tr_shared* tr_sharedInit( tr_session*, tr_bool isEnabled, tr_port publicPort );
 
 void       tr_sharedShuttingDown( tr_shared * );
 
@@ -49,5 +47,4 @@ tr_bool    tr_sharedTraversalIsEnabled( const tr_shared * s );
 
 int        tr_sharedTraversalStatus( const tr_shared * );
 
-const tr_socketList *tr_sharedGetBindSockets( const tr_shared * shared );
 #endif

@@ -440,7 +440,7 @@ tr_metainfoParseImpl( const tr_session * session,
 
     /* filename of Transmission's copy */
     tr_free( inf->torrent );
-    inf->torrent = session ?  getTorrentFilename( session, inf ) : NULL;
+    inf->torrent = getTorrentFilename( session, inf );
 
     return NULL;
 }

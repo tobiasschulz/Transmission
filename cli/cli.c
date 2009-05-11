@@ -33,7 +33,6 @@
 #include <libtransmission/makemeta.h>
 #include <libtransmission/tr-getopt.h>
 #include <libtransmission/utils.h> /* tr_wait */
-#include <libtransmission/version.h>
 #include <libtransmission/web.h> /* tr_webRun */
 
 #define LINEWIDTH 80
@@ -332,7 +331,7 @@ main( int     argc,
     if( sourceFile && *sourceFile ) /* creating a torrent */
     {
         int                   err;
-        tr_metainfo_builder * b = tr_metaInfoBuilderCreate( sourceFile );
+        tr_metainfo_builder * b = tr_metaInfoBuilderCreate( h, sourceFile );
         tr_tracker_info       ti;
         ti.tier = 0;
         ti.announce = (char*) announce;
@@ -356,7 +355,7 @@ main( int     argc,
     {
         tr_info info;
 
-        if( !tr_torrentParse( ctor, &info ) )
+        if( !tr_torrentParse( h, ctor, &info ) )
         {
             int          i;
             const time_t start = time( NULL );
@@ -392,7 +391,7 @@ main( int     argc,
     {
         tr_info info;
 
-        if( !tr_torrentParse( ctor, &info ) )
+        if( !tr_torrentParse( h, ctor, &info ) )
         {
             dumpInfo( stdout, &info );
             tr_metainfoFree( &info );
@@ -402,7 +401,7 @@ main( int     argc,
         goto cleanup;
     }
 
-    tor = tr_torrentNew( ctor, &error );
+    tor = tr_torrentNew( h, ctor, &error );
     tr_ctorFree( ctor );
     if( !tor )
     {
@@ -492,16 +491,16 @@ parseCommandLine( tr_benc * d, int argc, const char ** argv )
             case 'a':
                 announce = optarg; break;
 
-            case 'b': tr_bencDictAddBool( d, TR_PREFS_KEY_BLOCKLIST_ENABLED, TRUE );
+            case 'b': tr_bencDictAddInt( d, TR_PREFS_KEY_BLOCKLIST_ENABLED, 1 );
                       break;
-            case 'B': tr_bencDictAddBool( d, TR_PREFS_KEY_BLOCKLIST_ENABLED, FALSE );
+            case 'B': tr_bencDictAddInt( d, TR_PREFS_KEY_BLOCKLIST_ENABLED, 0 );
                       break;
             case 'c': comment = optarg;
                       break;
-            case 'd': tr_bencDictAddInt ( d, TR_PREFS_KEY_DSPEED, atoi( optarg ) );
-                      tr_bencDictAddBool( d, TR_PREFS_KEY_DSPEED_ENABLED, TRUE );
+            case 'd': tr_bencDictAddInt( d, TR_PREFS_KEY_DSPEED, atoi( optarg ) );
+                      tr_bencDictAddInt( d, TR_PREFS_KEY_DSPEED_ENABLED, 1 );
                       break;
-            case 'D': tr_bencDictAddBool( d, TR_PREFS_KEY_DSPEED_ENABLED, FALSE );
+            case 'D': tr_bencDictAddInt( d, TR_PREFS_KEY_DSPEED_ENABLED, 0 );
                       break;
             case 'f': finishCall = optarg;
                       break;
@@ -509,9 +508,9 @@ parseCommandLine( tr_benc * d, int argc, const char ** argv )
                       break;
             case 'i': showInfo = 1;
                       break;
-            case 'm': tr_bencDictAddBool( d, TR_PREFS_KEY_PORT_FORWARDING, TRUE );
+            case 'm': tr_bencDictAddInt( d, TR_PREFS_KEY_PORT_FORWARDING, 1 );
                       break;
-            case 'M': tr_bencDictAddBool( d, TR_PREFS_KEY_PORT_FORWARDING, FALSE );
+            case 'M': tr_bencDictAddInt( d, TR_PREFS_KEY_PORT_FORWARDING, 0 );
                       break;
             case 'n': sourceFile = optarg; break;
             case 'p': tr_bencDictAddInt( d, TR_PREFS_KEY_PEER_PORT, atoi( optarg ) );
@@ -523,9 +522,9 @@ parseCommandLine( tr_benc * d, int argc, const char ** argv )
             case 't': tr_bencDictAddInt( d, TR_PREFS_KEY_PEER_SOCKET_TOS, atoi( optarg ) );
                       break;
             case 'u': tr_bencDictAddInt( d, TR_PREFS_KEY_USPEED, atoi( optarg ) );
-                      tr_bencDictAddBool( d, TR_PREFS_KEY_USPEED_ENABLED, TRUE );
+                      tr_bencDictAddInt( d, TR_PREFS_KEY_USPEED_ENABLED, 1 );
                       break;
-            case 'U': tr_bencDictAddBool( d, TR_PREFS_KEY_USPEED_ENABLED, FALSE );
+            case 'U': tr_bencDictAddInt( d, TR_PREFS_KEY_USPEED_ENABLED, 0 );
                       break;
             case 'v': verify = 1;
                       break;

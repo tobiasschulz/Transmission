@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,6 +23,7 @@
  *****************************************************************************/
 
 #import "DragOverlayView.h"
+#import "NSBezierPathAdditions.h"
 
 #define PADDING 10.0f
 #define ICON_WIDTH 64.0f
@@ -35,7 +36,7 @@
     {
         //create badge
         NSRect badgeRect = NSMakeRect(0.0f, 0.0f, 325.0f, 84.0f);
-        NSBezierPath * bp = [NSBezierPath bezierPathWithRoundedRect: badgeRect xRadius: 15.0f yRadius: 15.0f];
+        NSBezierPath * bp = [NSBezierPath bezierPathWithRoundedRect: badgeRect radius: 15.0f];
         
         fBackBadge = [[NSImage alloc] initWithSize: badgeRect.size];
         [fBackBadge lockFocus];
