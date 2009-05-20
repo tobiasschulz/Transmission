@@ -49,7 +49,6 @@ libtransmission_a_SOURCES = \
     torrent-ctor.c \
     tr-getopt.c \
     tracker.c \
-    tr-dht.c \
     trevent.c \
     upnp.c \
     utils.c \
@@ -97,7 +96,6 @@ noinst_HEADERS = \
     tracker.h \
     tr-getopt.h \
     transmission.h \
-    tr-dht.h \
     trevent.h \
     upnp.h \
     utils.h \
@@ -126,7 +124,6 @@ apps_ldadd = \
     $(top_builddir)/third-party/miniupnp/libminiupnp.a \
     $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
     $(top_builddir)/third-party/libevent/libevent.la \
-    $(top_builddir)/third-party/dht/libdht.a \
     $(INTLLIBS) \
     $(LIBCURL_LIBS) \
     $(OPENSSL_LIBS) \

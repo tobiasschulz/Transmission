@@ -49,7 +49,6 @@
 #include "makemeta-ui.h"
 #include "msgwin.h"
 #include "notify.h"
-#include "relocate.h"
 #include "stats.h"
 #include "tr-core.h"
 #include "tr-icon.h"
@@ -108,7 +107,7 @@ struct cbdata
     GSList            * errqueue;
     GSList            * dupqueue;
     GtkTreeSelection  * sel;
-    gpointer            details;
+    GtkWidget         * details;
 };
 
 #define CBDATA_PTR "callback-data-pointer"
@@ -204,7 +203,6 @@ refreshActions( struct cbdata * data )
     action_sensitize( "delete-torrent", counts.totalCount != 0 );
     action_sensitize( "verify-torrent", counts.totalCount != 0 );
     action_sensitize( "open-torrent-folder", counts.totalCount == 1 );
-    action_sensitize( "relocate-torrent", counts.totalCount == 1 );
 
     canUpdate = 0;
     gtk_tree_selection_selected_foreach( s, accumulateCanUpdateForeach, &canUpdate );
@@ -250,7 +248,7 @@ refreshDetailsDialog( struct cbdata * data )
         }
     }
 
-    torrent_inspector_set_torrents( GTK_WIDGET( data->details ), ids );
+    torrent_inspector_set_torrents( data->details, ids );
 
     /* cleanup */
     g_slist_free( ids );
@@ -1075,9 +1073,7 @@ prefschanged( TrCore * core UNUSED,
     }
     else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_ENABLED ) )
     {
-        const gboolean b = pref_flag_get( key );
-        tr_sessionUseAltSpeed( tr, b );
-        action_toggle( key, b );
+        tr_sessionUseAltSpeed( tr, pref_flag_get( key ) );
     }
     else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_TIME_BEGIN ) )
     {
@@ -1285,24 +1281,6 @@ pauseAllTorrents( struct cbdata * data )
     tr_rpc_request_exec_json( session, cmd, strlen( cmd ), NULL, NULL );
 }
 
-static tr_torrent*
-getFirstSelectedTorrent( struct cbdata * data )
-{
-    tr_torrent * tor = NULL;
-    GtkTreeSelection * s = tr_window_get_selection( data->wind );
-    GtkTreeModel * m;
-    GList * l = gtk_tree_selection_get_selected_rows( s, &m );
-    if( l != NULL ) {
-        GtkTreePath * p = l->data;
-        GtkTreeIter i;
-        if( gtk_tree_model_get_iter( m, &i, p ) )
-            gtk_tree_model_get( m, &i, MC_TORRENT_RAW, &tor, -1 );
-    }
-    g_list_foreach( l, (GFunc)gtk_tree_path_free, NULL );
-    g_list_free( l );
-    return tor;
-}
-
 void
 doAction( const char * action_name, gpointer user_data )
 {
@@ -1333,16 +1311,6 @@ doAction( const char * action_name, gpointer user_data )
     {
         startAllTorrents( data );
     }
-    else if( !strcmp( action_name, "relocate-torrent" ) )
-    {
-        tr_torrent * tor = getFirstSelectedTorrent( data );
-        if( tor )
-        {
-            GtkWindow * parent = GTK_WINDOW( data->wind );
-            GtkWidget * w = gtr_relocate_dialog_new( parent, tor );
-            gtk_widget_show( w );
-        }
-    }
     else if( !strcmp( action_name, "pause-torrent" ) )
     {
         GtkTreeSelection * s = tr_window_get_selection( data->wind );
@@ -1364,10 +1332,10 @@ doAction( const char * action_name, gpointer user_data )
     {
         if( data->details == NULL ) {
             data->details = torrent_inspector_new( GTK_WINDOW( data->wind ), data->core );
-            g_object_add_weak_pointer( G_OBJECT( data->details ), &data->details );
+            g_object_add_weak_pointer( G_OBJECT( data->details ), (gpointer*)&data->details );
         }
         refreshDetailsDialog( data );
-        gtk_widget_show( GTK_WIDGET( data->details ) );
+        gtk_widget_show( data->details );
     }
     else if( !strcmp( action_name, "update-tracker" ) )
     {

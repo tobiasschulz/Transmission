@@ -311,8 +311,6 @@ tr_cryptoRandInt( int upperBound )
     int noise;
     int val;
 
-    assert( upperBound > 0 );
-
     if( RAND_pseudo_bytes ( (unsigned char *) &noise, sizeof noise ) >= 0 )
     {
         val = abs( noise ) % upperBound;
@@ -330,22 +328,17 @@ tr_cryptoRandInt( int upperBound )
 int
 tr_cryptoWeakRandInt( int upperBound )
 {
-    int val;
-    static tr_bool init = FALSE;
+    static int init = 0;
 
     assert( upperBound > 0 );
 
     if( !init )
     {
         srand( tr_date( ) );
-        init = TRUE;
+        init = 1;
     }
 
-    
-    val = rand( ) % upperBound;
-    assert( val >= 0 );
-    assert( val < upperBound );
-    return val;
+    return rand( ) % upperBound;
 }
 
 void

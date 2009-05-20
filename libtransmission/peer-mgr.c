@@ -53,7 +53,7 @@ enum
     BANDWIDTH_PERIOD_MSEC = 500,
 
     /* how frequently to age out old piece request lists */
-    REFILL_UPKEEP_PERIOD_MSEC = ( 10 * 1000 ),
+    REFILL_UPKEEP_PERIOD_MSEC = 10000,
 
     /* how frequently to decide which peers live and die */
     RECONNECT_PERIOD_MSEC = 500,
@@ -450,25 +450,17 @@ tr_peerMgr*
 tr_peerMgrNew( tr_session * session )
 {
     tr_peerMgr * m = tr_new0( tr_peerMgr, 1 );
+
     m->session = session;
     m->incomingHandshakes = TR_PTR_ARRAY_INIT;
+    m->bandwidthTimer    = tr_timerNew( session, bandwidthPulse, m, BANDWIDTH_PERIOD_MSEC );
+    m->rechokeTimer      = tr_timerNew( session, rechokePulse,   m, RECHOKE_PERIOD_MSEC );
+    m->reconnectTimer    = tr_timerNew( session, reconnectPulse, m, RECONNECT_PERIOD_MSEC );
+    m->refillUpkeepTimer = tr_timerNew( session, refillUpkeep,   m, REFILL_UPKEEP_PERIOD_MSEC );
+
+    rechokePulse( m );
+
     return m;
-}
-
-static void
-deleteTimers( struct tr_peerMgr * m )
-{
-    if( m->bandwidthTimer )
-        tr_timerFree( &m->bandwidthTimer );
-
-    if( m->rechokeTimer )
-        tr_timerFree( &m->rechokeTimer );
-
-    if( m->reconnectTimer )
-        tr_timerFree( &m->reconnectTimer );
-
-    if( m->refillUpkeepTimer )
-        tr_timerFree( &m->refillUpkeepTimer );
 }
 
 void
@@ -476,7 +468,10 @@ tr_peerMgrFree( tr_peerMgr * manager )
 {
     managerLock( manager );
 
-    deleteTimers( manager );
+    tr_timerFree( &manager->refillUpkeepTimer );
+    tr_timerFree( &manager->reconnectTimer );
+    tr_timerFree( &manager->rechokeTimer );
+    tr_timerFree( &manager->bandwidthTimer );
 
     /* free the handshakes.  Abort invokes handshakeDoneCB(), which removes
      * the item from manager->handshakes, so this is a little roundabout... */
@@ -1573,32 +1568,14 @@ tr_peerMgrGetPeers( tr_torrent      * tor,
     return peersReturning;
 }
 
-static void
-ensureMgrTimersExist( struct tr_peerMgr * m )
-{
-    tr_session * s = m->session;
-
-    if( m->bandwidthTimer == NULL )
-        m->bandwidthTimer = tr_timerNew( s, bandwidthPulse, m, BANDWIDTH_PERIOD_MSEC );
-
-    if( m->rechokeTimer == NULL )
-        m->rechokeTimer = tr_timerNew( s, rechokePulse, m, RECHOKE_PERIOD_MSEC );
-
-    if( m->reconnectTimer == NULL )
-        m->reconnectTimer = tr_timerNew( s, reconnectPulse, m, RECONNECT_PERIOD_MSEC );
-
-    if( m->refillUpkeepTimer == NULL )
-        m->refillUpkeepTimer = tr_timerNew( s, refillUpkeep, m, REFILL_UPKEEP_PERIOD_MSEC );
-}
-
 void
 tr_peerMgrStartTorrent( tr_torrent * tor )
 {
     Torrent * t = tor->torrentPeers;
 
-    assert( t != NULL );
     managerLock( t->manager );
-    ensureMgrTimersExist( t->manager );
+
+    assert( t );
 
     if( !t->isRunning )
     {
@@ -1608,7 +1585,6 @@ tr_peerMgrStartTorrent( tr_torrent * tor )
             refillSoon( t );
     }
 
-    rechokePulse( t->manager );
     managerUnlock( t->manager );
 }
 
@@ -1873,7 +1849,6 @@ tr_peerMgrPeerStats( const tr_torrent    * tor,
         if( !stat->clientIsChoked && !stat->clientIsInterested ) *pch++ = 'K';
         if( !stat->peerIsChoked && !stat->peerIsInterested ) *pch++ = '?';
         if( stat->isEncrypted ) *pch++ = 'E';
-        if( stat->from == TR_PEER_FROM_DHT ) *pch++ = 'H';
         if( stat->from == TR_PEER_FROM_PEX ) *pch++ = 'X';
         if( stat->isIncoming ) *pch++ = 'I';
         *pch = '\0';
@@ -2164,8 +2139,8 @@ compareCandidates( const void * va,
     if( a->time != b->time )
         return a->time < b->time ? -1 : 1;
 
-    /* In order to avoid fragmenting the swarm, peers from trackers and
-     * from the DHT should be preferred to peers from PEX. */
+    /* all other things being equal, prefer peers whose
+     * information comes from a more reliable source */
     if( a->from != b->from )
         return a->from < b->from ? -1 : 1;
 

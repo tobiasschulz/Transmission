@@ -32,15 +32,14 @@
 #include "transmission.h"
 #include "net.h"
 
-struct tr_bindsockets;
-
 typedef struct tr_shared tr_shared;
 
-tr_shared* tr_sharedInit( tr_session*, tr_bool isEnabled );
+tr_shared* tr_sharedInit( tr_session*, tr_bool isEnabled, tr_port publicPort,
+                          tr_socketList * socks);
 
-void       tr_sharedClose( tr_session * );
+void       tr_sharedShuttingDown( tr_shared * );
 
-void       tr_sharedPortChanged( tr_session * );
+void       tr_sharedSetPort( tr_shared *, tr_port publicPort );
 
 void       tr_sharedTraversalEnable( tr_shared *, tr_bool isEnabled );
 
@@ -50,4 +49,5 @@ tr_bool    tr_sharedTraversalIsEnabled( const tr_shared * s );
 
 int        tr_sharedTraversalStatus( const tr_shared * );
 
+const tr_socketList *tr_sharedGetBindSockets( const tr_shared * shared );
 #endif

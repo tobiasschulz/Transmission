@@ -519,18 +519,15 @@ scanWatchDir( TrCore * core )
 
     if( isEnabled )
     {
-        const char * basename;
         const char * dirname = pref_string_get( PREF_KEY_DIR_WATCH );
-        GDir * dir = g_dir_open( dirname, 0, NULL );
-
-        while(( basename = g_dir_read_name( dir )))
+        GDir *       dir = g_dir_open( dirname, 0, NULL );
+        const char * basename;
+        while( ( basename = g_dir_read_name( dir ) ) )
         {
             char * filename = g_build_filename( dirname, basename, NULL );
             maybeAddTorrent( core, filename );
             g_free( filename );
         }
-
-        g_dir_close( dir );
     }
 }
 
@@ -862,7 +859,9 @@ add_filename( TrCore *     core,
 
     if( filename && session )
     {
-        tr_ctor * ctor = tr_ctorNew( session );
+        tr_ctor * ctor;
+
+        ctor = tr_ctorNew( session );
         tr_core_apply_defaults( ctor );
         tr_ctorSetPaused( ctor, TR_FORCE, !doStart );
 
@@ -1444,7 +1443,7 @@ tr_core_exec_json( TrCore * core, const char * json )
 void
 tr_core_exec( TrCore * core, const tr_benc * top )
 {
-    char * json = tr_bencToJSON( top, FALSE );
+    char * json = tr_bencToJSON( top );
     tr_core_exec_json( core, json );
     tr_free( json );
 }

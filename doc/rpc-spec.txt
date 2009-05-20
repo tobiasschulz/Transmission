@@ -95,7 +95,6 @@
    "files-unwanted"                  | array      indices of file(s) to not download
    "honorsSessionLimits"             | boolean    true if session upload limits are honored
    "ids"                             | array      torrent list, as described in 3.1
-   "location"                        | string     new location of the torrent's content
    "peer-limit"                      | number     maximum number of peers
    "priority-high"                   | array      indices of high-priority file(s)
    "priority-low"                    | array      indices of low-priority file(s)
@@ -345,20 +344,6 @@
    Response arguments: none
 
 
-3.6.  Moving a Torrent
-
-   Method name: "torrent-set-location"
-
-   Request arguments:
-
-   string                     | value type & description
-   ---------------------------+-------------------------------------------------
-   "ids"                      | array      torrent list, as described in 3.1
-   "move"                     | boolean    if true, move from previous location
-
-   Response arguments: none
-
-
 4.   Session Requests
 
 4.1.  Session Arguments
@@ -527,8 +512,6 @@
          |         | yes       | torrent-get    | new ids option "recently-active"
          |         |        NO | torrent-get    | removed arg "downloadLimitMode"
          |         |        NO | torrent-get    | removed arg "uploadLimitMode"
-   ------+---------+-----------+----------------+-------------------------------
-   6     | 1.70    | yes       |                | new "method torrent-set-location"
    ------+---------+-----------+----------------+-------------------------------
 
 

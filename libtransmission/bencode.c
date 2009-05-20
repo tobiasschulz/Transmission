@@ -13,7 +13,6 @@
 #include <assert.h>
 #include <ctype.h> /* isdigit, isprint, isspace */
 #include <errno.h>
-#include <math.h> /* fabs */
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -1181,23 +1180,19 @@ struct ParentState
 
 struct jsonWalk
 {
-    tr_bool doIndent;
-    tr_list * parents;
+    tr_list *          parents;
     struct evbuffer *  out;
 };
 
 static void
 jsonIndent( struct jsonWalk * data )
 {
-    if( data->doIndent )
-    {
-        char buf[1024];
-        const int width = tr_list_size( data->parents ) * 4;
+    char buf[1024];
+    const int width = tr_list_size( data->parents ) * 4;
 
-        buf[0] = '\n';
-        memset( buf+1, ' ', width );
-        evbuffer_add( data->out, buf, 1+width );
-    }
+    buf[0] = '\n';
+    memset( buf+1, ' ', width );
+    evbuffer_add( data->out, buf, 1+width );
 }
 
 static void
@@ -1213,10 +1208,10 @@ jsonChildFunc( struct jsonWalk * data )
             {
                 const int i = parentState->childIndex++;
                 if( !( i % 2 ) )
-                    evbuffer_add( data->out, ": ", data->doIndent ? 2 : 1 );
+                    evbuffer_add( data->out, ": ", 2 );
                 else
                 {
-                    evbuffer_add( data->out, ", ", data->doIndent ? 2 : 1 );
+                    evbuffer_add( data->out, ", ", 2 );
                     jsonIndent( data );
                 }
                 break;
@@ -1225,7 +1220,7 @@ jsonChildFunc( struct jsonWalk * data )
             case TR_TYPE_LIST:
             {
                 ++parentState->childIndex;
-                evbuffer_add( data->out, ", ", data->doIndent ? 2 : 1 );
+                evbuffer_add( data->out, ", ", 2 );
                 jsonIndent( data );
                 break;
             }
@@ -1283,15 +1278,11 @@ jsonRealFunc( const tr_benc * val, void * vdata )
     struct jsonWalk * data = vdata;
     char locale[128];
 
-    if( fabs( val->val.d ) < 0.00001 )
-        evbuffer_add( data->out, "0", 1 );
-    else {
-        /* json requires a '.' decimal point regardless of locale */
-        tr_strlcpy( locale, setlocale( LC_NUMERIC, NULL ), sizeof( locale ) );
-        setlocale( LC_NUMERIC, "POSIX" );
-        evbuffer_add_printf( data->out, "%.4f", val->val.d );
-        setlocale( LC_NUMERIC, locale );
-    }
+    /* json requires a '.' decimal point regardless of locale */
+    tr_strlcpy( locale, setlocale( LC_NUMERIC, NULL ), sizeof( locale ) );
+    setlocale( LC_NUMERIC, "POSIX" );
+    evbuffer_add_printf( data->out, "%f", val->val.d );
+    setlocale( LC_NUMERIC, locale );
 
     jsonChildFunc( data );
 }
@@ -1405,13 +1396,12 @@ static const struct WalkFuncs jsonWalkFuncs = { jsonIntFunc,
                                                 jsonContainerEndFunc };
                                             
 char*
-tr_bencSaveAsJSON( const tr_benc * top, struct evbuffer * out, tr_bool doIndent )
+tr_bencSaveAsJSON( const tr_benc * top, struct evbuffer * out )
 {
     struct jsonWalk data;
 
     evbuffer_drain( out, EVBUFFER_LENGTH( out ) );
 
-    data.doIndent = doIndent;
     data.out = out;
     data.parents = NULL;
 
@@ -1424,11 +1414,11 @@ tr_bencSaveAsJSON( const tr_benc * top, struct evbuffer * out, tr_bool doIndent 
 }
 
 char*
-tr_bencToJSON( const tr_benc * top, tr_bool doIndent )
+tr_bencToJSON( const tr_benc * top )
 {
     char * ret;
     struct evbuffer * buf = evbuffer_new( );
-    tr_bencSaveAsJSON( top, buf, doIndent );
+    tr_bencSaveAsJSON( top, buf );
     ret = tr_strndup( EVBUFFER_DATA( buf ), EVBUFFER_LENGTH( buf ) );
     evbuffer_free( buf );
     return ret;
@@ -1571,7 +1561,7 @@ tr_bencSaveJSONFile( const char *    filename,
                      const tr_benc * b )
 {
     struct evbuffer * buf = tr_getBuffer( );
-    const char * json = tr_bencSaveAsJSON( b, buf, TRUE );
+    const char * json = tr_bencSaveAsJSON( b, buf );
     const int err = saveFile( filename, json, EVBUFFER_LENGTH( buf ) );
     tr_releaseBuffer( buf );
     return err;

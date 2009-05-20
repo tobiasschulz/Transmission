@@ -24,7 +24,6 @@
 
 #import <IOKit/IOMessage.h>
 #import <IOKit/pwr_mgt/IOPMLib.h>
-#import <Carbon/Carbon.h>
 
 #import "Controller.h"
 #import "Torrent.h"
@@ -307,8 +306,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         
         [[SUUpdater sharedUpdater] setDelegate: self];
         fUpdateInProgress = NO;
-        
-        fPauseOnLaunch = (GetCurrentKeyModifiers() & (optionKey | rightOptionKey)) != 0;
     }
     return self;
 }
@@ -404,7 +401,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         for (NSDictionary * historyItem in history)
         {
             Torrent * torrent;
-            if ((torrent = [[Torrent alloc] initWithHistory: historyItem lib: fLib forcePause: fPauseOnLaunch]))
+            if ((torrent = [[Torrent alloc] initWithHistory: historyItem lib: fLib]))
             {
                 [fTorrents addObject: torrent];
                 [torrent release];

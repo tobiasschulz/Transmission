@@ -74,7 +74,7 @@ test_utf8( void )
     check( tr_bencIsDict( &top ) );
     check( tr_bencDictFindStr( &top, "key", &str ) );
     check( !strcmp( str, "Letöltések" ) );
-    json = tr_bencSaveAsJSON( &top, buf, TRUE );
+    json = tr_bencSaveAsJSON( &top, buf );
     if( !err )
         tr_bencFree( &top );
     check( json );

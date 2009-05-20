@@ -32,7 +32,6 @@
 #include "list.h"
 #include "metainfo.h" /* tr_metainfoFree */
 #include "net.h"
-#include "peer-io.h"
 #include "peer-mgr.h"
 #include "platform.h" /* tr_lock */
 #include "port-forwarding.h"
@@ -45,7 +44,6 @@
 #include "version.h"
 #include "verify.h"
 #include "web.h"
-#include "tr-dht.h"
 
 #define dbgmsg( ... ) \
     do { \
@@ -127,100 +125,9 @@ tr_sessionSetEncryption( tr_session *       session,
 ****
 ***/
 
-struct tr_bindinfo
-{
-    int socket;
-    tr_address addr;
-    struct event ev;
-};
-
-
-static void
-close_bindinfo( struct tr_bindinfo * b )
-{
-    if( b->socket >=0 )
-    {
-        event_del( &b->ev );
-        EVUTIL_CLOSESOCKET( b->socket );
-    }
-}
-
-static void
-close_incoming_peer_port( tr_session * session )
-{
-    close_bindinfo( session->public_ipv4 );
-    close_bindinfo( session->public_ipv6 );
-}
-
-static void
-free_incoming_peer_port( tr_session * session )
-{
-    close_bindinfo( session->public_ipv4 );
-    tr_free( session->public_ipv4 );
-    session->public_ipv4 = NULL;
-
-    close_bindinfo( session->public_ipv6 );
-    tr_free( session->public_ipv6 );
-    session->public_ipv6 = NULL;
-}
-
-static void
-accept_incoming_peer( int fd, short what UNUSED, void * vsession )
-{
-    int clientSocket;
-    tr_port clientPort;
-    tr_address clientAddr;
-    tr_session * session = vsession;
-
-    clientSocket = tr_netAccept( session, fd, &clientAddr, &clientPort );
-    if( clientSocket > 0 ) {
-        tr_deepLog( __FILE__, __LINE__, NULL, "new incoming connection %d (%s)",
-                   clientSocket, tr_peerIoAddrStr( &clientAddr, clientPort ) );
-        tr_peerMgrAddIncoming( session->peerMgr, &clientAddr, clientPort, clientSocket );
-    }
-}
-
-static void
-open_incoming_peer_port( tr_session * session )
-{
-    struct tr_bindinfo * b;
-
-    /* bind an ipv4 port to listen for incoming peers... */
-    b = session->public_ipv4;
-    b->socket = tr_netBindTCP( &b->addr, session->peerPort, FALSE );
-    if( b->socket >= 0 ) {
-        event_set( &b->ev, b->socket, EV_READ | EV_PERSIST, accept_incoming_peer, session );
-        event_add( &b->ev, NULL );
-    }
-
-    /* and do the exact same thing for ipv6, if it's supported... */
-    if( tr_net_hasIPv6( session->peerPort ) ) {
-        b = session->public_ipv6;
-        b->socket = tr_netBindTCP( &b->addr, session->peerPort, FALSE );
-        if( b->socket >= 0 ) {
-            event_set( &b->ev, b->socket, EV_READ | EV_PERSIST, accept_incoming_peer, session );
-            event_add( &b->ev, NULL );
-        }
-    }
-}
-
-const tr_address*
-tr_sessionGetPublicAddress( const tr_session * session, int tr_af_type )
-{
-    switch( tr_af_type )
-    {
-        case TR_AF_INET: return &session->public_ipv4->addr;
-        case TR_AF_INET6: return &session->public_ipv6->addr; break;
-        default: return NULL;
-    }
-}
-
-/***
-****
-***/
-
 static int
-tr_stringEndsWith( const char * str, const char * end )
+tr_stringEndsWith( const char * str,
+                   const char * end )
 {
     const size_t slen = strlen( str );
     const size_t elen = strlen( end );
@@ -396,9 +303,14 @@ tr_sessionGetDefaultSettings( tr_benc * d )
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV6,        TR_DEFAULT_BIND_ADDRESS_IPV6 );
 }
 
+const tr_socketList * tr_getSessionBindSockets( const tr_session * session );
+
 void
 tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
 {
+    const char * val;
+    const tr_address * addr;
+
     assert( tr_bencIsDict( d ) );
 
     tr_bencDictReserve( d, 30 );
@@ -447,8 +359,14 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_USPEED,                   tr_sessionGetSpeedLimit( s, TR_UP ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_USPEED_ENABLED,           tr_sessionIsSpeedLimited( s, TR_UP ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, s->uploadSlotsPerTorrent );
-    tr_bencDictAddStr ( d, TR_DEFAULT_BIND_ADDRESS_IPV4,          tr_ntop_non_ts( &s->public_ipv4->addr ) );
-    tr_bencDictAddStr ( d, TR_DEFAULT_BIND_ADDRESS_IPV6,          tr_ntop_non_ts( &s->public_ipv6->addr ) );
+
+    addr = tr_socketListGetType( tr_getSessionBindSockets( s ), TR_AF_INET );
+    val = addr ? tr_ntop_non_ts( addr ) : TR_DEFAULT_BIND_ADDRESS_IPV4;
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV4, val );
+
+    addr = tr_socketListGetType( tr_getSessionBindSockets( s ), TR_AF_INET6 );
+    val = addr ? tr_ntop_non_ts( addr ) : TR_DEFAULT_BIND_ADDRESS_IPV6;
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV6, val );
 }
 
 void
@@ -594,6 +512,8 @@ tr_sessionInitImpl( void * vdata )
     struct init_data * data = vdata;
     tr_benc * clientSettings = data->clientSettings;
     tr_session * session = data->session;
+    tr_address address;
+    tr_socketList * socketList;
 
     assert( tr_amInEventThread( session ) );
     assert( tr_bencIsDict( clientSettings ) );
@@ -622,8 +542,6 @@ tr_sessionInitImpl( void * vdata )
     found = tr_bencDictFindBool( &settings, TR_PREFS_KEY_PEX_ENABLED, &boolVal );
     assert( found );
     session->isPexEnabled = boolVal;
-    /* This really ought to be a separate preference. */
-    session->isDHTEnabled = boolVal;
 
     found = tr_bencDictFindInt( &settings, TR_PREFS_KEY_ENCRYPTION, &i );
     assert( found );
@@ -715,30 +633,39 @@ tr_sessionInitImpl( void * vdata )
     assert( found );
     session->peerPort = session->isPortRandom ? getRandomPort( session ) : j;
 
-    /* public addresses */
+    /* bind addresses */
 
-    {
-        struct tr_bindinfo b;
-        const char * str;
+    found = tr_bencDictFindStr( &settings, TR_PREFS_KEY_BIND_ADDRESS_IPV4,
+                                &str );
+    assert( found );
+    if( tr_pton( str, &address ) == NULL ) {
+        tr_err( _( "%s is not a valid address" ), str );
+        socketList = tr_socketListNew( &tr_inaddr_any );
+    } else if( address.type != TR_AF_INET ) {
+        tr_err( _( "%s is not an IPv4 address" ), str );
+        socketList = tr_socketListNew( &tr_inaddr_any );
+    } else
+        socketList = tr_socketListNew( &address );
 
-        str = TR_PREFS_KEY_BIND_ADDRESS_IPV4;
-        tr_bencDictFindStr( &settings, TR_PREFS_KEY_BIND_ADDRESS_IPV4, &str );
-        if( !tr_pton( str, &b.addr ) || ( b.addr.type != TR_AF_INET ) )
-            b.addr = tr_inaddr_any;
-        b.socket = -1;
-        session->public_ipv4 = tr_memdup( &b, sizeof( struct tr_bindinfo ) );
-
-        str = TR_PREFS_KEY_BIND_ADDRESS_IPV6;
-        tr_bencDictFindStr( &settings, TR_PREFS_KEY_BIND_ADDRESS_IPV6, &str );
-        if( !tr_pton( str, &b.addr ) || ( b.addr.type != TR_AF_INET6 ) )
-            b.addr = tr_in6addr_any;
-        b.socket = -1;
-        session->public_ipv6 = tr_memdup( &b, sizeof( struct tr_bindinfo ) );
-
-        open_incoming_peer_port( session );
+    found = tr_bencDictFindStr( &settings, TR_PREFS_KEY_BIND_ADDRESS_IPV6,
+                                &str );
+    assert( found );
+    if( tr_pton( str, &address ) == NULL ) {
+        tr_err( _( "%s is not a valid address" ), str );
+        address = tr_in6addr_any;
+    } else if( address.type != TR_AF_INET6 ) {
+        tr_err( _( "%s is not an IPv6 address" ), str );
+        address = tr_in6addr_any;
     }
+    if( tr_net_hasIPv6( session->peerPort ) )
+        tr_socketListAppend( socketList, &address );
+    else
+        tr_inf( _( "System does not seem to support IPv6. Not listening on"
+                   "an IPv6 address" ) );
 
-    session->shared = tr_sharedInit( session, boolVal );
+    session->shared = tr_sharedInit( session, boolVal, session->peerPort,
+                                     socketList );
+    session->isPortSet = session->peerPort > 0;
 
     /**
     **/
@@ -833,9 +760,6 @@ tr_sessionInitImpl( void * vdata )
     metainfoLookupRescan( session );
     session->isWaiting = FALSE;
     dbgmsg( "returning session %p; session->tracker is %p", session, session->tracker );
-
-    if( session->isDHTEnabled )
-        tr_dhtInit(session);
 }
 
 /***
@@ -894,19 +818,36 @@ tr_globalIsLocked( const tr_session * session )
  *
  **********************************************************************/
 
-static void
-setPeerPort( void * session )
+struct bind_port_data
 {
-    tr_torrent * tor = NULL;
+    tr_session * session;
+    tr_port      port;
+};
+
+static void
+tr_setBindPortImpl( void * vdata )
+{
+    struct bind_port_data * data = vdata;
+    tr_session * session = data->session;
+    const tr_port port = data->port;
+
+    session->isPortSet = 1;
+    tr_sharedSetPort( session->shared, port );
+
+    tr_free( data );
+}
+
+static void
+setPortImpl( tr_session * session, tr_port port )
+{
+    struct bind_port_data * data;
 
     assert( tr_isSession( session ) );
 
-    close_incoming_peer_port( session );
-    open_incoming_peer_port( session );
-    tr_sharedPortChanged( session );
-
-    while(( tor = tr_torrentNext( session, tor )))
-        tr_torrentChangeMyPort( tor );
+    data = tr_new( struct bind_port_data, 1 );
+    data->session = session;
+    data->port = port;
+    tr_runInEventThread( session, tr_setBindPortImpl, data );
 }
 
 void
@@ -916,8 +857,7 @@ tr_sessionSetPeerPort( tr_session * session,
     assert( tr_isSession( session ) );
 
     session->peerPort = port;
-
-    tr_runInEventThread( session, setPeerPort, session );
+    setPortImpl( session, session->peerPort );
 }
 
 tr_port
@@ -933,7 +873,8 @@ tr_sessionSetPeerPortRandom( tr_session * session )
 {
     assert( tr_isSession( session ) );
 
-    tr_sessionSetPeerPort( session, getRandomPort( session ) );
+    session->peerPort = getRandomPort( session );
+    setPortImpl( session, session->peerPort );
     return session->peerPort;
 }
 
@@ -1031,7 +972,7 @@ tr_sessionGetActiveSpeedLimit( const tr_session * session, tr_direction dir, int
 static void
 updateBandwidth( tr_session * session, tr_direction dir )
 {
-    int limit = 0;
+    int limit;
     const tr_bool isLimited = tr_sessionGetActiveSpeedLimit( session, dir, &limit );
     const tr_bool zeroCase = isLimited && !limit;
 
@@ -1398,7 +1339,7 @@ compareTorrentByCur( const void * va, const void * vb )
 }
 
 static void
-sessionCloseImpl( void * vsession )
+tr_closeAllConnections( void * vsession )
 {
     tr_session *  session = vsession;
     tr_torrent *  tor;
@@ -1407,18 +1348,13 @@ sessionCloseImpl( void * vsession )
 
     assert( tr_isSession( session ) );
 
-    free_incoming_peer_port( session );
-
-    if( session->isDHTEnabled )
-        tr_dhtUninit( session );
-
     evtimer_del( session->altTimer );
     tr_free( session->altTimer );
     session->altTimer = NULL;
 
     tr_verifyClose( session );
     tr_statsClose( session );
-    tr_sharedClose( session );
+    tr_sharedShuttingDown( session->shared );
     tr_rpcClose( &session->rpcServer );
 
     /* close the torrents.  get the most active ones first so that
@@ -1464,7 +1400,7 @@ tr_sessionClose( tr_session * session )
     dbgmsg( "shutting down transmission session %p", session );
 
     /* close the session */
-    tr_runInEventThread( session, sessionCloseImpl, session );
+    tr_runInEventThread( session, tr_closeAllConnections, session );
     while( !session->isClosed && !deadlineReached( deadline ) )
     {
         dbgmsg(
@@ -1586,14 +1522,6 @@ tr_sessionIsPexEnabled( const tr_session * session )
     assert( tr_isSession( session ) );
 
     return session->isPexEnabled;
-}
-
-tr_bool
-tr_sessionIsDHTEnabled( const tr_session * session )
-{
-    assert( tr_isSession( session ) );
-
-    return session->isDHTEnabled;
 }
 
 /***
@@ -2164,4 +2092,10 @@ tr_sessionGetActiveTorrentCount( tr_session * session )
             ++ret;
 
     return ret;
+}
+
+const tr_socketList *
+tr_getSessionBindSockets( const tr_session * session )
+{
+    return tr_sharedGetBindSockets( session->shared );
 }

@@ -46,9 +46,9 @@
 	<key>CFBundleShortVersionString</key>
 	<string>VERSION_STRING_INFOPLIST</string>
 	<key>CFBundleVersion</key>
-	<string>SVN_REVISION_NUM</string>
+	<string>BUNDLE_VERSION_INFOPLIST</string>
 	<key>CFBundleGetInfoString</key>
-	<string>VERSION_STRING_INFOPLIST (SVN_REVISION_NUM)</string>
+	<string>VERSION_STRING_INFOPLIST (BUNDLE_VERSION_INFOPLIST)</string>
 	<key>LSMinimumSystemVersion</key>
 	<string>10.5.0</string>
 	<key>NSAppleScriptEnabled</key>

@@ -281,13 +281,15 @@ privateFree( gpointer vprivate )
 }
 
 static void
-onYinYangReleased( GtkWidget * w UNUSED, gpointer vprivate )
+onYinYangReleased( GtkWidget * w           UNUSED,
+                   GdkEventButton * button UNUSED,
+                   gpointer                vprivate )
 {
     PrivateData * p = vprivate;
 
-    gtk_menu_popup( GTK_MENU( p->status_menu ),
-                    NULL, NULL, NULL, NULL, 0,
-                    gtk_get_current_event_time( ) );
+    gtk_menu_popup( GTK_MENU(
+                       p->status_menu ), NULL, NULL, NULL, NULL, 0,
+                   gtk_get_current_event_time( ) );
 }
 
 #define STATS_MODE "stats-mode"
@@ -797,7 +799,7 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
     const char *  pch;
     PrivateData * p;
     GtkWidget   *mainmenu, *toolbar, *filter, *list, *status;
-    GtkWidget *   vbox, *w, *self, *h, *s, *hbox, *image, *menu;
+    GtkWidget *   vbox, *w, *self, *h, *c, *s, *hbox, *image, *menu;
     GtkWindow *   win;
     GSList *      l;
 
@@ -944,10 +946,11 @@ tr_window_new( GtkUIManager * ui_mgr, TrCore * core )
             w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
             gtk_widget_set_size_request( w, GUI_PAD, 0u );
             gtk_box_pack_start( GTK_BOX( hbox ), w, FALSE, FALSE, 0 );
-            w = gtk_button_new( );
-            gtk_container_add( GTK_CONTAINER( w ), gtk_image_new_from_stock( GTK_STOCK_REFRESH, GTK_ICON_SIZE_MENU ) );
-            gtk_button_set_relief( GTK_BUTTON( w ), GTK_RELIEF_NONE );
-            g_signal_connect( w, "clicked", G_CALLBACK( onYinYangReleased ), p );
+            w = gtk_image_new_from_stock( GTK_STOCK_REFRESH, GTK_ICON_SIZE_MENU );
+            c = gtk_event_box_new( );
+            gtk_container_add( GTK_CONTAINER( c ), w );
+            w = c;
+            g_signal_connect( w, "button-release-event", G_CALLBACK( onYinYangReleased ), p );
             gtk_box_pack_start( GTK_BOX( hbox ), w, FALSE, FALSE, 0 );
             w = p->stats_lb = gtk_label_new( NULL );
             gtk_box_pack_end( GTK_BOX( h ), w, FALSE, FALSE, 0 );

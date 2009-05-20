@@ -35,7 +35,6 @@
 #include "options.h"
 #include "prefs.h"
 #include "prefs-dialog.h"
-#include "relocate.h"
 #include "session.h"
 #include "session-dialog.h"
 #include "speed.h"
@@ -158,20 +157,15 @@ TrMainWindow :: TrMainWindow( Session& session, Prefs& prefs, TorrentModel& mode
     connect( ui.action_About, SIGNAL(triggered()), myAboutDialog, SLOT(show()));
     connect( ui.action_Contents, SIGNAL(triggered()), this, SLOT(openHelp()));
     connect( ui.action_OpenFolder, SIGNAL(triggered()), this, SLOT(openFolder()));
-    connect( ui.action_SetLocation, SIGNAL(triggered()), this, SLOT(setLocation()));
     connect( ui.action_Properties, SIGNAL(triggered()), this, SLOT(openProperties()));
     connect( ui.action_SessionDialog, SIGNAL(triggered()), mySessionDialog, SLOT(show()));
     connect( ui.listView, SIGNAL(activated(const QModelIndex&)), ui.action_Properties, SLOT(trigger()));
-
-    QAction * sep2 = new QAction( this );
-    sep2->setSeparator( true );
 
     // context menu
     QList<QAction*> actions;
     actions << ui.action_Properties
             << ui.action_OpenFolder
-            << ui.action_SetLocation
-            << sep2
+            << sep
             << ui.action_Start
             << ui.action_Pause
             << ui.action_Verify
@@ -346,20 +340,21 @@ TrMainWindow :: createFilterBar( )
     h = new QHBoxLayout( top );
     h->setContentsMargins( HIG::PAD_SMALL, HIG::PAD_SMALL, HIG::PAD_SMALL, HIG::PAD_SMALL );
     h->setSpacing( HIG::PAD_SMALL );
-#ifdef Q_OS_MAC
-    top->setStyleSheet( "QPushButton{ "
-                        "  border-radius: 10px; "
-                        "  padding: 0 5px; "
-                        "  border: 1px none; "
-                        "} "
-                        "QPushButton:pressed, QPushButton:checked{ "
-                        "  border-width: 1px; "
-                        "  border-style: solid; "
-                        "  border-color: #5f5f5f #979797 #979797; "
-                        "  background-color: #979797; "
-                        "  color: white; "
-                        "} ");
-#endif
+
+    top->setStyleSheet(" \
+      QPushButton{ \
+        border-radius: 10px; \
+        padding: 0 5px; \
+        border: 1px none; \
+      } \
+      QPushButton:pressed, QPushButton:checked{ \
+        border-width: 1px; \
+        border-style: solid; \
+        border-color: #5f5f5f #979797 #979797; \
+        background-color: #979797; \
+        color: white; \
+      } \
+    ");
 
         QList<QString> titles;
         titles << tr( "A&ll" ) << tr( "&Active" ) << tr( "&Downloading" ) << tr( "&Seeding" ) << tr( "&Paused" );
@@ -619,13 +614,6 @@ TrMainWindow :: openProperties( )
 }
 
 void
-TrMainWindow :: setLocation( )
-{
-    QDialog * d = new RelocateDialog( mySession, getSelectedTorrents(), this );
-    d->show( );
-}
-
-void
 TrMainWindow :: openFolder( )
 {
     const int torrentId( *getSelectedTorrents().begin() );
@@ -742,7 +730,6 @@ TrMainWindow :: refreshActionSensitivity( )
     ui.action_Delete->setEnabled( haveSelection );
     ui.action_Properties->setEnabled( haveSelection );
     ui.action_DeselectAll->setEnabled( haveSelection );
-    ui.action_SetLocation->setEnabled( haveSelection );
 
     const bool oneSelection( selected == 1 );
     ui.action_OpenFolder->setEnabled( oneSelection && mySession.isLocal( ) );

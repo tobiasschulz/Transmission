@@ -324,7 +324,7 @@ testJSONSnippet( const char * benc_str,
     char * serialized;
 
     tr_bencLoad( benc_str, strlen( benc_str ), &top, NULL );
-    serialized = tr_bencSaveAsJSON( &top, buf, TRUE );
+    serialized = tr_bencSaveAsJSON( &top, buf );
     stripWhitespace( serialized );
 #if 0
     fprintf( stderr, "benc: %s\n", benc_str );

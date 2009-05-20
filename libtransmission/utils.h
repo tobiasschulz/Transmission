@@ -350,9 +350,6 @@ const char* tr_strerror( int );
 
 char*       tr_strstrip( char * str );
 
-const char* tr_memmem( const char * haystack, size_t haystack_len,
-                       const char * needle, size_t needle_len );
-
 /***
 ****
 ***/
@@ -471,9 +468,6 @@ char* tr_strratio( char * buf, size_t buflen, double ratio, const char * infinit
 
 struct tm * tr_localtime_r( const time_t *_clock, struct tm *_result );
 
-
-/** on success, return 0.  on failure, return -1 and set errno */
-int tr_moveFile( const char * oldpath, const char * newpath );
 
 
 #ifdef __cplusplus

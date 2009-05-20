@@ -97,7 +97,6 @@ typedef enum
     IBOutlet NSButton               * fURLSheetOpenButton;
     
     BOOL                            fUpdateInProgress;
-    BOOL                            fPauseOnLaunch;
     
     Badger                          * fBadger;
     IBOutlet NSMenu                 * fDockMenu;

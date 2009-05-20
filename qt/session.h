@@ -40,6 +40,8 @@ class Session: public QObject
         Session( const char * configDir, Prefs& prefs );
         ~Session( );
 
+        static const int ADD_TORRENT_TAG;
+
     public:
         void stop( );
         void restart( );
@@ -77,9 +79,6 @@ class Session: public QObject
         void exec( const char * request );
         void exec( const struct tr_benc * request );
 
-    public:
-        int64_t getUniqueTag( ) { return nextUniqueTag++; }
-
     private:
         void sessionSet( const char * key, const QVariant& variant );
         void pumpRequests( );
@@ -92,7 +91,6 @@ class Session: public QObject
         void torrentSet( const QSet<int>& ids, const QString& key, int val );
         void torrentSet( const QSet<int>& ids, const QString& key, double val );
         void torrentSet( const QSet<int>& ids, const QString& key, const QList<int>& val );
-        void torrentSetLocation( const QSet<int>& ids, const QString& path, bool doMove );
 
 
     public slots:
@@ -118,7 +116,6 @@ class Session: public QObject
         void onRequestFinished( int id, bool error );
 
     signals:
-        void executed( int64_t tag, const QString& result, struct tr_benc * arguments );
         void sourceChanged( );
         void portTested( bool isOpen );
         void statsUpdated( );
@@ -131,7 +128,6 @@ class Session: public QObject
         void httpAuthenticationRequired( );
 
     private:
-        int64_t nextUniqueTag;
         int64_t myBlocklistSize;
         Prefs& myPrefs;
         tr_session * mySession;

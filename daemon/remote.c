@@ -75,8 +75,6 @@ static tr_option opts[] =
     { 'i', "info",                 "Show the current torrent(s)' details", "i",  0, NULL },
     { 920, "session-info",         "Show the session's details", "si", 0, NULL },
     { 'l', "list",                 "List all torrents", "l",  0, NULL },
-    { 960, "move",                 "Move current torrent's data to a new folder", NULL, 1, "<path>" },
-    { 961, "find",                 "Tell Transmission where to find a torrent's data", NULL, 1, "<path>" },
     { 'm', "portmap",              "Enable portmapping via NAT-PMP or UPnP", "m",  0, NULL },
     { 'M', "no-portmap",           "Disable portmapping", "M",  0, NULL },
     { 'n', "auth",                 "Set authentication info", "n",  1, "<username:password>" },
@@ -113,6 +111,7 @@ static void
 showUsage( void )
 {
     tr_getopt_usage( MY_NAME, getUsage( ), opts );
+    exit( 0 );
 }
 
 static int
@@ -125,7 +124,6 @@ numarg( const char * arg )
     {
         fprintf( stderr, "Not a number: \"%s\"\n", arg );
         showUsage( );
-        exit( EXIT_FAILURE );
     }
     return num;
 }
@@ -302,15 +300,14 @@ static const char * list_keys[] = {
     "uploadRatio"
 };
 
-static int
+static void
 readargs( int           argc,
           const char ** argv )
 {
-    int c;
-    int addingTorrents = 0;
-    int status = EXIT_SUCCESS;
-    char id[4096];
+    int          c;
+    int          addingTorrents = 0;
     const char * optarg;
+    char         id[4096];
 
     *id = '\0';
 
@@ -344,7 +341,6 @@ readargs( int           argc,
                 {
                     fprintf( stderr, "Unknown option: %s\n", optarg );
                     addArg = FALSE;
-                    status |= EXIT_FAILURE;
                 }
                 break;
 
@@ -592,24 +588,9 @@ readargs( int           argc,
                 tr_bencDictAddBool( args, "seedRatioLimited", FALSE );
                 break;
 
-            case 960:
-                tr_bencDictAddStr( &top, "method", "torrent-set-location" );
-                tr_bencDictAddStr( args, "location", optarg );
-                tr_bencDictAddBool( args, "move", TRUE );
-                addIdArg( args, id );
-                break;
-
-            case 961:
-                tr_bencDictAddStr( &top, "method", "torrent-set-location" );
-                tr_bencDictAddStr( args, "location", optarg );
-                tr_bencDictAddBool( args, "move", FALSE );
-                addIdArg( args, id );
-                break;
-
             case TR_OPT_ERR:
                 fprintf( stderr, "invalid option\n" );
                 showUsage( );
-                status |= EXIT_FAILURE;
                 break;
 
             default:
@@ -621,14 +602,12 @@ readargs( int           argc,
         if( addArg )
         {
             struct evbuffer * buf = tr_getBuffer( );
-            reqs[reqCount++] = tr_strdup( tr_bencSaveAsJSON( &top, buf, FALSE ) );
+            reqs[reqCount++] = tr_strdup( tr_bencSaveAsJSON( &top, buf ) );
             tr_releaseBuffer( buf );
         }
 
         tr_bencFree( &top );
     }
-
-    return status;
 }
 
 /* [host:port] or [host] or [port] */
@@ -1257,25 +1236,21 @@ printTorrentList( tr_benc * top )
     }
 }
 
-static int
+static void
 processResponse( const char * host,
                  int          port,
                  const void * response,
                  size_t       len )
 {
     tr_benc top;
-    int status = EXIT_SUCCESS;
 
     if( debug )
-        fprintf( stderr, "got response (len %d):\n--------\n%*.*s\n--------\n",
-                 (int)len, (int)len, (int)len, (const char*) response );
+        fprintf( stderr, "got response:\n--------\n%*.*s\n--------\n",
+                 (int)len, (int)len, (const char*) response );
 
     if( tr_jsonParse( response, len, &top, NULL ) )
-    {
         tr_nerr( MY_NAME, "Unable to parse response \"%*.*s\"", (int)len,
                  (int)len, (char*)response );
-        status |= EXIT_FAILURE;
-    }
     else
     {
         int64_t      tag = -1;
@@ -1300,19 +1275,12 @@ processResponse( const char * host,
                 printPeers( &top ); break;
 
             default:
-                if( !tr_bencDictFindStr( &top, "result", &str ) )
-                    status |= EXIT_FAILURE;
-                else {
+                if( tr_bencDictFindStr( &top, "result", &str ) )
                     printf( "%s:%d responded: \"%s\"\n", host, port, str );
-                    if( strcmp( str, "success") )
-                        status |= EXIT_FAILURE;
-                }
         }
 
         tr_bencFree( &top );
     }
-
-    return status;
 }
 
 /* look for a session id in the header in case the server gives back a 409 */
@@ -1367,7 +1335,7 @@ tr_curl_easy_init( struct evbuffer * writebuf )
 }
     
 
-static int
+static void
 processRequests( const char *  host,
                  int           port,
                  const char ** reqs,
@@ -1377,7 +1345,6 @@ processRequests( const char *  host,
     CURL * curl = NULL;
     struct evbuffer * buf = evbuffer_new( );
     char * url = tr_strdup_printf( "http://%s:%d/transmission/rpc", host, port );
-    int status = EXIT_SUCCESS;
 
     for( i=0; i<reqCount; ++i )
     {
@@ -1395,16 +1362,13 @@ processRequests( const char *  host,
         if( debug )
             fprintf( stderr, "posting:\n--------\n%s\n--------\n", reqs[i] );
         if( ( res = curl_easy_perform( curl ) ) )
-        {
             tr_nerr( MY_NAME, "(%s:%d) %s", host, port, curl_easy_strerror( res ) );
-            status |= EXIT_FAILURE;
-        }
         else {
             long response;
             curl_easy_getinfo( curl, CURLINFO_RESPONSE_CODE, &response );
             switch( response ) {
                 case 200:
-                    status |= processResponse( host, port, EVBUFFER_DATA(buf), EVBUFFER_LENGTH(buf) );
+                    processResponse( host, port, EVBUFFER_DATA(buf), EVBUFFER_LENGTH(buf) );
                     break;
                 case 409:
                     /* session id failed.  our curl header func has already
@@ -1416,7 +1380,6 @@ processRequests( const char *  host,
                     break;
                 default:
                     fprintf( stderr, "Unexpected response: %s\n", (char*)EVBUFFER_DATA(buf) );
-                    status |= EXIT_FAILURE;
                     break;
             }
         }
@@ -1427,7 +1390,6 @@ processRequests( const char *  host,
     evbuffer_free( buf );
     if( curl != NULL )
         curl_easy_cleanup( curl );
-    return status;
 }
 
 int
@@ -1437,30 +1399,24 @@ main( int     argc,
     int    i;
     int    port = DEFAULT_PORT;
     char * host = NULL;
-    int    exit_status = EXIT_SUCCESS;
 
-    if( argc < 2 ) {
+    if( argc < 2 )
         showUsage( );
-        return EXIT_FAILURE;
-    }
 
     getHostAndPort( &argc, argv, &host, &port );
     if( host == NULL )
         host = tr_strdup( DEFAULT_HOST );
 
-    exit_status |= readargs( argc, (const char**)argv );
+    readargs( argc, (const char**)argv );
     if( reqCount )
-        exit_status = processRequests( host, port, (const char**)reqs, reqCount );
-    else {
+        processRequests( host, port, (const char**)reqs, reqCount );
+    else
         showUsage( );
-        return EXIT_FAILURE;
-    }
-        
 
-    for( i=0; i<reqCount; ++i )
+    for( i = 0; i < reqCount; ++i )
         tr_free( reqs[i] );
 
     tr_free( host );
-    return exit_status;
+    return 0;
 }
 

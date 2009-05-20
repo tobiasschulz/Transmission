@@ -116,7 +116,7 @@ int trashDataFile(const char * filename)
     return self;
 }
 
-- (id) initWithHistory: (NSDictionary *) history lib: (tr_session *) lib forcePause: (BOOL) pause
+- (id) initWithHistory: (NSDictionary *) history lib: (tr_session *) lib
 {
     self = [self initWithHash: [history objectForKey: @"TorrentHash"]
                 path: [history objectForKey: @"TorrentPath"] torrentStruct: NULL lib: lib
@@ -132,7 +132,7 @@ int trashDataFile(const char * filename)
     {
         //start transfer
         NSNumber * active;
-        if (!pause && (active = [history objectForKey: @"Active"]) && [active boolValue])
+        if ((active = [history objectForKey: @"Active"]) && [active boolValue])
         {
             fStat = tr_torrentStat(fHandle);
             [self startTransfer];
@@ -1284,11 +1284,6 @@ int trashDataFile(const char * filename)
 - (NSInteger) totalPeersPex
 {
     return fStat->peersFrom[TR_PEER_FROM_PEX];
-}
-
-- (NSInteger) totalPeersDHT
-{
-    return fStat->peersFrom[TR_PEER_FROM_DHT];
 }
 
 - (NSInteger) totalPeersKnown
