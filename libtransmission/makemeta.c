@@ -114,7 +114,8 @@ builderFileCompare( const void * va,
 }
 
 tr_metainfo_builder*
-tr_metaInfoBuilderCreate( const char * topFile )
+tr_metaInfoBuilderCreate( tr_session * session,
+                          const char * topFile )
 {
     int                   i;
     struct FileList *     files;
@@ -122,7 +123,7 @@ tr_metaInfoBuilderCreate( const char * topFile )
     tr_metainfo_builder * ret = tr_new0( tr_metainfo_builder, 1 );
 
     ret->top = tr_strdup( topFile );
-
+    ret->handle = session;
     {
         struct stat sb;
         stat( topFile, &sb );
@@ -417,7 +418,7 @@ tr_realMakeMetaInfo( tr_metainfo_builder * builder )
     /* save the file */
     if( !builder->result && !builder->abortFlag )
     {
-        if( tr_bencToFile( &top, TR_FMT_BENC, builder->outputFile ) )
+        if( tr_bencSaveFile( builder->outputFile, &top ) )
         {
             builder->my_errno = errno;
             tr_strlcpy( builder->errfile, builder->outputFile,
@@ -444,25 +445,29 @@ static tr_metainfo_builder * queue = NULL;
 static tr_thread *           workerThread = NULL;
 
 static tr_lock*
-getQueueLock( void )
+getQueueLock( tr_session * session )
 {
     static tr_lock * lock = NULL;
+    tr_globalLock( session );
 
     if( !lock )
         lock = tr_lockNew( );
 
+    tr_globalUnlock( session );
     return lock;
 }
 
 static void
-makeMetaWorkerFunc( void * unused UNUSED )
+makeMetaWorkerFunc( void * user_data )
 {
-    for( ;; )
+    tr_session * session = user_data;
+
+    for( ; ; )
     {
         tr_metainfo_builder * builder = NULL;
 
         /* find the next builder to process */
-        tr_lock * lock = getQueueLock( );
+        tr_lock * lock = getQueueLock( session );
         tr_lockLock( lock );
         if( queue )
         {
@@ -517,12 +522,12 @@ tr_makeMetaInfo( tr_metainfo_builder *   builder,
         builder->outputFile = tr_strdup_printf( "%s.torrent", builder->top );
 
     /* enqueue the builder */
-    lock = getQueueLock ( );
+    lock = getQueueLock ( builder->handle );
     tr_lockLock( lock );
     builder->nextBuilder = queue;
     queue = builder;
     if( !workerThread )
-        workerThread = tr_threadNew( makeMetaWorkerFunc, NULL );
+        workerThread = tr_threadNew( makeMetaWorkerFunc, builder->handle );
     tr_lockUnlock( lock );
 }
 

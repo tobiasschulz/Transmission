@@ -26,7 +26,6 @@
 #include "resume.h"
 #include "torrent.h"
 #include "tracker.h"
-#include "tr-dht.h"
 #include "trevent.h"
 #include "utils.h"
 #include "web.h"
@@ -42,7 +41,7 @@ enum
     HTTP_OK = 200,
 
     /* seconds between tracker pulses */
-    PULSE_INTERVAL_MSEC = 1500,
+    PULSE_INTERVAL_MSEC = 1000,
 
     /* unless the tracker says otherwise, rescrape this frequently */
     DEFAULT_SCRAPE_INTERVAL_SEC = ( 60 * 15 ),
@@ -227,7 +226,7 @@ publishWarning( tr_tracker * t,
 static void
 publishNewPeers( tr_tracker * t,
                  int          allAreSeeds,
-                 const void * compact,
+                 void *       compact,
                  int          compactLen )
 {
     tr_tracker_event event = emptyEvent;
@@ -243,12 +242,11 @@ publishNewPeers( tr_tracker * t,
 static void
 publishNewPeersCompact( tr_tracker * t,
                         int          allAreSeeds,
-                        const void * compact,
+                        void       * compact,
                         int          compactLen )
 {
     int i;
-    const uint8_t *compactWalk;
-    uint8_t *array, *walk;
+    uint8_t *array, *walk, *compactWalk;
     const int peerCount = compactLen / 6;
     const int arrayLen = peerCount * ( sizeof( tr_address ) + 2 );
     tr_address addr;
@@ -275,12 +273,11 @@ publishNewPeersCompact( tr_tracker * t,
 static void
 publishNewPeersCompact6( tr_tracker * t,
                          int          allAreSeeds,
-                         const void * compact,
+                         void       * compact,
                          int          compactLen )
 {
     int i;
-    const uint8_t *compactWalk;
-    uint8_t *array, *walk;
+    uint8_t *array, *walk, *compactWalk;
     const int peerCount = compactLen / 18;
     const int arrayLen = peerCount * ( sizeof( tr_address ) + 2 );
     tr_address addr;
@@ -434,75 +431,79 @@ onTrackerResponse( tr_session * session,
             int64_t      i;
             int          incomplete = -1;
             const char * str;
-            const uint8_t * raw;
-            size_t rawlen;
 
             success = TRUE;
             t->retryAnnounceIntervalSec = FIRST_SCRAPE_RETRY_INTERVAL_SEC;
 
-            if( tr_bencDictFindStr( &benc, "failure reason", &str ) )
+            if( ( tr_bencDictFindStr( &benc, "failure reason", &str ) ) )
             {
                 publishMessage( t, str, TR_TRACKER_ERROR );
                 success = FALSE;
             }
 
-            if( tr_bencDictFindStr( &benc, "warning message", &str ) )
+            if( ( tr_bencDictFindStr( &benc, "warning message", &str ) ) )
                 publishWarning( t, str );
 
-            if( tr_bencDictFindInt( &benc, "interval", &i ) )
+            if( ( tr_bencDictFindInt( &benc, "interval", &i ) ) )
             {
                 dbgmsg( t->name, "setting interval to %d", (int)i );
                 t->announceIntervalSec = i;
             }
 
-            if( tr_bencDictFindInt( &benc, "min interval", &i ) )
+            if( ( tr_bencDictFindInt( &benc, "min interval", &i ) ) )
             {
                 dbgmsg( t->name, "setting min interval to %d", (int)i );
                 t->announceMinIntervalSec = i;
             }
 
-            if( tr_bencDictFindStr( &benc, "tracker id", &str ) )
+            if( ( tr_bencDictFindStr( &benc, "tracker id", &str ) ) )
                 t->trackerID = tr_strdup( str );
 
-            if( tr_bencDictFindInt( &benc, "complete", &i ) )
+            if( ( tr_bencDictFindInt( &benc, "complete", &i ) ) )
             {
                 ++scrapeFields;
                 t->seederCount = i;
             }
 
-            if( tr_bencDictFindInt( &benc, "incomplete", &i ) )
+            if( ( tr_bencDictFindInt( &benc, "incomplete", &i ) ) )
             {
                 ++scrapeFields;
                 t->leecherCount = incomplete = i;
             }
 
-            if( tr_bencDictFindInt( &benc, "downloaded", &i ) )
+            if( ( tr_bencDictFindInt( &benc, "downloaded", &i ) ) )
             {
                 ++scrapeFields;
                 t->timesDownloaded = i;
             }
 
-            if( tr_bencDictFindRaw( &benc, "peers", &raw, &rawlen ) )
+            if( ( tmp = tr_bencDictFind( &benc, "peers" ) ) )
             {
-                /* "compact" extension */
                 const int allAreSeeds = incomplete == 0;
-                publishNewPeersCompact( t, allAreSeeds, raw, rawlen );
-            }
-            else if( tr_bencDictFindList( &benc, "peers", &tmp ) )
-            {
-                /* original version of peers */
-                const int allAreSeeds = incomplete == 0;
-                size_t byteCount = 0;
-                uint8_t * array = parseOldPeers( tmp, &byteCount );
-                publishNewPeers( t, allAreSeeds, array, byteCount );
-                tr_free( array );
-            }
 
-            if( tr_bencDictFindRaw( &benc, "peers6", &raw, &rawlen ) )
+                if( tr_bencIsString( tmp ) ) /* "compact" extension */
+                {
+                    publishNewPeersCompact( t, allAreSeeds, tmp->val.s.s,
+                                            tmp->val.s.i );
+                }
+                else if( tr_bencIsList( tmp ) ) /* original protocol */
+                {
+                    size_t    byteCount = 0;
+                    uint8_t * array = parseOldPeers( tmp, &byteCount );
+                    publishNewPeers( t, allAreSeeds, array, byteCount );
+                    tr_free( array );
+                }
+            }
+            
+            if( ( tmp = tr_bencDictFind( &benc, "peers6" ) ) )
             {
-                /* "compact" extension */
                 const int allAreSeeds = incomplete == 0;
-                publishNewPeersCompact6( t, allAreSeeds, raw, rawlen );
+                
+                if( tr_bencIsString( tmp ) ) /* "compact" extension */
+                {
+                    publishNewPeersCompact6( t, allAreSeeds, tmp->val.s.s,
+                                             tmp->val.s.i );
+                }
             }
         }
 
@@ -622,34 +623,34 @@ onScrapeResponse( tr_session * session,
                                              &benc, NULL );
         if( bencLoaded && tr_bencDictFindDict( &benc, "files", &files ) )
         {
-            const char * key;
-            tr_benc * val;
-            int i = 0;
-            while( tr_bencDictChild( files, i++, &key, &val ))
+            size_t i;
+            for( i = 0; i < files->val.l.count; i += 2 )
             {
-                int64_t intVal;
-                tr_benc * flags;
-
-                if( memcmp( t->hash, key, SHA_DIGEST_LENGTH ) )
+                int64_t        itmp;
+                const uint8_t* hash =
+                    (const uint8_t*) files->val.l.vals[i].val.s.s;
+                tr_benc *      flags;
+                tr_benc *      tordict = &files->val.l.vals[i + 1];
+                if( memcmp( t->hash, hash, SHA_DIGEST_LENGTH ) )
                     continue;
 
                 publishErrorClear( t );
 
-                if( ( tr_bencDictFindInt( val, "complete", &intVal ) ) )
-                    t->seederCount = intVal;
+                if( ( tr_bencDictFindInt( tordict, "complete", &itmp ) ) )
+                    t->seederCount = itmp;
 
-                if( ( tr_bencDictFindInt( val, "incomplete", &intVal ) ) )
-                    t->leecherCount = intVal;
+                if( ( tr_bencDictFindInt( tordict, "incomplete", &itmp ) ) )
+                    t->leecherCount = itmp;
 
-                if( ( tr_bencDictFindInt( val, "downloaded", &intVal ) ) )
-                    t->timesDownloaded = intVal;
+                if( ( tr_bencDictFindInt( tordict, "downloaded", &itmp ) ) )
+                    t->timesDownloaded = itmp;
 
-                if( ( tr_bencDictFindInt( val, "downloaders", &intVal ) ) )
-                    t->downloaderCount = intVal;
+                if( ( tr_bencDictFindInt( tordict, "downloaders", &itmp ) ) )
+                    t->downloaderCount = itmp;
 
-                if( tr_bencDictFindDict( val, "flags", &flags ) )
-                    if( ( tr_bencDictFindInt( flags, "min_request_interval", &intVal ) ) )
-                        t->scrapeIntervalSec = intVal;
+                if( tr_bencDictFindDict( tordict, "flags", &flags ) )
+                    if( ( tr_bencDictFindInt( flags, "min_request_interval", &itmp ) ) )
+                        t->scrapeIntervalSec = itmp;
 
                 /* as per ticket #1045, safeguard against trackers returning
                  * a very low min_request_interval... */
@@ -975,18 +976,6 @@ trackerPulse( void * vsession )
             t->reannounceAt = TR_TRACKER_BUSY;
             t->manualAnnounceAllowedAt = TR_TRACKER_BUSY;
             enqueueRequest( session, t, TR_REQ_REANNOUNCE );
-        }
-
-        if( tor->dhtAnnounceAt <= now ) {
-            int rc = 1;
-            if( tr_torrentAllowsDHT(tor) )
-                rc = tr_dhtAnnounce(tor, 1);
-            if(rc == 0)
-                /* The DHT is not ready yet.  Try again soon. */
-                tor->dhtAnnounceAt = now + 5 + tr_cryptoWeakRandInt( 5 );
-            else
-                /* We should announce at least once every 30 minutes. */
-                tor->dhtAnnounceAt = now + 25 * 60 + tr_cryptoWeakRandInt( 3 * 60 );
         }
     }
 

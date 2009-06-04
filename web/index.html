@@ -1,6 +1,7 @@
-<!DOCTYPE html>
-<html>
+<!DOCTYPE html PUBLIC "-//W3C//DTD XHTML 1.0 Transitional//EN" "http://www.w3.org/TR/xhtml1/DTD/xhtml1-transitional.dtd">
+<html xmlns="http://www.w3.org/1999/xhtml" xml:lang="en" lang="en">
 	<head>
+		<title>Transmission Web Interface</title>
 		<meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
 		<meta http-equiv="cache-control" content="Private" />
 		<meta name="viewport" content="width=device-width; initial-scale=1.0; maximum-scale=1.0; user-scalable=0;"/>
@@ -11,12 +12,6 @@
 		<script type="text/javascript" src="./javascript/jquery/jquery.min.js"></script>
 		<link media="only screen and (max-device-width: 480px)" href="./stylesheets/iphone.css" type= "text/css" rel="stylesheet" />
 		<link media="screen and (min-device-width: 481px)" href="./stylesheets/common.css" type="text/css" rel="stylesheet" />
-		<!--[if IE]>
-		  <link media="screen" href="./stylesheets/common.css" type="text/css" rel="stylesheet" />
-		  <link media="screen" href="./stylesheets/ieAll.css" type="text/css" rel="stylesheet" />
-		<![endif]-->
-		<!--[if IE 6]><link media="screen" href="./stylesheets/ie6.css" type="text/css" rel="stylesheet" /><![endif]-->
-		<!--[if IE 7]><link media="screen" href="./stylesheets/ie7.css" type="text/css" rel="stylesheet" /><![endif]-->
 		<script type="text/javascript" src="./javascript/jquery/jquery.transmenu.min.js"></script>
 		<script type="text/javascript" src="./javascript/jquery/jquery.contextmenu.min.js"></script>
 		<script type="text/javascript" src="./javascript/menu.js"></script>
@@ -27,7 +22,6 @@
 		<script type="text/javascript" src="./javascript/transmission.js"></script>
 		<script type="text/javascript" src="./javascript/torrent.js"></script>
 		<script type="text/javascript" src="./javascript/dialog.js"></script>
-		<title>Transmission Web Interface</title>
 	</head>
 	<body id="transmission_body">
 
@@ -35,6 +29,7 @@
 			 <ul>    
 				 <li id="open"><div id="open_link"><div class="toolbar_image"></div>Open</div></li>
 				 <li id="remove" class="disabled"><div id="remove_link"><div class="toolbar_image"></div>Remove</div></li>
+				 <li class="divider">&nbsp;</li>
 				 <li id="removedata" class="disabled"><div id="removedata_link"><div class="toolbar_image"></div>Remove Data</div></li>
 				 <li class="divider">&nbsp;</li>
 				 <li id="pause_selected" class="disabled"><div id="pause_selected_link"><div class="toolbar_image"></div>Pause</div></li>
@@ -67,7 +62,6 @@
 			<div id="inspector_tabs">
 				<div class="inspector_tab selected" id="inspector_tab_info"><a href="#info"><img src="images/buttons/info_general.png" alt="Information"/></a></div>
 				<div class="inspector_tab" id="inspector_tab_activity"><a href="#activity"><img src="images/buttons/info_activity.png" alt="Activity"/></a></div>
-				<div class="inspector_tab" id="inspector_tab_files"><a href="#files"><img src="images/buttons/info_files.png" alt="Files"/></a></div>
 			</div>
 			
 			<div id="inspector_header">
@@ -175,16 +169,11 @@
 					</div>
 				</div><!-- class="inspector_group"-->
 			</div><!-- id="inspector_tab_activity_container" -->
-
-			<div style="display:none;" class="inspector_container" id="inspector_tab_files_container">
-				<div id="inspector_file_list"></div>
-			</div><!-- id="inspector_tab_files_container" -->
-
 		</div>
 		
 		<div id="torrent_container">
-			<ul class="torrent_list" id="torrent_list"><li style="display: none;"></li></ul>
-		</div>
+			<ul class="torrent_list" id="torrent_list"><li></li></ul>
+	</div>
 		
 		
 		
@@ -268,7 +257,7 @@
 					enctype="multipart/form-data" target="torrent_upload_frame">  
 					<div class="dialog_message">
 						<label for="torrent_upload_file">Please select a torrent file to upload:</label>
-							<input type="file" name="torrent_files[]" id="torrent_upload_file" multiple="multiple" />
+							<input type="file" name="torrent_file" id="torrent_upload_file"/>
 						<label for="torrent_upload_url">Or enter a URL:</label>
 							<input type="text" id="torrent_upload_url"/>
 					</div>
@@ -347,11 +336,9 @@
 			<ul>
 				<li id="context_pause_selected" class="disabled context_pause_selected">Pause Selected</li>
 				<li id="context_resume_selected" class="disabled context_resume_selected">Resume Selected</li>
-				<li class="separator"></li>
 				<li id="context_remove">Remove From List...</li>
-				<li id="context_removedata">Trash Data & Remove From List...</li>
 				<li class="separator"></li>
-				<li id="context_verify">Verify Local Data</li>
+				<li id="context_removedata">Delete Data And Remove From List...</li>
 				<li class="separator"></li>
 				<li id="context_toggle_inspector">Show Inspector</li>
 				<li class="separator"></li>
@@ -360,6 +347,6 @@
 			</ul>
 		</div>
 		
-		<iframe name="torrent_upload_frame" id="torrent_upload_frame" src="about:blank" ></iframe>
+		<iframe name="torrent_upload_frame" id="torrent_upload_frame" src="about:blank" />
 	</body>
 </html>

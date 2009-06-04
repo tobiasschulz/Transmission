@@ -163,22 +163,28 @@ tr_prefs_init_defaults( tr_benc * d )
     if( !str ) str = g_get_user_special_dir( G_USER_DIRECTORY_DESKTOP );
     if( !str ) str = tr_getDefaultDownloadDir( );
     tr_bencDictAddStr( d, PREF_KEY_DIR_WATCH, str );
-    tr_bencDictAddBool( d, PREF_KEY_DIR_WATCH_ENABLED, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_DIR_WATCH_ENABLED, FALSE );
 #endif
 
-    tr_bencDictAddBool( d, PREF_KEY_INHIBIT_HIBERNATION, FALSE );
-    tr_bencDictAddBool( d, PREF_KEY_BLOCKLIST_UPDATES_ENABLED, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_INHIBIT_HIBERNATION, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_BLOCKLIST_UPDATES_ENABLED, TRUE );
 
     tr_bencDictAddStr( d, PREF_KEY_OPEN_DIALOG_FOLDER, g_get_home_dir( ) );
 
-    tr_bencDictAddBool( d, PREF_KEY_TOOLBAR, TRUE );
-    tr_bencDictAddBool( d, PREF_KEY_FILTERBAR, TRUE );
-    tr_bencDictAddBool( d, PREF_KEY_STATUSBAR, TRUE );
-    tr_bencDictAddBool( d, PREF_KEY_SHOW_TRAY_ICON, FALSE );
-    tr_bencDictAddBool( d, PREF_KEY_SHOW_DESKTOP_NOTIFICATION, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_TOOLBAR, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_FILTERBAR, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_STATUSBAR, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_SHOW_TRAY_ICON, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_SHOW_DESKTOP_NOTIFICATION, TRUE );
     tr_bencDictAddStr( d, PREF_KEY_STATUSBAR_STATS, "total-ratio" );
 
-    tr_bencDictAddBool( d, PREF_KEY_OPTIONS_PROMPT, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_SCHED_LIMIT_ENABLED, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_SCHED_BEGIN,    60 * 23 ); /* 11pm */
+    tr_bencDictAddInt( d, PREF_KEY_SCHED_END,      60 * 7 );  /* 7am */
+    tr_bencDictAddInt( d, PREF_KEY_SCHED_DL_LIMIT, 200 );   /* 2x the other limit */
+    tr_bencDictAddInt( d, PREF_KEY_SCHED_UL_LIMIT, 100 );   /* 2x the other limit */
+
+    tr_bencDictAddInt( d, PREF_KEY_OPTIONS_PROMPT, TRUE );
 
     tr_bencDictAddInt( d, PREF_KEY_MAIN_WINDOW_HEIGHT, 500 );
     tr_bencDictAddInt( d, PREF_KEY_MAIN_WINDOW_WIDTH, 300 );
@@ -193,15 +199,14 @@ tr_prefs_init_defaults( tr_benc * d )
     if( !str ) str = tr_getDefaultDownloadDir( );
     tr_bencDictAddStr( d, TR_PREFS_KEY_DOWNLOAD_DIR, str );
 
-    tr_bencDictAddBool( d, PREF_KEY_ASKQUIT, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_ASKQUIT, TRUE );
 
-    tr_bencDictAddStr( d, PREF_KEY_FILTER_MODE, "show-all" );
     tr_bencDictAddStr( d, PREF_KEY_SORT_MODE, "sort-by-name" );
-    tr_bencDictAddBool( d, PREF_KEY_SORT_REVERSED, FALSE );
-    tr_bencDictAddBool( d, PREF_KEY_MINIMAL_VIEW, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_SORT_REVERSED, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_MINIMAL_VIEW, FALSE );
 
-    tr_bencDictAddBool( d, PREF_KEY_START, TRUE );
-    tr_bencDictAddBool( d, PREF_KEY_TRASH_ORIGINAL, FALSE );
+    tr_bencDictAddInt( d, PREF_KEY_START, TRUE );
+    tr_bencDictAddInt( d, PREF_KEY_TRASH_ORIGINAL, FALSE );
 }
 
 static char*
@@ -254,21 +259,6 @@ pref_int_set( const char * key,
     tr_bencDictAddInt( getPrefs( ), key, value );
 }
 
-double
-pref_double_get( const char * key )
-{
-    double d = 0.0;
-    tr_bencDictFindReal( getPrefs( ), key, &d );
-    return d;
-}
-
-void
-pref_double_set( const char * key,
-                 double       value )
-{
-    tr_bencDictAddReal( getPrefs( ), key, value );
-}
-
 /***
 ****
 ***/
@@ -276,9 +266,10 @@ pref_double_set( const char * key,
 gboolean
 pref_flag_get( const char * key )
 {
-    tr_bool boolVal;
-    tr_bencDictFindBool( getPrefs( ), key, &boolVal );
-    return boolVal != 0;
+    int64_t i;
+
+    tr_bencDictFindInt( getPrefs( ), key, &i );
+    return i != 0;
 }
 
 gboolean
@@ -302,7 +293,7 @@ void
 pref_flag_set( const char * key,
                gboolean     value )
 {
-    tr_bencDictAddBool( getPrefs( ), key, value );
+    pref_int_set( key, value != 0 );
 }
 
 /***
@@ -357,6 +348,14 @@ tr_file_set_contents( const char *   filename,
 #endif
 
 static char*
+getCompat080PrefsFilename( void )
+{
+    assert( gl_confdir != NULL );
+
+    return g_build_filename( g_get_home_dir( ), ".transmission", "gtk", "prefs", NULL );
+}
+
+static char*
 getCompat090PrefsFilename( void )
 {
     assert( gl_confdir != NULL );
@@ -368,6 +367,63 @@ static char*
 getCompat121PrefsFilename( void )
 {
     return g_build_filename( g_get_user_config_dir( ), "transmission", "gtk", "prefs.ini", NULL );
+}
+
+static void
+translate_08_to_09( const char* oldfile,
+                    const char* newfile )
+{
+    static struct pref_entry {
+        const char*   oldkey;
+        const char*   newkey;
+    } pref_table[] = {
+        { "add-behavior-ipc",       "add-behavior-ipc"               },
+        { "add-behavior-standard",  "add-behavior-standard"          },
+        { "download-directory",     "default-download-directory"     },
+        { "download-limit",         "download-limit"                 },
+        { "use-download-limit",     "download-limit-enabled"         },
+        { "listening-port",         "listening-port"                 },
+        { "use-nat-traversal",      "nat-traversal-enabled"          },
+        { "use-peer-exchange",      "pex-enabled"                    },
+        { "ask-quit",               "prompt-before-exit"             },
+        { "ask-download-directory", "prompt-for-download-directory"  },
+        { "use-tray-icon",          "system-tray-icon-enabled"       },
+        { "upload-limit",           "upload-limit"                   },
+        { "use-upload-limit",       "upload-limit-enabled"           }
+    };
+
+    GString * out = g_string_new( NULL );
+    gchar *   contents = NULL;
+    gsize     contents_len = 0;
+    tr_benc   top;
+
+    memset( &top, 0, sizeof( tr_benc ) );
+
+    if( g_file_get_contents( oldfile, &contents, &contents_len, NULL )
+      && !tr_bencLoad( contents, contents_len, &top, NULL )
+      && tr_bencIsDict( &top ) )
+    {
+        unsigned int i;
+        g_string_append( out, "\n[general]\n" );
+        for( i = 0; i < G_N_ELEMENTS( pref_table ); ++i )
+        {
+            const tr_benc * val = tr_bencDictFind( &top,
+                                                   pref_table[i].oldkey );
+            if( val != NULL )
+            {
+                const char * valstr = val->val.s.s;
+                if( !strcmp( valstr, "yes" ) ) valstr = "true";
+                if( !strcmp( valstr, "no" ) ) valstr = "false";
+                g_string_append_printf( out, "%s=%s\n",
+                                        pref_table[i].newkey,
+                                        valstr );
+            }
+        }
+    }
+
+    g_file_set_contents( newfile, out->str, out->len, NULL );
+    g_string_free( out, TRUE );
+    g_free( contents );
 }
 
 static void
@@ -428,7 +484,7 @@ translate_keyfile_to_json( const char * old_file,
     }
 
     g_key_file_free( keyfile );
-    tr_bencToFile( &dict, TR_FMT_JSON, new_file );
+    tr_bencSaveJSONFile( new_file, &dict );
     tr_bencFree( &dict );
 }
 
@@ -441,6 +497,7 @@ cf_check_older_configs( void )
     {
         char * key1 = getCompat121PrefsFilename( );
         char * key2 = getCompat090PrefsFilename( );
+        char * benc = getCompat080PrefsFilename( );
 
         if( g_file_test( key1, G_FILE_TEST_IS_REGULAR ) )
         {
@@ -452,7 +509,18 @@ cf_check_older_configs( void )
             g_message( _( "Importing \"%s\"" ), key2 );
             translate_keyfile_to_json( key2, filename );
         }
+        else if( g_file_test( benc, G_FILE_TEST_IS_REGULAR ) )
+        {
+            char * tmpfile;
+            int    fd = g_file_open_tmp( "transmission-prefs-XXXXXX", &tmpfile, NULL );
+            g_message( _( "Importing \"%s\"" ), benc );
+            if( fd != -1 ) close( fd );
+            translate_08_to_09( benc, tmpfile );
+            translate_keyfile_to_json( tmpfile, filename );
+            unlink( tmpfile );
+        }
 
+        g_free( benc );
         g_free( key2 );
         g_free( key1 );
     }

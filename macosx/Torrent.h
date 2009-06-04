@@ -27,6 +27,8 @@
 
 @class FileListNode;
 
+#define INVALID -99
+
 typedef enum
 {
     TORRENT_FILE_DELETE,
@@ -63,9 +65,11 @@ typedef enum
     NSIndexSet * fPreviousFinishedIndexes;
     NSDate * fPreviousFinishedIndexesDate;
     
+    CGFloat fRatioLimit;
+    NSInteger fRatioSetting;
     BOOL fFinishedSeeding, fWaitToStart, fStalled;
     
-    NSInteger fGroupValue;
+    NSInteger fOrderValue, fGroupValue;
     
     BOOL fAddedTrackers;
     
@@ -75,7 +79,7 @@ typedef enum
 - (id) initWithPath: (NSString *) path location: (NSString *) location deleteTorrentFile: (torrentFileState) torrentDelete
         lib: (tr_session *) lib;
 - (id) initWithTorrentStruct: (tr_torrent *) torrentStruct location: (NSString *) location lib: (tr_session *) lib;
-- (id) initWithHistory: (NSDictionary *) history lib: (tr_session *) lib forcePause: (BOOL) pause;
+- (id) initWithHistory: (NSDictionary *) history lib: (tr_session *) lib;
 
 - (NSDictionary *) history;
 
@@ -103,28 +107,23 @@ typedef enum
 - (void) resetCache;
 
 - (CGFloat) ratio;
-- (tr_ratiolimit) ratioSetting;
-- (void) setRatioSetting: (tr_ratiolimit) setting;
+- (NSInteger) ratioSetting;
+- (void) setRatioSetting: (NSInteger) setting;
 - (CGFloat) ratioLimit;
 - (void) setRatioLimit: (CGFloat) limit;
-- (BOOL) seedRatioSet;
+- (CGFloat) actualStopRatio; //returns INVALID if will not stop
 - (CGFloat) progressStopRatio;
 
-- (BOOL) usesSpeedLimit: (BOOL) upload;
-- (void) setUseSpeedLimit: (BOOL) use upload: (BOOL) upload;
+- (tr_speedlimit) speedMode: (BOOL) upload;
+- (void) setSpeedMode: (tr_speedlimit) mode upload: (BOOL) upload;
 - (NSInteger) speedLimit: (BOOL) upload;
 - (void) setSpeedLimit: (NSInteger) limit upload: (BOOL) upload;
-- (BOOL) usesGlobalSpeedLimit;
-- (void) setUseGlobalSpeedLimit: (BOOL) use;
 
 - (void) setMaxPeerConnect: (uint16_t) count;
 - (uint16_t) maxPeerConnect;
 
 - (void) setWaitToStart: (BOOL) wait;
 - (BOOL) waitingToStart;
-
-- (tr_priority_t) priority;
-- (void) setPriority: (tr_priority_t) priority;
 
 - (void) revealData;
 - (void) revealPublicTorrent;
@@ -181,6 +180,7 @@ typedef enum
 - (CGFloat) checkingProgress;
 
 - (NSInteger) eta;
+- (NSInteger) etaRatio;
 
 - (CGFloat) notAvailableDesired;
 
@@ -214,7 +214,6 @@ typedef enum
 - (NSInteger) totalPeersIncoming;
 - (NSInteger) totalPeersCache;
 - (NSInteger) totalPeersPex;
-- (NSInteger) totalPeersDHT;
 - (NSInteger) totalPeersKnown;
 
 - (NSInteger) peersSendingToUs;
@@ -230,6 +229,9 @@ typedef enum
 - (uint64_t) uploadedTotal;
 - (uint64_t) failedHash;
 - (CGFloat) swarmSpeed;
+
+- (NSInteger) orderValue;
+- (void) setOrderValue: (NSInteger) orderValue;
 
 - (NSInteger) groupValue;
 - (void) setGroupValue: (NSInteger) groupValue;
@@ -247,8 +249,8 @@ typedef enum
 - (BOOL) canChangeDownloadCheckForFiles: (NSIndexSet *) indexSet;
 - (NSInteger) checkForFiles: (NSIndexSet *) indexSet;
 - (void) setFileCheckState: (NSInteger) state forIndexes: (NSIndexSet *) indexSet;
-- (void) setFilePriority: (tr_priority_t) priority forIndexes: (NSIndexSet *) indexSet;
-- (BOOL) hasFilePriority: (tr_priority_t) priority forIndexes: (NSIndexSet *) indexSet;
+- (void) setFilePriority: (NSInteger) priority forIndexes: (NSIndexSet *) indexSet;
+- (BOOL) hasFilePriority: (NSInteger) priority forIndexes: (NSIndexSet *) indexSet;
 - (NSSet *) filePrioritiesForIndexes: (NSIndexSet *) indexSet;
 
 - (NSDate *) dateAdded;

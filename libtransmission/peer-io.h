@@ -35,11 +35,6 @@ struct tr_bandwidth;
 struct tr_crypto;
 struct tr_peerIo;
 
-/**
- * @addtogroup networked_io Networked IO
- * @{
- */
-
 typedef enum
 {
     READ_NOW,
@@ -68,14 +63,11 @@ typedef struct tr_peerIo
     tr_bool               peerIdIsSet;
     tr_bool               extendedProtocolSupported;
     tr_bool               fastExtensionSupported;
-    tr_bool               dhtSupported;
 
     /* we create the socket in a nonblocking way, so this flag is initially
      * false and then set to true when libevent says that the socket is ready
      * for reading or writing */
     tr_bool               hasFinishedConnecting;
-
-    tr_priority_t         priority;
 
     int                   pendingEvents;
 
@@ -163,15 +155,6 @@ static TR_INLINE tr_bool tr_peerIoSupportsFEXT( const tr_peerIo * io )
     assert( tr_isPeerIo( io ) );
 
     return io->fastExtensionSupported;
-}
-
-void        tr_peerIoEnableDHT( tr_peerIo * io, tr_bool flag );
-
-static TR_INLINE tr_bool tr_peerIoSupportsDHT( const tr_peerIo * io )
-{
-    assert( tr_isPeerIo( io ) );
-
-    return io->dhtSupported;
 }
 
 /**
@@ -406,6 +389,5 @@ static TR_INLINE struct evbuffer * tr_peerIoGetReadBuffer( tr_peerIo * io )
     return io->inbuf;
 }
 
-/* @} */
 
 #endif

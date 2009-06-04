@@ -28,7 +28,6 @@
 #include "peer-io.h"
 #include "peer-mgr.h"
 #include "torrent.h"
-#include "tr-dht.h"
 #include "trevent.h"
 #include "utils.h"
 
@@ -36,8 +35,6 @@
 #define ENABLE_LTEP * /
 /* fast extensions */
 #define ENABLE_FAST * /
-/* DHT */
-#define ENABLE_DHT * /
 
 /***
 ****
@@ -85,14 +82,6 @@ enum
  #define HANDSHAKE_SET_FASTEXT( bits ) ( (void)0 ) 
 #endif 
 
-#ifdef ENABLE_DHT
- #define HANDSHAKE_HAS_DHT( bits ) ( ( ( bits )[7] & 0x01 ) ? 1 : 0 )
- #define HANDSHAKE_SET_DHT( bits ) ( ( bits )[7] |= 0x01 )
-#else
- #define HANDSHAKE_HAS_DHT( bits ) ( 0 )
- #define HANDSHAKE_SET_DHT( bits ) ( (void)0 )
-#endif 
-
 /* http://www.azureuswiki.com/index.php/Extension_negotiation_protocol
    these macros are to be used if both extended messaging and the
    azureus protocol is supported, they indicate which protocol is preferred */
@@ -107,6 +96,7 @@ struct tr_handshake
     tr_peerIo *           io;
     tr_crypto *           crypto;
     tr_session *          session;
+    uint8_t               myPublicKey[KEY_LEN];
     uint8_t               mySecret[KEY_LEN];
     uint8_t               state;
     tr_encryption_mode    encryptionMode;
@@ -116,6 +106,7 @@ struct tr_handshake
     uint32_t              crypto_select;
     uint32_t              crypto_provide;
     uint8_t               myReq1[SHA_DIGEST_LENGTH];
+    uint8_t               peer_id[PEER_ID_LEN];
     handshakeDoneCB       doneCB;
     void *                doneUserData;
     tr_timer *            timeout;
@@ -212,9 +203,11 @@ setReadState( tr_handshake * handshake,
     setState( handshake, state );
 }
 
-static void
-buildHandshakeMessage( tr_handshake * handshake, uint8_t * buf )
+static uint8_t *
+buildHandshakeMessage( tr_handshake * handshake,
+                       int *          setme_len )
 {
+    uint8_t          * buf = tr_new0( uint8_t, HANDSHAKE_SIZE );
     uint8_t          * walk = buf;
     const uint8_t    * torrentHash = tr_cryptoGetTorrentHash( handshake->crypto );
     const tr_torrent * tor = tr_torrentFindFromHash( handshake->session, torrentHash );
@@ -226,12 +219,6 @@ buildHandshakeMessage( tr_handshake * handshake, uint8_t * buf )
     HANDSHAKE_SET_LTEP( walk );
     HANDSHAKE_SET_FASTEXT( walk );
 
-    /* Note that this doesn't depend on whether the torrent is private.  We
-       don't accept DHT peers for a private torrent, but we participate in
-       the DHT regardless. */
-    if(tr_dhtEnabled(handshake->session))
-        HANDSHAKE_SET_DHT( walk );
-
     walk += HANDSHAKE_FLAGS_LEN;
     memcpy( walk, torrentHash, SHA_DIGEST_LENGTH );
     walk += SHA_DIGEST_LENGTH;
@@ -240,6 +227,8 @@ buildHandshakeMessage( tr_handshake * handshake, uint8_t * buf )
 
     assert( strlen( ( const char* )peer_id ) == PEER_ID_LEN );
     assert( walk - buf == HANDSHAKE_SIZE );
+    *setme_len = walk - buf;
+    return buf;
 }
 
 static int tr_handshakeDone( tr_handshake * handshake,
@@ -261,8 +250,7 @@ parseHandshake( tr_handshake *    handshake,
     uint8_t reserved[HANDSHAKE_FLAGS_LEN];
     uint8_t hash[SHA_DIGEST_LENGTH];
     const tr_torrent * tor;
-    const uint8_t * tor_peer_id;
-    uint8_t peer_id[PEER_ID_LEN];
+    const uint8_t * peer_id;
 
     dbgmsg( handshake, "payload: need %d, got %zu",
             (int)HANDSHAKE_SIZE, EVBUFFER_LENGTH( inbuf ) );
@@ -290,16 +278,18 @@ parseHandshake( tr_handshake *    handshake,
     }
 
     /* peer_id */
-    tr_peerIoReadBytes( handshake->io, inbuf, peer_id, sizeof( peer_id ) );
-    tr_peerIoSetPeersId( handshake->io, peer_id );
+    tr_peerIoReadBytes( handshake->io, inbuf, handshake->peer_id,
+                       sizeof( handshake->peer_id ) );
+    tr_peerIoSetPeersId( handshake->io, handshake->peer_id );
 
     /* peer id */
     handshake->havePeerID = TRUE;
-    dbgmsg( handshake, "peer-id is [%*.*s]", PEER_ID_LEN, PEER_ID_LEN, peer_id );
+    dbgmsg( handshake, "peer-id is [%*.*s]", PEER_ID_LEN, PEER_ID_LEN,
+            handshake->peer_id );
 
     tor = tr_torrentFindFromHash( handshake->session, hash );
-    tor_peer_id = tor && tor->peer_id ? tor->peer_id : tr_getPeerId( );
-    if( !memcmp( peer_id, tor_peer_id, PEER_ID_LEN ) )
+    peer_id = tor && tor->peer_id ? tor->peer_id : tr_getPeerId( );
+    if( !memcmp( handshake->peer_id, peer_id, PEER_ID_LEN ) )
     {
         dbgmsg( handshake, "streuth!  we've connected to ourselves." );
         return HANDSHAKE_PEER_IS_SELF;
@@ -312,10 +302,6 @@ parseHandshake( tr_handshake *    handshake,
     tr_peerIoEnableLTEP( handshake->io, HANDSHAKE_HAS_LTEP( reserved ) );
 
     tr_peerIoEnableFEXT( handshake->io, HANDSHAKE_HAS_FASTEXT( reserved ) );
-
-    /* This doesn't depend on whether the torrent is private. */
-    if( tor && tor->session->isDHTEnabled )
-        tr_peerIoEnableDHT( handshake->io, HANDSHAKE_HAS_DHT( reserved ) );
 
     return HANDSHAKE_OK;
 }
@@ -486,13 +472,14 @@ readYb( tr_handshake *    handshake,
 
     /* ENCRYPT len(IA)), ENCRYPT(IA) */
     {
-        uint8_t msg[HANDSHAKE_SIZE];
-        buildHandshakeMessage( handshake, msg );
+        int       msglen;
+        uint8_t * msg = buildHandshakeMessage( handshake, &msglen );
 
-        tr_peerIoWriteUint16( handshake->io, outbuf, sizeof( msg ) );
-        tr_peerIoWriteBytes( handshake->io, outbuf, msg, sizeof( msg ) );
+        tr_peerIoWriteUint16( handshake->io, outbuf, msglen );
+        tr_peerIoWriteBytes( handshake->io, outbuf, msg, msglen );
 
         handshake->haveSentBitTorrentHandshake = 1;
+        tr_free( msg );
     }
 
     /* send it */
@@ -710,9 +697,10 @@ readHandshake( tr_handshake *    handshake,
 
     if( !handshake->haveSentBitTorrentHandshake )
     {
-        uint8_t msg[HANDSHAKE_SIZE];
-        buildHandshakeMessage( handshake, msg );
-        tr_peerIoWrite( handshake->io, msg, sizeof( msg ), FALSE );
+        int       msgSize;
+        uint8_t * msg = buildHandshakeMessage( handshake, &msgSize );
+        tr_peerIoWrite( handshake->io, msg, msgSize, FALSE );
+        tr_free( msg );
         handshake->haveSentBitTorrentHandshake = 1;
     }
 
@@ -727,24 +715,23 @@ readPeerId( tr_handshake    * handshake,
     int  peerIsGood;
     char client[128];
     tr_torrent * tor;
-    const uint8_t * tor_peer_id;
-    uint8_t peer_id[PEER_ID_LEN];
+    const uint8_t * peer_id;
 
     if( EVBUFFER_LENGTH( inbuf ) < PEER_ID_LEN )
         return READ_LATER;
 
     /* peer id */
-    tr_peerIoReadBytes( handshake->io, inbuf, peer_id, PEER_ID_LEN );
-    tr_peerIoSetPeersId( handshake->io, peer_id );
+    tr_peerIoReadBytes( handshake->io, inbuf, handshake->peer_id, PEER_ID_LEN );
+    tr_peerIoSetPeersId( handshake->io, handshake->peer_id );
     handshake->havePeerID = TRUE;
-    tr_clientForId( client, sizeof( client ), peer_id );
+    tr_clientForId( client, sizeof( client ), handshake->peer_id );
     dbgmsg( handshake, "peer-id is [%s] ... isIncoming is %d", client,
             tr_peerIoIsIncoming( handshake->io ) );
 
     /* if we've somehow connected to ourselves, don't keep the connection */
     tor = tr_torrentFindFromHash( handshake->session, tr_peerIoGetTorrentHash( handshake->io ) );
-    tor_peer_id = tor && tor->peer_id ? tor->peer_id : tr_getPeerId( );
-    peerIsGood = memcmp( peer_id, tor_peer_id, PEER_ID_LEN ) != 0;
+    peer_id = tor && tor->peer_id ? tor->peer_id : tr_getPeerId( );
+    peerIsGood = memcmp( handshake->peer_id, peer_id, PEER_ID_LEN ) != 0;
     dbgmsg( handshake, "isPeerGood == %d", peerIsGood );
     return tr_handshakeDone( handshake, peerIsGood );
 }
@@ -978,11 +965,11 @@ readIA( tr_handshake *    handshake,
     dbgmsg( handshake, "sending handshake" );
     /* send our handshake */
     {
-        uint8_t msg[HANDSHAKE_SIZE];
-        buildHandshakeMessage( handshake, msg );
-
-        tr_peerIoWriteBytes( handshake->io, outbuf, msg, sizeof( msg ) );
+        int       msgSize;
+        uint8_t * msg = buildHandshakeMessage( handshake, &msgSize );
+        tr_peerIoWriteBytes( handshake->io, outbuf, msg, msgSize );
         handshake->haveSentBitTorrentHandshake = 1;
+        tr_free( msg );
     }
 
     /* send it out */
@@ -1098,13 +1085,14 @@ fireDoneFunc( tr_handshake * handshake,
               tr_bool        isConnected )
 {
     const uint8_t * peer_id = isConnected && handshake->havePeerID
-                            ? tr_peerIoGetPeersId( handshake->io )
-                            : NULL;
-    const int success = ( *handshake->doneCB )( handshake,
-                                                handshake->io,
-                                                isConnected,
-                                                peer_id,
-                                                handshake->doneUserData );
+                              ? handshake->peer_id
+                              : NULL;
+    const int       success = ( *handshake->doneCB )( handshake,
+                                                      handshake->io,
+                                                      isConnected,
+                                                      peer_id,
+                                                      handshake->
+                                                      doneUserData );
 
     return success;
 }
@@ -1157,13 +1145,14 @@ gotError( tr_peerIo  * io UNUSED,
       && ( handshake->encryptionMode != TR_ENCRYPTION_REQUIRED )
       && ( !tr_peerIoReconnect( handshake->io ) ) )
     {
-        uint8_t msg[HANDSHAKE_SIZE];
-
+        int       msgSize;
+        uint8_t * msg;
         dbgmsg( handshake, "handshake failed, trying plaintext..." );
-        buildHandshakeMessage( handshake, msg );
+        msg = buildHandshakeMessage( handshake, &msgSize );
         handshake->haveSentBitTorrentHandshake = 1;
         setReadState( handshake, AWAITING_HANDSHAKE );
-        tr_peerIoWrite( handshake->io, msg, sizeof( msg ), FALSE );
+        tr_peerIoWrite( handshake->io, msg, msgSize, FALSE );
+        tr_free( msg );
     }
     else
     {
@@ -1211,12 +1200,12 @@ tr_handshakeNew( tr_peerIo *        io,
         sendYa( handshake );
     else
     {
-        uint8_t msg[HANDSHAKE_SIZE];
-        buildHandshakeMessage( handshake, msg );
-
+        int       msgSize;
+        uint8_t * msg = buildHandshakeMessage( handshake, &msgSize );
         handshake->haveSentBitTorrentHandshake = 1;
         setReadState( handshake, AWAITING_HANDSHAKE );
-        tr_peerIoWrite( handshake->io, msg, sizeof( msg ), FALSE );
+        tr_peerIoWrite( handshake->io, msg, msgSize, FALSE );
+        tr_free( msg );
     }
 
     return handshake;

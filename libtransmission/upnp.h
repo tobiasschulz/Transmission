@@ -17,11 +17,6 @@
 #ifndef TR_UPNP_H
 #define TR_UPNP_H 1
 
-/** 
- * @addtogroup port_forwarding Port Forwarding
- * @{
- */
-
 typedef struct tr_upnp tr_upnp;
 
 tr_upnp * tr_upnpInit( void );
@@ -30,7 +25,6 @@ void      tr_upnpClose( tr_upnp * );
 
 int       tr_upnpPulse(         tr_upnp *,
                             int port,
-                            int isEnabled,
-                            int doPortCheck );
-/* @} */
+                            int isEnabled );
+
 #endif

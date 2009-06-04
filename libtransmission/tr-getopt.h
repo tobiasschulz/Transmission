@@ -29,11 +29,6 @@
 extern "C" {
 #endif
 
-/**
- * @addtogroup utils Utilities
- * @{ 
- */
-
 extern int tr_optind;
 
 typedef struct tr_option
@@ -77,7 +72,5 @@ void tr_getopt_usage( const char *      appName,
 #ifdef __cplusplus
 } /* extern "C" */
 #endif
-
-/** @} */
 
 #endif /* TR_GETOPT_H */

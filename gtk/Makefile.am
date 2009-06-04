@@ -37,19 +37,17 @@ AM_LDFLAGS = \
 noinst_HEADERS = \
     actions.h \
     add-dialog.h \
+    blocklist.h \
     conf.h \
     details.h \
     dialogs.h \
     hig.h \
-    icons.h \
     file-list.h \
     lock.h \
     logo.h \
     makemeta-ui.h \
     msgwin.h \
     notify.h \
-    options-icon.h \
-    relocate.h \
     stats.h \
     sexy-icon-entry.h \
     sexy-marshal.h \
@@ -61,7 +59,6 @@ noinst_HEADERS = \
     tr-prefs.h \
     tr-torrent.h \
     tr-window.h \
-    turtles.h \
     ui.h \
     util.h
 
@@ -72,17 +69,16 @@ dbus_generated_sources = tr-core-dbus.h
 transmission_SOURCES = \
     actions.c \
     add-dialog.c \
+    blocklist.c \
     conf.c \
     details.c \
     dialogs.c \
     file-list.c \
     hig.c \
-    icons.c \
     main.c \
     makemeta-ui.c \
     msgwin.c \
     notify.c \
-    relocate.c \
     sexy-icon-entry.c \
     sexy-marshal.c \
     stats.c \
@@ -100,13 +96,12 @@ dist_man_MANS = transmission.1
 
 transmission_LDADD = \
     $(top_builddir)/libtransmission/libtransmission.a \
+    $(top_builddir)/third-party/libevent/libevent.la \
     $(top_builddir)/third-party/miniupnp/libminiupnp.a \
     $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
-    $(top_builddir)/third-party/dht/libdht.a \
     $(GTK_LIBS) \
     $(GIO_LIBS) \
     $(LIBNOTIFY_LIBS) \
-    $(LIBEVENT_LIBS) \
     $(DBUS_GLIB_LIBS) \
     $(OPENSSL_LIBS) \
     $(LIBCURL_LIBS) \

@@ -26,11 +26,6 @@
 #include "net.h"
 #include "publish.h" /* tr_publisher_tag */
 
-/**
- * @addtogroup peers Peers
- * @{
- */
-
 struct tr_peer_stat;
 struct tr_torrent;
 typedef struct tr_peerMgr tr_peerMgr;
@@ -65,9 +60,6 @@ enum
     ENCRYPTION_PREFERENCE_NO
 };
 
-/* opaque forward declaration */
-struct peer_atom;
-
 /**
  * State information about a connected peer.
  *
@@ -90,7 +82,6 @@ typedef struct tr_peer
     tr_port                  dht_port;
     tr_address               addr;
     struct tr_peerIo       * io;
-    struct peer_atom       * atom;
 
     struct tr_bitfield     * blame;
     struct tr_bitfield     * have;
@@ -178,15 +169,11 @@ void tr_peerMgrTorrentStats( tr_torrent * tor,
 struct tr_peer_stat* tr_peerMgrPeerStats( const tr_torrent * tor,
                                           int              * setmeCount );
 
-float tr_peerMgrGetWebseedSpeed( const tr_torrent * tor, uint64_t now );
-
 float* tr_peerMgrWebSpeeds( const tr_torrent * tor );
 
 
 double tr_peerGetPieceSpeed( const tr_peer    * peer,
                              uint64_t           now,
                              tr_direction       direction );
-
-/* @} */
 
 #endif

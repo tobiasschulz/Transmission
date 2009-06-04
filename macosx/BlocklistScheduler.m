@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2008-2009 Transmission authors and contributors
+ * Copyright (c) 2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -24,6 +24,7 @@
 
 #import "BlocklistScheduler.h"
 #import "BlocklistDownloader.h"
+#import "NSApplicationAdditions.h"
 
 //thirty second delay before running after option is changed
 #define SMALL_DELAY 30
@@ -70,7 +71,7 @@ BlocklistScheduler * fScheduler = nil;
                 userInfo: nil repeats: NO];
     
     //current run loop usually means a second update won't work
-    NSRunLoop * loop = [NSRunLoop mainRunLoop];
+    NSRunLoop * loop = [NSApp isOnLeopardOrBetter] ? [NSRunLoop mainRunLoop] : [NSRunLoop currentRunLoop];
     [loop addTimer: fTimer forMode: NSDefaultRunLoopMode];
     [loop addTimer: fTimer forMode: NSModalPanelRunLoopMode];
     [loop addTimer: fTimer forMode: NSEventTrackingRunLoopMode];

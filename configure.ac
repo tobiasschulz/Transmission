@@ -3,8 +3,8 @@ dnl STATUS: "X" for prerelease beta builds,
 dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
-m4_define([user_agent_prefix],[1.70])
-m4_define([peer_id_prefix],[-TR1700-])
+m4_define([user_agent_prefix],[1.54])
+m4_define([peer_id_prefix],[-TR1540-])
 
 AC_INIT([transmission],
         [user_agent_prefix],
@@ -22,8 +22,8 @@ AC_PROG_LIBTOOL
 if test m4_substr(peer_id_prefix,6,1) = "0"; then
   supported_build=yes
   if test "x$GCC" = "xyes" ; then
-    CFLAGS="$CFLAGS -g -O3 "
-    CXXFLAGS="$CXXFLAGS -g -O3 "
+    CFLAGS="$CFLAGS -g -O3 -funroll-loops "
+    CXXFLAGS="$CXXFLAGS -g -O3 -funroll-loops "
   fi
   AC_DEFINE(TR_STABLE_RELEASE, 1, [Define to 1 if this is a stable release of Transmission])
 else
@@ -45,37 +45,23 @@ CURL_MINIMUM=7.16.3
 GIO_MINIMUM=2.15.5
 GLIB_MINIMUM=2.6.0
 GTK_MINIMUM=2.6.0
+WX_MINIMUM=2.6.0
 LIBNOTIFY_MINIMUM=0.4.3
 DBUS_GLIB_MINIMUM=0.70
-LIBEVENT_MINIMUM=1.4.5
 AC_SUBST(OPENSSL_MINIMUM)
 AC_SUBST(CURL_MINIMUM)
 AC_SUBST(GIO_MINIMUM)
 AC_SUBST(GLIB_MINIMUM)
 AC_SUBST(GTK_MINIMUM)
+AC_SUBST(WX_MINIMUM)
 AC_SUBST(LIBNOTIFY_MINIMUM)
 AC_SUBST(DBUS_GLIB_MINIMUM)
-AC_SUBST(LIBEVENT_MINIUM)
 
 AC_PROG_CC
 AC_PROG_CXX
 AC_C_INLINE
 if test "x$GCC" = "xyes" ; then
-
-    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -W -Wpointer-arith -Wformat-security -Wcast-align -Wundef -Wcast-align -Wstrict-prototypes -Wmissing-declarations -Wmissing-format-attribute -Wredundant-decls -Wnested-externs -Wunused-parameter -Wwrite-strings"
-
-    dnl figure out gcc version
-    AC_MSG_CHECKING([gcc version])
-    GCC_VERSION=`$CC -dumpversion`
-    GCC_MAJOR=`echo $GCC_VERSION | cut -d . -f1`
-    GCC_MINOR=`echo $GCC_VERSION | cut -d . -f2`
-    GCC_VERSION_NUM=`(expr $GCC_MAJOR "*" 100 + $GCC_MINOR) 2>/dev/null`
-
-    AC_MSG_RESULT($GCC_VERSION)
-    if test $GCC_VERSION_NUM -ge 304; then
-        dnl these were added in 3.4
-        CFLAGS="$CFLAGS -Wextra -Wdeclaration-after-statement -Winit-self"
-    fi
+  CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -Wextra -Wredundant-decls -Wpointer-arith -Wformat-security -W -Wmissing-declarations -Wdeclaration-after-statement -Wcast-align -Winit-self -Wundef -Wnested-externs -Wmissing-format-attribute"
 fi
 
 AC_HEADER_STDC
@@ -87,7 +73,7 @@ AC_TRY_LINK([#include <linux/falloc.h>],
             [AC_DEFINE([HAVE_FALLOCATE],[1],[Defined if fallocate() exists])
              AC_MSG_RESULT([yes])],
             [AC_MSG_RESULT([no])])
-AC_CHECK_FUNCS([lrintf strlcpy daemon dirname basename daemon strcasecmp localtime_r posix_fallocate memmem])
+AC_CHECK_FUNCS([lrintf strlcpy daemon dirname basename daemon strcasecmp localtime_r posix_fallocate])
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
 ACX_PTHREAD
@@ -99,55 +85,6 @@ PKG_CHECK_MODULES(LIBCURL, [libcurl >= $CURL_MINIMUM])
 AC_PATH_ZLIB
 
 AC_SYS_LARGEFILE
-
-
-dnl ----------------------------------------------------------------------------
-dnl
-dnl posix_fadvise
-
-dnl can posix_fadvise be used
-AC_CHECK_DECLS(posix_fadvise, [], [], [
-#define _XOPEN_SOURCE 600
-#include <fcntl.h>])
-AC_CHECK_FUNCS([posix_fadvise])
-
-
-dnl ----------------------------------------------------------------------------
-dnl
-dnl file monitoring for the daemon
-
-AC_CHECK_HEADER([sys/inotify.h], 
-                [AC_CHECK_FUNC([inotify_init],[have_inotify="yes"],[have_inotify="no"])], 
-                [have_inotify="no"]) 
-AC_ARG_WITH([inotify], 
-            [AS_HELP_STRING([--with-inotify],[Enable inotify support (default=auto)])], 
-            [want_inotify=${enableval}], 
-            [want_inotify=${have_inotify}]) 
-if test "x$want_inotify" = "xyes" ; then 
-    if test "x$have_inotify" = "xyes"; then 
-      AC_DEFINE([WITH_INOTIFY],[1]) 
-    else 
-      AC_MSG_ERROR("inotify not found!") 
-    fi 
-fi 
- 
-AC_CHECK_HEADER([sys/event.h], 
-                [AC_CHECK_FUNC([kqueue],[have_kqueue="yes"],[have_kqueue="no"])], 
-                [have_kqueue="no"]) 
-AC_ARG_WITH([kqueue], 
-            [AS_HELP_STRING([--with-kqueue],[Enable kqueue support (default=auto)])], 
-            [want_kqueue=${enableval}], 
-            [want_kqueue=${have_kqueue}]) 
-if test "x$want_kqueue" = "xyes" ; then 
-    if test "x$have_kqueue" = "xyes"; then 
-      AC_DEFINE([WITH_KQUEUE],[1]) 
-    else 
-      AC_MSG_ERROR("kqueue not found!") 
-    fi 
-fi 
-
-AC_CHECK_HEADERS([xfs/xfs.h])
-
 
 dnl ----------------------------------------------------------------------------
 dnl
@@ -165,23 +102,14 @@ AC_TRY_LINK([#include <stdarg.h>], [va_list ap1, ap2; va_copy(ap1, ap2);],
     )
 ])
 
+dnl ----------------------------------------------------------------------------
+dnl
+dnl  libevent fun
 
-dnl build our copy of libevent whether we use it or not,
-dnl because "make dist" needs its Makefiles to exist, and
-dnl AM_CONDITIONAL + AC_CONFIG_SUBDIRS don't seem to play nice
 AC_CONFIG_SUBDIRS([third-party/libevent])
-
-AC_CHECK_HEADER([event-config.h],
-                [libevent_source=system
-                 LIBEVENT_CPPFLAGS=""
-                 LIBEVENT_LIBS="-levent -lrt"],
-                [libevent_source=bundled
-                 AC_MSG_NOTICE([couldn't find event-config.h, so using our own copy of libevent from third-party/libevent/.])
-                 AC_MSG_NOTICE([if you are cross-compiling this is probably NOT what you want.])
-                 LIBEVENT_CPPFLAGS="-I\$(top_srcdir)/third-party/libevent -I\$(top_builddir)/third-party/libevent"
-                 LIBEVENT_LIBS="\$(top_builddir)/third-party/libevent/libevent.la"])
+AC_MSG_NOTICE([invoking libevent's configure script])
+LIBEVENT_CPPFLAGS="-I\$(top_srcdir)/third-party/libevent"
 AC_SUBST(LIBEVENT_CPPFLAGS)
-AC_SUBST(LIBEVENT_LIBS)
 
 
 dnl ----------------------------------------------------------------------------
@@ -272,7 +200,7 @@ fi
 use_nls=no
 if test "x$enable_nls" = "xyes" ; then
     use_nls=yes
-    IT_PROG_INTLTOOL([0.35],[no-xml])
+    IT_PROG_INTLTOOL([0.40.0],[no-xml])
     AC_CHECK_HEADERS([libintl.h])
     GETTEXT_PACKAGE=transmission
     AC_SUBST(GETTEXT_PACKAGE)
@@ -281,6 +209,27 @@ if test "x$enable_nls" = "xyes" ; then
     transmissionlocaledir='${prefix}/${DATADIRNAME}/locale'
     AC_SUBST(transmissionlocaledir)
 fi
+
+dnl ----------------------------------------------------------------------------
+dnl
+dnl  wxWidgets detection for the wxWidgets client
+
+build_wx=no
+AC_ARG_ENABLE([wx],
+              AS_HELP_STRING([--enable-wx],[build wxWidgets client]),
+              [want_wx=${enableval}],
+              [want_wx=no])
+if test "x$want_wx" != "xno"; then
+    AM_OPTIONS_WXCONFIG
+    AM_PATH_WXCONFIG($WX_MINIMUM,[have_wx=yes],[have_wx=no])
+    if test "x$have_wx" = "xyes"; then
+        build_wx=yes
+    elif test "x$want_wx" = "xyes"; then 
+        AC_MSG_ERROR("wxWidgets not found!")
+    fi
+fi
+AM_CONDITIONAL([BUILD_WX],[test "x$build_wx" = "xyes"])
+
 
 
 dnl ----------------------------------------------------------------------------
@@ -364,8 +313,9 @@ AC_CONFIG_FILES([Makefile
                  third-party/Makefile
                  third-party/miniupnp/Makefile
                  third-party/libnatpmp/Makefile
-                 third-party/dht/Makefile
                  macosx/Makefile
+                 wx/Makefile
+                 wx/images/Makefile
                  gtk/Makefile
                  gtk/icons/Makefile
                  po/Makefile.in])
@@ -377,16 +327,15 @@ echo "
 
 Configuration:
 
-        Source code location:          ${srcdir}
-        Compiler:                      ${CXX}
-        System or bundled libevent:    ${libevent_source}
-
-        Build OS X client:             ${build_mac}
-        Build GTK+ client:             ${build_gtk}
-          ... with gio support:        ${use_gio}
-          ... with dbus-glib support:  ${use_dbus_glib}
-          ... with libnotify support:  ${use_libnotify}
-        Build Command-Line client:     ${build_cli}
-        Build Daemon:                  ${build_daemon}
+        Source code location:       ${srcdir}
+        Compiler:                   ${CXX}
+        Build Command-Line client:  ${build_cli}
+        Build Daemon:               ${build_daemon}
+        Build GTK+ client:          ${build_gtk}
+          ... gio support:          ${use_gio}
+          ... dbus-glib support:    ${use_dbus_glib}
+          ... libnotify support:    ${use_libnotify}
+        Build OS X client:          ${build_mac}
+        Build wxWidgets client:     ${build_wx}
 
 "

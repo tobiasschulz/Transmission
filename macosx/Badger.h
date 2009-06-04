@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2006-2009 Transmission authors and contributors
+ * Copyright (c) 2006-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -30,6 +30,12 @@
     tr_session * fLib;
     
     NSUInteger fCompleted;
+    
+    //tiger-only fields
+    NSImage * fDockIcon, * fBadge;
+    NSDictionary * fAttributes;
+    NSUInteger fCompletedBadged;
+    BOOL fSpeedBadge, fQuittingTiger;
 }
 
 - (id) initWithLib: (tr_session *) lib;

@@ -17,7 +17,7 @@
 #include <stdlib.h> /* strtol */
 #include <string.h>
 
-#include <event.h> /* evbuffer */
+#include <libevent/event.h> /* evbuffer */
 
 #include "transmission.h"
 #include "clients.h"
@@ -171,7 +171,18 @@ tr_clientForId( char * buf, size_t buflen, const void * id_in )
     /* Azureus-style */
     if( id[0] == '-' && id[7] == '-' )
     {
-        if( !memcmp( id+1, "TR", 2 ) )
+        if( !memcmp( id+1, "UT", 2 ) )
+        {
+            tr_snprintf( buf, buflen, "\xc2\xb5Torrent %d.%d.%d%s",
+                         strint(id+3,1), strint(id+4,1), strint(id+5,1), getMnemonicEnd(id[6]) );
+        }
+        if( !memcmp( id+1, "UM", 2 ) )
+        {
+            tr_snprintf( buf, buflen, "\xc2\xb5Torrent Mac %d.%d.%d%s",
+                         strint(id+3,1), strint(id+4,1), strint(id+5,1), getMnemonicEnd(id[6]) );
+        }
+
+        else if( !memcmp( id+1, "TR", 2 ) )
         {
             if( !memcmp( id+3, "000", 3 ) ) /* very old client style: -TR0006- is 0.6 */
                 tr_snprintf( buf, buflen, "Transmission 0.%c", id[6] );
@@ -180,17 +191,6 @@ tr_clientForId( char * buf, size_t buflen, const void * id_in )
             else /* current client style: -TR111Z- is 1.11+ */
                 tr_snprintf( buf, buflen, "Transmission %d.%02d%s", strint(id+3,1), strint(id+4,2),
                           id[6]=='Z' || id[6]=='X' ? "+" : "" );
-        }
-        
-        else if( !memcmp( id+1, "UT", 2 ) )
-        {
-            tr_snprintf( buf, buflen, "\xc2\xb5Torrent %d.%d.%d%s",
-                         strint(id+3,1), strint(id+4,1), strint(id+5,1), getMnemonicEnd(id[6]) );
-        }
-        else if( !memcmp( id+1, "UM", 2 ) )
-        {
-            tr_snprintf( buf, buflen, "\xc2\xb5Torrent Mac %d.%d.%d%s",
-                         strint(id+3,1), strint(id+4,1), strint(id+5,1), getMnemonicEnd(id[6]) );
         }
         
         else if( !memcmp( id+1, "AZ", 2 ) )
@@ -240,7 +240,6 @@ tr_clientForId( char * buf, size_t buflen, const void * id_in )
         else if( !memcmp( id+1, "QD", 2 ) ) four_digits( buf, buflen, "QQDownload", id+3 );
         else if( !memcmp( id+1, "RS", 2 ) ) four_digits( buf, buflen, "Rufus", id+3 );
         else if( !memcmp( id+1, "RT", 2 ) ) four_digits( buf, buflen, "Retriever", id+3 );
-        else if( !memcmp( id+1, "RZ", 2 ) ) four_digits( buf, buflen, "RezTorrent", id+3 );
         else if( !memcmp( id+1, "SD", 2 ) ) four_digits( buf, buflen, "Xunlei", id+3 );
         else if( !memcmp( id+1, "SS", 2 ) ) four_digits( buf, buflen, "SwarmScope", id+3 );
         else if( !memcmp( id+1, "SZ", 2 ) ) four_digits( buf, buflen, "Shareaza", id+3 );
@@ -412,17 +411,16 @@ tr_clientForId( char * buf, size_t buflen, const void * id_in )
     /* No match */
     if( !*buf )
     {
-        char out[32], *walk=out;
+        struct evbuffer * out = tr_getBuffer( );
         const char *in, *in_end;
         for( in=(const char*)id, in_end=in+8; in!=in_end; ++in ) {
             if( isprint( *in ) )
-                *walk++ = *in;
-            else {
-                tr_snprintf( walk, out+sizeof(out)-walk, "%%%02X", (unsigned int)*in );
-                walk += 3;
-            }
+                evbuffer_add_printf( out, "%c", *in );
+            else
+                evbuffer_add_printf( out, "%%%02X", (unsigned int)*in );
         }
-        *walk = '\0';
-        tr_strlcpy( buf, out, buflen );
+
+        tr_strlcpy( buf, EVBUFFER_DATA( out ), buflen );
+        tr_releaseBuffer( out );
     }
 }

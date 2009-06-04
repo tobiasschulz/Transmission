@@ -26,12 +26,6 @@
 **/
 
 struct evbuffer;
-
-/**
- * @addtogroup utils Utilities
- * @{ 
- */
-
 typedef struct tr_crypto tr_crypto;
 
 /**
@@ -100,11 +94,5 @@ int            tr_cryptoWeakRandInt( int n );
 /** Fills a buffer with random bytes */
 void           tr_cryptoRandBuf( unsigned char *buf,
                                  size_t         len );
-
-char*          tr_ssha1( const void * plaintext );
-
-tr_bool        tr_ssha1_matches( const char * source, const char * pass );
-
-/* @} */
 
 #endif

@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2005-2009 Transmission authors and contributors
+ * Copyright (c) 2005-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -45,8 +45,7 @@
     NSInteger fMouseControlRow, fMouseRevealRow, fMouseActionRow, fActionPushedRow;
     NSArray * fSelectedValues;
     
-    IBOutlet NSMenu * fActionMenu, * fUploadMenu, * fDownloadMenu, * fRatioMenu, * fPriorityMenu;
-    IBOutlet NSMenuItem * fGlobalLimitItem;
+    IBOutlet NSMenu * fActionMenu, * fUploadMenu, * fDownloadMenu, * fRatioMenu;
     Torrent * fMenuTorrent;
     
     CGFloat fPiecesBarPercent;
@@ -77,12 +76,9 @@
 
 - (void) setQuickLimitMode: (id) sender;
 - (void) setQuickLimit: (id) sender;
-- (void) setGlobalLimit: (id) sender;
 
 - (void) setQuickRatioMode: (id) sender;
 - (void) setQuickRatio: (id) sender;
-
-- (void) setPriority: (id) sender;
 
 - (void) checkFile: (id) sender;
 - (void) moveDataFile: (id) sender;

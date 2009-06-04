@@ -311,8 +311,6 @@ tr_cryptoRandInt( int upperBound )
     int noise;
     int val;
 
-    assert( upperBound > 0 );
-
     if( RAND_pseudo_bytes ( (unsigned char *) &noise, sizeof noise ) >= 0 )
     {
         val = abs( noise ) % upperBound;
@@ -330,22 +328,17 @@ tr_cryptoRandInt( int upperBound )
 int
 tr_cryptoWeakRandInt( int upperBound )
 {
-    int val;
-    static tr_bool init = FALSE;
+    static int init = 0;
 
     assert( upperBound > 0 );
 
     if( !init )
     {
         srand( tr_date( ) );
-        init = TRUE;
+        init = 1;
     }
 
-    
-    val = rand( ) % upperBound;
-    assert( val >= 0 );
-    assert( val < upperBound );
-    return val;
+    return rand( ) % upperBound;
 }
 
 void
@@ -356,64 +349,3 @@ tr_cryptoRandBuf( unsigned char *buf,
         logErrorFromSSL( );
 }
 
-/***
-****
-***/
-
-char*
-tr_ssha1( const void * plaintext )
-{
-    static const char * salter = "0123456789"
-                                 "abcdefghijklmnopqrstuvwxyz"
-                                 "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
-                                 "./";
-    static const size_t salter_len = 64;
-    static const size_t saltval_len = 8;
-
-    size_t i;
-    char salt[saltval_len];
-    uint8_t sha[SHA_DIGEST_LENGTH];
-    char buf[2*SHA_DIGEST_LENGTH + saltval_len + 2];
-
-    for( i=0; i<saltval_len; ++i )
-        salt[i] = salter[ tr_cryptoRandInt( salter_len ) ];
-
-    tr_sha1( sha, plaintext, strlen( plaintext ), salt, saltval_len, NULL );
-    tr_sha1_to_hex( &buf[1], sha );
-    memcpy( &buf[1+2*SHA_DIGEST_LENGTH], &salt, saltval_len );
-    buf[1+2*SHA_DIGEST_LENGTH + saltval_len] = '\0';
-    buf[0] = '{'; /* signal that this is a hash. this makes saving/restoring
-                     easier */
-
-    return tr_strdup( &buf );
-}
-
-tr_bool
-tr_ssha1_matches( const char * source, const char * pass )
-{
-    char * salt;
-    size_t saltlen;
-    char * hashed;
-    uint8_t buf[SHA_DIGEST_LENGTH];
-    tr_bool result;
-
-    /* extract the salt */
-    saltlen = strlen( source ) - 2*SHA_DIGEST_LENGTH-1;
-    salt = tr_malloc( saltlen );
-    memcpy( salt, source + 2*SHA_DIGEST_LENGTH+1, saltlen );
-
-    /* hash pass + salt */
-    hashed = tr_malloc( 2*SHA_DIGEST_LENGTH + saltlen + 2 );
-    tr_sha1( buf, pass, strlen( pass ), salt, saltlen, NULL );
-    tr_sha1_to_hex( &hashed[1], buf );
-    memcpy( hashed + 1+2*SHA_DIGEST_LENGTH, salt, saltlen );
-    hashed[1+2*SHA_DIGEST_LENGTH + saltlen] = '\0';
-    hashed[0] = '{';
-
-    result = strcmp( source, hashed ) == 0 ? TRUE : FALSE;
-
-    tr_free( hashed );
-    tr_free( salt );
-    
-    return result;
-}

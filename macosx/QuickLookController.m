@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  * 
- * Copyright (c) 2008-2009 Transmission authors and contributors
+ * Copyright (c) 2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -144,7 +144,7 @@ QuickLookController * fQuickLookInstance = nil;
         fMainController = controller;
         fInfoController = infoController;
         
-        //load the QuickLook framework and set the delegate
+        //load the QuickLook framework and set the delegate, no point on trying this on Tiger
         //animation types: 0 = none; 1 = fade; 2 = zoom
         fQuickLookAvailable = [[NSBundle bundleWithPath: @"/System/Library/PrivateFrameworks/QuickLookUI.framework"] load];
         if (fQuickLookAvailable)

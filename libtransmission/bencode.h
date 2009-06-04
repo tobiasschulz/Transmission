@@ -13,87 +13,76 @@
 #ifndef TR_BENCODE_H
 #define TR_BENCODE_H 1
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
 #include <inttypes.h> /* for int64_t */
 
 struct evbuffer;
 
-/**
- * @addtogroup tr_benc Variant
- *
- * An object that acts like a union for
- * integers, strings, lists, dictionaries, booleans, and floating-point numbers.
- * The structure is named tr_benc due to the historical reason that it was 
- * originally tightly coupled with bencoded data.  It currently supports
- * being parsed from, and serialized to, both bencoded notation and json notation.
- *
- * @{
- */
-
-/* these are PRIVATE IMPLEMENTATION details that should not be touched.
- * I'll probably change them just to break your code! HA HA HA!
- * it's included in the header for inlining and composition */
 enum
 {
-    TR_TYPE_INT  = 1,
-    TR_TYPE_STR  = 2,
-    TR_TYPE_LIST = 4,
-    TR_TYPE_DICT = 8,
-    TR_TYPE_BOOL = 16,
-    TR_TYPE_REAL = 32
+    TYPE_INT  = 1,
+    TYPE_STR  = 2,
+    TYPE_LIST = 4,
+    TYPE_DICT = 8
 };
-   
-/* These are PRIVATE IMPLEMENTATION details that should not be touched.
- * I'll probably change them just to break your code! HA HA HA!
- * it's included in the header for inlining and composition */
+
 typedef struct tr_benc
 {
+    char    type;
     union
     {
-        uint8_t b; /* bool type */
-
-        double d;  /* double type */
-
-        int64_t i; /* int type */
-
-        struct /* string type */
+        int64_t i;
+        struct
         {
-            size_t len; /* the string length */
-            union {
-                char buf[16]; /* local buffer for short strings */
-                char * ptr; /* alloc'ed pointer for long strings */
-            } str;
+            size_t i;
+            char * s;
         } s;
-
-        struct /* list & dict types */
+        struct
         {
-            struct tr_benc * vals; /* nodes */
-            size_t alloc; /* nodes allocated */
-            size_t count; /* nodes used */
+            size_t alloc;
+            size_t count;
+            struct tr_benc * vals;
         } l;
     } val;
-
-    char type;
 } tr_benc;
+
+#ifdef __cplusplus
+extern "C" {
+#endif
 
 /***
 ****
 ***/
 
-int       tr_bencParse( const void     * buf,
-                        const void     * bufend,
-                        tr_benc        * setme_benc,
+int       tr_bencParse( const void *     buf,
+                        const void *     bufend,
+                        tr_benc *        setme_benc,
                         const uint8_t ** setme_end );
 
-int       tr_bencLoad( const void   * buf,
-                       size_t         buflen,
-                       tr_benc      * setme_benc,
-                       char        ** setme_end );
+int       tr_bencLoad( const void * buf,
+                       size_t       buflen,
+                       tr_benc *    setme_benc,
+                       char **      setme_end );
+
+int       tr_bencLoadFile( const char * filename,
+                                        tr_benc * );
+
+int       tr_bencLoadJSONFile( const char * filename,
+                                            tr_benc * );
+
+#if 0
+void      tr_bencPrint( const tr_benc * );
+
+#endif
 
 void      tr_bencFree( tr_benc * );
+
+char*     tr_bencSave( const tr_benc * val, int * len );
+
+char*     tr_bencSaveAsJSON( const tr_benc * top, struct evbuffer * out );
+
+int       tr_bencSaveFile( const char * filename, const tr_benc * );
+
+int       tr_bencSaveJSONFile( const char * filename, const tr_benc * );
 
 void      tr_bencInitStr( tr_benc *, const void * str, int str_len );
 
@@ -105,36 +94,11 @@ int       tr_bencInitDict( tr_benc *, size_t reserveCount );
 
 int       tr_bencInitList( tr_benc *, size_t reserveCount );
 
-void      tr_bencInitBool( tr_benc *, int value );
-
-void      tr_bencInitReal( tr_benc *, double value );
-
-/***
-****  Serialization / Deserialization
-***/
-
-typedef enum
-{
-    TR_FMT_BENC,
-    TR_FMT_JSON,
-    TR_FMT_JSON_LEAN /* saves bandwidth by omitting all whitespace. */
-}
-tr_fmt_mode;
-
-int tr_bencToFile( const tr_benc *, tr_fmt_mode, const char * filename );
-
-char* tr_bencToStr( const tr_benc *, tr_fmt_mode, int * len );
-
-void tr_bencToBuf( const tr_benc *, tr_fmt_mode, struct evbuffer * );
-
-/* TR_FMT_JSON_LEAN and TR_FMT_JSON are equivalent in this function. */
-int tr_bencLoadFile( tr_benc * setme, tr_fmt_mode, const char * filename );
-
 /***
 ****
 ***/
 
-int tr_bencListReserve( tr_benc *, size_t reserveCount );
+int       tr_bencListReserve( tr_benc *, size_t reserveCount );
 
 tr_benc * tr_bencListAdd( tr_benc * );
 
@@ -160,11 +124,9 @@ int       tr_bencDictRemove( tr_benc *, const char * key );
 
 tr_benc * tr_bencDictAdd( tr_benc *, const char * key );
 
-tr_benc * tr_bencDictAddReal( tr_benc *, const char * key, double );
+tr_benc * tr_bencDictAddDouble( tr_benc *, const char * key, double );
 
 tr_benc * tr_bencDictAddInt( tr_benc *, const char * key, int64_t );
-
-tr_benc * tr_bencDictAddBool( tr_benc *, const char * key, tr_bool );
 
 tr_benc * tr_bencDictAddStr( tr_benc *, const char * key, const char * );
 
@@ -175,8 +137,6 @@ tr_benc * tr_bencDictAddDict( tr_benc *, const char * key, size_t reserve );
 tr_benc * tr_bencDictAddRaw( tr_benc *, const char * key,
                              const void * raw, size_t rawlen );
 
-tr_bool   tr_bencDictChild( tr_benc *, size_t i, const char ** key, tr_benc ** val );
-
 tr_benc*  tr_bencDictFind( tr_benc *, const char * key );
 
 tr_bool   tr_bencDictFindList( tr_benc *, const char * key, tr_benc ** setme );
@@ -185,9 +145,7 @@ tr_bool   tr_bencDictFindDict( tr_benc *, const char * key, tr_benc ** setme );
 
 tr_bool   tr_bencDictFindInt( tr_benc *, const char * key, int64_t * setme );
 
-tr_bool   tr_bencDictFindReal( tr_benc *, const char * key, double * setme );
-
-tr_bool   tr_bencDictFindBool( tr_benc *, const char * key, tr_bool * setme );
+tr_bool   tr_bencDictFindDouble( tr_benc *, const char * key, double * setme );
 
 tr_bool   tr_bencDictFindStr( tr_benc *, const char * key, const char ** setme );
 
@@ -199,17 +157,14 @@ tr_bool   tr_bencDictFindRaw( tr_benc *, const char * key,
 ***/
 
 tr_bool   tr_bencGetInt( const tr_benc * val, int64_t * setme );
+
 tr_bool   tr_bencGetStr( const tr_benc * val, const char ** setme );
-tr_bool   tr_bencGetBool( const tr_benc * val, tr_bool * setme );
-tr_bool   tr_bencGetReal( const tr_benc * val, double * setme );
 
 static TR_INLINE tr_bool tr_bencIsType  ( const tr_benc * b, int type ) { return ( b != NULL ) && ( b->type == type ); }
-static TR_INLINE tr_bool tr_bencIsInt   ( const tr_benc * b ) { return tr_bencIsType( b, TR_TYPE_INT ); }
-static TR_INLINE tr_bool tr_bencIsDict  ( const tr_benc * b ) { return tr_bencIsType( b, TR_TYPE_DICT ); }
-static TR_INLINE tr_bool tr_bencIsList  ( const tr_benc * b ) { return tr_bencIsType( b, TR_TYPE_LIST ); }
-static TR_INLINE tr_bool tr_bencIsString( const tr_benc * b ) { return tr_bencIsType( b, TR_TYPE_STR ); }
-static TR_INLINE tr_bool tr_bencIsBool  ( const tr_benc * b ) { return tr_bencIsType( b, TR_TYPE_BOOL ); }
-static TR_INLINE tr_bool tr_bencIsReal  ( const tr_benc * b ) { return tr_bencIsType( b, TR_TYPE_REAL ); }
+static TR_INLINE tr_bool tr_bencIsInt   ( const tr_benc * b ) { return tr_bencIsType( b, TYPE_INT ); }
+static TR_INLINE tr_bool tr_bencIsDict  ( const tr_benc * b ) { return tr_bencIsType( b, TYPE_DICT ); }
+static TR_INLINE tr_bool tr_bencIsList  ( const tr_benc * b ) { return tr_bencIsType( b, TYPE_LIST ); }
+static TR_INLINE tr_bool tr_bencIsString( const tr_benc * b ) { return tr_bencIsType( b, TYPE_STR ); }
 
 /**
 ***  Treat these as private -- they're only made public here
@@ -231,10 +186,7 @@ int tr_bencParseStr( const uint8_t *  buf,
 ***
 **/
 
-/* this is only quasi-supported.  don't rely on it too heavily outside of libT */
 void  tr_bencMergeDicts( tr_benc * target, const tr_benc * source );
-
-/* @} */
 
 #ifdef __cplusplus
 }

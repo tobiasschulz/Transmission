@@ -49,7 +49,6 @@ libtransmission_a_SOURCES = \
     torrent-ctor.c \
     tr-getopt.c \
     tracker.c \
-    tr-dht.c \
     trevent.c \
     upnp.c \
     utils.c \
@@ -97,12 +96,10 @@ noinst_HEADERS = \
     tracker.h \
     tr-getopt.h \
     transmission.h \
-    tr-dht.h \
     trevent.h \
     upnp.h \
     utils.h \
     verify.h \
-    version.h \
     web.h \
     webseed.h
 
@@ -126,9 +123,8 @@ apps_ldadd = \
     ./libtransmission.a  \
     $(top_builddir)/third-party/miniupnp/libminiupnp.a \
     $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
-    $(top_builddir)/third-party/dht/libdht.a \
+    $(top_builddir)/third-party/libevent/libevent.la \
     $(INTLLIBS) \
-    $(LIBEVENT_LIBS) \
     $(LIBCURL_LIBS) \
     $(OPENSSL_LIBS) \
     $(PTHREAD_LIBS) \
@@ -170,3 +166,22 @@ peer_msgs_test_LDFLAGS = ${apps_ldflags}
 utils_test_SOURCES = utils-test.c
 utils_test_LDADD = ${apps_ldadd}
 utils_test_LDFLAGS = ${apps_ldflags}
+
+
+
+clean-local:
+	if test -d .svn; then if test -e version.h; then rm version.h; fi; fi;
+
+EXTRA_libtransmission_a_SOURCES = \
+    version.h
+
+BUILT_SOURCES = \
+    version.h
+
+version.h:
+	echo '#define PEERID_PREFIX         "'@PEERID_PREFIX@'"' > version.h
+	echo '#define USERAGENT_PREFIX      "'@USERAGENT_PREFIX@'"' >> version.h
+	echo '#define SVN_REVISION          "'`svn info | grep "Revision" | awk -F': ' '{print $$2}'`'"' >> version.h
+	echo '#define SVN_REVISION_NUM      '`svn info | grep "Revision" | awk -F': ' '{print $$2}'`'' >> version.h
+	echo '#define SHORT_VERSION_STRING  "'@USERAGENT_PREFIX@'"' >> version.h
+	echo '#define LONG_VERSION_STRING   "'@USERAGENT_PREFIX@' ('`svn info | grep "Revision" | awk -F': ' '{print $$2}'`')"' >> version.h

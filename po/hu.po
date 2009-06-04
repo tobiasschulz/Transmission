@@ -8,184 +8,184 @@ msgid ""
 msgstr ""
 "Project-Id-Version: transmission\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2009-05-28 18:17-0500\n"
-"PO-Revision-Date: 2009-04-30 21:52+0000\n"
+"POT-Creation-Date: 2009-02-23 17:50-0600\n"
+"PO-Revision-Date: 2009-04-03 10:03+0000\n"
 "Last-Translator: Gabor Kelemen <kelemeng@gnome.hu>\n"
 "Language-Team: <hu@li.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Launchpad-Export-Date: 2009-06-04 20:20+0000\n"
+"X-Launchpad-Export-Date: 2009-04-13 01:48+0000\n"
 "X-Generator: Launchpad (build Unknown)\n"
 
-#: ../gtk/actions.c:49
+#: ../gtk/actions.c:47
 msgid "Sort by _Activity"
 msgstr "_Aktivitás szerinti rendezés"
 
-#: ../gtk/actions.c:50
+#: ../gtk/actions.c:49
 msgid "Sort by _Name"
 msgstr "_Név szerinti rendezés"
 
 #: ../gtk/actions.c:51
 msgid "Sort by _Progress"
-msgstr "Előre_haladás szerinti rendezés"
-
-#: ../gtk/actions.c:52
-msgid "Sort by _Ratio"
-msgstr "Meg_osztási arány szerinti rendezés"
+msgstr "_Előrehaladás szerinti rendezés"
 
 #: ../gtk/actions.c:53
+msgid "Sort by _Ratio"
+msgstr "Megosztási _arány szerinti rendezés"
+
+#: ../gtk/actions.c:55
 msgid "Sort by _State"
 msgstr "Álla_pot szerinti rendezés"
 
-#: ../gtk/actions.c:54
+#: ../gtk/actions.c:57
 msgid "Sort by _Tracker"
 msgstr "Köve_tő szerinti rendezés"
 
-#: ../gtk/actions.c:55
+#: ../gtk/actions.c:59
 msgid "Sort by A_ge"
 msgstr "_Kor szerinti rendezés"
 
-#: ../gtk/actions.c:74
+#: ../gtk/actions.c:78
 msgid "_Main Window"
 msgstr "_Főablak megjelenítése"
 
-#: ../gtk/actions.c:75
+#: ../gtk/actions.c:80
 msgid "Message _Log"
-msgstr "Ü_zenetnapló"
+msgstr "Üzenetnapló"
 
-#: ../gtk/actions.c:91
+#: ../gtk/actions.c:96
 msgid "_Minimal View"
 msgstr "_Minimalizált nézet"
 
-#: ../gtk/actions.c:92
+#: ../gtk/actions.c:99
 msgid "_Reverse Sort Order"
 msgstr "Fo_rdított rendezés"
 
-#: ../gtk/actions.c:93
+#: ../gtk/actions.c:102
 msgid "_Filterbar"
 msgstr "_Szűrősor"
 
-#: ../gtk/actions.c:94
+#: ../gtk/actions.c:104
 msgid "_Statusbar"
 msgstr "Á_llapotsor"
 
-#: ../gtk/actions.c:95
+#: ../gtk/actions.c:106
 msgid "_Toolbar"
 msgstr "_Eszköztár"
 
-#: ../gtk/actions.c:100
+#: ../gtk/actions.c:111
 msgid "_Torrent"
 msgstr "_Torrent"
 
-#: ../gtk/actions.c:101
+#: ../gtk/actions.c:112
 msgid "_View"
-msgstr "_Nézet"
+msgstr "Né_zet"
 
-#: ../gtk/actions.c:102
+#: ../gtk/actions.c:113
 msgid "_Sort Torrents By"
 msgstr "T_orrentek rendezése:"
 
-#: ../gtk/actions.c:103
+#: ../gtk/actions.c:114
 msgid "_Edit"
-msgstr "S_zerkesztés"
+msgstr "Sz_erkesztés"
 
-#: ../gtk/actions.c:104
+#: ../gtk/actions.c:115
 msgid "_Help"
 msgstr "_Súgó"
 
-#: ../gtk/actions.c:105 ../gtk/actions.c:106
+#: ../gtk/actions.c:116 ../gtk/actions.c:117
 msgid "Add a torrent"
 msgstr "Torrent hozzáadása"
 
-#: ../gtk/actions.c:106
+#: ../gtk/actions.c:117
 msgid "_Add..."
 msgstr "Hozzá_adás..."
 
-#: ../gtk/actions.c:107
+#: ../gtk/actions.c:118
 msgid "_Start"
 msgstr "_Indítás"
 
-#: ../gtk/actions.c:107
+#: ../gtk/actions.c:118
 msgid "Start torrent"
 msgstr "Torrent indítása"
 
-#: ../gtk/actions.c:108
+#: ../gtk/actions.c:119
 msgid "_Statistics"
 msgstr "_Statisztikák"
 
-#: ../gtk/actions.c:109 ../gtk/add-dialog.c:364
+#: ../gtk/actions.c:120 ../gtk/add-dialog.c:364
 msgid "_Verify Local Data"
 msgstr "_Helyi adatok ellenőrzése"
 
-#: ../gtk/actions.c:110
+#: ../gtk/actions.c:121
 msgid "_Pause"
 msgstr "_Felfüggesztés"
 
-#: ../gtk/actions.c:110
+#: ../gtk/actions.c:121
 msgid "Pause torrent"
 msgstr "Torrent megállítása"
 
-#: ../gtk/actions.c:111
+#: ../gtk/actions.c:122
 msgid "_Pause All"
-msgstr "Összes felfügge_sztése"
+msgstr "Összes f_elfüggesztése"
 
-#: ../gtk/actions.c:111
+#: ../gtk/actions.c:122
 msgid "Pause all torrents"
 msgstr "Minden torrent felfüggesztése"
 
-#: ../gtk/actions.c:112
+#: ../gtk/actions.c:123
 msgid "_Start All"
-msgstr "Összes in_dítása"
+msgstr "Összes i_ndítása"
 
-#: ../gtk/actions.c:112
+#: ../gtk/actions.c:123
 msgid "Start all torrents"
 msgstr "Minden torrent elindítása"
 
-#: ../gtk/actions.c:114
+#: ../gtk/actions.c:124
 msgid "Remove torrent"
 msgstr "Torrent eltávolítása"
 
-#: ../gtk/actions.c:115
+#: ../gtk/actions.c:125
 msgid "_Delete Files and Remove"
-msgstr "Fájlok törlése és eltáv_olítás"
+msgstr "_Fájlok törlése és eltávolítása"
 
-#: ../gtk/actions.c:116
+#: ../gtk/actions.c:126
 msgid "_New..."
 msgstr "Ú_j..."
 
-#: ../gtk/actions.c:116
+#: ../gtk/actions.c:126
 msgid "Create a torrent"
 msgstr "Új torrent létrehozása"
 
-#: ../gtk/actions.c:117
+#: ../gtk/actions.c:127
 msgid "_Quit"
 msgstr "_Kilépés"
 
-#: ../gtk/actions.c:118
+#: ../gtk/actions.c:128
 msgid "Select _All"
 msgstr "Összes _kijelölése"
 
-#: ../gtk/actions.c:119
+#: ../gtk/actions.c:129
 msgid "Dese_lect All"
 msgstr "Kije_lölések megszüntetése"
 
-#: ../gtk/actions.c:121
+#: ../gtk/actions.c:131
 msgid "Torrent properties"
 msgstr "Torrent tulajdonságai"
 
-#: ../gtk/actions.c:122
+#: ../gtk/actions.c:132
 msgid "_Open Folder"
 msgstr "Kö_nyvtár megnyitása"
 
-#: ../gtk/actions.c:124
+#: ../gtk/actions.c:134
 msgid "_Contents"
-msgstr "_Tartalom"
+msgstr "_Tartalmak"
 
-#: ../gtk/actions.c:125
+#: ../gtk/actions.c:135
 msgid "Ask Tracker for _More Peers"
-msgstr "Több partner kérése a kö_vetőtől"
+msgstr "_Több partner kérése a követőtől"
 
 #: ../gtk/add-dialog.c:241
 msgid "Torrent files"
@@ -203,7 +203,7 @@ msgstr "Torrentbeállítások"
 msgid "_Move source file to Trash"
 msgstr "_Forrásfájl áthelyezése a kukába"
 
-#: ../gtk/add-dialog.c:300 ../gtk/tr-prefs.c:297
+#: ../gtk/add-dialog.c:300 ../gtk/tr-prefs.c:316
 msgid "_Start when added"
 msgstr "_Elindítás hozzáadáskor"
 
@@ -215,7 +215,7 @@ msgstr "_Torrent fájl:"
 msgid "Select Source File"
 msgstr "Válasszon forrásfájlt"
 
-#: ../gtk/add-dialog.c:332 ../gtk/tr-prefs.c:306
+#: ../gtk/add-dialog.c:332 ../gtk/tr-prefs.c:325
 msgid "_Destination folder:"
 msgstr "_Célmappa:"
 
@@ -227,137 +227,146 @@ msgstr "Válasszon célmappát"
 msgid "Add a Torrent"
 msgstr "Torrent hozzáadása"
 
-#: ../gtk/add-dialog.c:454 ../gtk/tr-prefs.c:293
+#: ../gtk/add-dialog.c:454 ../gtk/tr-prefs.c:312
 msgid "Display _options dialog"
-msgstr "Beállítások _ablak megjelenítése"
+msgstr "_Beállítások párbeszédablak megjelenítése"
 
-#: ../gtk/conf.c:64 ../gtk/makemeta-ui.c:142 ../libtransmission/fdlimit.c:307
-#: ../libtransmission/metainfo.c:99 ../libtransmission/utils.c:596
-#: ../libtransmission/utils.c:607
+#: ../gtk/blocklist.c:90
+msgid "Retrieving blocklist..."
+msgstr "Blokkolási lista lekérése..."
+
+#: ../gtk/blocklist.c:100
+#, c-format
+msgid "Unable to get blocklist: %s"
+msgstr "Nem lehet lekérni a blokkolási listát: %s"
+
+#: ../gtk/blocklist.c:126
+msgid "Unable to get blocklist."
+msgstr "Nem lehet lekérni a blokkolási listát."
+
+#: ../gtk/blocklist.c:132
+msgid "Uncompressing blocklist..."
+msgstr "Blokkolási lista kibontása..."
+
+#: ../gtk/blocklist.c:142
+msgid "Parsing blocklist..."
+msgstr "Blokkolási lista elemzése..."
+
+#: ../gtk/blocklist.c:149
+#, c-format
+msgid "Blocklist updated with %'d entries"
+msgstr "A blokkolási lista %'d bejegyzéssel frissült"
+
+#: ../gtk/conf.c:63 ../gtk/makemeta-ui.c:142 ../libtransmission/fdlimit.c:228
+#: ../libtransmission/metainfo.c:98 ../libtransmission/utils.c:589
+#: ../libtransmission/utils.c:600
 #, c-format
 msgid "Couldn't create \"%1$s\": %2$s"
 msgstr "„%1$s” nem hozható létre: %2$s"
 
-#: ../gtk/conf.c:89 ../libtransmission/bencode.c:1540
-#: ../libtransmission/fdlimit.c:336
+#: ../gtk/conf.c:88 ../libtransmission/bencode.c:1427
+#: ../libtransmission/fdlimit.c:257
 #, c-format
 msgid "Couldn't open \"%1$s\": %2$s"
 msgstr "„%1$s” nem nyitható meg: %2$s"
 
-#: ../gtk/conf.c:94
+#: ../gtk/conf.c:93
 #, c-format
 msgid "%s is already running."
 msgstr "A(z) %s már fut."
 
-#: ../gtk/details.c:497 ../gtk/file-list.c:654
-msgid "Low"
-msgstr "Alacsony"
+#: ../gtk/details.c:274
+msgid "Web Seeds"
+msgstr "Webes források"
 
-#: ../gtk/details.c:498 ../gtk/file-list.c:650
-msgid "Normal"
-msgstr "Közepes"
+#. 'download speed' column header. terse to keep the column narrow.
+#: ../gtk/details.c:276 ../gtk/details.c:318
+msgid "Down"
+msgstr "Le"
 
-#: ../gtk/details.c:499 ../gtk/file-list.c:646
-msgid "High"
-msgstr "Magas"
+#: ../gtk/details.c:316
+msgid "Address"
+msgstr "Cím"
 
-#: ../gtk/details.c:542 ../gtk/tr-prefs.c:1181
-msgid "Limit _download speed (KB/s):"
-msgstr "_Letöltési sebesség korlátozása (KB/s):"
+#. 'upload speed' column header.  terse to keep the column narrow.
+#: ../gtk/details.c:320
+msgid "Up"
+msgstr "Fel"
 
-#: ../gtk/details.c:554 ../gtk/tr-prefs.c:1188
-msgid "Limit _upload speed (KB/s):"
-msgstr "_Feltöltési sebesség korlátozása (KB/s):"
+#: ../gtk/details.c:321
+msgid "Client"
+msgstr "Kliens"
 
-#: ../gtk/details.c:610
-msgid "Peer Connections"
-msgstr "Partnerkapcsolatok"
+#. 'percent done' column header. terse to keep the column narrow.
+#: ../gtk/details.c:323
+msgid "%"
+msgstr "%"
 
-#: ../gtk/details.c:613
-msgid "_Maximum peers:"
-msgstr "_Partnerszám maximum:"
+#: ../gtk/details.c:325
+msgid "Status"
+msgstr "Állapot"
 
-#: ../gtk/details.c:632 ../gtk/torrent-cell-renderer.c:173
-msgid "Waiting to verify local data"
-msgstr "Várakozás helyi adatok ellenőrzésére"
+#: ../gtk/details.c:619
+msgid "Optimistic unchoke"
+msgstr "Optimista engedélyezés"
 
-#: ../gtk/details.c:634
-msgid "Downloading"
-msgstr "Letöltés"
+#: ../gtk/details.c:622
+msgid "Downloading from this peer"
+msgstr "Letöltés a partnertől"
 
-#: ../gtk/details.c:636 ../gtk/torrent-cell-renderer.c:169
-msgid "Paused"
-msgstr "Felfüggesztett"
+#: ../gtk/details.c:626
+msgid "We would download from this peer if they would let us"
+msgstr "Letöltés a partnertől, ha hagyná"
 
-#: ../gtk/details.c:647 ../gtk/details.c:889 ../gtk/details.c:1440
-#: ../gtk/details.c:1733 ../gtk/util.c:68 ../libtransmission/utils.c:1581
-msgid "None"
-msgstr "Nincs"
+#: ../gtk/details.c:630
+msgid "Uploading to peer"
+msgstr "Feltöltés partnernek"
 
-#: ../gtk/details.c:648 ../gtk/details.c:890 ../gtk/details.c:1735
-#: ../gtk/file-list.c:658
-msgid "Mixed"
-msgstr "Vegyes"
+#: ../gtk/details.c:633
+msgid "We would upload to this peer if they asked"
+msgstr "Feltöltés a partnernek, ha kérné"
 
-#: ../gtk/details.c:680
-#, c-format
-msgid "%.1f%%"
-msgstr "%.1f%%"
+#: ../gtk/details.c:638
+msgid "Peer has unchoked us, but we're not interested"
+msgstr "A partner hajlandó küldeni, de nem érdeklődünk"
 
-#: ../gtk/details.c:832
-msgid "Transfer"
-msgstr "Követő"
+#: ../gtk/details.c:643
+msgid "We unchoked this peer, but they're not interested"
+msgstr "A partner engedélyezve, de nem érdeklődik"
 
-#: ../gtk/details.c:835
-msgid "State:"
-msgstr "Állapot:"
+#: ../gtk/details.c:647
+msgid "Encrypted connection"
+msgstr "Titkosított kapcsolat"
 
-#: ../gtk/details.c:838
-msgid "Progress:"
-msgstr "Előrehaladás:"
+#: ../gtk/details.c:651
+msgid "Peer was discovered through Peer Exchange (PEX)"
+msgstr "Partnercserével (PEX) felfedezett partner"
 
-#. "Have" refers to how much of the torrent we have
-#: ../gtk/details.c:842
-msgid "Have:"
-msgstr "Meglévő:"
+#: ../gtk/details.c:655
+msgid "Peer is an incoming connection"
+msgstr "A partner egy beérkező kapcsolat"
 
-#: ../gtk/details.c:845 ../gtk/stats.c:149 ../gtk/stats.c:161
-msgid "Downloaded:"
-msgstr "Letöltve:"
+#: ../gtk/details.c:846
+msgid "<b>Seeders:</b>"
+msgstr "<b>Feltöltők:</b>"
 
-#: ../gtk/details.c:848 ../gtk/stats.c:147 ../gtk/stats.c:159
-msgid "Uploaded:"
-msgstr "Feltöltve:"
+#: ../gtk/details.c:854
+msgid "<b>Leechers:</b>"
+msgstr "<b>Letöltők:</b>"
 
-#: ../gtk/details.c:852
-msgid "Failed DL:"
-msgstr "Sikertelen letöltés:"
+#: ../gtk/details.c:862
+msgid "<b>Times Completed:</b>"
+msgstr "<b>Befejezve ennyiszer:</b>"
 
-#: ../gtk/details.c:855 ../gtk/stats.c:151 ../gtk/stats.c:163
-msgid "Ratio:"
-msgstr "Arány:"
+#: ../gtk/details.c:884 ../gtk/details.c:1423 ../gtk/details.c:1434
+msgid "Never"
+msgstr "Soha"
 
-#: ../gtk/details.c:861
-msgid "Error:"
-msgstr "Hiba:"
+#: ../gtk/details.c:909
+msgid "Details"
+msgstr "Részletek"
 
-#: ../gtk/details.c:864
-msgid "Dates"
-msgstr "Dátumok"
-
-#: ../gtk/details.c:867
-msgid "Started at:"
-msgstr "Elkezdve:"
-
-#: ../gtk/details.c:870
-msgid "Last activity at:"
-msgstr "Utolsó aktivitás:"
-
-#: ../gtk/details.c:891
-msgid "Unknown"
-msgstr "Ismeretlen"
-
-#: ../gtk/details.c:907 ../gtk/makemeta-ui.c:284
+#: ../gtk/details.c:912 ../gtk/makemeta-ui.c:284
 #, c-format
 msgid "%'d Piece"
 msgid_plural "%'d Pieces"
@@ -366,209 +375,241 @@ msgstr[1] "%'d szelet"
 
 #. %1$s is number of pieces;
 #. %2$s is how big each piece is
-#: ../gtk/details.c:916 ../gtk/makemeta-ui.c:290
+#: ../gtk/details.c:918 ../gtk/makemeta-ui.c:290
 #, c-format
 msgid "%1$s @ %2$s"
 msgstr "%1$s @ %2$s"
 
-#: ../gtk/details.c:946
-msgid "Public torrent"
-msgstr "Publikus torrent"
-
-#: ../gtk/details.c:1037
-msgid "Details"
-msgstr "Részletek"
-
-#: ../gtk/details.c:1041
+#: ../gtk/details.c:922
 msgid "Pieces:"
 msgstr "Darabok:"
 
-#: ../gtk/details.c:1047
+#: ../gtk/details.c:930
 msgid "Hash:"
 msgstr "Hash:"
 
-#: ../gtk/details.c:1052
+#: ../gtk/details.c:933
+msgid "Private to this tracker -- PEX disabled"
+msgstr "Privát a követőn – PEX letiltva"
+
+#: ../gtk/details.c:934
+msgid "Public torrent"
+msgstr "Publikus torrent"
+
+#: ../gtk/details.c:936
 msgid "Privacy:"
 msgstr "Magánszféra:"
 
-#: ../gtk/details.c:1069
+#: ../gtk/details.c:948
 msgid "Comment:"
 msgstr "Megjegyzés:"
 
-#: ../gtk/details.c:1073
+#: ../gtk/details.c:952
 msgid "Origins"
 msgstr "Származás"
 
-#: ../gtk/details.c:1077
+#: ../gtk/details.c:954
+msgid "Unknown"
+msgstr "Ismeretlen"
+
+#: ../gtk/details.c:956
 msgid "Creator:"
 msgstr "Készítő:"
 
-#: ../gtk/details.c:1080
+#: ../gtk/details.c:960
 msgid "Date:"
 msgstr "Dátum:"
 
-#: ../gtk/details.c:1083
+#: ../gtk/details.c:963
 msgid "Location"
 msgstr "Hely"
 
-#: ../gtk/details.c:1094
+#: ../gtk/details.c:969
+msgid "Destination folder:"
+msgstr "Célmappa:"
+
+#: ../gtk/details.c:976
 msgid "Torrent file:"
 msgstr "Torrent fájl:"
 
-#: ../gtk/details.c:1124 ../gtk/details.c:1164
-msgid "Down"
-msgstr "Le"
+#: ../gtk/details.c:1024
+#, c-format
+msgid "%.1f%%"
+msgstr "%.1f%%"
 
-#: ../gtk/details.c:1162
-msgid "Address"
-msgstr "Cím"
+#: ../gtk/details.c:1030
+#, c-format
+msgid "%1$.1f%% (%2$.1f%% selected)"
+msgstr "%1$.1f %% (%2$.1f %% kiválasztva)"
 
-#: ../gtk/details.c:1166
-msgid "Up"
-msgstr "Fel"
+#. %1$s is total size of what we've saved to disk
+#. %2$s is how much of it's passed the checksum test
+#. %3$s is how many pieces are verified
+#: ../gtk/details.c:1042
+#, c-format
+msgid "%1$s (%2$s verified in %3$d pieces)"
+msgstr "%1$s (%3$d darabból %2$s ellenőrizve)"
 
-#: ../gtk/details.c:1167
-msgid "Client"
-msgstr "Kliens"
+#: ../gtk/details.c:1062 ../gtk/util.c:57 ../gtk/util.c:79
+msgid "None"
+msgstr "Nincs"
 
-#: ../gtk/details.c:1168
-msgid "%"
-msgstr "%"
+#: ../gtk/details.c:1084
+msgid "Transfer"
+msgstr "Követő"
 
-#: ../gtk/details.c:1169
-msgid "Status"
-msgstr "Állapot"
+#: ../gtk/details.c:1087
+msgid "State:"
+msgstr "Állapot:"
 
-#: ../gtk/details.c:1497
-msgid "Optimistic unchoke"
-msgstr "Optimista engedélyezés"
+#: ../gtk/details.c:1090
+msgid "Progress:"
+msgstr "Előrehaladás:"
 
-#: ../gtk/details.c:1498
-msgid "Downloading from this peer"
-msgstr "Letöltés a partnertől"
+#. "Have" refers to how much of the torrent we have
+#: ../gtk/details.c:1094
+msgid "Have:"
+msgstr "Meglévő:"
 
-#: ../gtk/details.c:1499
-msgid "We would download from this peer if they would let us"
-msgstr "Letöltés a partnertől, ha hagyná"
+#: ../gtk/details.c:1097 ../gtk/stats.c:149 ../gtk/stats.c:161
+msgid "Downloaded:"
+msgstr "Letöltve:"
 
-#: ../gtk/details.c:1500
-msgid "Uploading to peer"
-msgstr "Feltöltés partnernek"
+#: ../gtk/details.c:1100 ../gtk/stats.c:147 ../gtk/stats.c:159
+msgid "Uploaded:"
+msgstr "Feltöltve:"
 
-#: ../gtk/details.c:1501
-msgid "We would upload to this peer if they asked"
-msgstr "Feltöltés a partnernek, ha kérné"
+#: ../gtk/details.c:1104
+msgid "Failed DL:"
+msgstr "Sikertelen letöltés:"
 
-#: ../gtk/details.c:1502
-msgid "Peer has unchoked us, but we're not interested"
-msgstr "A partner hajlandó küldeni, de nem érdeklődünk"
+#: ../gtk/details.c:1107 ../gtk/stats.c:151 ../gtk/stats.c:163
+msgid "Ratio:"
+msgstr "Arány:"
 
-#: ../gtk/details.c:1503
-msgid "We unchoked this peer, but they're not interested"
-msgstr "A partner engedélyezve, de nem érdeklődik"
+#: ../gtk/details.c:1110
+msgid "Swarm rate:"
+msgstr "Raj sebessége:"
 
-#: ../gtk/details.c:1504
-msgid "Encrypted connection"
-msgstr "Titkosított kapcsolat"
+#: ../gtk/details.c:1113
+msgid "Error:"
+msgstr "Hiba:"
 
-#: ../gtk/details.c:1505
-msgid "Peer was discovered through Peer Exchange (PEX)"
-msgstr "Partnercserével (PEX) felfedezett partner"
+#: ../gtk/details.c:1117
+msgid "Completion"
+msgstr "Kiegészítés"
 
-#: ../gtk/details.c:1507
-msgid "Peer is an incoming connection"
-msgstr "A partner egy beérkező kapcsolat"
+#: ../gtk/details.c:1129
+msgid "Dates"
+msgstr "Dátumok"
 
-#: ../gtk/details.c:1685
-msgid "<b>Seeders:</b>"
-msgstr "<b>Feltöltők:</b>"
+#: ../gtk/details.c:1132
+msgid "Started at:"
+msgstr "Elkezdve:"
 
-#: ../gtk/details.c:1692
-msgid "<b>Leechers:</b>"
-msgstr "<b>Letöltők:</b>"
+#: ../gtk/details.c:1135
+msgid "Last activity at:"
+msgstr "Utolsó aktivitás:"
 
-#: ../gtk/details.c:1699
-msgid "<b>Times Completed:</b>"
-msgstr "<b>Befejezve ennyiszer:</b>"
+#: ../gtk/details.c:1226 ../gtk/tr-prefs.c:504 ../gtk/tr-prefs.c:1107
+msgid "Limits"
+msgstr "Korlátok"
 
-#: ../gtk/details.c:1734
-msgid "Now"
-msgstr "Most"
+#: ../gtk/details.c:1230 ../gtk/tr-prefs.c:1109
+msgid "Limit _download speed (KB/s):"
+msgstr "_Letöltési sebesség korlátozása (KB/s):"
 
-#: ../gtk/details.c:1737
-msgid "In progress"
-msgstr "Folyamatban"
+#: ../gtk/details.c:1249 ../gtk/tr-prefs.c:1116
+msgid "Limit _upload speed (KB/s):"
+msgstr "_Feltöltési sebesség korlátozása (KB/s):"
 
-#: ../gtk/details.c:1882 ../gtk/makemeta-ui.c:427 ../gtk/tr-prefs.c:1397
+#: ../gtk/details.c:1267
+msgid "Peer Connections"
+msgstr "Partnerkapcsolatok"
+
+#: ../gtk/details.c:1272
+msgid "_Maximum peers:"
+msgstr "_Partnerszám maximum:"
+
+#: ../gtk/details.c:1327 ../gtk/makemeta-ui.c:427 ../gtk/tr-prefs.c:1363
 msgid "Trackers"
 msgstr "Követők"
 
-#: ../gtk/details.c:1889
+#: ../gtk/details.c:1333
 msgid "Scrape"
 msgstr "Infokérés"
 
-#: ../gtk/details.c:1891
+#: ../gtk/details.c:1335
 msgid "Last scrape at:"
 msgstr "Utolsó infokérés:"
 
-#: ../gtk/details.c:1896 ../gtk/details.c:1918
+#: ../gtk/details.c:1340 ../gtk/details.c:1362
 msgid "Tracker responded:"
 msgstr "Követő válaszolt:"
 
-#: ../gtk/details.c:1901
+#: ../gtk/details.c:1345
 msgid "Next scrape in:"
 msgstr "Következő infokérés:"
 
-#: ../gtk/details.c:1907
+#: ../gtk/details.c:1351
 msgid "Announce"
 msgstr "Bejelentés"
 
-#: ../gtk/details.c:1911
+#: ../gtk/details.c:1355
 msgid "Tracker:"
 msgstr "Követő:"
 
-#: ../gtk/details.c:1913
+#: ../gtk/details.c:1357
 msgid "Last announce at:"
 msgstr "Utolsó bejelentés:"
 
-#: ../gtk/details.c:1923
+#: ../gtk/details.c:1367
 msgid "Next announce in:"
 msgstr "Következő bejelentés:"
 
 #. how long until the tracker will honor user
 #. * pressing the "ask for more peers" button
-#: ../gtk/details.c:1930
+#: ../gtk/details.c:1374
 msgid "Manual announce allowed in:"
 msgstr "Kézi bejelentés engedélyezett:"
 
-#: ../gtk/details.c:2005
-msgid "Activity"
-msgstr "Aktivitás"
+#: ../gtk/details.c:1393
+msgid "In progress"
+msgstr "Folyamatban"
 
-#: ../gtk/details.c:2009 ../gtk/tr-prefs.c:1382
-msgid "Peers"
-msgstr "Partnerek"
+#: ../gtk/details.c:1438
+msgid "Now"
+msgstr "Most"
 
-#: ../gtk/details.c:2013 ../gtk/tr-window.c:817
-msgid "Tracker"
-msgstr "Követő"
-
-#: ../gtk/details.c:2017 ../gtk/msgwin.c:193
-msgid "Information"
-msgstr "Információ"
-
-#: ../gtk/details.c:2022 ../gtk/tr-window.c:817
-msgid "Files"
-msgstr "Fájlok"
-
-#: ../gtk/details.c:2027 ../gtk/tr-prefs.c:335
-msgid "Options"
-msgstr "Beállítások"
-
-#: ../gtk/details.c:2055
+#. create the dialog
+#: ../gtk/details.c:1489
 #, c-format
 msgid "%s Properties"
 msgstr "%s tulajdonságai"
+
+#: ../gtk/details.c:1507
+msgid "Activity"
+msgstr "Aktivitás"
+
+#: ../gtk/details.c:1512 ../gtk/tr-prefs.c:1348
+msgid "Peers"
+msgstr "Partnerek"
+
+#: ../gtk/details.c:1517 ../gtk/tr-window.c:525
+msgid "Tracker"
+msgstr "Követő"
+
+#: ../gtk/details.c:1521 ../gtk/msgwin.c:193
+msgid "Information"
+msgstr "Információ"
+
+#: ../gtk/details.c:1527 ../gtk/tr-window.c:525
+msgid "Files"
+msgstr "Fájlok"
+
+#: ../gtk/details.c:1532 ../gtk/tr-prefs.c:344 ../gtk/tr-prefs.c:512
+msgid "Options"
+msgstr "Beállítások"
 
 #: ../gtk/dialogs.c:120
 msgid "<big><b>Quit Transmission?</b></big>"
@@ -614,75 +655,99 @@ msgid_plural "Some of these torrents have not finished downloading."
 msgstr[0] "Egy torrent letöltése még nem fejeződött be."
 msgstr[1] "Néhány torrent letöltése még nem fejeződött be."
 
-#: ../gtk/file-list.c:692 ../gtk/file-list.c:843
+#: ../gtk/file-list.c:622
+msgid "High"
+msgstr "Magas"
+
+#: ../gtk/file-list.c:626
+msgid "Normal"
+msgstr "Közepes"
+
+#: ../gtk/file-list.c:630
+msgid "Low"
+msgstr "Alacsony"
+
+#: ../gtk/file-list.c:634
+msgid "Mixed"
+msgstr "Vegyes"
+
+#: ../gtk/file-list.c:664 ../gtk/file-list.c:814
 msgid "Download"
 msgstr "Letöltés"
 
-#: ../gtk/file-list.c:693 ../gtk/file-list.c:850
+#: ../gtk/file-list.c:665 ../gtk/file-list.c:821
 msgid "Priority"
 msgstr "Prioritás"
 
-#: ../gtk/file-list.c:822
+#: ../gtk/file-list.c:793
 msgid "File"
 msgstr "Fájl"
 
-#: ../gtk/file-list.c:836
+#: ../gtk/file-list.c:807
 msgid "Progress"
 msgstr "Folyamat"
 
-#: ../gtk/main.c:375
+#: ../gtk/main.c:361
 msgid "Start with all torrents paused"
 msgstr "Az összes torrent indítása felfüggesztettként"
 
-#: ../gtk/main.c:377
+#: ../gtk/main.c:363
 msgid "Show version number and exit"
 msgstr "Verziószám megjelenítése és kilépés"
 
-#: ../gtk/main.c:381
+#: ../gtk/main.c:367
 msgid "Start minimized in system tray"
 msgstr "Indítás kis méretben"
 
-#: ../gtk/main.c:384
+#: ../gtk/main.c:370
 msgid "Where to look for configuration files"
 msgstr "Hol keresse a beállításfájlokat"
 
-#: ../gtk/main.c:395
+#: ../gtk/main.c:383
 msgid "Transmission"
 msgstr "Transmission"
 
-#: ../gtk/main.c:402
+#: ../gtk/main.c:390
 msgid "[torrent files]"
 msgstr "[torrentfájlok]"
 
-#: ../gtk/main.c:704
+#: ../gtk/main.c:510
+msgid "Beginning to use scheduled bandwidth limits"
+msgstr "Ütemezett sávszélesség-korlátozások használatának megkezdése"
+
+#: ../gtk/main.c:524
+msgid "Ending use of scheduled bandwidth limits"
+msgstr "Ütemezett sávszélesség-korlátozások használatának befejezése"
+
+#: ../gtk/main.c:778
 msgid "<b>Closing Connections</b>"
 msgstr "<b>Kapcsolatok lezárása</b>"
 
-#: ../gtk/main.c:708
+#: ../gtk/main.c:782
 msgid "Sending upload/download totals to tracker..."
 msgstr "Az összesített le/feltöltési adat elküldése a követőnek..."
 
-#: ../gtk/main.c:713
+#: ../gtk/main.c:787
 msgid "_Quit Now"
 msgstr "_Kilépés most"
 
-#: ../gtk/main.c:871
+#: ../gtk/main.c:946
 msgid "Couldn't add corrupt torrent"
 msgid_plural "Couldn't add corrupt torrents"
 msgstr[0] "A sérült torrent hozzáadása sikertelen"
 msgstr[1] "A sérült torrentek hozzáadása sikertelen"
 
-#: ../gtk/main.c:878
+#: ../gtk/main.c:953
 msgid "Couldn't add duplicate torrent"
 msgid_plural "Couldn't add duplicate torrents"
 msgstr[0] "A már meglévő torrent hozzáadása sikertelen"
 msgstr[1] "A már meglévő torrentek hozzáadása sikertelen"
 
-#: ../gtk/main.c:1158
+#: ../gtk/main.c:1222
 msgid "A fast and easy BitTorrent client"
 msgstr "Gyors és egyszerű  BitTorrent kliens"
 
-#: ../gtk/main.c:1163
+#: ../gtk/main.c:1227
 msgid "Copyright 2005-2009 The Transmission Project"
 msgstr "Copyright 2005-2009 The Transmission Project"
 
@@ -690,7 +755,7 @@ msgstr "Copyright 2005-2009 The Transmission Project"
 #. your name
 #. to have it appear in the credits in the "About"
 #. dialog
-#: ../gtk/main.c:1174
+#: ../gtk/main.c:1238
 msgid "translator-credits"
 msgstr ""
 "Kéménczy Kálmán <kkemenczy@openscope.org>\n"
@@ -698,14 +763,12 @@ msgstr ""
 "Launchpad Contributions:\n"
 "  Dr. Gráf https://launchpad.net/~dr-graf-nxt\n"
 "  Ferenc Karsany https://launchpad.net/~fkarsany\n"
-"  Freeman07 https://launchpad.net/~csatarij\n"
 "  G. U. https://launchpad.net/~gergo86\n"
 "  Gabor Kelemen https://launchpad.net/~kelemeng\n"
-"  Gergely Janossy https://launchpad.net/~marcabru\n"
+"  Gergely J. https://launchpad.net/~marcabru\n"
 "  Incze GASPAR https://launchpad.net/~inczegaspar\n"
 "  Messó https://launchpad.net/~redhat24\n"
 "  Pittmann Tamás https://launchpad.net/~zaivaldi\n"
-"  ifj. Kalman Tarnay https://launchpad.net/~kalmisoft\n"
 "  Úr Balázs https://launchpad.net/~urbalazs\n"
 "  Γριφεγ https://launchpad.net/~grfgguvf"
 
@@ -728,7 +791,7 @@ msgid "Torrent creation cancelled"
 msgstr "A torrent létrehozása megszakítva"
 
 #: ../gtk/makemeta-ui.c:128 ../libtransmission/blocklist.c:78
-#: ../libtransmission/blocklist.c:237 ../libtransmission/utils.c:476
+#: ../libtransmission/blocklist.c:237 ../libtransmission/utils.c:471
 #, c-format
 msgid "Couldn't read \"%1$s\": %2$s"
 msgstr "„%1$s” nem olvasható be: %2$s"
@@ -786,7 +849,7 @@ msgstr "M_egjegyzés:"
 msgid "_Private torrent"
 msgstr "_Privát torrent"
 
-#: ../gtk/msgwin.c:87 ../libtransmission/bencode.c:1546
+#: ../gtk/msgwin.c:87 ../libtransmission/bencode.c:1433
 #: ../libtransmission/blocklist.c:293
 #, c-format
 msgid "Couldn't save file \"%1$s\": %2$s"
@@ -808,7 +871,7 @@ msgstr "Nyomkövetés"
 msgid "Time"
 msgstr "Idő"
 
-#: ../gtk/msgwin.c:272 ../gtk/tr-window.c:817
+#: ../gtk/msgwin.c:272 ../gtk/tr-window.c:525
 msgid "Name"
 msgstr "Név"
 
@@ -824,15 +887,15 @@ msgstr "Üzenetnapló"
 msgid "Level"
 msgstr "Szint"
 
-#: ../gtk/notify.c:93
+#: ../gtk/notify.c:70
 msgid "Torrent Complete"
 msgstr "Torrent kész"
 
-#: ../gtk/notify.c:101
+#: ../gtk/notify.c:76
 msgid "Open File"
 msgstr "Fájl megnyitása"
 
-#: ../gtk/notify.c:106
+#: ../gtk/notify.c:81
 msgid "Open Folder"
 msgstr "Mappa megnyitása"
 
@@ -862,7 +925,7 @@ msgstr "Összesen"
 #. %1$s is how much we've got,
 #. %2$s is how much we'll have when done,
 #. %3$.2f%% is a percentage of the two
-#: ../gtk/torrent-cell-renderer.c:61
+#: ../gtk/torrent-cell-renderer.c:52
 #, c-format
 msgid "%1$s of %2$s (%3$.2f%%)"
 msgstr "%1$s, összesen %2$s (%3$.2f %%)"
@@ -872,7 +935,7 @@ msgstr "%1$s, összesen %2$s (%3$.2f %%)"
 #. %3$.2f%% is a percentage of the two,
 #. %4$s is how much we've uploaded,
 #. %5$s is our upload-to-download ratio
-#: ../gtk/torrent-cell-renderer.c:74
+#: ../gtk/torrent-cell-renderer.c:63
 #, c-format
 msgid "%1$s of %2$s (%3$.2f%%), uploaded %4$s (Ratio: %5$s)"
 msgstr "%1$s, összesen %2$s (%3$.2f %%), feltöltve %4$s (Arány: %5$s)"
@@ -880,74 +943,82 @@ msgstr "%1$s, összesen %2$s (%3$.2f %%), feltöltve %4$s (Arány: %5$s)"
 #. %1$s is the torrent's total size,
 #. %2$s is how much we've uploaded,
 #. %3$s is our upload-to-download ratio
-#: ../gtk/torrent-cell-renderer.c:100
+#: ../gtk/torrent-cell-renderer.c:74
 #, c-format
 msgid "%1$s, uploaded %2$s (Ratio: %3$s)"
 msgstr "%1$s, feltöltve %2$s (Arány: %3$s)"
 
-#: ../gtk/torrent-cell-renderer.c:113 ../gtk/tr-torrent.c:247
+#: ../gtk/torrent-cell-renderer.c:86 ../gtk/tr-torrent.c:247
 #, c-format
 msgid "Remaining time unknown"
 msgstr "Hátralévő idő ismeretlen"
 
 #. time remaining
-#: ../gtk/torrent-cell-renderer.c:119
+#: ../gtk/torrent-cell-renderer.c:92
 #, c-format
 msgid "%s remaining"
 msgstr "%s van hátra"
 
-#: ../gtk/torrent-cell-renderer.c:147
+#: ../gtk/torrent-cell-renderer.c:120
 #, c-format
 msgid "speed|Down: %1$s, Up: %2$s"
 msgstr "Le: %1$s, fel: %2$s"
 
 #. download speed
-#: ../gtk/torrent-cell-renderer.c:150
+#: ../gtk/torrent-cell-renderer.c:123
 #, c-format
 msgid "Down: %s"
 msgstr "Le: %s"
 
 #. upload speed
-#: ../gtk/torrent-cell-renderer.c:153
+#: ../gtk/torrent-cell-renderer.c:126
 #, c-format
 msgid "Up: %s"
 msgstr "Fel: %s"
 
 #. the torrent isn't uploading or downloading
-#: ../gtk/torrent-cell-renderer.c:156
+#: ../gtk/torrent-cell-renderer.c:129
 msgid "Idle"
 msgstr "Üresjárat"
 
-#: ../gtk/torrent-cell-renderer.c:179 ../gtk/tr-torrent.c:240
+#: ../gtk/torrent-cell-renderer.c:142
+msgid "Paused"
+msgstr "Felfüggesztett"
+
+#: ../gtk/torrent-cell-renderer.c:146
+msgid "Waiting to verify local data"
+msgstr "Várakozás helyi adatok ellenőrzésére"
+
+#: ../gtk/torrent-cell-renderer.c:152 ../gtk/tr-torrent.c:240
 #, c-format
 msgid "Verifying local data (%.1f%% tested)"
 msgstr "Helyi adat ellenőrzése (%.1f%% ellenőrizve)"
 
-#: ../gtk/torrent-cell-renderer.c:190 ../gtk/tr-window.c:1067
-#: ../gtk/tr-window.c:1095
+#: ../gtk/torrent-cell-renderer.c:163 ../gtk/tr-window.c:747
+#: ../gtk/tr-window.c:775
 #, c-format
 msgid "Ratio: %s"
 msgstr "Arány: %s"
 
-#: ../gtk/torrent-cell-renderer.c:232
+#: ../gtk/torrent-cell-renderer.c:205
 #, c-format
 msgid "Downloading from %1$'d of %2$'d connected peer"
 msgid_plural "Downloading from %1$'d of %2$'d connected peers"
 msgstr[0] "Letöltés %1$'d / %2$'d csatlakozott partnertől"
 msgstr[1] "Letöltés %1$'d / %2$'d csatlakozott partnertől"
 
-#: ../gtk/torrent-cell-renderer.c:243 ../gtk/tr-torrent.c:259
+#: ../gtk/torrent-cell-renderer.c:216 ../gtk/tr-torrent.c:259
 #, c-format
 msgid "Seeding to %1$'d of %2$'d connected peer"
 msgid_plural "Seeding to %1$'d of %2$'d connected peers"
 msgstr[0] "Megosztás %1$'d / %2$'d csatlakozott partnerrel"
 msgstr[1] "Megosztás %1$'d / %2$'d csatlakozott partnerrel"
 
-#: ../gtk/tracker-list.c:344
+#: ../gtk/tracker-list.c:327
 msgid "Tier"
 msgstr "Réteg"
 
-#: ../gtk/tracker-list.c:350
+#: ../gtk/tracker-list.c:339
 msgid "Announce URL"
 msgstr "Bejelentési URL"
 
@@ -963,24 +1034,24 @@ msgstr "Fájlok letöltése és megosztása BitTorrenten keresztül"
 msgid "Transmission BitTorrent Client"
 msgstr "Transmission Bittorrent kliens"
 
-#: ../gtk/tr-core.c:1123
+#: ../gtk/tr-core.c:1124
 msgid "Transmission Bittorrent Client"
 msgstr "Transmission Bittorrent kliens"
 
-#: ../gtk/tr-core.c:1124
+#: ../gtk/tr-core.c:1125
 msgid "BitTorrent Activity"
 msgstr "BitTorrent-aktivitás"
 
-#: ../gtk/tr-core.c:1132
+#: ../gtk/tr-core.c:1133
 msgid "Disallowing desktop hibernation"
 msgstr "Számítógép hibernálásának letiltása"
 
-#: ../gtk/tr-core.c:1136
+#: ../gtk/tr-core.c:1137
 #, c-format
 msgid "Couldn't disable desktop hibernation: %s"
 msgstr "Nem lehet letiltani a számítógép hibernálását: %s"
 
-#: ../gtk/tr-core.c:1160
+#: ../gtk/tr-core.c:1161
 msgid "Allowing desktop hibernation"
 msgstr "Számítógép hibernálásának engedélyezése"
 
@@ -997,172 +1068,202 @@ msgstr ""
 "%1$'d megosztása, %2$'d letöltése\n"
 "Le: %3$s, fel: %4$s"
 
-#: ../gtk/tr-prefs.c:281
+#: ../gtk/tr-prefs.c:300
 msgid "Adding Torrents"
 msgstr "Torrentek hozzáadása"
 
-#: ../gtk/tr-prefs.c:284
+#: ../gtk/tr-prefs.c:303
 msgid "Automatically _add torrents from:"
 msgstr "Torrentek automatikus _hozzáadása innen:"
 
-#: ../gtk/tr-prefs.c:301
+#: ../gtk/tr-prefs.c:320
 msgid "Mo_ve source files to Trash"
 msgstr "Forrásfájlok át_helyezése a Kukába"
 
-#: ../gtk/tr-prefs.c:309 ../gtk/tr-prefs.c:527
-msgid "Limits"
-msgstr "Korlátok"
-
-#: ../gtk/tr-prefs.c:337
+#: ../gtk/tr-prefs.c:346
 msgid "Inhibit desktop _hibernation when torrents are active"
 msgstr "Számítógép _hibernálásának tiltása, ha vannak aktív torrentek"
 
-#: ../gtk/tr-prefs.c:341
+#: ../gtk/tr-prefs.c:350
 msgid "Show _icon in the desktop Notification Area"
 msgstr "_Ikon megjelenítése az értesítési területen"
 
-#: ../gtk/tr-prefs.c:345
+#: ../gtk/tr-prefs.c:354
 msgid "Show desktop _notifications"
 msgstr "Asztali értesítések megjelenítése"
 
-#: ../gtk/tr-prefs.c:372
+#: ../gtk/tr-prefs.c:384
 #, c-format
 msgid "Enable _blocklist (contains %'d rule)"
 msgid_plural "Enable _blocklist (contains %'d rules)"
 msgstr[0] "Bl_okkolási lista engedélyezése (%'d szabályt tartalmaz)"
 msgstr[1] "Bl_okkolási lista engedélyezése (%'d szabályt tartalmaz)"
 
-#: ../gtk/tr-prefs.c:504
+#: ../gtk/tr-prefs.c:434
+msgid "Updating Blocklist"
+msgstr "Blokkolási lista frissítése"
+
+#: ../gtk/tr-prefs.c:481
 msgid "Blocklist"
 msgstr "Blokkolási lista"
 
-#: ../gtk/tr-prefs.c:510
+#: ../gtk/tr-prefs.c:487
 msgid "_Update"
 msgstr "_Frissítés"
 
-#: ../gtk/tr-prefs.c:520
+#: ../gtk/tr-prefs.c:497
 msgid "Enable _automatic updates"
 msgstr "_Automatikus frissítések engedélyezése"
 
-#: ../gtk/tr-prefs.c:530
+#: ../gtk/tr-prefs.c:507
 msgid "Maximum peers _overall:"
 msgstr "_Partnerek száma összesen:"
 
-#: ../gtk/tr-prefs.c:532
+#: ../gtk/tr-prefs.c:509
 msgid "Maximum peers per _torrent:"
-msgstr "Partnerek _maximális száma torrentenként:"
+msgstr "Partnerek maximális száma t_orrentenként:"
 
-#: ../gtk/tr-prefs.c:755
+#: ../gtk/tr-prefs.c:514
+msgid "_Ignore unencrypted peers"
+msgstr "Nem t_itkosított partnerek figyelmen kívül hagyása"
+
+#: ../gtk/tr-prefs.c:522
+msgid "Use peer e_xchange"
+msgstr "Partner_csere használata"
+
+#: ../gtk/tr-prefs.c:731
 msgid "Web Interface"
 msgstr "Webes felület"
 
 #. "enabled" checkbutton
-#: ../gtk/tr-prefs.c:758
+#: ../gtk/tr-prefs.c:734
 msgid "_Enable web interface"
 msgstr "_Webes felület engedélyezése"
 
-#: ../gtk/tr-prefs.c:764
+#: ../gtk/tr-prefs.c:740
 msgid "_Open web interface"
-msgstr "Webes felület _megnyitása"
+msgstr "_Webes felület megnyitása"
 
-#: ../gtk/tr-prefs.c:773
+#: ../gtk/tr-prefs.c:749 ../gtk/tr-prefs.c:1299
 msgid "Listening _port:"
 msgstr "Figyelő_port:"
 
 #. require authentication
-#: ../gtk/tr-prefs.c:777
+#: ../gtk/tr-prefs.c:753
 msgid "_Require username"
-msgstr "Felhasználónév s_zükséges"
+msgstr "Felhasználónév _szükséges"
 
 #. username
-#: ../gtk/tr-prefs.c:785 ../gtk/tr-prefs.c:1000
+#: ../gtk/tr-prefs.c:761 ../gtk/tr-prefs.c:979
 msgid "_Username:"
 msgstr "_Felhasználónév:"
 
 #. password
-#: ../gtk/tr-prefs.c:792 ../gtk/tr-prefs.c:1006
+#: ../gtk/tr-prefs.c:768 ../gtk/tr-prefs.c:985
 msgid "Pass_word:"
 msgstr "_Jelszó:"
 
 #. require authentication
-#: ../gtk/tr-prefs.c:800
+#: ../gtk/tr-prefs.c:776
 msgid "Only allow the following IP _addresses to connect:"
 msgstr "_Csak a következő IP-címek csatlakozásának engedélyezése:"
 
-#: ../gtk/tr-prefs.c:825
+#: ../gtk/tr-prefs.c:803
 msgid "IP addresses may use wildcards, such as 192.168.*.*"
 msgstr ""
 "Az IP címekhez használhatóak helyettesítő karakterek, például: 192.168.*.*"
 
-#: ../gtk/tr-prefs.c:847
+#: ../gtk/tr-prefs.c:826
 msgid "Addresses:"
 msgstr "Címek:"
 
-#: ../gtk/tr-prefs.c:963
+#: ../gtk/tr-prefs.c:942
 msgid "Tracker Proxy"
 msgstr "Követő proxyja"
 
-#: ../gtk/tr-prefs.c:965
+#: ../gtk/tr-prefs.c:944
 msgid "Connect to tracker via a pro_xy"
 msgstr "Kapcsolódás a követőhöz pro_xyn keresztül"
 
-#: ../gtk/tr-prefs.c:970
+#: ../gtk/tr-prefs.c:949
 msgid "Proxy _server:"
 msgstr "Proxy_kiszolgáló:"
 
-#: ../gtk/tr-prefs.c:978
+#: ../gtk/tr-prefs.c:957
 msgid "Proxy _port:"
 msgstr "Proxy _port:"
 
-#: ../gtk/tr-prefs.c:981
+#: ../gtk/tr-prefs.c:960
 msgid "Proxy _type:"
 msgstr "Proxy _típusa:"
 
-#: ../gtk/tr-prefs.c:994
+#: ../gtk/tr-prefs.c:973
 msgid "_Authentication is required"
 msgstr "_Hitelesítés szükséges"
 
-#: ../gtk/tr-prefs.c:1210
-msgid "Limit u_pload speed (KB/s):"
-msgstr "Feltöltési sebesség k_orlátozása (KB/s):"
+#: ../gtk/tr-prefs.c:1124
+msgid "Scheduled Limits"
+msgstr "Ütemezett korlátok"
 
-#: ../gtk/tr-prefs.c:1225
+#: ../gtk/tr-prefs.c:1130
 msgid " and "
 msgstr " és "
 
-#: ../gtk/tr-prefs.c:1289
+#: ../gtk/tr-prefs.c:1137
+msgid "_Limit bandwidth between"
+msgstr "_Sávszélesség-korlátozási időszak:"
+
+#: ../gtk/tr-prefs.c:1144
+msgid "Limit d_ownload speed (KB/s):"
+msgstr "_Letöltési sebesség korlátozása (KB/s):"
+
+#: ../gtk/tr-prefs.c:1149
+msgid "Limit u_pload speed (KB/s):"
+msgstr "_Feltöltési sebesség korlátozása (KB/s):"
+
+#: ../gtk/tr-prefs.c:1200
+#, c-format
 msgid "Port is <b>open</b>"
 msgstr "A port <b>nyitva</b>"
 
-#: ../gtk/tr-prefs.c:1289
+#: ../gtk/tr-prefs.c:1201
+#, c-format
 msgid "Port is <b>closed</b>"
 msgstr "A port <b>zárva</b>"
 
-#: ../gtk/tr-prefs.c:1323
+#: ../gtk/tr-prefs.c:1245
+msgid "<i>Testing port...</i>"
+msgstr "<i>Port vizsgálata...</i>"
+
+#: ../gtk/tr-prefs.c:1291
 msgid "Incoming Peers"
 msgstr "Bejövő partnerek"
 
-#: ../gtk/tr-prefs.c:1344
+#: ../gtk/tr-prefs.c:1308
 msgid "Use UPnP or NAT-PMP port _forwarding from my router"
 msgstr "UPnP vagy _NAT-PMP portátirányítás használata a routeremről"
 
-#: ../gtk/tr-prefs.c:1364
+#: ../gtk/tr-prefs.c:1330
 msgid "Transmission Preferences"
 msgstr "Transmission beállításai"
 
-#: ../gtk/tr-prefs.c:1379
+#: ../gtk/tr-prefs.c:1345
 msgid "Torrents"
 msgstr "Torrentek"
 
-#: ../gtk/tr-prefs.c:1388
+#: ../gtk/tr-prefs.c:1351
 msgid "Network"
 msgstr "Hálózat"
 
-#: ../gtk/tr-prefs.c:1391
+#: ../gtk/tr-prefs.c:1354
 msgid "Desktop"
 msgstr "Asztal"
 
-#: ../gtk/tr-prefs.c:1394
+#: ../gtk/tr-prefs.c:1357
+msgid "Bandwidth"
+msgstr "Sávszélesség"
+
+#: ../gtk/tr-prefs.c:1360
 msgid "Web"
 msgstr "Web"
 
@@ -1177,174 +1278,174 @@ msgstr "Várakozás a helyi adat ellenőrzésére (%.1f%% ellenőrizve)"
 msgid "%1$s remaining"
 msgstr "%1$s van hátra"
 
-#: ../gtk/tr-torrent.c:266 ../libtransmission/port-forwarding.c:170
+#: ../gtk/tr-torrent.c:266 ../libtransmission/port-forwarding.c:200
 msgid "Stopped"
 msgstr "Leállítva"
 
-#: ../gtk/tr-window.c:185
+#: ../gtk/tr-window.c:155
 msgid "Torrent"
 msgstr "Torrent"
 
-#: ../gtk/tr-window.c:299
+#: ../gtk/tr-window.c:253
 msgid "Total Ratio"
 msgstr "Összesített arány"
 
-#: ../gtk/tr-window.c:300
+#: ../gtk/tr-window.c:254
 msgid "Session Ratio"
 msgstr "Munkamenet aránya"
 
-#: ../gtk/tr-window.c:301
+#: ../gtk/tr-window.c:255
 msgid "Total Transfer"
 msgstr "Összes átvitel"
 
-#: ../gtk/tr-window.c:302
+#: ../gtk/tr-window.c:256
 msgid "Session Transfer"
 msgstr "Munkamenet átvitele"
 
-#: ../gtk/tr-window.c:559
+#: ../gtk/tr-window.c:488
 #, c-format
 msgid "Tracker will allow requests in %s"
 msgstr "A követő engedélyezi a kéréseket itt: %s"
 
 #. show all torrents
-#: ../gtk/tr-window.c:806
+#: ../gtk/tr-window.c:514
 msgid "A_ll"
-msgstr "Öss_zes"
+msgstr "Ö_sszes"
 
 #. show only torrents that have connected peers
-#: ../gtk/tr-window.c:808
+#: ../gtk/tr-window.c:516
 msgid "_Active"
 msgstr "_Aktív"
 
 #. show only torrents that are trying to download
-#: ../gtk/tr-window.c:810
+#: ../gtk/tr-window.c:518
 msgid "_Downloading"
 msgstr "_Letöltés"
 
 #. show only torrents that are trying to upload
-#: ../gtk/tr-window.c:812
+#: ../gtk/tr-window.c:520
 msgid "_Seeding"
-msgstr "Meg_osztás"
+msgstr "_Megosztás"
 
 #. show only torrents that are paused
-#: ../gtk/tr-window.c:814
+#: ../gtk/tr-window.c:522
 msgid "_Paused"
 msgstr "_Felfüggesztett"
 
-#: ../gtk/tr-window.c:1041
+#: ../gtk/tr-window.c:720
 #, c-format
 msgid "%1$'d of %2$'d Torrent"
 msgid_plural "%1$'d of %2$'d Torrents"
 msgstr[0] "%1$'d / %2$'d torrent"
 msgstr[1] "%1$'d / %2$'d torrent"
 
-#: ../gtk/tr-window.c:1047
+#: ../gtk/tr-window.c:725
 #, c-format
 msgid "%'d Torrent"
 msgid_plural "%'d Torrents"
 msgstr[0] "%'d torrent"
 msgstr[1] "%'d torrent"
 
-#: ../gtk/tr-window.c:1078 ../gtk/tr-window.c:1089
+#: ../gtk/tr-window.c:758 ../gtk/tr-window.c:769
 #, c-format
 msgid "size|Down: %1$s, Up: %2$s"
 msgstr "Le: %1$s, fel: %2$s"
 
-#: ../gtk/util.c:79
+#: ../gtk/util.c:90
 #, c-format
 msgid "%'u byte"
 msgid_plural "%'u bytes"
 msgstr[0] "%'u bájt"
 msgstr[1] "%'u bájt"
 
-#: ../gtk/util.c:87
+#: ../gtk/util.c:98
 #, c-format
 msgid "%'.1f KB"
 msgstr "%'.1f KB"
 
-#: ../gtk/util.c:92
+#: ../gtk/util.c:103
 #, c-format
 msgid "%'.1f MB"
 msgstr "%'.1f MB"
 
-#: ../gtk/util.c:97
+#: ../gtk/util.c:108
 #, c-format
 msgid "%'.1f GB"
 msgstr "%'.1f GB"
 
 #. 0.0 KB to 999.9 KB
-#: ../gtk/util.c:112
+#: ../gtk/util.c:123
 #, c-format
 msgid "%'.1f KB/s"
 msgstr "%'.1f KB/s"
 
 #. 0.98 MB to 99.99 MB
-#: ../gtk/util.c:114
+#: ../gtk/util.c:125
 #, c-format
 msgid "%'.2f MB/s"
 msgstr "%'.2f MB/s"
 
 #. 100.0 MB to 999.9 MB
-#: ../gtk/util.c:116
+#: ../gtk/util.c:127
 #, c-format
 msgid "%'.1f MB/s"
 msgstr "%'.1f MB/s"
 
 #. insane speeds
-#: ../gtk/util.c:118
+#: ../gtk/util.c:129
 #, c-format
 msgid "%'.2f GB/s"
 msgstr "%'.2f GB/s"
 
-#: ../gtk/util.c:139
+#: ../gtk/util.c:150
 #, c-format
 msgid "%'d day"
 msgid_plural "%'d days"
 msgstr[0] "%'d nap"
 msgstr[1] "%'d nap"
 
-#: ../gtk/util.c:141
+#: ../gtk/util.c:152
 #, c-format
 msgid "%'d hour"
 msgid_plural "%'d hours"
 msgstr[0] "%'d óra"
 msgstr[1] "%'d óra"
 
-#: ../gtk/util.c:144
+#: ../gtk/util.c:155
 #, c-format
 msgid "%'d minute"
 msgid_plural "%'d minutes"
 msgstr[0] "%'d perc"
 msgstr[1] "%'d perc"
 
-#: ../gtk/util.c:146
+#: ../gtk/util.c:157
 #, c-format
 msgid "%'d second"
 msgid_plural "%'d seconds"
 msgstr[0] "%'d mp."
 msgstr[1] "%'d mp."
 
-#: ../gtk/util.c:376
+#: ../gtk/util.c:378
 #, c-format
 msgid "The torrent file \"%s\" contains invalid data."
 msgstr "A torrentfájl („%s”) érvénytelen adatokat tartalmaz."
 
-#: ../gtk/util.c:380
+#: ../gtk/util.c:382
 #, c-format
 msgid "The torrent file \"%s\" is already in use."
 msgstr "A torrentfájl („%s”) már használatban van."
 
-#: ../gtk/util.c:384
+#: ../gtk/util.c:386
 #, c-format
 msgid "The torrent file \"%s\" encountered an unknown error."
 msgstr "A torrentfájl („%s”) ismeretlen hibát észlelt."
 
-#: ../gtk/util.c:396
+#: ../gtk/util.c:398
 msgid "Error opening torrent"
 msgstr "Hiba történt a torrent megnyitásakor"
 
 #. did caller give us an uninitialized val?
-#: ../libtransmission/bencode.c:1034
+#: ../libtransmission/bencode.c:986
 msgid "Invalid metadata"
 msgstr "Érvénytelen metaadat"
 
@@ -1363,17 +1464,17 @@ msgstr "A blokkolási lista („%1$s”) %2$'d bejegyzéssel frissítve"
 msgid "Couldn't read resume file"
 msgstr "A folytatáshoz szükséges adatok nem olvashatók"
 
-#: ../libtransmission/fdlimit.c:296
+#: ../libtransmission/fdlimit.c:217
 #, c-format
 msgid "Couldn't create \"%1$s\": parent folder \"%2$s\" does not exist"
 msgstr "A(z) „%1$s” nem hozható létre: a szülőmappa („%2$s”) nem létezik."
 
-#: ../libtransmission/fdlimit.c:319
+#: ../libtransmission/fdlimit.c:240
 #, c-format
 msgid "Preallocated file \"%s\""
 msgstr "A fájl előzetesen lefoglalva: „%s”"
 
-#: ../libtransmission/fdlimit.c:583
+#: ../libtransmission/fdlimit.c:517 ../libtransmission/net.c:391
 #, c-format
 msgid "Couldn't create socket: %s"
 msgstr "A socket létrehozása sikertelen: %s"
@@ -1383,7 +1484,7 @@ msgstr "A socket létrehozása sikertelen: %s"
 msgid "Torrent Creator is skipping file \"%s\": %s"
 msgstr "A torrentkészítő kihagyja a(z) „%s” fájlt: %s"
 
-#: ../libtransmission/metainfo.c:458
+#: ../libtransmission/metainfo.c:457
 #, c-format
 msgid "Invalid metadata entry \"%s\""
 msgstr "Érvénytelen metaadat-bejegyzés „%s”"
@@ -1412,14 +1513,14 @@ msgstr "a port (%d) már nincs átirányítva"
 msgid "Port %d forwarded successfully"
 msgstr "A port (%d) sikeresen átirányítva"
 
-#: ../libtransmission/net.c:357
+#: ../libtransmission/net.c:519
 #, c-format
 msgid "Couldn't connect socket %d to %s, port %d (errno %d - %s)"
 msgstr ""
 "A foglalat (%d) nem csatlakoztatható a következőhöz: %s, port: %d (hibaszám: "
 "%d - %s)"
 
-#: ../libtransmission/net.c:405
+#: ../libtransmission/net.c:572
 #, c-format
 msgid "Couldn't bind port %d on %s: %s"
 msgstr "Nem lehet csatlakoztatni a portot (%d) ezen: %s: %s"
@@ -1428,63 +1529,83 @@ msgstr "Nem lehet csatlakoztatni a portot (%d) ezen: %s: %s"
 msgid "Port Forwarding"
 msgstr "Portátirányítás"
 
-#: ../libtransmission/port-forwarding.c:59
+#: ../libtransmission/port-forwarding.c:64
 msgid "Starting"
 msgstr "Indítás"
 
-#: ../libtransmission/port-forwarding.c:60
+#: ../libtransmission/port-forwarding.c:68
 msgid "Forwarded"
 msgstr "Továbbítva"
 
-#: ../libtransmission/port-forwarding.c:61
+#: ../libtransmission/port-forwarding.c:72
 msgid "Stopping"
 msgstr "Leállítás"
 
-#: ../libtransmission/port-forwarding.c:62
+#: ../libtransmission/port-forwarding.c:76
 msgid "Not forwarded"
 msgstr "Nincs átirányítva"
 
-#: ../libtransmission/port-forwarding.c:86 ../libtransmission/torrent.c:1523
+#: ../libtransmission/port-forwarding.c:99 ../libtransmission/torrent.c:1322
 #, c-format
 msgid "State changed from \"%1$s\" to \"%2$s\""
 msgstr "Az állapot megváltoztatva: „%1$s” -> „%2$s”"
 
+#: ../libtransmission/port-forwarding.c:115
+#, c-format
+msgid "Closing port %d on %s"
+msgstr "A port (%d) bezárása a következőn: %s"
+
+#: ../libtransmission/port-forwarding.c:152
+#, c-format
+msgid "Opened port %d on %s to listen for incoming peer connections"
+msgstr ""
+"A bejövő kapcsolatok figyelésére szolgáló port (%d) kinyitva a következőn: %s"
+
+#: ../libtransmission/port-forwarding.c:160
+#, c-format
+msgid ""
+"Couldn't open port %d on %s to listen for incoming peer connections (errno "
+"%d - %s)"
+msgstr ""
+"Nem lehet megnyitni a portot (%d) a következőn: %s a bejövő "
+"partnerkapcsolatok figyelésére (hibaszám: %d - %s)"
+
 #. first %s is the application name
 #. second %s is the version number
-#: ../libtransmission/session.c:832
+#: ../libtransmission/session.c:575
 #, c-format
 msgid "%s %s started"
 msgstr "%s %s elindítva"
 
-#: ../libtransmission/session.c:1565
+#: ../libtransmission/session.c:997
 #, c-format
 msgid "Loaded %d torrents"
 msgstr "%d torrent betöltve"
 
-#: ../libtransmission/torrent.c:272
+#: ../libtransmission/torrent.c:202
 #, c-format
 msgid "Got %d peers from tracker"
 msgstr "%d partner érkezett a követőtől"
 
-#: ../libtransmission/torrent.c:286
+#: ../libtransmission/torrent.c:216
 #, c-format
 msgid "Tracker warning: \"%s\""
 msgstr "Követőfigyelmeztetés: „%s”"
 
-#: ../libtransmission/torrent.c:293
+#: ../libtransmission/torrent.c:223
 #, c-format
 msgid "Tracker error: \"%s\""
 msgstr "Követőhiba: „%s”"
 
-#: ../libtransmission/torrent.c:1449
+#: ../libtransmission/torrent.c:1265
 msgid "Done"
 msgstr "Kész"
 
-#: ../libtransmission/torrent.c:1452
+#: ../libtransmission/torrent.c:1268
 msgid "Complete"
 msgstr "Befejezve"
 
-#: ../libtransmission/torrent.c:1455
+#: ../libtransmission/torrent.c:1271
 msgid "Incomplete"
 msgstr "Hiányos"
 
@@ -1492,337 +1613,362 @@ msgstr "Hiányos"
 msgid "Port Forwarding (UPnP)"
 msgstr "Portátirányítás (UPnP)"
 
-#: ../libtransmission/upnp.c:104
+#: ../libtransmission/upnp.c:103
 #, c-format
 msgid "Found Internet Gateway Device \"%s\""
 msgstr "Megtalált internetátjáró-eszköz: „%s”"
 
-#: ../libtransmission/upnp.c:107
+#: ../libtransmission/upnp.c:106
 #, c-format
 msgid "Local Address is \"%s\""
 msgstr "A helyi cím: „%s”"
 
-#: ../libtransmission/upnp.c:158
+#: ../libtransmission/upnp.c:139
 #, c-format
 msgid "Stopping port forwarding through \"%s\", service \"%s\""
 msgstr "Portátirányítás leállítása ezen keresztül: „%s”, „%s” szolgáltatás"
 
-#: ../libtransmission/upnp.c:192
+#: ../libtransmission/upnp.c:173
 #, c-format
 msgid ""
 "Port forwarding through \"%s\", service \"%s\".  (local address: %s:%d)"
 msgstr ""
 "Portátirányítás ezen keresztül: „%s”, „%s” szolgáltatás (helyi cím: %s:%d)"
 
-#: ../libtransmission/upnp.c:197
+#: ../libtransmission/upnp.c:178
 msgid "Port forwarding successful!"
 msgstr "Port átirányítás sikeres!"
 
-#: ../libtransmission/utils.c:490
+#: ../libtransmission/utils.c:485
 msgid "Not a regular file"
 msgstr "Nem szabályos fájl"
 
-#: ../libtransmission/utils.c:508
+#: ../libtransmission/utils.c:503
 msgid "Memory allocation failed"
 msgstr "A memóriafoglalás meghiúsult"
 
 #. Node exists but isn't a folder
-#: ../libtransmission/utils.c:606
+#: ../libtransmission/utils.c:599
 #, c-format
 msgid "File \"%s\" is in the way"
 msgstr "A(z) „%s” fájl útban van"
 
-#: ../libtransmission/verify.c:212
+#: ../libtransmission/verify.c:144
 msgid "Verifying torrent"
 msgstr "Torrent ellenőrzése"
 
-#: ../libtransmission/verify.c:247
+#: ../libtransmission/verify.c:183
 msgid "Queued for verification"
 msgstr "Ellenőrzéshez sorba állítva"
 
-#: ../gtk/actions.c:56
-msgid "Sort by _ETA"
-msgstr ""
+#~ msgid "Open a torrent"
+#~ msgstr "Torrent megnyitása"
 
-#: ../gtk/actions.c:57
-msgid "Sort by Si_ze"
-msgstr ""
+#~ msgid "_Details"
+#~ msgstr "Rés_zletek"
 
-#: ../gtk/actions.c:90
-msgid "Speed _Limit Mode"
-msgstr ""
+#~ msgid "Bad IPC protocol version"
+#~ msgstr "Rossz IPC-protokoll verzió"
 
-#: ../gtk/actions.c:113
-msgid "Set _Location"
-msgstr ""
-
-#: ../gtk/conf.c:513 ../gtk/conf.c:518 ../gtk/conf.c:525
 #, c-format
-msgid "Importing \"%s\""
-msgstr ""
+#~ msgid "Couldn't set up IPC: %s"
+#~ msgstr "Az IPC beállítása sikertelen: %s"
 
-#: ../gtk/details.c:453
 #, c-format
-msgid ""
-"Use _Global setting  (currently: stop seeding when a torrent's ratio reaches "
-"%.2f)"
-msgstr ""
+#~ msgid "Couldn't set up socket: %s"
+#~ msgstr "A socket létrehozása sikertelen: %s"
 
-#: ../gtk/details.c:455
-msgid "Use _Global setting  (currently: seed regardless of ratio)"
-msgstr ""
+#~ msgid "Ask the running instance to quit"
+#~ msgstr "A futó példányból való kilépés kérése"
 
-#: ../gtk/details.c:535 ../gtk/tr-prefs.c:1385
-msgid "Speed"
-msgstr ""
+#~ msgid "_Quit Immediately"
+#~ msgstr "A_zonnali kilépés"
 
-#: ../gtk/details.c:537
-msgid "Honor global _limits"
-msgstr ""
-
-#: ../gtk/details.c:566
-msgid "_Bandwidth priority:"
-msgstr ""
-
-#: ../gtk/details.c:570
-msgid "Seed-Until Ratio"
-msgstr ""
-
-#: ../gtk/details.c:585
-msgid "Seed _regardless of ratio"
-msgstr ""
-
-#: ../gtk/details.c:594
-msgid "_Stop seeding when a torrent's ratio reaches"
-msgstr ""
-
-#: ../gtk/details.c:633
-msgid "Verifying local data"
-msgstr ""
-
-#: ../gtk/details.c:635
-msgid "Seeding"
-msgstr ""
-
-#: ../gtk/details.c:704
 #, c-format
-msgid "%1$s (%2$s verified in %3$d piece)"
-msgid_plural "%1$s (%2$s verified in %3$d pieces)"
-msgstr[0] ""
-msgstr[1] ""
+#~ msgid "Failed to load torrent file: %s"
+#~ msgid_plural "Failed to load torrent files: %s"
+#~ msgstr[0] ""
+#~ "A torrentfájl betöltése sikertelen:\n"
+#~ "%s"
+#~ msgstr[1] ""
+#~ "A torrentfájlok betöltése sikertelen:\n"
+#~ "%s"
 
-#: ../gtk/details.c:858
-msgid "Swarm speed:"
-msgstr ""
+#~ msgid "Torrent created"
+#~ msgstr "A torrent elkészült"
 
-#: ../gtk/details.c:944
-msgid "Private to this tracker -- DHT and PEX disabled"
-msgstr ""
+#~ msgid "Preferences"
+#~ msgstr "Beállítások"
 
-#: ../gtk/details.c:1088
-msgid "Destination:"
-msgstr ""
-
-#: ../gtk/details.c:1122
-msgid "Webseeds"
-msgstr ""
-
-#: ../gtk/details.c:1506
-msgid "Peer was discovered through DHT"
-msgstr ""
-
-#: ../gtk/details.c:1736
-msgid "None sent"
-msgstr ""
-
-#: ../gtk/details.c:2065
 #, c-format
-msgid "%'d Torrent Properties"
-msgstr ""
+#~ msgid "Stalled (%.1f%%)"
+#~ msgstr "Leállítva (%.1f%%)"
 
-#. %1$s is the torrent's total size,
-#. %2$s is how much we've uploaded,
-#. %3$s is our upload-to-download ratio,
-#. $4$s is the ratio we want to reach before we stop uploading
-#: ../gtk/torrent-cell-renderer.c:88
 #, c-format
-msgid "%1$s, uploaded %2$s (Ratio: %3$s Goal: %4$s)"
-msgstr ""
+#~ msgid "Stopped (%.1f%%)"
+#~ msgstr "Megállított (%.1f%%)"
 
-#: ../gtk/tr-prefs.c:311
-msgid "_Stop seeding torrents at ratio:"
-msgstr ""
+#~ msgid ""
+#~ "Failed to create the directory %s:\n"
+#~ "%s"
+#~ msgstr ""
+#~ "Nem sikerült a könyvtárat létrehozni: %s:\n"
+#~ "%s"
 
-#: ../gtk/tr-prefs.c:402
-#, c-format
-msgid "Blocklist now has %'d rule."
-msgid_plural "Blocklist now has %'d rules."
-msgstr[0] ""
-msgstr[1] ""
+#~ msgid "Choose a download directory"
+#~ msgstr "Letöltési könyvtár kiválasztása"
 
-#: ../gtk/tr-prefs.c:406
-msgid "<b>Update succeeded!</b>"
-msgstr ""
+#~ msgid "Choose a directory"
+#~ msgstr "Válasszon könyvtárat"
 
-#: ../gtk/tr-prefs.c:421
-msgid "Update Blocklist"
-msgstr ""
+#~ msgid "Info"
+#~ msgstr "Információ"
 
-#: ../gtk/tr-prefs.c:423
-msgid "Getting new blocklist..."
-msgstr ""
+#~ msgid "Confirm _quit"
+#~ msgstr "Kilépés _jóváhagyása"
 
-#: ../gtk/tr-prefs.c:458
-msgid "Plaintext Preferred"
-msgstr ""
+#~ msgid "For torrents added _normally:"
+#~ msgstr "_Grafikus felületről felvett torrentek esetén:"
 
-#: ../gtk/tr-prefs.c:459
-msgid "Encryption Preferred"
-msgstr ""
+#~ msgid "Use the torrent file where it is"
+#~ msgstr "A jelenlegi helyéről használja a torrentfájlt"
 
-#: ../gtk/tr-prefs.c:460
-msgid "Encryption Required"
-msgstr ""
+#~ msgid "Keep a copy of the torrent file"
+#~ msgstr "A torrentfájl másolatának megőrzése"
 
-#: ../gtk/tr-prefs.c:535
-msgid "Privacy"
-msgstr ""
+#~ msgid "Keep a copy and remove the original"
+#~ msgstr "Másolat megőrzése és az eredeti eltávolítása"
 
-#: ../gtk/tr-prefs.c:537
-msgid "_Encryption mode"
-msgstr ""
+#~ msgid "B"
+#~ msgstr "B"
 
-#: ../gtk/tr-prefs.c:541
-msgid "Use peer e_xchange (PEX)"
-msgstr ""
+#~ msgid "KiB"
+#~ msgstr "KiB"
 
-#: ../gtk/tr-prefs.c:545
-msgid "Use _distributed hash table (DHT)"
-msgstr ""
+#~ msgid "MiB"
+#~ msgstr "MiB"
 
-#: ../gtk/tr-prefs.c:1119
-msgid "Every Day"
-msgstr ""
+#~ msgid "GiB"
+#~ msgstr "GiB"
 
-#: ../gtk/tr-prefs.c:1120
-msgid "Weekdays"
-msgstr ""
+#~ msgid "TiB"
+#~ msgstr "TiB"
 
-#: ../gtk/tr-prefs.c:1121
-msgid "Weekends"
-msgstr ""
+#~ msgid "PiB"
+#~ msgstr "PiB"
 
-#: ../gtk/tr-prefs.c:1122
-msgid "Sunday"
-msgstr ""
+#~ msgid "EiB"
+#~ msgstr "EiB"
 
-#: ../gtk/tr-prefs.c:1123
-msgid "Monday"
-msgstr ""
+#~ msgid "%i %s"
+#~ msgstr "%i %s"
 
-#: ../gtk/tr-prefs.c:1124
-msgid "Tuesday"
-msgstr ""
+#~ msgid "%i %s %i %s"
+#~ msgstr "%i %s %i %s"
 
-#: ../gtk/tr-prefs.c:1125
-msgid "Wednesday"
-msgstr ""
+#~ msgid "N/A"
+#~ msgstr "N/A"
 
-#: ../gtk/tr-prefs.c:1126
-msgid "Thursday"
-msgstr ""
+#~ msgid "Sort by _Date Added"
+#~ msgstr "Hozzáadás _dátuma szerinti rendezés"
 
-#: ../gtk/tr-prefs.c:1127
-msgid "Friday"
-msgstr ""
+#~ msgid "Torrent Information"
+#~ msgstr "Torrentinformáció"
 
-#: ../gtk/tr-prefs.c:1128
-msgid "Saturday"
-msgstr ""
+#~ msgid "IPC parsing failed: %s"
+#~ msgstr "Az IPC feldolgozása sikertelen: %s"
 
-#: ../gtk/tr-prefs.c:1179
-msgid "Global Bandwidth Limits"
-msgstr ""
+#~ msgid "File _Type"
+#~ msgstr "Fájl_típus"
 
-#: ../gtk/tr-prefs.c:1199
-msgid "Speed Limit Mode"
-msgstr ""
+#~ msgid "Commen_t"
+#~ msgstr "Me_gjegyzés"
 
-#: ../gtk/tr-prefs.c:1206
-msgid "Limit do_wnload speed (KB/s):"
-msgstr ""
+#~ msgid "Program started %d times"
+#~ msgstr "A program %d alkalommal indult el"
 
-#: ../gtk/tr-prefs.c:1214
-msgid "When enabled, Speed Limit Mode overrides the Global Bandwidth Limits"
-msgstr ""
+#~ msgid "Speed Limits"
+#~ msgstr "Sebességkorlát"
 
-#: ../gtk/tr-prefs.c:1220
-msgid "Use Speed Limit Mode _between:"
-msgstr ""
+#~ msgid "_Remove"
+#~ msgstr "_Eltávolítás"
 
-#: ../gtk/tr-prefs.c:1235
-msgid "_On days:"
-msgstr ""
+#~ msgid "_Close"
+#~ msgstr "_Bezárás"
 
-#: ../gtk/tr-prefs.c:1268 ../gtk/tr-prefs.c:1330
-msgid "Status unknown"
-msgstr ""
+#~ msgid "_About Transmission"
+#~ msgstr "A _Transmission névjegye"
 
-#: ../gtk/tr-prefs.c:1301
-msgid "<i>Testing...</i>"
-msgstr ""
+#~ msgid "Secure"
+#~ msgstr "Biztonságos"
 
-#: ../gtk/tr-prefs.c:1325
-msgid "_Port for incoming connections:"
-msgstr ""
+#~ msgid "This will close all active torrents."
+#~ msgstr "Ez lezárja az összes aktív torrentet."
 
-#: ../gtk/tr-prefs.c:1333
-msgid "_Test Port"
-msgstr ""
+#~ msgid "Failed to create socket: %s"
+#~ msgstr "A socket létrehozása sikertelen: %s"
 
-#: ../gtk/tr-prefs.c:1340
-msgid "_Randomize the port every launch"
-msgstr ""
+#~ msgid "Failed to connect to %s: %s"
+#~ msgstr "Sikertelen kapcsolódás ehhez: %s: %s"
 
-#: ../gtk/tr-window.c:330
-msgid "Click to disable Speed Limit Mode"
-msgstr ""
+#~ msgid "Failed to set up socket: %s"
+#~ msgstr "A socket beállítása sikertelen: %s"
 
-#: ../gtk/tr-window.c:331
-msgid "Click to enable Speed Limit Mode"
-msgstr ""
+#~ msgid "Piece"
+#~ msgid_plural "Pieces"
+#~ msgstr[0] "Egység"
+#~ msgstr[1] "Egység"
 
-#: ../gtk/tr-window.c:630
-msgid "Unlimited"
-msgstr ""
+#~ msgid "Directory"
+#~ msgstr "Könyvtár"
 
-#: ../gtk/tr-window.c:697
-msgid "Seed Forever"
-msgstr ""
+#~ msgid "Error writing to \"%s\": %s"
+#~ msgstr "Nem sikerült írni ide: \"%s\": %s"
 
-#: ../gtk/tr-window.c:735
-msgid "Limit Download Speed"
-msgstr ""
+#~ msgid "Cumulative"
+#~ msgstr "Összesítő"
 
-#: ../gtk/tr-window.c:739
-msgid "Limit Upload Speed"
-msgstr ""
+#~ msgid "Uploading to %d of %d peer"
+#~ msgid_plural "Uploading to %d of %d peers"
+#~ msgstr[0] "%d / %d kapcsolat feltöltése"
+#~ msgstr[1] "%d / %d kapcsolat feltöltése"
 
-#: ../gtk/tr-window.c:746
-msgid "Stop Seeding at Ratio"
-msgstr ""
+#~ msgid "Seeding to %d of %d peer"
+#~ msgid_plural "Seeding to %d of %d peers"
+#~ msgstr[0] "Megosztás %d / %d partnerrel"
+#~ msgstr[1] "Megosztás %d / %d partnerrel"
 
-#: ../gtk/tr-window.c:780
-#, c-format
-msgid "Stop at Ratio (%s)"
-msgstr ""
+#~ msgid "Unrecognized state: %d"
+#~ msgstr "Ismeretlen állapot: %d"
 
-#: ../libtransmission/net.c:341
-#, c-format
-msgid "Couldn't set source address %s on %d: %s"
-msgstr ""
+#~ msgid "Down: %s  Up: %s"
+#~ msgstr "Le: %s, Fel: %s"
 
-#: ../libtransmission/upnp.c:144
-#, c-format
-msgid "Port %d isn't forwarded"
-msgstr ""
+#~ msgid "ZiB"
+#~ msgstr "ZiB"
+
+#~ msgid "YiB"
+#~ msgstr "YiB"
+
+#~ msgid "sec"
+#~ msgid_plural "secs"
+#~ msgstr[0] "mp"
+#~ msgstr[1] "mp"
+
+#~ msgid "min"
+#~ msgid_plural "mins"
+#~ msgstr[0] "perc"
+#~ msgstr[1] "perc"
+
+#~ msgid "hr"
+#~ msgid_plural "hrs"
+#~ msgstr[0] "óra"
+#~ msgstr[1] "óra"
+
+#~ msgid "Transfer files via Peer to Peer"
+#~ msgstr "Partnerek közötti adatátvitel"
+
+#~ msgid "_High"
+#~ msgstr "N_agy"
+
+#~ msgid "_Normal"
+#~ msgstr "_Közepes"
+
+#~ msgid "_Low"
+#~ msgstr "Ki_csi"
+
+#~ msgid "_Priority"
+#~ msgstr "_Prioritás"
+
+#~ msgid "Create _New Torrent"
+#~ msgstr "Új torrent _létrehozása"
+
+#~ msgid "Torrent creation aborted."
+#~ msgstr "A torrent létrehozása megszakítva."
+
+#~ msgid "Making Torrent..."
+#~ msgstr "Torrent létrehozása..."
+
+#~ msgid "Downloading from %d of %d connected peers"
+#~ msgstr "Letöltés %d / %d csatlakozott partnertől"
+
+#~ msgid "Seeding to %d of %d connected peers"
+#~ msgstr "Megosztás %d / %d kapcsolatban lévő partnerrel"
+
+#~ msgid "Downloading"
+#~ msgstr "Letöltés"
+
+#~ msgid "DL Rate"
+#~ msgstr "Letöltési arány"
+
+#~ msgid "Uploading"
+#~ msgstr "Feltöltés"
+
+#~ msgid "UL Rate"
+#~ msgstr "Feltöltési arány"
+
+#~ msgid "Peer wants our data"
+#~ msgstr "A partner az adatait kéri"
+
+#~ msgid "Refusing to send data to peer"
+#~ msgstr "Partnernek való adatküldés elutasítása"
+
+#~ msgid "Downloading from peer"
+#~ msgstr "Letöltés partnertől"
+
+#~ msgid "Requesting data from peer"
+#~ msgstr "Adatkérés partnertől"
+
+#~ msgid "Waiting to request data from peer"
+#~ msgstr "Várakozás a partnertől érkező adatra"
+
+#~ msgid "Peer will not send us data"
+#~ msgstr "A partner nem küld adatot"
+
+#~ msgid "Added:"
+#~ msgstr "Hozzáadott:"
+
+#~ msgid "_Info"
+#~ msgstr "_Információ"
+
+#~ msgid "_Files"
+#~ msgstr "_Fájlok"
+
+#~ msgid "_Limit Upload Speed (KiB/s)"
+#~ msgstr "_Feltöltési sebességkorlát (KiB/mp)"
+
+#~ msgid "Li_mit Download Speed (KiB/s)"
+#~ msgstr "L_etöltési sebességkorlát (KiB/mp)"
+
+#~ msgid "Downloads"
+#~ msgstr "Letöltések"
+
+#~ msgid "P_rompt for download directory"
+#~ msgstr "Ké_rdezze meg a letöltési könyvtárat"
+
+#~ msgid "For torrents added from _command-line:"
+#~ msgstr "_Parancssorból felvett torrentek esetén:"
+
+#~ msgid "Global maximum connected peers:"
+#~ msgstr "Kapcsolatban lévő partnerek maximális száma:"
+
+#~ msgid "_Automatically map port"
+#~ msgstr "Port _automatikus összerendelése"
+
+#~ msgid "NAT traversal uses either NAT-PMP or UPnP"
+#~ msgstr "A NAT-fordítás NAT-PMP-t vagy UPnP-t használ"
+
+#~ msgid "%d of %d Transfers"
+#~ msgstr "%d / %d átvitel"
+
+#~ msgid "%d Transfers"
+#~ msgstr "%d átvitel"
+
+#~ msgid "Ratio: %.1f"
+#~ msgstr "Arány: %.1f"
+
+#~ msgid "Show Message _Log"
+#~ msgstr "Üzenetnap_ló megjelenítése"
+
+#~ msgid "Handshaking"
+#~ msgstr "Kapcsolatfelvétel"

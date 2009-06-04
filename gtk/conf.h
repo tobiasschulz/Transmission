@@ -31,9 +31,6 @@
 int64_t          pref_int_get           ( const char * key );
 void             pref_int_set           ( const char * key, int64_t value );
 
-double           pref_double_get        ( const char * key );
-void             pref_double_set        ( const char * key, double value );
-
 gboolean         pref_flag_get          ( const char * key );
 void             pref_flag_set          ( const char * key, gboolean value );
 

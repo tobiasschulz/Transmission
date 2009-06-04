@@ -303,7 +303,7 @@ onSourceActivated( GtkEditable * editable,
 
     if( ui->builder )
         tr_metaInfoBuilderFree( ui->builder );
-    ui->builder = tr_metaInfoBuilderCreate( filename );
+    ui->builder = tr_metaInfoBuilderCreate( ui->session, filename );
     refreshFromBuilder( ui );
 }
 
@@ -426,7 +426,7 @@ make_meta_ui( GtkWindow  * parent,
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title( t, &row, _( "Trackers" ) );
 
-    w = tracker_list_new( session, -1, TRUE );
+    w = tracker_list_new( NULL );
 
     n = pref_int_get( ANNOUNCE_KEY"-count" );
     if( n > 0 )

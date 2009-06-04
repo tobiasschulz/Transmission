@@ -33,21 +33,20 @@ function testSafari3()
 };
 
 $(document).ready( function() {
+	// Initialise a torrent controller to handle events
+	
 	// Initialise the dialog controller
 	dialog = new Dialog();
 	
 	// Initialise the main Transmission controller
 	transmission = new Transmission();
 
-	// IE specific fixes here
-	if ($.browser.msie) {
-		try {
-		  document.execCommand("BackgroundImageCache", false, true);
-		} catch(err) {}
-		$('.dialog_container').css('height',$(window).height()+'px');
-	}
-
 	if ($.browser.safari) {
+		
+		// Fix div height problem - causes scrollbar flash in
+		// firefox so have to be safari-specific
+		$('#torrent_inspector').css('height', '100%');
+		
 		// Move search field's margin down for the styled input
 		$('#torrent_search').css('margin-top', 3);		
 	}
@@ -89,18 +88,12 @@ Array.prototype.clone = function () {
 /**
  * "innerHTML = html" is pretty slow in FF.  Happily a lot of our innerHTML
  * changes are triggered by periodic refreshes on torrents whose state hasn't
- * changed since the last update, so even this simple test helps a lot.
+ * changed sine the last update, so even this simple test helps a lot.
  */
 function setInnerHTML( e, html )
 {
-	/* innerHTML is listed as a string, but the browser seems to change it.
-	 * For example, "&infin;" gets changed to "∞" somewhere down the line.
-	 * So, let's use an arbitrary  different field to test our state... */
-	if( e.currentHTML != html )
-	{
-		e.currentHTML = html;
+	if( e.innerHTML != html )
 		e.innerHTML = html;
-	}
 };
 
 /*
@@ -218,7 +211,7 @@ Math.roundWithPrecision = function(floatnum, precision) {
  */
 Math.ratio = function( numerator, denominator )
 {
-	var result = Math.floor(100 * numerator / denominator) / 100;
+	var result = Math.roundWithPrecision((numerator / denominator), 2);
 
 	// check for special cases
 	if (isNaN(result)) result = 0;

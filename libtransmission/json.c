@@ -15,6 +15,7 @@
 #include <errno.h>
 #include <string.h>
 #include <stdio.h> /* printf */
+#include <locale.h>
 
 #include <event.h> /* evbuffer */
 
@@ -92,9 +93,19 @@ callback( void *             vdata,
             break;
 
         case JSON_T_FLOAT:
+        {
+            char buf[128];
+            char locale[128];
+
+            tr_strlcpy( locale, setlocale( LC_NUMERIC, NULL ), sizeof( locale ) );
+            setlocale( LC_NUMERIC, "POSIX" );
+            tr_snprintf( buf, sizeof( buf ), "%f", (double)value->vu.float_value );
+            setlocale( LC_NUMERIC, locale );
+
+            tr_bencInitStr( getNode( data ), buf, -1 );
             data->hasContent = TRUE;
-            tr_bencInitReal( getNode( data ), (double)value->vu.float_value );
             break;
+        }
 
         case JSON_T_NULL:
             data->hasContent = TRUE;
@@ -108,12 +119,12 @@ callback( void *             vdata,
 
         case JSON_T_TRUE:
             data->hasContent = TRUE;
-            tr_bencInitBool( getNode( data ), 1 );
+            tr_bencInitInt( getNode( data ), 1 );
             break;
 
         case JSON_T_FALSE:
             data->hasContent = TRUE;
-            tr_bencInitBool( getNode( data ), 0 );
+            tr_bencInitInt( getNode( data ), 0 );
             break;
 
         case JSON_T_STRING:
@@ -134,8 +145,7 @@ callback( void *             vdata,
 }
 
 int
-tr_jsonParse( const char     * source,
-              const void     * vbuf,
+tr_jsonParse( const void     * vbuf,
               size_t           len,
               tr_benc        * setme_benc,
               const uint8_t ** setme_end )
@@ -145,7 +155,7 @@ tr_jsonParse( const char     * source,
     int                         err = 0;
     const unsigned char       * buf = vbuf;
     const void                * bufend = buf + len;
-    JSON_config                 config;
+    struct JSON_config_struct   config;
     struct JSON_parser_struct * checker;
     struct json_benc_data       data;
 
@@ -171,10 +181,7 @@ tr_jsonParse( const char     * source,
     }
 
     if( buf != bufend ) {
-        if( source )
-            tr_err( "JSON parser failed in %s at line %d, column %d: \"%.16s\"", source, line, column, buf );
-        else
-            tr_err( "JSON parser failed at line %d, column %d: \"%.16s\"", line, column, buf );
+        tr_err( "JSON parser failed at line %d, column %d: \"%.16s\"", line, column, buf );
         err = EILSEQ;
     }
 

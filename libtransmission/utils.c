@@ -10,17 +10,13 @@
  * $Id$
  */
 
-#ifdef HAVE_MEMMEM
- #define _GNU_SOURCE /* glibc's string.h needs this to pick up memmem */
-#endif
-
 #include <assert.h>
 #include <ctype.h> /* isalpha, tolower */
 #include <errno.h>
 #include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h> /* strerror, memset, memmem */
+#include <string.h> /* strerror, memset */
 
 #include <libgen.h> /* basename */
 #include <sys/time.h>
@@ -36,7 +32,6 @@
 #endif
 
 #include "transmission.h"
-#include "fdlimit.h"
 #include "ConvertUTF.h"
 #include "list.h"
 #include "utils.h"
@@ -183,8 +178,8 @@ tr_freeMessageList( tr_msg_list * list )
 ***
 **/
 
-struct tm *
-tr_localtime_r( const time_t *_clock, struct tm *_result )
+static struct tm *
+tr_localtime_r( time_t *_clock, struct tm *_result )
 {
 #ifdef HAVE_LOCALTIME_R
     return localtime_r( _clock, _result );
@@ -270,9 +265,8 @@ tr_deepLog( const char  * file,
         evbuffer_add_vprintf( buf, fmt, args );
         va_end( args );
         evbuffer_add_printf( buf, " (%s:%d)\n", base, line );
-        /* FIXME(libevent2) ifdef this out for nonwindows platforms */
         OutputDebugString( EVBUFFER_DATA( buf ) );
-        if(fp) /* FIXME(libevent2) tr_getLog() should return an fd, then use evbuffer_write() here ) */
+        if(fp)
             (void) fwrite( EVBUFFER_DATA( buf ), 1, EVBUFFER_LENGTH( buf ), fp );
 
         tr_free( base );
@@ -294,11 +288,13 @@ tr_msgLoggingIsActive( int level )
 }
 
 void
-tr_msg( const char * file, int line,
-        int level, const char * name,
-        const char * fmt, ... )
+tr_msg( const char * file,
+        int          line,
+        int          level,
+        const char * name,
+        const char * fmt,
+        ... )
 {
-    const int err = errno; /* message logging shouldn't affect errno */
     FILE * fp;
     tr_msgInit( );
     tr_lockLock( messageLock );
@@ -353,7 +349,6 @@ tr_msg( const char * file, int line,
     }
 
     tr_lockUnlock( messageLock );
-    errno = err;
 }
 
 /***
@@ -470,10 +465,9 @@ uint8_t *
 tr_loadFile( const char * path,
              size_t *     size )
 {
-    uint8_t * buf;
+    uint8_t *    buf;
     struct stat  sb;
-    int fd;
-    ssize_t n;
+    FILE *       file;
     const char * err_fmt = _( "Couldn't read \"%1$s\": %2$s" );
 
     /* try to stat the file */
@@ -494,36 +488,34 @@ tr_loadFile( const char * path,
     }
 
     /* Load the torrent file into our buffer */
-    fd = tr_open_file_for_scanning( path );
-    if( fd < 0 )
+    file = fopen( path, "rb" );
+    if( !file )
     {
         const int err = errno;
         tr_err( err_fmt, path, tr_strerror( errno ) );
         errno = err;
         return NULL;
     }
-    buf = malloc( sb.st_size + 1 );
+    buf = malloc( sb.st_size );
     if( !buf )
     {
         const int err = errno;
         tr_err( err_fmt, path, _( "Memory allocation failed" ) );
-        tr_close_file( fd );
+        fclose( file );
         errno = err;
         return NULL;
     }
-    n = read( fd, buf, sb.st_size );
-    if( n == -1 )
+    if( fread( buf, sb.st_size, 1, file ) != 1 )
     {
         const int err = errno;
         tr_err( err_fmt, path, tr_strerror( errno ) );
-        tr_close_file( fd );
+        fclose( file );
         free( buf );
         errno = err;
         return NULL;
     }
 
-    tr_close_file( fd );
-    buf[ sb.st_size ] = '\0';
+    fclose( file );
     *size = sb.st_size;
     return buf;
 }
@@ -686,25 +678,6 @@ tr_strndup( const void * in, int len )
     }
 
     return out;
-}
-
-const char*
-tr_memmem( const char * haystack, size_t haystacklen,
-           const char * needle, size_t needlelen )
-{
-#ifdef HAVE_MEMMEM
-    return memmem( haystack, haystacklen, needle, needlelen );
-#else
-    size_t i;
-    if( !needlelen )
-        return haystack;
-    if( needlelen > haystacklen || !haystack || !needle )
-        return NULL;
-    for( i=0; i<=haystacklen-needlelen; ++i )
-        if( !memcmp( haystack+i, needle, needlelen ) )
-            return haystack+i;
-    return NULL;
-#endif
 }
 
 char*
@@ -1553,109 +1526,4 @@ tr_parseNumberRange( const char * str_in, int len, int * setmeCount )
     /* return the result */
     *setmeCount = n;
     return uniq;
-}
-
-/***
-****
-***/
-
-static void
-printf_double_without_rounding( char * buf, int buflen, double d, int places )
-{
-    char * pch;
-    char tmp[128];
-    int len;
-    tr_snprintf( tmp, sizeof( tmp ), "%'.64f", d );
-    pch = tmp;
-    while( isdigit( *pch ) ) ++pch; /* walk to the decimal point */
-    ++pch; /* walk over the decimal point */
-    pch += places;
-    len = MIN( buflen - 1, pch - tmp );
-    memcpy( buf, tmp, len );
-    buf[len] = '\0';
-}
-
-char*
-tr_strratio( char * buf, size_t buflen, double ratio, const char * infinity )
-{
-    if( (int)ratio == TR_RATIO_NA )
-        tr_strlcpy( buf, _( "None" ), buflen );
-    else if( (int)ratio == TR_RATIO_INF )
-        tr_strlcpy( buf, infinity, buflen );
-    else if( ratio < 10.0 )
-        printf_double_without_rounding( buf, buflen, ratio, 2 );
-    else if( ratio < 100.0 )
-        printf_double_without_rounding( buf, buflen, ratio, 1 );
-    else
-        tr_snprintf( buf, buflen, "%'.0f", ratio );
-    return buf;
-}
-
-/***
-****
-***/
-
-int
-tr_moveFile( const char * oldpath, const char * newpath )
-{
-    int in;
-    int out;
-    char * buf;
-    struct stat st;
-    size_t bytesLeft;
-    size_t buflen;
-
-    /* make sure the old file exists */
-    if( stat( oldpath, &st ) ) {
-        const int err = errno;
-        errno = err;
-        return -1;
-    }
-    if( !S_ISREG( st.st_mode ) ) {
-        errno = ENOENT;
-        return -1;
-    }
-    bytesLeft = st.st_size;
-
-    /* make sure the target directory exists */
-    {
-        char * newdir = tr_dirname( newpath );
-        int i = tr_mkdirp( newdir, 0777 );
-        tr_free( newdir );
-        if( i )
-            return i;
-    }
-
-    /* they  might be on the same filesystem... */
-    if( !rename( oldpath, newpath ) )
-        return 0;
-
-    /* copy the file */
-    in = tr_open_file_for_scanning( oldpath );
-    tr_preallocate_file( newpath, bytesLeft );
-    out = tr_open_file_for_writing( newpath );
-    buflen = stat( newpath, &st ) ? 4096 : st.st_blksize;
-    buf = tr_new( char, buflen );
-    while( bytesLeft > 0 )
-    {
-        ssize_t bytesWritten;
-        const size_t bytesThisPass = MIN( bytesLeft, buflen );
-        const int numRead = read( in, buf, bytesThisPass );
-        if( numRead < 0 )
-            break;
-        bytesWritten = write( out, buf, numRead );
-        if( bytesWritten < 0 )
-            break;
-        bytesLeft -= bytesWritten;
-    }
-
-    /* cleanup */
-    tr_free( buf );
-    tr_close_file( out );
-    tr_close_file( in );
-    if( bytesLeft != 0 )
-        return -1;
-
-    unlink( oldpath );
-    return 0;
 }

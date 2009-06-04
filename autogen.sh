@@ -22,8 +22,6 @@ then
 fi
 export LIBTOOLIZE
 
-./update-version-h.sh
-
 autoreconf -fi -I m4
 
 if test "$GETTEXTIZE"; then

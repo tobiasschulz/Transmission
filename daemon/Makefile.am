@@ -21,16 +21,12 @@ LDADD = \
     $(top_builddir)/libtransmission/libtransmission.a \
     $(top_builddir)/third-party/miniupnp/libminiupnp.a \
     $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
-    $(top_builddir)/third-party/dht/libdht.a \
-    $(LIBEVENT_LIBS) \
+    $(top_builddir)/third-party/libevent/libevent.la \
     $(INTLLIBS) \
     $(LIBCURL_LIBS) \
     $(ZLIB_LIBS) \
     $(OPENSSL_LIBS) \
     $(PTHREAD_LIBS) -lm
 
-noinst_HEADERS = \
-    watch.h
-
-transmission_daemon_SOURCES = daemon.c watch.c
+transmission_daemon_SOURCES = daemon.c
 transmission_remote_SOURCES = remote.c

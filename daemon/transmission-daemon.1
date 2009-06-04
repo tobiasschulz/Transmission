@@ -11,8 +11,6 @@
 .Nm
 .Op Fl a Ar x.x.x.x,...
 .Op Fl b | B
-.Op Fl c Ar directory
-.Op Fl C
 .Op Fl f
 .Op Fl g Ar directory
 .Op Fl h
@@ -48,13 +46,6 @@ Example: "127.0.0.*,192.168.1.*"
 Enable peer blocklists.  Transmission understands the bluetack blocklist file format.
 New blocklists can be added by copying them into the config-dir's "blocklists" subdirectory.
 
-.It Fl c Ar directory
-Directory to watch for new .torrent files to be added.  As they are added to this directory,
-the daemon will load them into Transmission.
-
-.It Fl C
-Do not watch for new .torrent files.
-
 .It Fl B Fl -no-blocklist
 Disble blocklists.
 
@@ -73,16 +64,6 @@ Prefer unencrypted peer connections.
 
 .It Fl h Fl -help
 Print command-line option descriptions.
-
-.It Fl i Fl -bind-address-ipv4
-Listen for IPv4 BitTorrent connections on a specific address. Only one IPv4 listening address is allowed. Default: 0.0.0.0 (All addresses)
-.It Fl I Fl -bind-address-ipv6
-Listen for IPv6 BitTorrent connections on a specific address. Only one IPv6 listening address is allowed. Default: :: (All addresses)
-.It Fl r Fl -rpc-bind-address
-Listen for RPC connections on a specific address. This must be an IPv4 address. Only one RPC listening address is allowed. Default: 0.0.0.0 (All addresses)
-
-.It Fl -paused
-Pause all torrents on startup
 
 .It Fl L Fl -peerlimit-global Ar limit
 Overall peer limit. Useful on embedded systems where the default might be unsuitable. Default: 240

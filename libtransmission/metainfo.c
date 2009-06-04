@@ -74,7 +74,6 @@ getOldTorrentFilename( const tr_session * session,
     return ret;
 }
 
-/* this is for really old versions of T and will probably be removed someday */
 void
 tr_metainfoMigrate( tr_session * session,
                     tr_info *   inf )
@@ -366,8 +365,8 @@ tr_metainfoParseImpl( const tr_session * session,
         return "info";
     else
     {
-        int len;
-        char * bstr = tr_bencToStr( beInfo, TR_FMT_BENC, &len );
+        int    len;
+        char * bstr = tr_bencSave( beInfo, &len );
         tr_sha1( inf->hash, bstr, len, NULL );
         tr_sha1_to_hex( inf->hashString, inf->hash );
         tr_free( bstr );
@@ -441,7 +440,7 @@ tr_metainfoParseImpl( const tr_session * session,
 
     /* filename of Transmission's copy */
     tr_free( inf->torrent );
-    inf->torrent = session ?  getTorrentFilename( session, inf ) : NULL;
+    inf->torrent = getTorrentFilename( session, inf );
 
     return NULL;
 }

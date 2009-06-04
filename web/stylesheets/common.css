@@ -514,7 +514,6 @@ div#torrent_inspector {
 	border-left: 1px solid #888;
 	z-index: 2;
 	text-align: left;
-	overflow: auto;
 }
 div#torrent_inspector #torrent_inspector_name {
 	margin: 0;
@@ -533,25 +532,24 @@ div#inspector_header {
 	padding-right: 10px;
 }
 div#inspector_tabs {
-	width: 189px;
 	margin: 0 auto;
 	padding-top: 10px;
+	width: 140px;
 }
 .inspector_tab {
 	float: left;
-	height: 17px;
 	background: transparent url('../images/buttons/tab_backgrounds.png') left -1px repeat-x;
 	border: 1px solid #888;
 	margin: 0px 1px;
 	padding: 3px 15px; /* 3px == ((bg image height - fg image height) / 2) */
 	cursor: pointer;
 }
-#inspector_tabs .selected {
+#inspector_tabs > .selected {
 	background-position: left -26px; /* the highlighted part of the image */
 }
 .inspector_container {
-	margin: 3%;
-	width: 96%;
+	margin: 10px;
+	width: 330px; /* inspector_width==350 - ((margin==10)*2) */
 }
 .inspector_group {
 	display: table;
@@ -575,115 +573,6 @@ div#inspector_tabs {
 	display: table-cell;
 	padding-top: 10px;
 	width: 230px; /* inspector_container_width==330 - inspector_label_width==100 */
-}
-
-/* Files Inspector Tab */
-#inspector_file_list {
-	padding: 0 0 0 0;
-	margin: 0 0 0 0;
-	text-align: left;
-	cursor: default;
-	overflow: hidden;
-}
-ul.inspector_torrent_file_list {
-	width: 100%;
-	margin: 0  0 0 0;
-	padding-bottom: 10px;
-	text-align: left;
-	display: block;
-	cursor: default;
-	list-style-type: none;
-	list-style: none;
-	list-style-image: none;
-}
-li.inspector_torrent_file_list_entry {
-	padding: 3px 0 3px 2px;
-	display: block;
-}
-
-li.inspector_torrent_file_list_entry.skip {
-	color: #666;
-}
-
-li.inspector_torrent_file_list_entry.even {
-	background-color: #EEEEEE;
-}
-div.inspector_torrent_file_list_entry_name {
-	font-size: 1.2em;
-	font-weight: bold;
-	color: #222;
-	margin-left: 20px;
-}
-li.inspector_torrent_file_list_entry.skip>.inspector_torrent_file_list_entry_name {
-	color: #666;
-}
-li.inspector_torrent_file_list_entry.even {
-	background-color: #EEEEEE;
-}
-div.inspector_torrent_file_list_entry_progress {
-	font-size: 1em;
-	color: #666;
-	margin-left: 20px;
-} 
-div.file_wanted_control {
-	background-position: left -19px;
-	float: left;
-	position: absolute;
-	cursor: pointer;
-	margin: 3px 0 0 0;
-	width: 19px;
-	height: 19px;
-	background-image: url('../images/buttons/file_wanted_buttons.png');
-	background-repeat: no-repeat;
-	background-color: transparent;
-}
-
-li.inspector_torrent_file_list_entry.skip>.file_wanted_control {
-	background-position: left top;
-}
-
-li.inspector_torrent_file_list_entry.complete>.file_wanted_control {
-	background-position: left -19px;
-}
-
-ul.single_file li.inspector_torrent_file_list_entry>.file_wanted_control,
-li.inspector_torrent_file_list_entry.complete>.file_wanted_control {
-	background-position: left -38px;
-	cursor: default;
-}
-
-div.file_priority_control {
-	float: right;
-	margin: 4px 0 0 0;
-	width: 35px;
-	height: 19px;
-	background-image: url('../images/buttons/file_priority_buttons.png');
-	background-repeat: no-repeat;
-	background-color: transparent;
-	cursor: pointer;
-}
-div.file_priority_control.normal {
-	background-position: left top;
-}
-div.file_priority_control.normal:hover {
-	background-position: right top;
-}
-div.file_priority_control.high {
-	background-position: left -19px;
-}
-div.file_priority_control.high:hover {
-	background-position: right -19px;
-}
-div.file_priority_control.low {
-	background-position: left -38px;
-}
-div.file_priority_control.low:hover {
-	background-position: right -38px;
-}
-ul.single_file li.inspector_torrent_file_list_entry>.file_priority_control,
-li.inspector_torrent_file_list_entry.complete div.file_priority_control {
-  background-position: left -57px;
-  cursor: default;
 }
 
 /*--------------------------------------
@@ -765,10 +654,11 @@ div.dialog_container div.dialog_window {
 	text-align: left;
 	width: 420px;
 	z-index: 4;
-	overflow: hidden;
+	height: 145px;
 	position: relative;
 	-webkit-box-shadow: 0 3px 6px rgba(0,0,0,0.7);
 	top: 80px;
+	padding-bottom: 20px;
 }
 @media screen and (-webkit-min-device-pixel-ratio:0) {
 	div.dialog_container div.dialog_window {
@@ -780,6 +670,7 @@ div.dialog_container div.dialog_window {
 
 div#prefs_container div.dialog_window {
 	width: 410px;
+	height: 420px;
 	padding: 0 15px;
 }
 
@@ -801,14 +692,16 @@ div.dialog_container div.dialog_window div.dialog_message {
 	float: left;
 	padding-left: 3px;
 	margin-left: -3px;
+	margin-bottom: 10px;
 	width: 305px;
+	height: 55px;
 	overflow: hidden;
 }
 
 div.dialog_container div.dialog_window a {
 	display: block;
 	float: right;
-	margin: 10px 20px 10px -8px;
+	margin: 0px 20px 0px -8px;
 	padding: 5px;
 	background-color: #EEE;
 	border: 1px solid #787878;
@@ -825,7 +718,7 @@ div.dialog_container div.dialog_window a {
 
 div.dialog_container div.dialog_window a:hover,
 div.dialog_container div.dialog_window a:active {
-	background: #C0C8D6 url('../images/graphics/filter_bar.png') bottom repeat-x;
+	background: #C0C8D6 url('../images/graphics/filter_bar.png') repeat-x;
 }
 
 div#upload_container div.dialog_window div.dialog_message label {
@@ -1033,11 +926,13 @@ div#prefs_container div#pref_error {
 	background: transparent;
 	border: 1px solid rgba(0,0,0,0.1);
 	-webkit-border-radius: 5px;
+	min-width: 210px;
 }
 
 .trans_menu div.inner {
 	left: 0;
 	margin: 0;
+	min-width: 210px;
 }
 
 .trans_menu li.main {
@@ -1048,7 +943,7 @@ div#prefs_container div#pref_error {
 
 .trans_menu li.main li {
 	z-index: 2;
-	min-width: 78px;
+	min-width: 180px;
 }
 
 .trans_menu li.main.active {

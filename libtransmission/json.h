@@ -16,9 +16,7 @@
 extern "C" {
 #endif
 
-/** @ingroup tr_benc */
-int tr_jsonParse( const char * source, /* such as a filename.  only when logging an error */
-                  const void *     vbuf,
+int tr_jsonParse( const void *     vbuf,
                   size_t           len,
                   struct tr_benc * setme_benc,
                   const uint8_t ** setme_end );

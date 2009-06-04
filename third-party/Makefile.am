@@ -1,6 +1,9 @@
+SUBDIRS = \
+    libevent \
+    libnatpmp \
+    miniupnp
 
-SUBDIRS = libnatpmp miniupnp dht libevent
-
-EXTRA_DIST = macosx-libevent-config.h
+EXTRA_DIST = \
+    macosx-libevent-config.h
 
 install:

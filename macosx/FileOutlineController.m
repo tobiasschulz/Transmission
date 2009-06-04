@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2008-2009 Transmission authors and contributors
+ * Copyright (c) 2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -28,8 +28,9 @@
 #import "FilePriorityCell.h"
 #import "FileListNode.h"
 #import "QuickLookController.h"
+#import "NSApplicationAdditions.h"
 
-#define ROW_SMALL_HEIGHT 18.0
+#define ROW_SMALL_HEIGHT 18.0f
 
 typedef enum
 {
@@ -58,21 +59,17 @@ typedef enum
     [fOutline setTarget: self];
     
     //set table header tool tips
-    [[fOutline tableColumnWithIdentifier: @"Check"] setHeaderToolTip: NSLocalizedString(@"Download",
-                                                                        "file table -> header tool tip")];
-    [[fOutline tableColumnWithIdentifier: @"Priority"] setHeaderToolTip: NSLocalizedString(@"Priority",
-                                                                        "file table -> header tool tip")];
+    if ([NSApp isOnLeopardOrBetter])
+    {
+        [[fOutline tableColumnWithIdentifier: @"Check"] setHeaderToolTip: NSLocalizedString(@"Download",
+                                                                            "file table -> header tool tip")];
+        [[fOutline tableColumnWithIdentifier: @"Priority"] setHeaderToolTip: NSLocalizedString(@"Priority",
+                                                                            "file table -> header tool tip")];
+    }
     
     [fOutline setMenu: [self menu]];
     
     [self setTorrent: nil];
-}
-
-- (void) dealloc
-{
-    [fFileList release];
-    [fFilterText release];
-    [super dealloc];
 }
 
 - (FileOutlineView *) outlineView
@@ -80,46 +77,17 @@ typedef enum
     return fOutline;
 }
 
+- (void) outlineViewSelectionDidChange: (NSNotification *) notification
+{
+    [[QuickLookController quickLook] updateQuickLook];
+}
+
 - (void) setTorrent: (Torrent *) torrent
 {
     fTorrent = torrent;
     [fOutline setTorrent: fTorrent];
     
-    [fFileList release];
-    fFileList = [[fTorrent fileList] retain];
-    
-    [fFilterText release];
-    fFilterText = nil;
-    
     [fOutline deselectAll: nil];
-    [fOutline reloadData];
-}
-
-- (void) setFilterText: (NSString *) text
-{
-    if ([text isEqualToString: @""])
-        text = nil;
-    
-    if ((!text && !fFilterText) || (text && fFilterText && [text isEqualToString: fFilterText]))
-        return;
-    
-    [fFilterText release];
-    fFilterText = [text retain];
-    
-    [fFileList release];
-    if (!fFilterText)
-        fFileList = [[fTorrent fileList] retain];
-    else
-    {
-        NSMutableArray * list = [NSMutableArray arrayWithCapacity: [fTorrent fileCount]];
-        
-        for (FileListNode * node in [fTorrent flatFileList])
-            if ([[node name] rangeOfString: fFilterText options: NSCaseInsensitiveSearch].location != NSNotFound)
-                [list addObject: node];
-        
-        fFileList = [[NSArray alloc] initWithArray: list];
-    }
-    
     [fOutline reloadData];
 }
 
@@ -129,15 +97,10 @@ typedef enum
     [fOutline reloadData];
 }
 
-- (void) outlineViewSelectionDidChange: (NSNotification *) notification
-{
-    [[QuickLookController quickLook] updateQuickLook];
-}
-
 - (NSInteger) outlineView: (NSOutlineView *) outlineView numberOfChildrenOfItem: (id) item
 {
     if (!item)
-        return fFileList ? [fFileList count] : 0;
+        return fTorrent ? [[fTorrent fileList] count] : 0;
     else
     {
         FileListNode * node = (FileListNode *)item;
@@ -152,7 +115,7 @@ typedef enum
 
 - (id) outlineView: (NSOutlineView *) outlineView child: (NSInteger) index ofItem: (id) item
 {
-    return [(item ? [(FileListNode *)item children] : fFileList) objectAtIndex: index];
+    return [(item ? [(FileListNode *)item children] : [fTorrent fileList]) objectAtIndex: index];
 }
 
 - (id) outlineView: (NSOutlineView *) outlineView objectValueForTableColumn: (NSTableColumn *) tableColumn byItem: (id) item
@@ -287,7 +250,7 @@ typedef enum
 
 - (void) setPriority: (id) sender
 {
-    tr_priority_t priority;
+    NSInteger priority;
     switch ([sender tag])
     {
         case FILE_PRIORITY_HIGH_TAG:
@@ -332,7 +295,7 @@ typedef enum
         NSIndexSet * indexSet = [fOutline selectedRowIndexes];
         for (NSInteger i = [indexSet firstIndex]; i != NSNotFound; i = [indexSet indexGreaterThanIndex: i])
             if ([[NSFileManager defaultManager] fileExistsAtPath:
-                    [downloadFolder stringByAppendingPathComponent: [[fFileList objectAtIndex: i] fullPath]]])
+                    [downloadFolder stringByAppendingPathComponent: [[[fTorrent fileList] objectAtIndex: i] fullPath]]])
                 return YES;
         return NO;
     }
@@ -374,7 +337,7 @@ typedef enum
         
         //determine which priorities are checked
         NSIndexSet * indexSet = [fOutline selectedRowIndexes];
-        tr_priority_t priority;
+        NSInteger priority;
         switch ([menuItem tag])
         {
             case FILE_PRIORITY_HIGH_TAG:
@@ -478,7 +441,7 @@ typedef enum
     [menu addItem: [NSMenuItem separatorItem]];
     
     //reveal in finder
-    item = [[NSMenuItem alloc] initWithTitle: NSLocalizedString(@"Show in Finder", "File Outline -> Menu")
+    item = [[NSMenuItem alloc] initWithTitle: NSLocalizedString(@"Reveal in Finder", "File Outline -> Menu")
             action: @selector(revealFile:) keyEquivalent: @""];
     [item setTarget: self];
     [menu addItem: item];

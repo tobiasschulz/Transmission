@@ -23,11 +23,6 @@
 
 struct tr_peerIo;
 
-/**
- * @addtogroup networked_io Networked IO
- * @{
- */
-
 /* these are PRIVATE IMPLEMENTATION details that should not be touched.
  * it's included in the header for inlining and composition. */
 enum
@@ -105,7 +100,6 @@ typedef struct tr_bandwidth
 
     struct tr_band band[2];
     struct tr_bandwidth * parent;
-    tr_priority_t priority;
     int magicNumber;
     tr_session * session;
     tr_ptrArray children; /* struct tr_bandwidth */
@@ -248,15 +242,6 @@ static TR_INLINE void tr_bandwidthHonorParentLimits ( tr_bandwidth        * band
     bandwidth->band[direction].honorParentLimits = isEnabled;
 }
 
-static TR_INLINE tr_bool tr_bandwidthAreParentLimitsHonored( tr_bandwidth  * bandwidth,
-                                                             tr_direction    direction )
-{
-    assert( tr_isBandwidth( bandwidth ) );
-    assert( tr_isDirection( direction ) );
-
-    return bandwidth->band[direction].honorParentLimits;
-}
-
 /******
 *******
 ******/
@@ -264,5 +249,4 @@ static TR_INLINE tr_bool tr_bandwidthAreParentLimitsHonored( tr_bandwidth  * ban
 void tr_bandwidthSetPeer( tr_bandwidth        * bandwidth,
                           struct tr_peerIo    * peerIo );
 
-/* @} */
 #endif

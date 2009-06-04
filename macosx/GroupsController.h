@@ -1,7 +1,7 @@
 /******************************************************************************
  * $Id$
  *
- * Copyright (c) 2007-2009 Transmission authors and contributors
+ * Copyright (c) 2007-2008 Transmission authors and contributors
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -23,7 +23,6 @@
  *****************************************************************************/
 
 #import <Cocoa/Cocoa.h>
-#import "Torrent.h"
 
 @interface GroupsController : NSObject
 {
@@ -45,24 +44,11 @@
 - (NSColor *) colorForIndex: (NSInteger) index;
 - (void) setColor: (NSColor *) color forIndex: (NSInteger) index;
 
-- (BOOL) usesCustomDownloadLocationForIndex: (NSInteger) index;
-- (void) setUsesCustomDownloadLocation: (BOOL) useCustomLocation forIndex: (NSInteger) index;
-
-- (NSString *) customDownloadLocationForIndex: (NSInteger) index;
-- (void) setCustomDownloadLocation: (NSString *) location forIndex: (NSInteger) index;
-
-- (BOOL) usesAutoAssignRulesForIndex: (NSInteger) index;
-- (void) setUsesAutoAssignRules: (BOOL) useAutoAssignRules forIndex: (NSInteger) index;
-
-- (NSPredicate *) autoAssignRulesForIndex: (NSInteger) index;
-- (void) setAutoAssignRules: (NSPredicate *) predicate forIndex: (NSInteger) index;
-
 - (void) addNewGroup;
-- (void) removeGroupWithRowIndex: (NSInteger) row;
+- (void) removeGroupWithRowIndexes: (NSIndexSet *) rowIndexes;
 
-- (void) moveGroupAtRow: (NSInteger) oldRow toRow: (NSInteger) newRow;
+- (NSIndexSet *) moveGroupsAtRowIndexes: (NSIndexSet *) indexes toRow: (NSInteger) newRow oldSelected: (NSIndexSet *) selectedIndexes;
 
 - (NSMenu *) groupMenuWithTarget: (id) target action: (SEL) action isSmall: (BOOL) small;
 
-- (NSInteger) groupIndexForTorrent: (Torrent *) torrent;
 @end

@@ -4,7 +4,6 @@
 #include "transmission.h"
 #include "session.h"
 #include "utils.h"
-#include "version.h"
 
 #undef VERBOSE
 

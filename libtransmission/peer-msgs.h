@@ -25,11 +25,6 @@ struct tr_torrent;
 struct tr_peer;
 struct tr_bitfield;
 
-/**
- * @addtogroup peers Peers
- * @{
- */
-
 typedef struct tr_peermsgs tr_peermsgs;
 
 tr_peermsgs* tr_peerMsgsNew( struct tr_torrent * torrent,
@@ -70,5 +65,4 @@ size_t       tr_generateAllowedSet( tr_piece_index_t  * setmePieces,
                                     const tr_address  * addr );
 
 
-/* @} */
 #endif

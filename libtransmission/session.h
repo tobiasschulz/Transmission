@@ -39,7 +39,6 @@
  #endif
 #endif
 
-#include "bencode.h"
 
 typedef enum { TR_NET_OK, TR_NET_ERROR, TR_NET_WAIT } tr_tristate_t;
 
@@ -55,39 +54,21 @@ struct tr_metainfo_lookup
 
 struct tr_address;
 struct tr_bandwidth;
-struct tr_bindsockets;
 
 struct tr_session
 {
+    tr_bool                      isPortSet;
     tr_bool                      isPortRandom;
     tr_bool                      isPexEnabled;
-    tr_bool                      isDHTEnabled;
     tr_bool                      isBlocklistEnabled;
     tr_bool                      isProxyEnabled;
     tr_bool                      isProxyAuthEnabled;
     tr_bool                      isClosed;
     tr_bool                      isWaiting;
     tr_bool                      useLazyBitfield;
-    tr_bool                      isRatioLimited;
 
-    tr_benc                      removedTorrents;
-    
+    tr_bool                      isSpeedLimited[2];
     int                          speedLimit[2];
-    tr_bool                      speedLimitEnabled[2];
-
-    int                          altSpeed[2];
-    tr_bool                      altSpeedEnabled;
-
-    int                          altSpeedTimeBegin;
-    int                          altSpeedTimeEnd;
-    tr_sched_day                 altSpeedTimeDay;
-    tr_bool                      altSpeedTimeEnabled;
-    tr_bool                      altSpeedChangedByUser;
-
-    tr_altSpeedFunc            * altCallback;
-    void                       * altCallbackUserData;
-
-
     int                          magicNumber;
 
     tr_encryption_mode           encryptionMode;
@@ -140,8 +121,6 @@ struct tr_session
     struct tr_metainfo_lookup *  metainfoLookup;
     int                          metainfoLookupCount;
 
-    struct event               * altTimer;
-
     /* the size of the output buffer for peer connections */
     int so_sndbuf;
 
@@ -149,17 +128,8 @@ struct tr_session
     int so_rcvbuf;
 
     /* monitors the "global pool" speeds */
-    struct tr_bandwidth        * bandwidth;
-
-    double                       desiredRatio;
-
-    struct tr_bindinfo         * public_ipv4;
-    struct tr_bindinfo         * public_ipv6;
+    struct tr_bandwidth       * bandwidth;
 };
-
-tr_bool      tr_sessionGetActiveSpeedLimit( const tr_session  * session,
-                                            tr_direction        dir,
-                                            int               * setme );
 
 const char * tr_sessionFindTorrentFile( const tr_session * session,
                                         const char *       hashString );
@@ -171,45 +141,21 @@ void         tr_sessionSetTorrentFile( tr_session * session,
 tr_bool      tr_sessionIsAddressBlocked( const tr_session        * session,
                                          const struct tr_address * addr );
 
+
 void         tr_globalLock( tr_session * );
 
 void         tr_globalUnlock( tr_session * );
 
 tr_bool      tr_globalIsLocked( const tr_session * );
 
-const struct tr_address*  tr_sessionGetPublicAddress( const tr_session *, int tr_af_type );
-
-struct tr_bindsockets * tr_sessionGetBindSockets( tr_session * );
-
 enum
 {
     SESSION_MAGIC_NUMBER = 3845
 };
 
-static TR_INLINE tr_bool tr_isSession( const tr_session * session )
+static inline tr_bool tr_isSession( const tr_session * session )
 {
     return ( session != NULL ) && ( session->magicNumber == SESSION_MAGIC_NUMBER );
-}
-
-static TR_INLINE tr_bool tr_isPreallocationMode( tr_preallocation_mode m  )
-{
-    return ( m == TR_PREALLOCATE_NONE )
-        || ( m == TR_PREALLOCATE_SPARSE )
-        || ( m == TR_PREALLOCATE_FULL );
-}
-
-static TR_INLINE tr_bool tr_isEncryptionMode( tr_encryption_mode m )
-{
-    return ( m == TR_CLEAR_PREFERRED )
-        || ( m == TR_ENCRYPTION_PREFERRED )
-        || ( m == TR_ENCRYPTION_REQUIRED );
-}
-
-static TR_INLINE tr_bool tr_isPriority( tr_priority_t p )
-{
-    return ( p == TR_PRI_LOW )
-        || ( p == TR_PRI_NORMAL )
-        || ( p == TR_PRI_HIGH );
 }
 
 #endif

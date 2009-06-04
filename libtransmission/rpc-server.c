@@ -24,8 +24,8 @@
  #include <zlib.h>
 #endif
 
-#include <event.h>
-#include <evhttp.h>
+#include <libevent/event.h>
+#include <libevent/evhttp.h>
 
 #include "transmission.h"
 #include "bencode.h"
@@ -38,7 +38,6 @@
 #include "trevent.h"
 #include "utils.h"
 #include "web.h"
-#include "net.h"
 
 /* session-id is used to make cross-site request forgery attacks difficult.
  * Don't disable this feature unless you really know what you're doing!
@@ -61,7 +60,6 @@ struct tr_rpc_server
     tr_bool            isPasswordEnabled;
     tr_bool            isWhitelistEnabled;
     tr_port            port;
-    struct in_addr     bindAddress;
     struct evhttp *    httpd;
     tr_session *       session;
     char *             username;
@@ -132,6 +130,22 @@ send_simple_response( struct evhttp_request * req,
     evhttp_send_reply( req, code, code_text, body );
 
     tr_releaseBuffer( body );
+}
+
+static const char*
+tr_memmem( const char * s1, size_t l1, /* haystack */
+           const char * s2, size_t l2 ) /* needle */
+{
+    if( !l2 ) return s1;
+    while( l1 >= l2 )
+    {
+        l1--;
+        if( !memcmp( s1, s2, l2 ) )
+            return s1;
+        s1++;
+    }
+
+    return NULL;
 }
 
 struct tr_mimepart
@@ -252,8 +266,8 @@ handle_upload( struct evhttp_request * req,
                 tr_bencDictAddStr( &top, "method", "torrent-add" );
                 b64 = tr_base64_encode( body, body_len, NULL );
                 tr_bencDictAddStr( args, "metainfo", b64 );
-                tr_bencDictAddBool( args, "paused", paused );
-                tr_bencToBuf( &top, TR_FMT_JSON_LEAN, json );
+                tr_bencDictAddInt( args, "paused", paused );
+                tr_bencSaveAsJSON( &top, json );
                 tr_rpc_request_exec_json( server->session,
                                           EVBUFFER_DATA( json ),
                                           EVBUFFER_LENGTH( json ),
@@ -324,9 +338,6 @@ add_response( struct evhttp_request * req,
     {
         int state;
 
-        /* FIXME(libevent2): this won't compile under libevent2.
-           but we can use evbuffer_reserve_space() + evbuffer_commit_space() instead */
-
         server->stream.next_in = (Bytef*) content;
         server->stream.avail_in = content_len;
 
@@ -373,17 +384,6 @@ add_response( struct evhttp_request * req,
 }
 
 static void
-add_time_header( struct evkeyvalq * headers, const char * key, time_t value )
-{
-    /* According to RFC 2616 this must follow RFC 1123's date format,
-       so use gmtime instead of localtime... */
-    char buf[128];
-    struct tm tm = *gmtime( &value );
-    strftime( buf, sizeof( buf ), "%a, %d %b %Y %H:%M:%S GMT", &tm );
-    evhttp_add_header( headers, key, buf );
-}
-
-static void
 serve_file( struct evhttp_request * req,
             struct tr_rpc_server *  server,
             const char *            filename )
@@ -405,20 +405,16 @@ serve_file( struct evhttp_request * req,
 
         if( errno )
         {
-            char * tmp = tr_strdup_printf( "%s (%s)", filename, tr_strerror( errno ) );
-            send_simple_response( req, HTTP_NOTFOUND, tmp );
-            tr_free( tmp );
+            send_simple_response( req, HTTP_NOTFOUND, filename );
         }
         else
         {
             struct evbuffer * out;
-            const time_t now = time( NULL );
 
             errno = error;
             out = tr_getBuffer( );
-            evhttp_add_header( req->output_headers, "Content-Type", mimetype_guess( filename ) );
-            add_time_header( req->output_headers, "Date", now );
-            add_time_header( req->output_headers, "Expires", now+(24*60*60) );
+            evhttp_add_header( req->output_headers, "Content-Type",
+                               mimetype_guess( filename ) );
             add_response( req, server, out, content, content_len );
             evhttp_send_reply( req, HTTP_OK, "OK", out );
 
@@ -441,7 +437,7 @@ handle_clutch( struct evhttp_request * req,
         send_simple_response( req, HTTP_NOTFOUND,
             "<p>Couldn't find Transmission's web interface files!</p>"
             "<p>Users: to tell Transmission where to look, "
-            "set the TRANSMISSION_WEB_HOME environment "
+            "set the TRANSMISSION_WEB_HOME environmental "
             "variable to the folder where the web interface's "
             "index.html is located.</p>"
             "<p>Package Builders: to set a custom default at compile time, "
@@ -481,7 +477,6 @@ struct rpc_response_data
     struct tr_rpc_server  * server;
 };
 
-/* FIXME(libevent2): make "response" an evbuffer and remove response_len */
 static void
 rpc_response_func( tr_session      * session UNUSED,
                    const char      * response,
@@ -586,8 +581,7 @@ handle_request( struct evhttp_request * req, void * arg )
         }
         else if( server->isPasswordEnabled
                  && ( !pass || !user || strcmp( server->username, user )
-                                     || !tr_ssha1_matches( server->password,
-                                                           pass ) ) )
+                                     || strcmp( server->password, pass ) ) )
         {
             evhttp_add_header( req->output_headers,
                                "WWW-Authenticate",
@@ -653,17 +647,12 @@ static void
 startServer( void * vserver )
 {
     tr_rpc_server * server  = vserver;
-    tr_address addr;
 
     if( !server->httpd )
     {
-        addr.type = TR_AF_INET;
-        addr.addr.addr4 = server->bindAddress;
         server->httpd = evhttp_new( tr_eventGetBase( server->session ) );
-        evhttp_bind_socket( server->httpd, tr_ntop_non_ts( &addr ),
-                            server->port );
+        evhttp_bind_socket( server->httpd, "0.0.0.0", server->port );
         evhttp_set_gencb( server->httpd, handle_request, server );
-
     }
 }
 
@@ -766,10 +755,10 @@ tr_rpcSetWhitelist( tr_rpc_server * server,
     }
 }
 
-const char*
+char*
 tr_rpcGetWhitelist( const tr_rpc_server * server )
 {
-    return server->whitelistStr ? server->whitelistStr : "";
+    return tr_strdup( server->whitelistStr ? server->whitelistStr : "" );
 }
 
 void
@@ -798,10 +787,10 @@ tr_rpcSetUsername( tr_rpc_server * server,
     dbgmsg( "setting our Username to [%s]", server->username );
 }
 
-const char*
+char*
 tr_rpcGetUsername( const tr_rpc_server * server )
 {
-    return server->username ? server->username : "";
+    return tr_strdup( server->username ? server->username : "" );
 }
 
 void
@@ -809,17 +798,14 @@ tr_rpcSetPassword( tr_rpc_server * server,
                    const char *    password )
 {
     tr_free( server->password );
-    if( *password != '{' )
-        server->password = tr_ssha1( password );
-    else
-        server->password = strdup( password );
+    server->password = tr_strdup( password );
     dbgmsg( "setting our Password to [%s]", server->password );
 }
 
-const char*
+char*
 tr_rpcGetPassword( const tr_rpc_server * server )
 {
-    return server->password ? server->password : "" ;
+    return tr_strdup( server->password ? server->password : "" );
 }
 
 void
@@ -834,15 +820,6 @@ tr_bool
 tr_rpcIsPasswordEnabled( const tr_rpc_server * server )
 {
     return server->isPasswordEnabled;
-}
-
-const char *
-tr_rpcGetBindAddress( const tr_rpc_server * server )
-{
-    tr_address addr;
-    addr.type = TR_AF_INET;
-    addr.addr.addr4 = server->bindAddress;
-    return tr_ntop_non_ts( &addr );
 }
 
 /****
@@ -881,29 +858,27 @@ tr_rpcInit( tr_session  * session,
 {
     tr_rpc_server * s;
     tr_bool found;
-    tr_bool boolVal;
     int64_t i;
     const char *str;
-    tr_address address;
 
     s = tr_new0( tr_rpc_server, 1 );
     s->session = session;
 
-    found = tr_bencDictFindBool( settings, TR_PREFS_KEY_RPC_ENABLED, &boolVal );
+    found = tr_bencDictFindInt( settings, TR_PREFS_KEY_RPC_ENABLED, &i );
     assert( found );
-    s->isEnabled = boolVal;
+    s->isEnabled = i != 0;
 
     found = tr_bencDictFindInt( settings, TR_PREFS_KEY_RPC_PORT, &i );
     assert( found );
     s->port = i;
 
-    found = tr_bencDictFindBool( settings, TR_PREFS_KEY_RPC_WHITELIST_ENABLED, &boolVal );
+    found = tr_bencDictFindInt( settings, TR_PREFS_KEY_RPC_WHITELIST_ENABLED, &i );
     assert( found );
-    s->isWhitelistEnabled = boolVal;
+    s->isWhitelistEnabled = i != 0;
 
-    found = tr_bencDictFindBool( settings, TR_PREFS_KEY_RPC_AUTH_REQUIRED, &boolVal );
+    found = tr_bencDictFindInt( settings, TR_PREFS_KEY_RPC_AUTH_REQUIRED, &i );
     assert( found );
-    s->isPasswordEnabled = boolVal;
+    s->isPasswordEnabled = i != 0;
 
     found = tr_bencDictFindStr( settings, TR_PREFS_KEY_RPC_WHITELIST, &str );
     assert( found );
@@ -915,22 +890,7 @@ tr_rpcInit( tr_session  * session,
 
     found = tr_bencDictFindStr( settings, TR_PREFS_KEY_RPC_PASSWORD, &str );
     assert( found );
-    if( *str != '{' )
-        s->password = tr_ssha1( str );
-    else
-        s->password = strdup( str );
-
-    found = tr_bencDictFindStr( settings, TR_PREFS_KEY_RPC_BIND_ADDRESS, &str );
-    assert( found );
-    if( tr_pton( str, &address ) == NULL ) {
-        tr_err( _( "%s is not a valid address" ), str );
-        address = tr_inaddr_any;
-    } else if( address.type != TR_AF_INET ) {
-        tr_err( _( "%s is not an IPv4 address. RPC listeners must be IPv4" ),
-                   str );
-        address = tr_inaddr_any;
-    }
-    s->bindAddress = address.addr.addr4;
+    s->password = tr_strdup( str );
 
 #ifdef HAVE_ZLIB
     s->stream.zalloc = (alloc_func) Z_NULL;
