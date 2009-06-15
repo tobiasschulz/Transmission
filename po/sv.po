@@ -8,14 +8,14 @@ msgstr ""
 "Project-Id-Version: transmission\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2009-05-28 18:17-0500\n"
-"PO-Revision-Date: 2009-06-12 17:51+0000\n"
+"PO-Revision-Date: 2009-04-25 21:04+0000\n"
 "Last-Translator: Daniel Nylander <yeager@ubuntu.com>\n"
 "Language-Team: Swedish <tp-sv@listor.tp-sv.se>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Launchpad-Export-Date: 2009-06-15 03:48+0000\n"
+"X-Launchpad-Export-Date: 2009-06-04 20:21+0000\n"
 "X-Generator: Launchpad (build Unknown)\n"
 
 #: ../gtk/actions.c:49
@@ -1763,66 +1763,66 @@ msgstr "Köad för verifiering"
 
 #: ../gtk/actions.c:90
 msgid "Speed _Limit Mode"
-msgstr "Läge för hast_ighetsgräns"
+msgstr ""
 
 #: ../gtk/actions.c:113
 msgid "Set _Location"
-msgstr "Ange _plats"
+msgstr ""
 
 #: ../gtk/details.c:633
 msgid "Verifying local data"
-msgstr "Verifierar lokalt data"
+msgstr ""
 
 #: ../gtk/details.c:635
 msgid "Seeding"
-msgstr "Distribuerar"
+msgstr ""
 
 #: ../gtk/details.c:858
 msgid "Swarm speed:"
-msgstr "Svärmhastighet:"
+msgstr ""
 
 #: ../gtk/details.c:944
 msgid "Private to this tracker -- DHT and PEX disabled"
-msgstr "Privat för denna bevakare -- DHT och PEX är inaktiverade"
+msgstr ""
 
 #: ../gtk/details.c:1088
 msgid "Destination:"
-msgstr "Mål:"
+msgstr ""
 
 #: ../gtk/details.c:1122
 msgid "Webseeds"
-msgstr "Webbdistribueringar"
+msgstr ""
 
 #: ../gtk/details.c:1506
 msgid "Peer was discovered through DHT"
-msgstr "Klient upptäcktes genom DHT"
+msgstr ""
 
 #: ../gtk/details.c:1736
 msgid "None sent"
-msgstr "Ingenting skickat"
+msgstr ""
 
 #: ../gtk/details.c:2065
 #, c-format
 msgid "%'d Torrent Properties"
-msgstr "Egenskaper för torrenten %'d"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:541
 msgid "Use peer e_xchange (PEX)"
-msgstr "Använd Peer E_xchange (PEX)"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:545
 msgid "Use _distributed hash table (DHT)"
-msgstr "Använd _distribuerad hashtabell (DHT)"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:1220
 msgid "Use Speed Limit Mode _between:"
-msgstr "Använd hastighetsgräns m_ellan:"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:1340
 msgid "_Randomize the port every launch"
-msgstr "Slumpa p_orten vid varje uppstart"
+msgstr ""
 
 #: ../libtransmission/upnp.c:144
 #, c-format
 msgid "Port %d isn't forwarded"
-msgstr "Port %d är inte vidarebefordrad"
+msgstr ""

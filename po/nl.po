@@ -15,14 +15,14 @@ msgstr ""
 "Project-Id-Version: Transmission 1.40b1 (7032)\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2009-05-28 18:17-0500\n"
-"PO-Revision-Date: 2009-06-08 19:06+0000\n"
+"PO-Revision-Date: 2009-05-05 18:52+0000\n"
 "Last-Translator: Arnout Lok <Unknown>\n"
 "Language-Team: vertaling@vrijschrift.org\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Launchpad-Export-Date: 2009-06-15 03:48+0000\n"
+"X-Launchpad-Export-Date: 2009-06-04 20:20+0000\n"
 "X-Generator: Launchpad (build Unknown)\n"
 
 #: ../gtk/actions.c:49
@@ -55,7 +55,7 @@ msgstr "Sorteren op ou_derdom"
 
 #: ../gtk/actions.c:74
 msgid "_Main Window"
-msgstr "_Hoofdvenster"
+msgstr "Hoofdscher_m"
 
 #: ../gtk/actions.c:75
 msgid "Message _Log"
@@ -654,7 +654,7 @@ msgstr "Geminimaliseerd in het mededelingengebied starten"
 
 #: ../gtk/main.c:384
 msgid "Where to look for configuration files"
-msgstr "Locaties voor configuratiebestanden"
+msgstr "Zoeklocaties voor configuratiebestanden"
 
 #: ../gtk/main.c:395
 msgid "Transmission"
@@ -721,7 +721,6 @@ msgstr ""
 "  Toorgedm https://launchpad.net/~toorgedm\n"
 "  Wouter Bolsterlee (uws) https://launchpad.net/~uws\n"
 "  dvdmeer https://launchpad.net/~dennis-dvdmeer\n"
-"  friendly demon https://launchpad.net/~verstraete-kenny\n"
 "  kkaltuu https://launchpad.net/~kaldranos"
 
 #: ../gtk/makemeta-ui.c:111
@@ -1563,11 +1562,11 @@ msgstr "Sorteren op _grootte"
 
 #: ../gtk/actions.c:90
 msgid "Speed _Limit Mode"
-msgstr "Snelheids_limietmodus"
+msgstr ""
 
 #: ../gtk/actions.c:113
 msgid "Set _Location"
-msgstr "_Locatie instellen"
+msgstr ""
 
 #: ../gtk/conf.c:513 ../gtk/conf.c:518 ../gtk/conf.c:525
 #, c-format
@@ -1632,7 +1631,7 @@ msgstr "Zwermsnelheid:"
 
 #: ../gtk/details.c:944
 msgid "Private to this tracker -- DHT and PEX disabled"
-msgstr "Privé voor deze Tracker — DHT en PEX uitgeschakeld"
+msgstr ""
 
 #: ../gtk/details.c:1088
 msgid "Destination:"
@@ -1644,7 +1643,7 @@ msgstr "Web-seeds"
 
 #: ../gtk/details.c:1506
 msgid "Peer was discovered through DHT"
-msgstr "Peer is ontdekt via DHT"
+msgstr ""
 
 #: ../gtk/details.c:1736
 msgid "None sent"
@@ -1709,11 +1708,11 @@ msgstr "_Encryptiemodus"
 
 #: ../gtk/tr-prefs.c:541
 msgid "Use peer e_xchange (PEX)"
-msgstr "Peeruit_wisseling (PEX) gebruiken"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:545
 msgid "Use _distributed hash table (DHT)"
-msgstr "Ge_distribueerde hashtabel (DHT) gebruiken"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:1119
 msgid "Every Day"
@@ -1775,7 +1774,7 @@ msgstr ""
 
 #: ../gtk/tr-prefs.c:1220
 msgid "Use Speed Limit Mode _between:"
-msgstr "Snelheidslimietmodus gebruiken _tussen:"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:1235
 msgid "_On days:"
@@ -1799,7 +1798,7 @@ msgstr "Poort _testen"
 
 #: ../gtk/tr-prefs.c:1340
 msgid "_Randomize the port every launch"
-msgstr "Een willekeurige poort kiezen bij het opsta_rten"
+msgstr ""
 
 #: ../gtk/tr-window.c:330
 msgid "Click to disable Speed Limit Mode"

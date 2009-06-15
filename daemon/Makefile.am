@@ -1,7 +1,6 @@
-AM_CPPFLAGS = -I@top_srcdir@ -DEMBEDDED
+AM_CPPFLAGS = -I@top_srcdir@ $(LIBEVENT_CPPFLAGS) -I$(top_srcdir)/third-party/ -DEMBEDDED
 
 AM_CFLAGS = \
-    $(LIBEVENT_CFLAGS) \
     $(OPENSSL_CFLAGS) \
     $(LIBCURL_CFLAGS) \
     $(ZLIB_CFLAGS) \

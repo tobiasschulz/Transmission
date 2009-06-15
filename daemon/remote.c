@@ -1408,7 +1408,9 @@ tr_curl_easy_init( struct evbuffer * writebuf )
     curl_easy_setopt( curl, CURLOPT_HTTPAUTH, CURLAUTH_ANY );
     curl_easy_setopt( curl, CURLOPT_TIMEOUT, 60L );
     curl_easy_setopt( curl, CURLOPT_VERBOSE, debug );
-    curl_easy_setopt( curl, CURLOPT_ENCODING, "" ); /* "" tells curl to fill in the blanks with what it was compiled to support */
+#ifdef HAVE_ZLIB
+    curl_easy_setopt( curl, CURLOPT_ENCODING, "deflate" );
+#endif
     if( netrc )
         curl_easy_setopt( curl, CURLOPT_NETRC_FILE, netrc );
     if( auth )

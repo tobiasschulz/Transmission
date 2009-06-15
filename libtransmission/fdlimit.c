@@ -43,6 +43,10 @@
  #include <fcntl.h>
 #endif
 
+#ifdef HAVE_FALLOCATE
+ #include <linux/falloc.h>
+#endif
+
 #ifdef HAVE_XFS_XFS_H
  #include <xfs/xfs.h>
 #endif
@@ -174,6 +178,12 @@ preallocateFileFull( const char * filename, uint64_t length )
             fst.fst_length = length;
             fst.fst_bytesalloc = 0;
             success = !fcntl( fd, F_PREALLOCATE, &fst );
+        }
+# endif
+# ifdef HAVE_FALLOCATE
+        if( !success )
+        {
+            success = !fallocate( fd, FALLOC_FL_KEEP_SIZE, 0, length );
         }
 # endif
 # ifdef HAVE_POSIX_FALLOCATE
@@ -600,7 +610,7 @@ tr_fdSocketAccept( int           b,
     len = sizeof( struct sockaddr_storage );
     s = accept( b, (struct sockaddr *) &sock, &len );
 
-    if( ( s >= 0 ) && gFd->socketCount > getSocketMax( gFd ) )
+    if( ( s >= 0 ) && gFd->socketCount < getSocketMax( gFd ) )
     {
         EVUTIL_CLOSESOCKET( s );
         s = -1;
@@ -611,24 +621,18 @@ tr_fdSocketAccept( int           b,
         /* "The ss_family field of the sockaddr_storage structure will always 
          * align with the family field of any protocol-specific structure." */ 
         if( sock.ss_family == AF_INET ) 
-        {
-            struct sockaddr_in *si;
-            union { struct sockaddr_storage dummy; struct sockaddr_in si; } s;
-            s.dummy = sock;
-            si = &s.si;
+        { 
+            struct sockaddr_in * sock4 = (struct sockaddr_in *)&sock; 
             addr->type = TR_AF_INET; 
-            addr->addr.addr4.s_addr = si->sin_addr.s_addr; 
-            *port = si->sin_port; 
+            addr->addr.addr4.s_addr = sock4->sin_addr.s_addr; 
+            *port = sock4->sin_port; 
         } 
         else 
         { 
-            struct sockaddr_in6 *si;
-            union { struct sockaddr_storage dummy; struct sockaddr_in6 si; } s;
-            s.dummy = sock;
-            si = &s.si;
+            struct sockaddr_in6 * sock6 = (struct sockaddr_in6 *)&sock; 
             addr->type = TR_AF_INET6; 
-            addr->addr.addr6 = si->sin6_addr;
-            *port = si->sin6_port; 
+            addr->addr.addr6 = sock6->sin6_addr;
+            *port = sock6->sin6_port; 
         } 
         ++gFd->socketCount;
     }

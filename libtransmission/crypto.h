@@ -98,7 +98,8 @@ int            tr_cryptoRandInt( int n );
 int            tr_cryptoWeakRandInt( int n );
 
 /** Fills a buffer with random bytes */
-void           tr_cryptoRandBuf( void * buf, size_t len );
+void           tr_cryptoRandBuf( unsigned char *buf,
+                                 size_t         len );
 
 char*          tr_ssha1( const void * plaintext );
 
