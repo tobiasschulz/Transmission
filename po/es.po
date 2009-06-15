@@ -11,15 +11,15 @@ msgid ""
 msgstr ""
 "Project-Id-Version: es\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2009-05-28 18:17-0500\n"
-"PO-Revision-Date: 2009-06-14 17:51+0000\n"
-"Last-Translator: Paco Molinero <paco@byasl.com>\n"
+"POT-Creation-Date: 2009-04-25 17:53-0500\n"
+"PO-Revision-Date: 2009-03-10 19:20+0000\n"
+"Last-Translator: Julián Alarcón <alarconj@gmail.com>\n"
 "Language-Team: Español <gnome-es-list@gnome.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=2; plural=n != 1;\n"
-"X-Launchpad-Export-Date: 2009-06-15 03:48+0000\n"
+"X-Launchpad-Export-Date: 2009-05-11 18:21+0000\n"
 "X-Generator: Launchpad (build Unknown)\n"
 "X-Poedit-Country: SPAIN\n"
 "X-Poedit-Language: Spanish\n"
@@ -64,131 +64,131 @@ msgstr "_Registro de mensajes"
 msgid "_Minimal View"
 msgstr "_Modo reducido"
 
-#: ../gtk/actions.c:92
+#: ../gtk/actions.c:94
 msgid "_Reverse Sort Order"
 msgstr "_Invertir orden"
 
-#: ../gtk/actions.c:93
+#: ../gtk/actions.c:97
 msgid "_Filterbar"
 msgstr "Barra de _filtros"
 
-#: ../gtk/actions.c:94
+#: ../gtk/actions.c:99
 msgid "_Statusbar"
 msgstr "Barra de _estado"
 
-#: ../gtk/actions.c:95
+#: ../gtk/actions.c:101
 msgid "_Toolbar"
 msgstr "Barra de _herramientas"
 
-#: ../gtk/actions.c:100
+#: ../gtk/actions.c:106
 msgid "_Torrent"
 msgstr "_Torrent"
 
-#: ../gtk/actions.c:101
+#: ../gtk/actions.c:107
 msgid "_View"
 msgstr "_Ver"
 
-#: ../gtk/actions.c:102
+#: ../gtk/actions.c:108
 msgid "_Sort Torrents By"
 msgstr "_Ordenar torrents por"
 
-#: ../gtk/actions.c:103
+#: ../gtk/actions.c:109
 msgid "_Edit"
 msgstr "_Editar"
 
-#: ../gtk/actions.c:104
+#: ../gtk/actions.c:110
 msgid "_Help"
 msgstr "A_yuda"
 
-#: ../gtk/actions.c:105 ../gtk/actions.c:106
+#: ../gtk/actions.c:111 ../gtk/actions.c:112
 msgid "Add a torrent"
 msgstr "Añadir un torrent"
 
-#: ../gtk/actions.c:106
+#: ../gtk/actions.c:112
 msgid "_Add..."
 msgstr "_Añadir…"
 
-#: ../gtk/actions.c:107
+#: ../gtk/actions.c:113
 msgid "_Start"
 msgstr "_Iniciar"
 
-#: ../gtk/actions.c:107
+#: ../gtk/actions.c:113
 msgid "Start torrent"
 msgstr "Iniciar torrent"
 
-#: ../gtk/actions.c:108
+#: ../gtk/actions.c:114
 msgid "_Statistics"
 msgstr "E_stadísticas"
 
-#: ../gtk/actions.c:109 ../gtk/add-dialog.c:364
+#: ../gtk/actions.c:115 ../gtk/add-dialog.c:364
 msgid "_Verify Local Data"
 msgstr "_Verificar datos locales"
 
-#: ../gtk/actions.c:110
+#: ../gtk/actions.c:116
 msgid "_Pause"
 msgstr "_Pausar"
 
-#: ../gtk/actions.c:110
+#: ../gtk/actions.c:116
 msgid "Pause torrent"
 msgstr "Pausar torrent"
 
-#: ../gtk/actions.c:111
+#: ../gtk/actions.c:117
 msgid "_Pause All"
 msgstr "_Detener todo"
 
-#: ../gtk/actions.c:111
+#: ../gtk/actions.c:117
 msgid "Pause all torrents"
 msgstr "Pausar todos los torrents"
 
-#: ../gtk/actions.c:112
+#: ../gtk/actions.c:118
 msgid "_Start All"
 msgstr "_Iniciar todos"
 
-#: ../gtk/actions.c:112
+#: ../gtk/actions.c:118
 msgid "Start all torrents"
 msgstr "Iniciar todos los torrents"
 
-#: ../gtk/actions.c:114
+#: ../gtk/actions.c:119
 msgid "Remove torrent"
 msgstr "Eliminar torrent"
 
-#: ../gtk/actions.c:115
+#: ../gtk/actions.c:120
 msgid "_Delete Files and Remove"
 msgstr "_Borrar archivos y eliminar"
 
-#: ../gtk/actions.c:116
+#: ../gtk/actions.c:121
 msgid "_New..."
 msgstr "_Nuevo..."
 
-#: ../gtk/actions.c:116
+#: ../gtk/actions.c:121
 msgid "Create a torrent"
 msgstr "Crear un torrent"
 
-#: ../gtk/actions.c:117
+#: ../gtk/actions.c:122
 msgid "_Quit"
 msgstr "_Salir"
 
-#: ../gtk/actions.c:118
+#: ../gtk/actions.c:123
 msgid "Select _All"
 msgstr "Seleccionar _todo"
 
-#: ../gtk/actions.c:119
+#: ../gtk/actions.c:124
 msgid "Dese_lect All"
 msgstr "Dese_leccionar todo"
 
-#: ../gtk/actions.c:121
+#: ../gtk/actions.c:126
 msgid "Torrent properties"
 msgstr "Propiedades del torrent"
 
-#: ../gtk/actions.c:122
+#: ../gtk/actions.c:127
 msgid "_Open Folder"
 msgstr "_Abrir carpeta"
 
-#: ../gtk/actions.c:124
+#: ../gtk/actions.c:129
 msgid "_Contents"
 msgstr "_Contenidos"
 
-#: ../gtk/actions.c:125
+#: ../gtk/actions.c:130
 msgid "Ask Tracker for _More Peers"
 msgstr "Solicitar _más pares al rastreador"
 
@@ -236,15 +236,15 @@ msgstr "Añadir un torrent"
 msgid "Display _options dialog"
 msgstr "Mostrar ventana de _opciones"
 
-#: ../gtk/conf.c:64 ../gtk/makemeta-ui.c:142 ../libtransmission/fdlimit.c:307
-#: ../libtransmission/metainfo.c:99 ../libtransmission/utils.c:596
-#: ../libtransmission/utils.c:607
+#: ../gtk/conf.c:64 ../gtk/makemeta-ui.c:142 ../libtransmission/fdlimit.c:270
+#: ../libtransmission/metainfo.c:98 ../libtransmission/utils.c:589
+#: ../libtransmission/utils.c:600
 #, c-format
 msgid "Couldn't create \"%1$s\": %2$s"
 msgstr "No se pudo crear \"%1$s\": %2$s"
 
-#: ../gtk/conf.c:89 ../libtransmission/bencode.c:1540
-#: ../libtransmission/fdlimit.c:336
+#: ../gtk/conf.c:89 ../libtransmission/bencode.c:1533
+#: ../libtransmission/fdlimit.c:299
 #, c-format
 msgid "Couldn't open \"%1$s\": %2$s"
 msgstr "No se pudo abrir \"%1$s\": %2$s"
@@ -266,99 +266,99 @@ msgstr "Normal"
 msgid "High"
 msgstr "Alta"
 
-#: ../gtk/details.c:542 ../gtk/tr-prefs.c:1181
+#: ../gtk/details.c:542 ../gtk/tr-prefs.c:1177
 msgid "Limit _download speed (KB/s):"
 msgstr "Limitar la velocidad de _descarga (KiB/s):"
 
-#: ../gtk/details.c:554 ../gtk/tr-prefs.c:1188
+#: ../gtk/details.c:555 ../gtk/tr-prefs.c:1184
 msgid "Limit _upload speed (KB/s):"
 msgstr "Limitar la velocidad de _subida (KiB/s):"
 
-#: ../gtk/details.c:610
+#: ../gtk/details.c:612
 msgid "Peer Connections"
 msgstr "Conexiones de pares"
 
-#: ../gtk/details.c:613
+#: ../gtk/details.c:615
 msgid "_Maximum peers:"
 msgstr "_Nº máximo de pares permitidos:"
 
-#: ../gtk/details.c:632 ../gtk/torrent-cell-renderer.c:173
+#: ../gtk/details.c:634 ../gtk/torrent-cell-renderer.c:173
 msgid "Waiting to verify local data"
 msgstr "A la espera de verificar datos descargados"
 
-#: ../gtk/details.c:636 ../gtk/torrent-cell-renderer.c:169
+#: ../gtk/details.c:638 ../gtk/torrent-cell-renderer.c:169
 msgid "Paused"
 msgstr "Pausado"
 
-#: ../gtk/details.c:647 ../gtk/details.c:889 ../gtk/details.c:1440
-#: ../gtk/details.c:1733 ../gtk/util.c:68 ../libtransmission/utils.c:1581
+#: ../gtk/details.c:649 ../gtk/details.c:891 ../gtk/details.c:1441
+#: ../gtk/details.c:1731 ../gtk/util.c:68 ../libtransmission/utils.c:1555
 msgid "None"
 msgstr "Ninguno"
 
-#: ../gtk/details.c:648 ../gtk/details.c:890 ../gtk/details.c:1735
+#: ../gtk/details.c:650 ../gtk/details.c:892 ../gtk/details.c:1733
 #: ../gtk/file-list.c:658
 msgid "Mixed"
 msgstr "Mixto"
 
-#: ../gtk/details.c:680
+#: ../gtk/details.c:682
 #, c-format
 msgid "%.1f%%"
 msgstr "%.1f%%"
 
-#: ../gtk/details.c:832
+#: ../gtk/details.c:834
 msgid "Transfer"
 msgstr "Transferencia"
 
-#: ../gtk/details.c:835
+#: ../gtk/details.c:837
 msgid "State:"
 msgstr "Estado:"
 
-#: ../gtk/details.c:838
+#: ../gtk/details.c:840
 msgid "Progress:"
 msgstr "Progreso:"
 
 #. "Have" refers to how much of the torrent we have
-#: ../gtk/details.c:842
+#: ../gtk/details.c:844
 msgid "Have:"
 msgstr "Tengo:"
 
-#: ../gtk/details.c:845 ../gtk/stats.c:149 ../gtk/stats.c:161
+#: ../gtk/details.c:847 ../gtk/stats.c:149 ../gtk/stats.c:161
 msgid "Downloaded:"
 msgstr "Descargado:"
 
-#: ../gtk/details.c:848 ../gtk/stats.c:147 ../gtk/stats.c:159
+#: ../gtk/details.c:850 ../gtk/stats.c:147 ../gtk/stats.c:159
 msgid "Uploaded:"
 msgstr "Subido:"
 
-#: ../gtk/details.c:852
+#: ../gtk/details.c:854
 msgid "Failed DL:"
 msgstr "Descargas fallidas:"
 
-#: ../gtk/details.c:855 ../gtk/stats.c:151 ../gtk/stats.c:163
+#: ../gtk/details.c:857 ../gtk/stats.c:151 ../gtk/stats.c:163
 msgid "Ratio:"
 msgstr "Proporción:"
 
-#: ../gtk/details.c:861
+#: ../gtk/details.c:863
 msgid "Error:"
 msgstr "Error:"
 
-#: ../gtk/details.c:864
+#: ../gtk/details.c:866
 msgid "Dates"
 msgstr "Fechas"
 
-#: ../gtk/details.c:867
+#: ../gtk/details.c:869
 msgid "Started at:"
 msgstr "Iniciado el:"
 
-#: ../gtk/details.c:870
+#: ../gtk/details.c:872
 msgid "Last activity at:"
 msgstr "Última actividad:"
 
-#: ../gtk/details.c:891
+#: ../gtk/details.c:893
 msgid "Unknown"
 msgstr "Desconocido"
 
-#: ../gtk/details.c:907 ../gtk/makemeta-ui.c:284
+#: ../gtk/details.c:909 ../gtk/makemeta-ui.c:284
 #, c-format
 msgid "%'d Piece"
 msgid_plural "%'d Pieces"
@@ -367,112 +367,116 @@ msgstr[1] "%'d partes"
 
 #. %1$s is number of pieces;
 #. %2$s is how big each piece is
-#: ../gtk/details.c:916 ../gtk/makemeta-ui.c:290
+#: ../gtk/details.c:918 ../gtk/makemeta-ui.c:290
 #, c-format
 msgid "%1$s @ %2$s"
 msgstr "%1$s @ %2$s"
 
 #: ../gtk/details.c:946
+msgid "Private to this tracker -- PEX disabled"
+msgstr "Privado a este tracker -- PEX deshabilitado"
+
+#: ../gtk/details.c:948
 msgid "Public torrent"
 msgstr "Torrent público"
 
-#: ../gtk/details.c:1037
+#: ../gtk/details.c:1039
 msgid "Details"
 msgstr "Detalles"
 
-#: ../gtk/details.c:1041
+#: ../gtk/details.c:1043
 msgid "Pieces:"
 msgstr "Partes:"
 
-#: ../gtk/details.c:1047
+#: ../gtk/details.c:1049
 msgid "Hash:"
 msgstr "Hash:"
 
-#: ../gtk/details.c:1052
+#: ../gtk/details.c:1054
 msgid "Privacy:"
 msgstr "Privacidad:"
 
-#: ../gtk/details.c:1069
+#: ../gtk/details.c:1066
 msgid "Comment:"
 msgstr "Comentario:"
 
-#: ../gtk/details.c:1073
+#: ../gtk/details.c:1070
 msgid "Origins"
 msgstr "Orígenes"
 
-#: ../gtk/details.c:1077
+#: ../gtk/details.c:1074
 msgid "Creator:"
 msgstr "Creador:"
 
-#: ../gtk/details.c:1080
+#: ../gtk/details.c:1077
 msgid "Date:"
 msgstr "Fecha:"
 
-#: ../gtk/details.c:1083
+#: ../gtk/details.c:1080
 msgid "Location"
 msgstr "Ubicación"
 
-#: ../gtk/details.c:1094
+#: ../gtk/details.c:1091
 msgid "Torrent file:"
 msgstr "Archivo torrent:"
 
-#: ../gtk/details.c:1124 ../gtk/details.c:1164
+#: ../gtk/details.c:1119 ../gtk/details.c:1158
 msgid "Down"
 msgstr "Descarga"
 
-#: ../gtk/details.c:1162
+#: ../gtk/details.c:1156
 msgid "Address"
 msgstr "Dirección"
 
-#: ../gtk/details.c:1166
+#: ../gtk/details.c:1160
 msgid "Up"
 msgstr "Subida"
 
-#: ../gtk/details.c:1167
+#: ../gtk/details.c:1161
 msgid "Client"
 msgstr "Cliente"
 
-#: ../gtk/details.c:1168
+#: ../gtk/details.c:1162
 msgid "%"
 msgstr "%"
 
-#: ../gtk/details.c:1169
+#: ../gtk/details.c:1163
 msgid "Status"
 msgstr "Estado"
 
-#: ../gtk/details.c:1497
+#: ../gtk/details.c:1498
 msgid "Optimistic unchoke"
 msgstr "Desahogado optimista"
 
-#: ../gtk/details.c:1498
+#: ../gtk/details.c:1499
 msgid "Downloading from this peer"
 msgstr "Descargando desde este par"
 
-#: ../gtk/details.c:1499
+#: ../gtk/details.c:1500
 msgid "We would download from this peer if they would let us"
 msgstr "Descargaríamos desde este par si él nos lo permite"
 
-#: ../gtk/details.c:1500
+#: ../gtk/details.c:1501
 msgid "Uploading to peer"
 msgstr "Subiendo al par"
 
-#: ../gtk/details.c:1501
+#: ../gtk/details.c:1502
 msgid "We would upload to this peer if they asked"
 msgstr "Subiríamos a este par si él nos lo solicita"
 
-#: ../gtk/details.c:1502
+#: ../gtk/details.c:1503
 msgid "Peer has unchoked us, but we're not interested"
 msgstr "El par nos ha desahogado, pero no estamos interesados"
 
-#: ../gtk/details.c:1503
+#: ../gtk/details.c:1504
 msgid "We unchoked this peer, but they're not interested"
 msgstr "Desahogaríamos a este par, pero él no está interesado"
 
-#: ../gtk/details.c:1504
+#: ../gtk/details.c:1505
 msgid "Encrypted connection"
 msgstr "Conexión cifrada"
 
-#: ../gtk/details.c:1505
+#: ../gtk/details.c:1506
 msgid "Peer was discovered through Peer Exchange (PEX)"
 msgstr "El par fue descubierto mediante Intercambio de Pares (PEX)"
 
@@ -480,93 +484,93 @@ msgstr "El par fue descubierto mediante Intercambio de Pares (PEX)"
 msgid "Peer is an incoming connection"
 msgstr "El par es una conexión entrante"
 
-#: ../gtk/details.c:1685
+#: ../gtk/details.c:1683
 msgid "<b>Seeders:</b>"
 msgstr "<b>Sembradores:</b>"
 
-#: ../gtk/details.c:1692
+#: ../gtk/details.c:1690
 msgid "<b>Leechers:</b>"
 msgstr "<b>Gorrones:</b>"
 
-#: ../gtk/details.c:1699
+#: ../gtk/details.c:1697
 msgid "<b>Times Completed:</b>"
 msgstr "<b>Número de veces completado:</b>"
 
-#: ../gtk/details.c:1734
+#: ../gtk/details.c:1732
 msgid "Now"
 msgstr "Actual"
 
-#: ../gtk/details.c:1737
+#: ../gtk/details.c:1735
 msgid "In progress"
 msgstr "En progreso"
 
-#: ../gtk/details.c:1882 ../gtk/makemeta-ui.c:427 ../gtk/tr-prefs.c:1397
+#: ../gtk/details.c:1880 ../gtk/makemeta-ui.c:427 ../gtk/tr-prefs.c:1393
 msgid "Trackers"
 msgstr "Rastreadores"
 
-#: ../gtk/details.c:1889
+#: ../gtk/details.c:1887
 msgid "Scrape"
 msgstr "Raspada"
 
-#: ../gtk/details.c:1891
+#: ../gtk/details.c:1889
 msgid "Last scrape at:"
 msgstr "Última raspada:"
 
-#: ../gtk/details.c:1896 ../gtk/details.c:1918
+#: ../gtk/details.c:1894 ../gtk/details.c:1916
 msgid "Tracker responded:"
 msgstr "El rastreador respondió:"
 
-#: ../gtk/details.c:1901
+#: ../gtk/details.c:1899
 msgid "Next scrape in:"
 msgstr "Próxima raspada:"
 
-#: ../gtk/details.c:1907
+#: ../gtk/details.c:1905
 msgid "Announce"
 msgstr "Anuncio"
 
-#: ../gtk/details.c:1911
+#: ../gtk/details.c:1909
 msgid "Tracker:"
 msgstr "Rastreador:"
 
-#: ../gtk/details.c:1913
+#: ../gtk/details.c:1911
 msgid "Last announce at:"
 msgstr "Ultimo anuncio:"
 
-#: ../gtk/details.c:1923
+#: ../gtk/details.c:1921
 msgid "Next announce in:"
 msgstr "Próximo anuncio:"
 
 #. how long until the tracker will honor user
 #. * pressing the "ask for more peers" button
-#: ../gtk/details.c:1930
+#: ../gtk/details.c:1928
 msgid "Manual announce allowed in:"
 msgstr "Anuncio manual permitido en:"
 
-#: ../gtk/details.c:2005
+#: ../gtk/details.c:2003
 msgid "Activity"
 msgstr "Actividad"
 
-#: ../gtk/details.c:2009 ../gtk/tr-prefs.c:1382
+#: ../gtk/details.c:2007 ../gtk/tr-prefs.c:1378
 msgid "Peers"
 msgstr "Pares"
 
-#: ../gtk/details.c:2013 ../gtk/tr-window.c:817
+#: ../gtk/details.c:2011 ../gtk/tr-window.c:817
 msgid "Tracker"
 msgstr "Rastreador"
 
-#: ../gtk/details.c:2017 ../gtk/msgwin.c:193
+#: ../gtk/details.c:2015 ../gtk/msgwin.c:193
 msgid "Information"
 msgstr "Información"
 
-#: ../gtk/details.c:2022 ../gtk/tr-window.c:817
+#: ../gtk/details.c:2020 ../gtk/tr-window.c:817
 msgid "Files"
 msgstr "Archivos"
 
-#: ../gtk/details.c:2027 ../gtk/tr-prefs.c:335
+#: ../gtk/details.c:2025 ../gtk/tr-prefs.c:335
 msgid "Options"
 msgstr "Opciones"
 
-#: ../gtk/details.c:2055
+#: ../gtk/details.c:2053
 #, c-format
 msgid "%s Properties"
 msgstr "Propiedades de %s"
@@ -631,59 +635,59 @@ msgstr "Archivo"
 msgid "Progress"
 msgstr "Progreso"
 
-#: ../gtk/main.c:375
+#: ../gtk/main.c:374
 msgid "Start with all torrents paused"
 msgstr "Comenzar con todos los torrents pausados"
 
-#: ../gtk/main.c:377
+#: ../gtk/main.c:376
 msgid "Show version number and exit"
 msgstr "Mostrar número de versión y salir"
 
-#: ../gtk/main.c:381
+#: ../gtk/main.c:380
 msgid "Start minimized in system tray"
 msgstr "Iniciar minimizado en el área de notificación"
 
-#: ../gtk/main.c:384
+#: ../gtk/main.c:383
 msgid "Where to look for configuration files"
 msgstr "Dónde buscar los archivos de configuración"
 
-#: ../gtk/main.c:395
+#: ../gtk/main.c:394
 msgid "Transmission"
 msgstr "Transmission"
 
-#: ../gtk/main.c:402
+#: ../gtk/main.c:401
 msgid "[torrent files]"
 msgstr "[archivos torrent]"
 
-#: ../gtk/main.c:704
+#: ../gtk/main.c:703
 msgid "<b>Closing Connections</b>"
 msgstr "<b>Cerrando conexiones</b>"
 
-#: ../gtk/main.c:708
+#: ../gtk/main.c:707
 msgid "Sending upload/download totals to tracker..."
 msgstr "Enviando subidas/descargas totales al rastreador..."
 
-#: ../gtk/main.c:713
+#: ../gtk/main.c:712
 msgid "_Quit Now"
 msgstr "_Salir inmediatamente"
 
-#: ../gtk/main.c:871
+#: ../gtk/main.c:870
 msgid "Couldn't add corrupt torrent"
 msgid_plural "Couldn't add corrupt torrents"
 msgstr[0] "No se puedo agregar el torrent corrupto"
 msgstr[1] "No se pudieron agregar los torrents corruptos"
 
-#: ../gtk/main.c:878
+#: ../gtk/main.c:877
 msgid "Couldn't add duplicate torrent"
 msgid_plural "Couldn't add duplicate torrents"
 msgstr[0] "No su pudo agregar el torrent duplicado"
 msgstr[1] "No se pudieron agregar los torrents duplicados"
 
-#: ../gtk/main.c:1158
+#: ../gtk/main.c:1151
 msgid "A fast and easy BitTorrent client"
 msgstr "Un cliente de BitTorrent rápido y sencillo"
 
-#: ../gtk/main.c:1163
+#: ../gtk/main.c:1156
 msgid "Copyright 2005-2009 The Transmission Project"
 msgstr "Copyright 2005-2009 The Transmission Project"
 
@@ -691,7 +695,7 @@ msgstr "Copyright 2005-2009 The Transmission Project"
 #. your name
 #. to have it appear in the credits in the "About"
 #. dialog
-#: ../gtk/main.c:1174
+#: ../gtk/main.c:1167
 msgid "translator-credits"
 msgstr ""
 "Vicente Carro Fernandez <vicentecarro@andaluciajunta.es>, 2006\n"
@@ -710,7 +714,6 @@ msgstr ""
 "  Raúl Pedroche https://launchpad.net/~pedroche\n"
 "\n"
 "Launchpad Contributions:\n"
-"  Abel O'Rian https://launchpad.net/~abel-orian\n"
 "  Alain Bustamante https://launchpad.net/~webmaster-inkedcity\n"
 "  Alfonso Moratalla https://launchpad.net/~vanhell\n"
 "  Alvaro.Godoy https://launchpad.net/~alvaro.godoy\n"
@@ -737,7 +740,6 @@ msgstr ""
 "  Jorge González https://launchpad.net/~jorge-gonzalez-gonzalez\n"
 "  Jorge González https://launchpad.net/~jorgegonz\n"
 "  Jorge_C https://launchpad.net/~jorgecanardo\n"
-"  Juan Alfredo Salas Santillana https://launchpad.net/~ratasxy\n"
 "  Julián Alarcón https://launchpad.net/~alarconj\n"
 "  Kevin https://launchpad.net/~kevin64-deactivatedaccount\n"
 "  Kislev https://launchpad.net/~1hrevs-launchpad-deactivatedaccount\n"
@@ -747,7 +749,6 @@ msgstr ""
 "  Miguel Alvarado https://launchpad.net/~alvaradoma\n"
 "  Miguel Anxo Bouzada https://launchpad.net/~mbouzada\n"
 "  Miguel Herrero https://launchpad.net/~miguel-herrerobaena\n"
-"  Nicolás M. Zahlut https://launchpad.net/~nzahlut\n"
 "  Nicolás Rigalli https://launchpad.net/~hellknight1991\n"
 "  Paco Molinero https://launchpad.net/~franciscomol\n"
 "  Ramón Calderón https://launchpad.net/~rcalderon\n"
@@ -781,7 +782,7 @@ msgid "Torrent creation cancelled"
 msgstr "Creación del torrent cancelada"
 
 #: ../gtk/makemeta-ui.c:128 ../libtransmission/blocklist.c:78
-#: ../libtransmission/blocklist.c:237 ../libtransmission/utils.c:476
+#: ../libtransmission/blocklist.c:237 ../libtransmission/utils.c:471
 #, c-format
 msgid "Couldn't read \"%1$s\": %2$s"
 msgstr "No se pudo leer \"%1$s\": %2$s"
@@ -839,7 +840,7 @@ msgstr "Comen_tario:"
 msgid "_Private torrent"
 msgstr "Torrent _privado"
 
-#: ../gtk/msgwin.c:87 ../libtransmission/bencode.c:1546
+#: ../gtk/msgwin.c:87 ../libtransmission/bencode.c:1539
 #: ../libtransmission/blocklist.c:293
 #, c-format
 msgid "Couldn't save file \"%1$s\": %2$s"
@@ -976,8 +977,8 @@ msgstr "Inactivo"
 msgid "Verifying local data (%.1f%% tested)"
 msgstr "Verificando datos locales (%.1f%% comprobado)"
 
-#: ../gtk/torrent-cell-renderer.c:190 ../gtk/tr-window.c:1067
-#: ../gtk/tr-window.c:1095
+#: ../gtk/torrent-cell-renderer.c:190 ../gtk/tr-window.c:1058
+#: ../gtk/tr-window.c:1086
 #, c-format
 msgid "Ratio: %s"
 msgstr "Proporción: %s"
@@ -1016,24 +1017,24 @@ msgstr "Descargar y compartir archivos mediante BitTorrent"
 msgid "Transmission BitTorrent Client"
 msgstr "Cliente de BitTorrent Transmission"
 
-#: ../gtk/tr-core.c:1123
+#: ../gtk/tr-core.c:1122
 msgid "Transmission Bittorrent Client"
 msgstr "Cliente de BitTorrent Transmission"
 
-#: ../gtk/tr-core.c:1124
+#: ../gtk/tr-core.c:1123
 msgid "BitTorrent Activity"
 msgstr "Actividad BitTorrent"
 
-#: ../gtk/tr-core.c:1132
+#: ../gtk/tr-core.c:1131
 msgid "Disallowing desktop hibernation"
 msgstr "Impedir hibernación de escritorio"
 
-#: ../gtk/tr-core.c:1136
+#: ../gtk/tr-core.c:1135
 #, c-format
 msgid "Couldn't disable desktop hibernation: %s"
 msgstr "No se pudo inhabilitar la hibernación de escritorio: %s"
 
-#: ../gtk/tr-core.c:1160
+#: ../gtk/tr-core.c:1159
 msgid "Allowing desktop hibernation"
 msgstr "Permitir hibernación de escritorio"
 
@@ -1105,116 +1106,120 @@ msgstr "Nº _máximo de pares permitidos:"
 msgid "Maximum peers per _torrent:"
 msgstr "Nº máximo de pares por _torrent:"
 
-#: ../gtk/tr-prefs.c:755
+#: ../gtk/tr-prefs.c:541
+msgid "Use peer e_xchange"
+msgstr "Usar inter_cambio de pares"
+
+#: ../gtk/tr-prefs.c:751
 msgid "Web Interface"
 msgstr "Interfaz web"
 
 #. "enabled" checkbutton
-#: ../gtk/tr-prefs.c:758
+#: ../gtk/tr-prefs.c:754
 msgid "_Enable web interface"
 msgstr "_Activar interfaz  web"
 
-#: ../gtk/tr-prefs.c:764
+#: ../gtk/tr-prefs.c:760
 msgid "_Open web interface"
 msgstr "_Abrir interfaz web"
 
-#: ../gtk/tr-prefs.c:773
+#: ../gtk/tr-prefs.c:769
 msgid "Listening _port:"
 msgstr "_Puerto de escucha:"
 
 #. require authentication
-#: ../gtk/tr-prefs.c:777
+#: ../gtk/tr-prefs.c:773
 msgid "_Require username"
 msgstr "Solicitar un nombre de usuario"
 
 #. username
-#: ../gtk/tr-prefs.c:785 ../gtk/tr-prefs.c:1000
+#: ../gtk/tr-prefs.c:781 ../gtk/tr-prefs.c:996
 msgid "_Username:"
 msgstr "_Usuario:"
 
 #. password
-#: ../gtk/tr-prefs.c:792 ../gtk/tr-prefs.c:1006
+#: ../gtk/tr-prefs.c:788 ../gtk/tr-prefs.c:1002
 msgid "Pass_word:"
 msgstr "Contra_seña:"
 
 #. require authentication
-#: ../gtk/tr-prefs.c:800
+#: ../gtk/tr-prefs.c:796
 msgid "Only allow the following IP _addresses to connect:"
 msgstr "Permitir conectar solo a las siguientes _direcciones IP"
 
-#: ../gtk/tr-prefs.c:825
+#: ../gtk/tr-prefs.c:821
 msgid "IP addresses may use wildcards, such as 192.168.*.*"
 msgstr "Las direcciones IP pueden incluir comodines, como 192.168.*.*"
 
-#: ../gtk/tr-prefs.c:847
+#: ../gtk/tr-prefs.c:843
 msgid "Addresses:"
 msgstr "Direcciones:"
 
-#: ../gtk/tr-prefs.c:963
+#: ../gtk/tr-prefs.c:959
 msgid "Tracker Proxy"
 msgstr "Proxy de rastreador"
 
-#: ../gtk/tr-prefs.c:965
+#: ../gtk/tr-prefs.c:961
 msgid "Connect to tracker via a pro_xy"
 msgstr "Conectar al rastreador a través de un pro_xy"
 
-#: ../gtk/tr-prefs.c:970
+#: ../gtk/tr-prefs.c:966
 msgid "Proxy _server:"
 msgstr "Servidor _proxy:"
 
-#: ../gtk/tr-prefs.c:978
+#: ../gtk/tr-prefs.c:974
 msgid "Proxy _port:"
 msgstr "_Puerto del proxy:"
 
-#: ../gtk/tr-prefs.c:981
+#: ../gtk/tr-prefs.c:977
 msgid "Proxy _type:"
 msgstr "Tipo de _proxy"
 
-#: ../gtk/tr-prefs.c:994
+#: ../gtk/tr-prefs.c:990
 msgid "_Authentication is required"
 msgstr "_Autenticación requerida"
 
-#: ../gtk/tr-prefs.c:1210
+#: ../gtk/tr-prefs.c:1206
 msgid "Limit u_pload speed (KB/s):"
 msgstr "Limitar la velocidad de _subida (KB/s):"
 
-#: ../gtk/tr-prefs.c:1225
+#: ../gtk/tr-prefs.c:1221
 msgid " and "
 msgstr " y "
 
-#: ../gtk/tr-prefs.c:1289
+#: ../gtk/tr-prefs.c:1285
 msgid "Port is <b>open</b>"
 msgstr "El puerto está <b>abierto</b>"
 
-#: ../gtk/tr-prefs.c:1289
+#: ../gtk/tr-prefs.c:1285
 msgid "Port is <b>closed</b>"
 msgstr "El puerto está <b>cerrado</b>"
 
-#: ../gtk/tr-prefs.c:1323
+#: ../gtk/tr-prefs.c:1319
 msgid "Incoming Peers"
 msgstr "Pares entrantes"
 
-#: ../gtk/tr-prefs.c:1344
+#: ../gtk/tr-prefs.c:1340
 msgid "Use UPnP or NAT-PMP port _forwarding from my router"
 msgstr "Utilizar la _redirección del puerto UPnP o NAT-PMP desde mi router"
 
-#: ../gtk/tr-prefs.c:1364
+#: ../gtk/tr-prefs.c:1360
 msgid "Transmission Preferences"
 msgstr "Preferencias de Transmission"
 
-#: ../gtk/tr-prefs.c:1379
+#: ../gtk/tr-prefs.c:1375
 msgid "Torrents"
 msgstr "Torrents"
 
-#: ../gtk/tr-prefs.c:1388
+#: ../gtk/tr-prefs.c:1384
 msgid "Network"
 msgstr "Red"
 
-#: ../gtk/tr-prefs.c:1391
+#: ../gtk/tr-prefs.c:1387
 msgid "Desktop"
 msgstr "Escritorio"
 
-#: ../gtk/tr-prefs.c:1394
+#: ../gtk/tr-prefs.c:1390
 msgid "Web"
 msgstr "Web"
 
@@ -1229,11 +1234,11 @@ msgstr "A la espera de verificar datos descargados (%.1f%% verificado)"
 msgid "%1$s remaining"
 msgstr "Faltan %1$s"
 
-#: ../gtk/tr-torrent.c:266 ../libtransmission/port-forwarding.c:170
+#: ../gtk/tr-torrent.c:266 ../libtransmission/port-forwarding.c:201
 msgid "Stopped"
 msgstr "Detenido"
 
-#: ../gtk/tr-window.c:185
+#: ../gtk/tr-window.c:183
 msgid "Torrent"
 msgstr "Torrent"
 
@@ -1283,21 +1288,21 @@ msgstr "_Sembrando"
 msgid "_Paused"
 msgstr "_Pausados"
 
-#: ../gtk/tr-window.c:1041
+#: ../gtk/tr-window.c:1031
 #, c-format
 msgid "%1$'d of %2$'d Torrent"
 msgid_plural "%1$'d of %2$'d Torrents"
 msgstr[0] "%1$'d de %2$'d torrent"
 msgstr[1] "%1$'d de %2$'d torrents"
 
-#: ../gtk/tr-window.c:1047
+#: ../gtk/tr-window.c:1036
 #, c-format
 msgid "%'d Torrent"
 msgid_plural "%'d Torrents"
 msgstr[0] "%'d torrent"
 msgstr[1] "%'d torrents"
 
-#: ../gtk/tr-window.c:1078 ../gtk/tr-window.c:1089
+#: ../gtk/tr-window.c:1069 ../gtk/tr-window.c:1080
 #, c-format
 msgid "size|Down: %1$s, Up: %2$s"
 msgstr "Descarga: %1$s, Subida: %2$s"
@@ -1415,17 +1420,17 @@ msgstr "Lista de bloqueo «%1$s» actualizada con %2$'d entradas"
 msgid "Couldn't read resume file"
 msgstr "No se pudo leer el archivo de reanudación"
 
-#: ../libtransmission/fdlimit.c:296
+#: ../libtransmission/fdlimit.c:259
 #, c-format
 msgid "Couldn't create \"%1$s\": parent folder \"%2$s\" does not exist"
 msgstr "No se pudo crear «%1$s»: El directorio padre «%2$s» no existe"
 
-#: ../libtransmission/fdlimit.c:319
+#: ../libtransmission/fdlimit.c:282
 #, c-format
 msgid "Preallocated file \"%s\""
 msgstr "Archivo reservado para «%s»"
 
-#: ../libtransmission/fdlimit.c:583
+#: ../libtransmission/fdlimit.c:546 ../libtransmission/net.c:355
 #, c-format
 msgid "Couldn't create socket: %s"
 msgstr "No se ha podido crear el socket: %s"
@@ -1435,7 +1440,7 @@ msgstr "No se ha podido crear el socket: %s"
 msgid "Torrent Creator is skipping file \"%s\": %s"
 msgstr "El creador del torrent está omitiendo el archivo \"%s\": %s"
 
-#: ../libtransmission/metainfo.c:458
+#: ../libtransmission/metainfo.c:457
 #, c-format
 msgid "Invalid metadata entry \"%s\""
 msgstr "Entrada de metadatos inválida \"%s\""
@@ -1464,13 +1469,13 @@ msgstr "ya no se reenvía el puerto %d"
 msgid "Port %d forwarded successfully"
 msgstr "Puerto %d reenviado exitosamente"
 
-#: ../libtransmission/net.c:357
+#: ../libtransmission/net.c:513
 #, c-format
 msgid "Couldn't connect socket %d to %s, port %d (errno %d - %s)"
 msgstr ""
 "No se ha podido conectar el socket %d a %s, puerto %d (errno %d - %s)"
 
-#: ../libtransmission/net.c:405
+#: ../libtransmission/net.c:566
 #, c-format
 msgid "Couldn't bind port %d on %s: %s"
 msgstr "No se pudo enlazar el puerto %d en %s: %s"
@@ -1479,35 +1484,55 @@ msgstr "No se pudo enlazar el puerto %d en %s: %s"
 msgid "Port Forwarding"
 msgstr "Reenvío de puertos"
 
-#: ../libtransmission/port-forwarding.c:59
+#: ../libtransmission/port-forwarding.c:65
 msgid "Starting"
 msgstr "Iniciando"
 
-#: ../libtransmission/port-forwarding.c:60
+#: ../libtransmission/port-forwarding.c:69
 msgid "Forwarded"
 msgstr "Reenviado"
 
-#: ../libtransmission/port-forwarding.c:61
+#: ../libtransmission/port-forwarding.c:73
 msgid "Stopping"
 msgstr "Deteniendo"
 
-#: ../libtransmission/port-forwarding.c:62
+#: ../libtransmission/port-forwarding.c:77
 msgid "Not forwarded"
 msgstr "No reenviado"
 
-#: ../libtransmission/port-forwarding.c:86 ../libtransmission/torrent.c:1523
+#: ../libtransmission/port-forwarding.c:100 ../libtransmission/torrent.c:1489
 #, c-format
 msgid "State changed from \"%1$s\" to \"%2$s\""
 msgstr "El estado cambió de \"%1$s\" a \"%2$s\""
 
+#: ../libtransmission/port-forwarding.c:116
+#, c-format
+msgid "Closing port %d on %s"
+msgstr "Cerrando el puerto %d en %s"
+
+#: ../libtransmission/port-forwarding.c:153
+#, c-format
+msgid "Opened port %d on %s to listen for incoming peer connections"
+msgstr ""
+"Abierto el puerto %d en %s para escuchar conexiones entrantes de pares"
+
+#: ../libtransmission/port-forwarding.c:161
+#, c-format
+msgid ""
+"Couldn't open port %d on %s to listen for incoming peer connections (errno "
+"%d - %s)"
+msgstr ""
+"No se pudo abrir el puerto %d en %s para escuchar conexiones entrantes de "
+"pares (errno %d - %s)"
+
 #. first %s is the application name
 #. second %s is the version number
-#: ../libtransmission/session.c:832
+#: ../libtransmission/session.c:756
 #, c-format
 msgid "%s %s started"
 msgstr "%s %s iniciado"
 
-#: ../libtransmission/session.c:1565
+#: ../libtransmission/session.c:1499
 #, c-format
 msgid "Loaded %d torrents"
 msgstr "Cargados %d torrents"
@@ -1527,15 +1552,15 @@ msgstr "Aviso del rastreador: \"%s\""
 msgid "Tracker error: \"%s\""
 msgstr "Error del rastreador: \"%s\""
 
-#: ../libtransmission/torrent.c:1449
+#: ../libtransmission/torrent.c:1415
 msgid "Done"
 msgstr "Hecho"
 
-#: ../libtransmission/torrent.c:1452
+#: ../libtransmission/torrent.c:1418
 msgid "Complete"
 msgstr "Completo"
 
-#: ../libtransmission/torrent.c:1455
+#: ../libtransmission/torrent.c:1421
 msgid "Incomplete"
 msgstr "Incompleto"
 
@@ -1570,16 +1595,16 @@ msgstr ""
 msgid "Port forwarding successful!"
 msgstr "¡Reenvío de puertos exitoso!"
 
-#: ../libtransmission/utils.c:490
+#: ../libtransmission/utils.c:485
 msgid "Not a regular file"
 msgstr "No es un archivo regular"
 
-#: ../libtransmission/utils.c:508
+#: ../libtransmission/utils.c:503
 msgid "Memory allocation failed"
 msgstr "Falló la asignación de memoria"
 
 #. Node exists but isn't a folder
-#: ../libtransmission/utils.c:606
+#: ../libtransmission/utils.c:599
 #, c-format
 msgid "File \"%s\" is in the way"
 msgstr "El archivo \"%s\" estorba"
@@ -1592,29 +1617,18 @@ msgstr "Verificando torrent"
 msgid "Queued for verification"
 msgstr "En cola para verificación"
 
-#~ msgid "Private to this tracker -- PEX disabled"
-#~ msgstr "Privado a este tracker -- PEX deshabilitado"
-
 #: ../gtk/actions.c:56
 msgid "Sort by _ETA"
-msgstr "Ordenar por _ETA"
+msgstr ""
 
 #: ../gtk/actions.c:57
 msgid "Sort by Si_ze"
-msgstr "Ordenar por _tamaño"
-
-#: ../gtk/actions.c:90
-msgid "Speed _Limit Mode"
-msgstr "Modo de _límite de velocidad"
-
-#: ../gtk/actions.c:113
-msgid "Set _Location"
-msgstr "Definir _ubicación"
+msgstr ""
 
 #: ../gtk/conf.c:513 ../gtk/conf.c:518 ../gtk/conf.c:525
 #, c-format
 msgid "Importing \"%s\""
-msgstr "Importando «%s»"
+msgstr ""
 
 #: ../gtk/details.c:453
 #, c-format
@@ -1622,86 +1636,74 @@ msgid ""
 "Use _Global setting  (currently: stop seeding when a torrent's ratio reaches "
 "%.2f)"
 msgstr ""
-"Usar configuración _Global (actualmente: dejar de compartir cuando la "
-"proporción del torrent alcance %.2f)"
 
 #: ../gtk/details.c:455
 msgid "Use _Global setting  (currently: seed regardless of ratio)"
 msgstr ""
-"Usar configuración _Global (actualmente: compartir sin importar la "
-"proporción)"
 
-#: ../gtk/details.c:535 ../gtk/tr-prefs.c:1385
+#: ../gtk/details.c:535 ../gtk/tr-prefs.c:1381
 msgid "Speed"
-msgstr "Velocidad"
+msgstr ""
 
 #: ../gtk/details.c:537
 msgid "Honor global _limits"
-msgstr "Satisfacer _límites globales"
+msgstr ""
 
-#: ../gtk/details.c:566
+#: ../gtk/details.c:568
 msgid "_Bandwidth priority:"
-msgstr "Prioridad de ancho de _banda:"
+msgstr ""
 
-#: ../gtk/details.c:570
+#: ../gtk/details.c:572
 msgid "Seed-Until Ratio"
-msgstr "Compartir hasta proporción"
+msgstr ""
 
-#: ../gtk/details.c:585
+#: ../gtk/details.c:587
 msgid "Seed _regardless of ratio"
-msgstr "Compartir _sin importar la proporción"
+msgstr ""
 
-#: ../gtk/details.c:594
+#: ../gtk/details.c:596
 msgid "_Stop seeding when a torrent's ratio reaches"
-msgstr "_Dejar de compartir cuando la proporción de un torrent alcanza"
-
-#: ../gtk/details.c:633
-msgid "Verifying local data"
-msgstr "Verificar datos locales"
-
-#: ../gtk/details.c:634
-msgid "Downloading"
-msgstr "Descargando"
+msgstr ""
 
 #: ../gtk/details.c:635
-msgid "Seeding"
-msgstr "Compartiendo"
+msgid "Verifying local data"
+msgstr ""
 
-#: ../gtk/details.c:704
+#: ../gtk/details.c:636
+msgid "Downloading"
+msgstr ""
+
+#: ../gtk/details.c:637
+msgid "Seeding"
+msgstr ""
+
+#: ../gtk/details.c:706
 #, c-format
 msgid "%1$s (%2$s verified in %3$d piece)"
 msgid_plural "%1$s (%2$s verified in %3$d pieces)"
-msgstr[0] "%1$s (%2$s verificado en %3$d parte)"
-msgstr[1] "%1$s (%2$s verificado en %3$d partes)"
+msgstr[0] ""
+msgstr[1] ""
 
-#: ../gtk/details.c:858
+#: ../gtk/details.c:860
 msgid "Swarm speed:"
-msgstr "Velocidad del enjambre:"
+msgstr ""
 
-#: ../gtk/details.c:944
-msgid "Private to this tracker -- DHT and PEX disabled"
-msgstr "Privado para este tracker -- DHT y PEX desactivados"
-
-#: ../gtk/details.c:1088
+#: ../gtk/details.c:1085
 msgid "Destination:"
-msgstr "Destino:"
+msgstr ""
 
-#: ../gtk/details.c:1122
+#: ../gtk/details.c:1118
 msgid "Webseeds"
-msgstr "Semillas Web"
+msgstr ""
 
-#: ../gtk/details.c:1506
-msgid "Peer was discovered through DHT"
-msgstr "Par descubierto a través de DHT"
-
-#: ../gtk/details.c:1736
+#: ../gtk/details.c:1734
 msgid "None sent"
-msgstr "Ninguno enviado"
+msgstr ""
 
-#: ../gtk/details.c:2065
+#: ../gtk/details.c:2063
 #, c-format
 msgid "%'d Torrent Properties"
-msgstr "%'d Propiedades del torrent"
+msgstr ""
 
 #. %1$s is the torrent's total size,
 #. %2$s is how much we've uploaded,
@@ -1710,184 +1712,198 @@ msgstr "%'d Propiedades del torrent"
 #: ../gtk/torrent-cell-renderer.c:88
 #, c-format
 msgid "%1$s, uploaded %2$s (Ratio: %3$s Goal: %4$s)"
-msgstr "%1$s, subido %2$s (Proporción: %3$s Meta: %4$s)"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:311
 msgid "_Stop seeding torrents at ratio:"
-msgstr "_Dejar de compartir torrentes con proporción:"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:402
 #, c-format
 msgid "Blocklist now has %'d rule."
 msgid_plural "Blocklist now has %'d rules."
-msgstr[0] "La lista de bloqueo tiene ahora %'d regla."
-msgstr[1] "La lista de bloqueo tiene ahora %'d reglas."
+msgstr[0] ""
+msgstr[1] ""
 
 #: ../gtk/tr-prefs.c:406
 msgid "<b>Update succeeded!</b>"
-msgstr "<b>¡Actualización correcta!</b>"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:421
 msgid "Update Blocklist"
-msgstr "Actualizar lista de bloqueo"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:423
 msgid "Getting new blocklist..."
-msgstr "Obteniendo nueva lista de bloqueo..."
+msgstr ""
 
 #: ../gtk/tr-prefs.c:458
 msgid "Plaintext Preferred"
-msgstr "Preferible texto plano"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:459
 msgid "Encryption Preferred"
-msgstr "Preferible cifrado"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:460
 msgid "Encryption Required"
-msgstr "Cifrado requerido"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:535
 msgid "Privacy"
-msgstr "Privacidad"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:537
 msgid "_Encryption mode"
-msgstr "Modo de _cifrado"
+msgstr ""
 
-#: ../gtk/tr-prefs.c:541
-msgid "Use peer e_xchange (PEX)"
-msgstr "Usar _intercambio de pares (PEX)"
+#: ../gtk/tr-prefs.c:1115
+msgid "Every Day"
+msgstr ""
 
-#: ../gtk/tr-prefs.c:545
-msgid "Use _distributed hash table (DHT)"
-msgstr "Usar tabla de hash _distribuida (DHT)"
+#: ../gtk/tr-prefs.c:1116
+msgid "Weekdays"
+msgstr ""
+
+#: ../gtk/tr-prefs.c:1117
+msgid "Weekends"
+msgstr ""
+
+#: ../gtk/tr-prefs.c:1118
+msgid "Sunday"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:1119
-msgid "Every Day"
-msgstr "Todos los días"
+msgid "Monday"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:1120
-msgid "Weekdays"
-msgstr "Entre semana"
+msgid "Tuesday"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:1121
-msgid "Weekends"
-msgstr "Fines de semana"
+msgid "Wednesday"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:1122
-msgid "Sunday"
-msgstr "Domingo"
+msgid "Thursday"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:1123
-msgid "Monday"
-msgstr "Lunes"
+msgid "Friday"
+msgstr ""
 
 #: ../gtk/tr-prefs.c:1124
-msgid "Tuesday"
-msgstr "Martes"
-
-#: ../gtk/tr-prefs.c:1125
-msgid "Wednesday"
-msgstr "Miércoles"
-
-#: ../gtk/tr-prefs.c:1126
-msgid "Thursday"
-msgstr "Jueves"
-
-#: ../gtk/tr-prefs.c:1127
-msgid "Friday"
-msgstr "Viernes"
-
-#: ../gtk/tr-prefs.c:1128
 msgid "Saturday"
-msgstr "Sábado"
+msgstr ""
 
-#: ../gtk/tr-prefs.c:1179
+#: ../gtk/tr-prefs.c:1175
 msgid "Global Bandwidth Limits"
-msgstr "Límites globales de ancho de banda"
+msgstr ""
 
-#: ../gtk/tr-prefs.c:1199
+#: ../gtk/tr-prefs.c:1195
 msgid "Speed Limit Mode"
-msgstr "Modo de límite de velocidad"
+msgstr ""
 
-#: ../gtk/tr-prefs.c:1206
+#: ../gtk/tr-prefs.c:1202
 msgid "Limit do_wnload speed (KB/s):"
-msgstr "Limitar velocidad de _descarga (KB/s):"
+msgstr ""
 
-#: ../gtk/tr-prefs.c:1214
+#: ../gtk/tr-prefs.c:1210
 msgid "When enabled, Speed Limit Mode overrides the Global Bandwidth Limits"
 msgstr ""
-"Cuando está activado, el Modo de limitación de velocidad anula los Límites "
-"globales de ancho de banda"
 
-#: ../gtk/tr-prefs.c:1220
-msgid "Use Speed Limit Mode _between:"
-msgstr "Usar modo de limitación de velocidad entre:"
+#: ../gtk/tr-prefs.c:1216
+msgid "Use Speed Limit Mode between:"
+msgstr ""
 
-#: ../gtk/tr-prefs.c:1235
+#: ../gtk/tr-prefs.c:1231
 msgid "_On days:"
-msgstr "L_os días:"
+msgstr ""
 
-#: ../gtk/tr-prefs.c:1268 ../gtk/tr-prefs.c:1330
+#: ../gtk/tr-prefs.c:1264 ../gtk/tr-prefs.c:1326
 msgid "Status unknown"
-msgstr "Estado desconocido"
+msgstr ""
 
-#: ../gtk/tr-prefs.c:1301
+#: ../gtk/tr-prefs.c:1297
 msgid "<i>Testing...</i>"
-msgstr "<i>Probando...</i>"
+msgstr ""
 
-#: ../gtk/tr-prefs.c:1325
+#: ../gtk/tr-prefs.c:1321
 msgid "_Port for incoming connections:"
-msgstr "_Puerto para conexiones entrantes:"
+msgstr ""
 
-#: ../gtk/tr-prefs.c:1333
+#: ../gtk/tr-prefs.c:1329
 msgid "_Test Port"
-msgstr "Probar puer_to"
+msgstr ""
 
-#: ../gtk/tr-prefs.c:1340
-msgid "_Randomize the port every launch"
-msgstr "Puerto _aleatorio al lanzar"
+#: ../gtk/tr-prefs.c:1336
+msgid "Randomize the port every launch"
+msgstr ""
 
 #: ../gtk/tr-window.c:330
 msgid "Click to disable Speed Limit Mode"
-msgstr "Pulsar para desactivar el modo de limitación de velocidad"
+msgstr ""
 
 #: ../gtk/tr-window.c:331
 msgid "Click to enable Speed Limit Mode"
-msgstr "Pulsar para activar el modo de limitación de velocidad"
+msgstr ""
 
 #: ../gtk/tr-window.c:630
 msgid "Unlimited"
-msgstr "Ilimitado"
+msgstr ""
 
 #: ../gtk/tr-window.c:697
 msgid "Seed Forever"
-msgstr "Compartir para siempre"
+msgstr ""
 
 #: ../gtk/tr-window.c:735
 msgid "Limit Download Speed"
-msgstr "Limitar velocidad de bajada"
+msgstr ""
 
 #: ../gtk/tr-window.c:739
 msgid "Limit Upload Speed"
-msgstr "Limitar velocidad de subida"
+msgstr ""
 
 #: ../gtk/tr-window.c:746
 msgid "Stop Seeding at Ratio"
-msgstr "Dejar de compartir al alcanzar la proporción"
+msgstr ""
 
 #: ../gtk/tr-window.c:780
 #, c-format
 msgid "Stop at Ratio (%s)"
-msgstr "Detener en la proporción (%s)"
+msgstr ""
 
-#: ../libtransmission/net.c:341
+#: ../libtransmission/net.c:497
 #, c-format
 msgid "Couldn't set source address %s on %d: %s"
-msgstr "No se pudo establecer la dirección de la fuente %s en %d: %s"
+msgstr ""
+
+#: ../libtransmission/port-forwarding.c:222
+#, c-format
+msgid "Checking to see if port %d is still open"
+msgstr ""
+
+#: ../libtransmission/session.c:642 ../libtransmission/session.c:654
+#, c-format
+msgid "%s is not a valid address"
+msgstr ""
+
+#: ../libtransmission/session.c:645
+#, c-format
+msgid "%s is not an IPv4 address"
+msgstr ""
+
+#: ../libtransmission/session.c:657
+#, c-format
+msgid "%s is not an IPv6 address"
+msgstr ""
+
+#: ../libtransmission/session.c:663
+msgid "System does not seem to support IPv6. Not listening onan IPv6 address"
+msgstr ""
 
 #: ../libtransmission/upnp.c:144
 #, c-format
 msgid "Port %d isn't forwarded"
-msgstr "El puerto %d no está siendo redirigido"
+msgstr ""

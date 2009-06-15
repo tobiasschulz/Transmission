@@ -31,6 +31,10 @@
 
 #include "transmission.h"
 
+#ifdef __cplusplus
+extern "C" {
+#endif
+
 struct tr_benc;
 
 int  tr_metainfoParse( const tr_session     * session,
@@ -42,5 +46,9 @@ void tr_metainfoRemoveSaved( const tr_session * session,
 
 void tr_metainfoMigrate( tr_session * session,
                          tr_info    * inf );
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif

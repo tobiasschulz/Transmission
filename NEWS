@@ -1,38 +1,6 @@
 NEWS file for Transmission <http://www.transmissionbt.com/>
 
-1.72 (2009/06/15)
-<http://trac.transmissionbt.com/query?milestone=1.72&group=component&groupdesc=1&order=severity>
-- All Platforms
-   + Fix 1.70 crash with assertion "tv->tv_usec >= 0"
-   + Fix 1.70 crash with assertion "tr_peerIoSupportsFEXT( msgs->peer->io )"
-   + Better DHT announce management
-   + Fix error in reporting webseed counts via RPC
-- Mac
-   + Fix problem where a small set of users could not add torrents
-- GTK+
-   + Fix 1.70 crash when setting options in the Properties dialog
-   + Fix a rare crash in desktop notifications
-   + Can now sort the file list by priority, download, and completeness
-   + Adding a torrent from a browser sometimes didn't work.
-   + Various usability improvements
-- Daemon
-   + Remote didn't always send the right Encoding header in requests
-
-1.71 (2009/06/07)
-<http://trac.transmissionbt.com/query?milestone=1.71&group=component&groupdesc=1&order=severity>
-- All Platforms
-   + Fix 1.70 bug that caused high CPU use in high-peer swarms
-   + Fix 1.70 build problems with DHT and libevent
-- Daemon
-   + Fix watchdir issue on OSes that don't have inotify
-- GTK+
-   + Fix 1.70 intltool build problem
-   + Fix crash when the OS's stock mime-type icons are misconfigured 
-   + Handle very long torrent file lists faster
-- Web Client
-   + Fix 1.70 bug where some torrents appeared to be duplicates
-
-1.70 (2009/06/04)
+1.70 (2009/mm/dd)
 <http://trac.transmissionbt.com/query?milestone=1.70&group=component&groupdesc=1&order=severity>
 - All Platforms
    + Distributed hash table (DHT) support for public torrents
@@ -52,6 +20,7 @@ NEWS file for Transmission <http://www.transmissionbt.com/>
    + The "data remaining" field wasn't updated when the number reached 0
    + Smaller design adjustments
 - GTK+
+   + Fix intltool build problem
    + Make it clearer that the status bar's ratio mode button is a button
    + Torrent comment box did not scroll, so long comments were partially hidden
 - Qt
@@ -59,7 +28,7 @@ NEWS file for Transmission <http://www.transmissionbt.com/>
    + Add-torrent-and-delete-source deleted the source even if there was an error
    + Prefs dialog didn't show or modify "Stop seeding torrents at ratio"
 
-1.54 (2009/06/04)
+1.54 (2009/xx/yy)
 - All Platforms
    + Fix small bugs and memory leaks
 - Web Client

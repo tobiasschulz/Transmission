@@ -180,7 +180,6 @@ tr_prefs_init_defaults( tr_benc * d )
 
     tr_bencDictAddBool( d, PREF_KEY_OPTIONS_PROMPT, TRUE );
 
-    tr_bencDictAddBool( d, PREF_KEY_MAIN_WINDOW_IS_MAXIMIZED, FALSE );
     tr_bencDictAddInt( d, PREF_KEY_MAIN_WINDOW_HEIGHT, 500 );
     tr_bencDictAddInt( d, PREF_KEY_MAIN_WINDOW_WIDTH, 300 );
     tr_bencDictAddInt( d, PREF_KEY_MAIN_WINDOW_X, 50 );

@@ -1,8 +1,14 @@
 
-SUBDIRS = libnatpmp miniupnp dht libevent
+if BUILD_LIBEVENT
+  LIBEVENT_DIR = libevent
+else
+  LIBEVENT_DIR =
+endif
 
-EXTRA_DIST = macosx-libevent-config.h
+SUBDIRS = libnatpmp miniupnp dht $(LIBEVENT_DIR)
+
+EXTRA_DIST = \
+    libevent \
+    macosx-libevent-config.h
 
 install:
-
-uninstall:

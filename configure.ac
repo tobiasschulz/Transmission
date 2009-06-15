@@ -3,8 +3,8 @@ dnl STATUS: "X" for prerelease beta builds,
 dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
-m4_define([user_agent_prefix],[1.72])
-m4_define([peer_id_prefix],[-TR1720-])
+m4_define([user_agent_prefix],[1.61+])
+m4_define([peer_id_prefix],[-TR161Z-])
 
 AC_INIT([transmission],
         [user_agent_prefix],
@@ -81,6 +81,12 @@ fi
 AC_HEADER_STDC
 AC_HEADER_TIME
 
+AC_MSG_CHECKING([for fallocate])
+AC_TRY_LINK([#include <linux/falloc.h>],
+            [return fallocate(-1,0,0,0);],
+            [AC_DEFINE([HAVE_FALLOCATE],[1],[Defined if fallocate() exists])
+             AC_MSG_RESULT([yes])],
+            [AC_MSG_RESULT([no])])
 AC_CHECK_FUNCS([lrintf strlcpy daemon dirname basename daemon strcasecmp localtime_r posix_fallocate memmem])
 AC_PROG_INSTALL
 AC_PROG_MAKE_SET
@@ -160,34 +166,18 @@ AC_TRY_LINK([#include <stdarg.h>], [va_list ap1, ap2; va_copy(ap1, ap2);],
 ])
 
 
-dnl build our copy of libevent whether we use it or not,
-dnl because "make dist" needs its Makefiles to exist, and
-dnl AM_CONDITIONAL + AC_CONFIG_SUBDIRS don't seem to play nice
-AC_CONFIG_SUBDIRS([third-party/libevent])
-libevent_source=bundled
-AC_CHECK_LIB([event],[evutil_vsnprintf],
-             [libevent_found=yes],
-             [libevent_found=no],
-             [-levent])
 AC_CHECK_HEADER([event-config.h],
-                [libevent_headers_found=yes],
-                [libevent_headers_found=no])
-libevent_source=bundled
-if test "x$libevent_found" = "xyes" ; then
-    if test "x$libevent_headers_found" = "xyes"; then
-      libevent_source=system
-    fi
-fi
-if test "x$libevent_source" = "xbundled"; then
-    AC_MSG_WARN([using our own libevent from third-party/libevent/])
-    AC_MSG_WARN([if you are cross-compiling this is probably NOT what you want.])
-    LIBEVENT_CFLAGS="-I\$(top_srcdir)/third-party/libevent -I\$(top_builddir)/third-party/libevent"
-    LIBEVENT_LIBS="\$(top_builddir)/third-party/libevent/libevent.la"
-else
-    LIBEVENT_CFLAGS=""
-    LIBEVENT_LIBS="-levent -lrt"
-fi
-AC_SUBST(LIBEVENT_CFLAGS)
+                [libevent_source=system
+                 LIBEVENT_CPPFLAGS=""
+                 LIBEVENT_LIBS="-levent"],
+                [libevent_source=bundled
+                 AC_MSG_NOTICE([couldn't find event-config.h, so using our own copy of libevent from third-party/libevent/.])
+                 AC_MSG_NOTICE([if you are cross-compiling this is probably NOT what you want.])
+                 AC_CONFIG_SUBDIRS([third-party/libevent])
+                 LIBEVENT_CPPFLAGS="-I\$(top_srcdir)/third-party/libevent -I\$(top_builddir)/third-party/libevent"
+                 LIBEVENT_LIBS="\$(top_builddir)/third-party/libevent/.libs/libevent.a"])
+AM_CONDITIONAL([BUILD_LIBEVENT], [test x$libevent_source = xbundled])
+AC_SUBST(LIBEVENT_CPPFLAGS)
 AC_SUBST(LIBEVENT_LIBS)
 
 
@@ -279,7 +269,7 @@ fi
 use_nls=no
 if test "x$enable_nls" = "xyes" ; then
     use_nls=yes
-    IT_PROG_INTLTOOL([0.40.0],[no-xml])
+    IT_PROG_INTLTOOL([0.35],[no-xml])
     AC_CHECK_HEADERS([libintl.h])
     GETTEXT_PACKAGE=transmission
     AC_SUBST(GETTEXT_PACKAGE)

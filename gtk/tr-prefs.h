@@ -45,6 +45,5 @@ GtkWidget * tr_prefs_dialog_new( GObject *   core,
 #define PREF_KEY_MAIN_WINDOW_WIDTH          "main-window-width"
 #define PREF_KEY_MAIN_WINDOW_X              "main-window-x"
 #define PREF_KEY_MAIN_WINDOW_Y              "main-window-y"
-#define PREF_KEY_MAIN_WINDOW_IS_MAXIMIZED   "main-window-is-maximized"
 
 #endif

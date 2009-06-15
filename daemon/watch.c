@@ -7,8 +7,9 @@
  * This exemption does not extend to derived works not owned by
  * the Transmission project.
  *
- * $Id$
+ * $Id:$
  */
+
 #ifdef WITH_INOTIFY
   #include <sys/inotify.h>
   #include <sys/select.h>
@@ -17,14 +18,13 @@
   #include <sys/types.h> /* stat */
   #include <sys/stat.h> /* stat */
   #include <dirent.h> /* readdir */
-  #include <event.h> /* evbuffer */
 #endif
 
 #include <errno.h>
 #include <string.h> /* strstr */
 
 #include <libtransmission/transmission.h>
-#include <libtransmission/utils.h> /* tr_buildPath(), tr_inf() */
+#include <libtransmission/utils.h> /* tr_buildPath */
 #include "watch.h"
 
 struct dtr_watchdir
@@ -36,7 +36,6 @@ struct dtr_watchdir
     int inotify_fd;
 #else /* readdir implementation */
     time_t lastTimeChecked;
-    struct evbuffer * lastFiles;
 #endif
 };
 
@@ -99,7 +98,6 @@ watchdir_update_impl( dtr_watchdir * w )
         int len = read( fd, buf, sizeof( buf ) );
         while (i < len) {
             struct inotify_event * event = (struct inotify_event *) &buf[i];
-            tr_inf( "Found new .torrent file \"%s\" in watchdir \"%s\"", event->name, w->dir );
             w->callback( w->session, w->dir, event->name );
             i += EVENT_SIZE +  event->len;
         }
@@ -114,36 +112,15 @@ watchdir_update_impl( dtr_watchdir * w )
 
 #define WATCHDIR_POLL_INTERVAL_SECS 10
 
-#define FILE_DELIMITER '\0'
-
 static void
 watchdir_new_impl( dtr_watchdir * w UNUSED )
 {
     tr_inf( "Using readdir to watch directory \"%s\"", w->dir );
-    w->lastFiles = evbuffer_new( );
 }
 static void
-watchdir_free_impl( dtr_watchdir * w )
+watchdir_free_impl( dtr_watchdir * w UNUSED )
 {
-    evbuffer_free( w->lastFiles );
-}
-static void
-add_file_to_list( struct evbuffer * buf, const char * filename, size_t len )
-{
-    const char delimiter = FILE_DELIMITER;
-    evbuffer_add( buf, &delimiter, 1 );
-    evbuffer_add( buf, filename, len );
-    evbuffer_add( buf, &delimiter, 1 );
-}
-static tr_bool
-is_file_in_list( struct evbuffer * buf, const char * filename, size_t len )
-{
-    tr_bool in_list;
-    struct evbuffer * test = evbuffer_new( );
-    add_file_to_list( test, filename, len );
-    in_list = evbuffer_find( buf, EVBUFFER_DATA( test ), EVBUFFER_LENGTH( test ) );
-    evbuffer_free( test );
-    return in_list;
+    /* NOOP */
 }
 static void
 watchdir_update_impl( dtr_watchdir * w )
@@ -152,7 +129,6 @@ watchdir_update_impl( dtr_watchdir * w )
     DIR * odir;
     const time_t oldTime = w->lastTimeChecked;
     const char * dirname = w->dir;
-    struct evbuffer * curFiles = evbuffer_new( );
 
     if ( ( oldTime + WATCHDIR_POLL_INTERVAL_SECS < time( NULL ) )
          && !stat( dirname, &sb )
@@ -163,27 +139,23 @@ watchdir_update_impl( dtr_watchdir * w )
 
         for( d = readdir( odir ); d != NULL; d = readdir( odir ) )
         {
-            size_t len;
+            char * filename;
 
             if( !d->d_name || *d->d_name=='.' ) /* skip dotfiles */
                 continue;
             if( !strstr( d->d_name, ".torrent" ) ) /* skip non-torrents */
                 continue;
 
-            len = strlen( d->d_name );
-            add_file_to_list( curFiles, d->d_name, len );
-
-            /* if this file wasn't here last time, try adding it */
-            if( !is_file_in_list( w->lastFiles, d->d_name, len ) ) {
-                tr_inf( "Found new .torrent file \"%s\" in watchdir \"%s\"", d->d_name, w->dir );
+            /* if the file's changed since our last pass, try adding it */
+            filename = tr_buildPath( dirname, d->d_name, NULL );
+            if( !stat( filename, &sb ) && sb.st_mtime >= oldTime )
                 w->callback( w->session, w->dir, d->d_name );
-            }
+            tr_free( filename );
         }
 
         closedir( odir );
+
         w->lastTimeChecked = time( NULL );
-        evbuffer_free( w->lastFiles );
-        w->lastFiles = curFiles;
     }
 }
 
