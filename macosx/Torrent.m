@@ -436,6 +436,11 @@ int trashDataFile(const char * filename)
     return tr_torrentSetPriority(fHandle, priority);
 }
 
+- (void) revealData
+{
+    [[NSWorkspace sharedWorkspace] selectFile: [self dataLocation] inFileViewerRootedAtPath: nil];
+}
+
 #warning should be somewhere else?
 + (void) trashFile: (NSString *) path
 {
@@ -648,8 +653,11 @@ int trashDataFile(const char * filename)
 - (NSImage *) icon
 {
     if (!fIcon)
+    {
         fIcon = [[[NSWorkspace sharedWorkspace] iconForFileType: [self isFolder] ? NSFileTypeForHFSTypeCode('fldr')
                                                 : [[self name] pathExtension]] retain];
+        [fIcon setFlipped: YES];
+    }
     return fIcon;
 }
 
@@ -860,6 +868,11 @@ int trashDataFile(const char * filename)
     return fStat->percentDone;
 }
 
+- (CGFloat) progressLeft
+{
+    return (CGFloat)[self sizeLeft] / [self size];
+}
+
 - (CGFloat) checkingProgress
 {
     return fStat->recheckProgress;
@@ -870,9 +883,9 @@ int trashDataFile(const char * filename)
     return fStat->eta;
 }
 
-- (CGFloat) availableDesired
+- (CGFloat) notAvailableDesired
 {
-    return (CGFloat)fStat->desiredAvailable / [self sizeLeft];
+    return 1.0 - (CGFloat)fStat->desiredAvailable / [self sizeLeft];
 }
 
 - (BOOL) isActive
@@ -1552,11 +1565,6 @@ int trashDataFile(const char * filename)
 - (tr_torrent *) torrentStruct
 {
     return fHandle;
-}
-
-- (NSURL *) previewItemURL
-{
-    return [NSURL fileURLWithPath: [self dataLocation]];
 }
 
 @end

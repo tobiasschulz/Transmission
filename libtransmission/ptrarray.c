@@ -36,6 +36,14 @@ tr_ptrArrayDestruct( tr_ptrArray * p, PtrArrayForeachFunc func )
 }
 
 tr_ptrArray*
+tr_ptrArrayNew( void )
+{
+    tr_ptrArray * p = tr_new( tr_ptrArray, 1 );
+    *p = TR_PTR_ARRAY_INIT;
+    return p;
+}
+
+tr_ptrArray*
 tr_ptrArrayDup( tr_ptrArray* in )
 {
     tr_ptrArray * out;
@@ -59,6 +67,14 @@ tr_ptrArrayForeach( tr_ptrArray *       t,
 
     for( i = 0; i < t->n_items; ++i )
         func( t->items[i] );
+}
+
+void
+tr_ptrArrayFree( tr_ptrArray *       t,
+                 PtrArrayForeachFunc func )
+{
+    tr_ptrArrayDestruct( t, func );
+    tr_free( t );
 }
 
 void**
@@ -186,12 +202,10 @@ static void
 assertSortedAndUnique( const tr_ptrArray * t,
                         int compare(const void*, const void*) )
 {
-#ifndef NDEBUG
     int i;
 
     for( i = 0; i < t->n_items - 2; ++i )
         assert( compare( t->items[i], t->items[i + 1] ) <= 0 );
-#endif
 }
 
 int

@@ -27,8 +27,7 @@
 #import "FileOutlineView.h"
 #import "FilePriorityCell.h"
 #import "FileListNode.h"
-#import "NSApplicationAdditions.h"
-#import <Quartz/Quartz.h>
+#import "QuickLookController.h"
 
 #define ROW_SMALL_HEIGHT 18.0
 
@@ -132,11 +131,7 @@ typedef enum
 
 - (void) outlineViewSelectionDidChange: (NSNotification *) notification
 {
-    if ([QLPreviewPanel sharedPreviewPanelExists] && [[QLPreviewPanel sharedPreviewPanel] isVisible])
-    {
-        [[QLPreviewPanel sharedPreviewPanel] reloadData];
-        [[QLPreviewPanel sharedPreviewPanel] updateController];
-    }
+    [[QuickLookController quickLook] updateQuickLook];
 }
 
 - (NSInteger) outlineView: (NSOutlineView *) outlineView numberOfChildrenOfItem: (id) item
@@ -191,7 +186,7 @@ typedef enum
     if ([identifier isEqualToString: @"Check"])
     {
         NSIndexSet * indexSet;
-        if (([NSApp isOnSnowLeopardOrBetter] ? [NSEvent modifierFlags] : [[NSApp currentEvent] modifierFlags]) & NSAlternateKeyMask)
+        if ([[NSApp currentEvent] modifierFlags] & NSAlternateKeyMask)
             indexSet = [NSIndexSet indexSetWithIndexesInRange: NSMakeRange(0, [fTorrent fileCount])];
         else
             indexSet = [(FileListNode *)item indexes];
@@ -318,20 +313,9 @@ typedef enum
 {
     NSString * folder = [fTorrent downloadFolder];
     NSIndexSet * indexes = [fOutline selectedRowIndexes];
-    if ([NSApp isOnSnowLeopardOrBetter])
-    {
-        NSMutableArray * paths = [NSMutableArray arrayWithCapacity: [indexes count]];
-        for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
-            [paths addObject: [NSURL fileURLWithPath: [folder stringByAppendingPathComponent: [[fOutline itemAtRow: i] fullPath]]]];
-        
-        [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs: paths];
-    }
-    else
-    {
-        for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
-            [[NSWorkspace sharedWorkspace] selectFile: [folder stringByAppendingPathComponent: [[fOutline itemAtRow: i] fullPath]]
-                inFileViewerRootedAtPath: nil];
-    }
+    for (NSInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
+        [[NSWorkspace sharedWorkspace] selectFile: [folder stringByAppendingPathComponent:
+            [[fOutline itemAtRow: i] fullPath]] inFileViewerRootedAtPath: nil];
 }
 
 #warning make real view controller (Leopard-only) so that Command-R will work

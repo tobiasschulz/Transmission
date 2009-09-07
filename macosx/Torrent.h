@@ -24,14 +24,13 @@
 
 #import <Cocoa/Cocoa.h>
 #import <transmission.h>
-#import <Quartz/Quartz.h>
 
 @class FileListNode;
 
 #define STAT_TIME_NONE -1
 #define STAT_TIME_NOW -2
 
-@interface Torrent : NSObject <QLPreviewItem>
+@interface Torrent : NSObject
 {
     tr_torrent * fHandle;
     const tr_info * fInfo;
@@ -117,6 +116,7 @@
 - (tr_priority_t) priority;
 - (void) setPriority: (tr_priority_t) priority;
 
+- (void) revealData;
 + (void) trashFile: (NSString *) path;
 - (void) trashData;
 - (void) moveTorrentDataFileTo: (NSString *) folder;
@@ -163,11 +163,12 @@
 
 - (CGFloat) progress;
 - (CGFloat) progressDone;
+- (CGFloat) progressLeft;
 - (CGFloat) checkingProgress;
 
 - (NSInteger) eta;
 
-- (CGFloat) availableDesired;
+- (CGFloat) notAvailableDesired;
 
 - (BOOL) isActive;
 - (BOOL) isSeeding;

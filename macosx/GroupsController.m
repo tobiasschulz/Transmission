@@ -319,6 +319,7 @@ GroupsController * fGroupsInstance = nil;
     if (small)
     {
         icon = [icon copy];
+        [icon setScalesWhenResized: YES];
         [icon setSize: NSMakeSize(ICON_WIDTH_SMALL, ICON_WIDTH_SMALL)];
         
         [item setImage: icon];
@@ -341,6 +342,7 @@ GroupsController * fGroupsInstance = nil;
         if (small)
         {
             icon = [icon copy];
+            [icon setScalesWhenResized: YES];
             [icon setSize: NSMakeSize(ICON_WIDTH_SMALL, ICON_WIDTH_SMALL)];
             
             [item setImage: icon];

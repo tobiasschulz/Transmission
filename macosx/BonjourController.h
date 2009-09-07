@@ -24,7 +24,7 @@
 
 #import <Cocoa/Cocoa.h>
 
-@interface BonjourController : NSObject <NSNetServiceDelegate>
+@interface BonjourController : NSObject
 {
     NSNetService * fService;
 }

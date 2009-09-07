@@ -28,7 +28,7 @@
 #import "FilePriorityCell.h"
 #import "Torrent.h"
 #import "FileListNode.h"
-#import <Quartz/Quartz.h>
+#import "QuickLookController.h"
 
 @implementation FileOutlineView
 
@@ -90,13 +90,13 @@
     const unichar firstChar = [[event charactersIgnoringModifiers] characterAtIndex: 0];
     
     //don't allow quick look on add window
-    if (firstChar == ' ' && [[[self window] windowController] conformsToProtocol: @protocol(QLPreviewPanelDataSource)])
-    {
-        if ([[QLPreviewPanel sharedPreviewPanel] isVisible])
-            [[QLPreviewPanel sharedPreviewPanel] orderOut: nil];
-        else
-            [[QLPreviewPanel sharedPreviewPanel] makeKeyAndOrderFront: nil];
-    }
+    if (firstChar == ' ' && [[[self window] windowController] isKindOfClass: [InfoWindowController class]])
+        [[QuickLookController quickLook] toggleQuickLook];
+    else if (firstChar == NSRightArrowFunctionKey)
+        [[QuickLookController quickLook] pressRight];
+    else if (firstChar == NSLeftArrowFunctionKey)
+        [[QuickLookController quickLook] pressLeft];
+    else;
     
     [super keyDown: event];  
 }

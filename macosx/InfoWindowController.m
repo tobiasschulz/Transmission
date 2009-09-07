@@ -31,7 +31,7 @@
 #import "PeerProgressIndicatorCell.h"
 #import "TrackerTableView.h"
 #import "PiecesView.h"
-#import "NSApplicationAdditions.h"
+#import "QuickLookController.h"
 #import "NSStringAdditions.h"
 #include "utils.h" //tr_getRatio()
 
@@ -82,8 +82,6 @@ typedef enum
 - (void) setWebSeedTableHidden: (BOOL) hide animate: (BOOL) animate;
 - (NSArray *) peerSortDescriptors;
 
-- (NSArray *) quickLookURLs;
-- (BOOL) canQuickLook;
 - (BOOL) canQuickLookFile: (FileListNode *) item;
 
 - (void) addTrackers;
@@ -150,11 +148,8 @@ typedef enum
     //reset images for reveal button, since the images are also used in the main table
     NSImage * revealOn = [[NSImage imageNamed: @"RevealOn.png"] copy],
             * revealOff = [[NSImage imageNamed: @"RevealOff.png"] copy];
-    if (![NSApp isOnSnowLeopardOrBetter])
-    {
-        [revealOn setFlipped: NO];
-        [revealOff setFlipped: NO];
-    }
+    [revealOn setFlipped: NO];
+    [revealOff setFlipped: NO];
     
     [fRevealDataButton setImage: revealOff];
     [fRevealDataButton setAlternateImage: revealOn];
@@ -228,8 +223,6 @@ typedef enum
     [fTrackers release];
     
     [fWebSeedTableAnimation release];
-    
-    [fPreviewPanel release];
     
     [super dealloc];
 }
@@ -401,7 +394,10 @@ typedef enum
         
         [fFileController setTorrent: torrent];
         
-        [fImageView setImage: [torrent icon]];
+        NSImage * icon = [[torrent icon] copy];
+        [icon setFlipped: NO];
+        [fImageView setImage: icon];
+        [icon release];
         
         NSString * name = [torrent name];
         [fNameField setStringValue: name];
@@ -688,7 +684,7 @@ typedef enum
 
 - (void) setTab: (id) sender
 {
-    const NSInteger oldTabTag = fCurrentTabTag;
+    NSInteger oldTabTag = fCurrentTabTag;
     fCurrentTabTag = [fTabMatrix selectedTag];
     if (fCurrentTabTag == oldTabTag)
         return;
@@ -727,6 +723,8 @@ typedef enum
                 break;
             
             case TAB_FILES_TAG:
+                [[QuickLookController quickLook] updateQuickLook];
+                
                 oldResizeSaveKey = @"InspectorContentHeightFiles";
                 break;
         }
@@ -822,9 +820,8 @@ typedef enum
     [[window contentView] addSubview: view];
     [view setHidden: NO];
     
-    if ((fCurrentTabTag == TAB_FILES_TAG || oldTabTag == TAB_FILES_TAG)
-        && ([QLPreviewPanel sharedPreviewPanelExists] && [[QLPreviewPanel sharedPreviewPanel] isVisible]))
-        [[QLPreviewPanel sharedPreviewPanel] updateController];
+    if (fCurrentTabTag == TAB_FILES_TAG)
+        [[QuickLookController quickLook] updateQuickLook];
 }
 
 - (void) setNextTab
@@ -1104,50 +1101,46 @@ typedef enum
     return [[fTrackers objectAtIndex: i] intValue] == 0;
 }
 
-- (BOOL) acceptsPreviewPanelControl: (QLPreviewPanel *) panel
+- (BOOL) shouldQuickLookFileView
 {
-    return fCurrentTabTag == TAB_FILES_TAG && [self canQuickLook];
+    return [[self window] isVisible] && fCurrentTabTag == TAB_FILES_TAG && [[fFileController outlineView] numberOfSelectedRows] > 0;
 }
 
-- (void) beginPreviewPanelControl: (QLPreviewPanel *) panel
+- (NSArray *) quickLookURLs
 {
-    fPreviewPanel = [panel retain];
-    fPreviewPanel.delegate = self;
-    fPreviewPanel.dataSource = self;
-}
-
-- (void) endPreviewPanelControl: (QLPreviewPanel *) panel
-{
-    [fPreviewPanel release];
-    fPreviewPanel = nil;
-}
-
-- (NSInteger) numberOfPreviewItemsInPreviewPanel: (QLPreviewPanel *) panel
-{
-    return [[self quickLookURLs] count];
-}
-
-- (id <QLPreviewItem>) previewPanel: (QLPreviewPanel *)panel previewItemAtIndex: (NSInteger) index
-{
-    return [[self quickLookURLs] objectAtIndex: index];
-}
-
-- (BOOL) previewPanel: (QLPreviewPanel *) panel handleEvent: (NSEvent *) event
-{
-    if ([event type] == NSKeyDown)
+    FileOutlineView * fileOutlineView = [fFileController outlineView];
+    Torrent * torrent = [fTorrents objectAtIndex: 0];
+    NSString * folder = [torrent downloadFolder];
+    NSIndexSet * indexes = [fileOutlineView selectedRowIndexes];
+    NSMutableArray * urlArray = [NSMutableArray arrayWithCapacity: [indexes count]];
+    
+    for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
     {
-        [super keyDown: event];
-        return YES;
+        FileListNode * item = [fileOutlineView itemAtRow: i];
+        if ([self canQuickLookFile: item])
+            [urlArray addObject: [NSURL fileURLWithPath: [folder stringByAppendingPathComponent: [item fullPath]]]];
     }
+    
+    return urlArray;
+}
+
+- (BOOL) canQuickLook
+{
+    FileOutlineView * fileOutlineView = [fFileController outlineView];
+    NSIndexSet * indexes = [fileOutlineView selectedRowIndexes];
+    
+    for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
+        if ([self canQuickLookFile: [fileOutlineView itemAtRow: i]])
+            return YES;
     
     return NO;
 }
 
-- (NSRect) previewPanel: (QLPreviewPanel *) panel sourceFrameOnScreenForPreviewItem: (id <QLPreviewItem>) item
+- (NSRect) quickLookFrameWithURL: (NSURL *) url
 {
     FileOutlineView * fileOutlineView = [fFileController outlineView];
     
-    NSString * fullPath = [(NSURL *) item path];
+    NSString * fullPath = [url path];
     NSString * folder = [[fTorrents objectAtIndex: 0] downloadFolder];
     NSRange visibleRows = [fileOutlineView rowsInRect: [fileOutlineView bounds]];
     
@@ -1184,16 +1177,7 @@ typedef enum
 - (void) revealDataFile: (id) sender
 {
     if ([fTorrents count] > 0)
-    {
-        Torrent * torrent = [fTorrents objectAtIndex: 0];
-        if ([NSApp isOnSnowLeopardOrBetter])
-        {
-            NSURL * file = [NSURL fileURLWithPath: [torrent dataLocation]];
-            [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs: [NSArray arrayWithObject: file]];
-        }
-        else
-            [[NSWorkspace sharedWorkspace] selectFile: [torrent dataLocation] inFileViewerRootedAtPath: nil];
-    }
+        [[fTorrents objectAtIndex: 0] revealData];
 }
 
 - (void) setFileFilterText: (id) sender
@@ -1674,36 +1658,6 @@ typedef enum
     }
     
     return descriptors;
-}
-
-- (NSArray *) quickLookURLs
-{
-    FileOutlineView * fileOutlineView = [fFileController outlineView];
-    Torrent * torrent = [fTorrents objectAtIndex: 0];
-    NSString * folder = [torrent downloadFolder];
-    NSIndexSet * indexes = [fileOutlineView selectedRowIndexes];
-    NSMutableArray * urlArray = [NSMutableArray arrayWithCapacity: [indexes count]];
-    
-    for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
-    {
-        FileListNode * item = [fileOutlineView itemAtRow: i];
-        if ([self canQuickLookFile: item])
-            [urlArray addObject: [NSURL fileURLWithPath: [folder stringByAppendingPathComponent: [item fullPath]]]];
-    }
-    
-    return urlArray;
-}
-
-- (BOOL) canQuickLook
-{
-    FileOutlineView * fileOutlineView = [fFileController outlineView];
-    NSIndexSet * indexes = [fileOutlineView selectedRowIndexes];
-    
-    for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
-        if ([self canQuickLookFile: [fileOutlineView itemAtRow: i]])
-            return YES;
-    
-    return NO;
 }
 
 - (BOOL) canQuickLookFile: (FileListNode *) item

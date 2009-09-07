@@ -35,11 +35,6 @@
 ****
 ***/
 
-enum
-{
-    MSEC_TO_SLEEP_PER_SECOND_DURING_VERIFY = 200
-};
-
 /* #define STOPWATCH */
 
 static tr_bool
@@ -50,7 +45,6 @@ verifyTorrent( tr_torrent * tor, tr_bool * stopFlag )
     int64_t filePos = 0;
     tr_bool changed = 0;
     tr_bool hadPiece = 0;
-    time_t lastSleptAt = 0;
     uint32_t piecePos = 0;
     uint32_t pieceBytesRead = 0;
     tr_file_index_t fileIndex = 0;
@@ -58,7 +52,7 @@ verifyTorrent( tr_torrent * tor, tr_bool * stopFlag )
     const int64_t buflen = tor->info.pieceSize;
     uint8_t * buffer = tr_new( uint8_t, buflen );
 #ifdef STOPWATCH
-    const time_t begin = time( NULL );
+    time_t now = time( NULL );
 #endif
 
     SHA1_Init( &sha );
@@ -111,7 +105,6 @@ verifyTorrent( tr_torrent * tor, tr_bool * stopFlag )
         /* if we're finishing a piece... */
         if( leftInPiece == 0 )
         {
-            time_t now;
             tr_bool hasPiece;
             uint8_t hash[SHA_DIGEST_LENGTH];
 
@@ -128,15 +121,14 @@ verifyTorrent( tr_torrent * tor, tr_bool * stopFlag )
                 changed = TRUE;
             }
             tr_torrentSetPieceChecked( tor, pieceIndex, TRUE );
-            now = time( NULL );
-            tor->anyDate = now;
+            tor->anyDate = time( NULL );
 
-            /* sleeping even just a few msec per second goes a long
-             * way towards reducing IO load... */
-            if( lastSleptAt != now ) {
-                lastSleptAt = now;
-                tr_wait( MSEC_TO_SLEEP_PER_SECOND_DURING_VERIFY );
-            }
+            /* going full-throttle on a verify can choke other processes'
+             * disk IO, so wait a fwe msec between pieces.
+             * The msec is arbitrary, and the "if" clause is to make sure we
+             * don't slow down verification of files that don't exist */
+            if( pieceBytesRead == tr_torPieceCountBytes( tor, pieceIndex ) )
+                tr_wait( 50 );
 
             SHA1_Init( &sha );
             ++pieceIndex;
@@ -161,9 +153,9 @@ verifyTorrent( tr_torrent * tor, tr_bool * stopFlag )
 
 #ifdef STOPWATCH
 {
-    const time_t end = time( NULL );
+    time_t now2 = time( NULL );
     fprintf( stderr, "it took %d seconds to verify %"PRIu64" bytes (%"PRIu64" bytes per second)\n",
-             (int)(end-begin), tor->info.totalSize, (uint64_t)(tor->info.totalSize/(1+(end-begin))) );
+             (int)(now2-now), tor->info.totalSize, (uint64_t)(tor->info.totalSize/(1+(now2-now))) );
 }
 #endif
 
