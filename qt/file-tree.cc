@@ -43,13 +43,9 @@ FileTreeItem :: ~FileTreeItem( )
 {
     assert( myChildren.isEmpty( ) );
 
-    if( myParent ) {
-        const int pos = myParent->myChildren.indexOf( this );
-        if( pos >= 0 )
-            myParent->myChildren.removeAt( pos );
-        else 
+    if( myParent )
+        if( !myParent->myChildren.removeOne( this ) )
             assert( 0 && "failed to remove" );
-    }
 }
 
 void

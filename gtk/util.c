@@ -509,9 +509,7 @@ gtr_open_file( const char * path )
         }
 
         if( !opened )
-        {
             g_message( "Unable to open \"%s\"", path );
-        }
     }
 }
 

@@ -525,10 +525,10 @@ onTrackerResponse( tr_session * session,
                                       tr_webGetResponseStr( responseCode ) );
         tr_strlcpy( t->lastAnnounceStr, buf, sizeof( t->lastAnnounceStr ) );
 
-        /* if the repsonse may require intervention, notify the user; otherwise, just log it */
-        if( responseCode >= 400 )
-            publishWarning( t, buf );
-        tr_ninf( t->name, "%s", buf );
+        /* if the repsonse may require intervention, notify the user; otherwise, just log it */ 
+        if( responseCode >= 400 ) 
+            publishWarning( t, buf ); 
+        tr_ninf( t->name, "%s", buf ); 
 
         tr_free( buf );
     }

@@ -25,7 +25,6 @@
 #import "TorrentCell.h"
 #import "TorrentTableView.h"
 #import "GroupsController.h"
-#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "ProgressGradients.h"
 
@@ -33,7 +32,6 @@
 
 #define IMAGE_SIZE_REG 32.0f
 #define IMAGE_SIZE_MIN 16.0f
-#define ERROR_IMAGE_SIZE 20.0f
 
 #define NORMAL_BUTTON_WIDTH 14.0f
 #define ACTION_BUTTON_WIDTH 16.0f
@@ -79,8 +77,6 @@
 - (NSString *) buttonString;
 - (NSString *) statusString;
 - (NSString *) minimalStatusString;
-
-- (void) drawImage: (NSImage *) image inRect: (NSRect) rect; //use until 10.5 dropped
 
 @end
 
@@ -301,13 +297,7 @@
         fMouseDownRevealButton = NO;
         [controlView setNeedsDisplayInRect: cellFrame];
         
-        if ([NSApp isOnSnowLeopardOrBetter])
-        {
-            NSURL * file = [NSURL fileURLWithPath: [[self representedObject] dataLocation]];
-            [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs: [NSArray arrayWithObject: file]];
-        }
-        else
-            [[NSWorkspace sharedWorkspace] selectFile: [[self representedObject] dataLocation] inFileViewerRootedAtPath: nil];
+        [[self representedObject] revealData];
     }
     else;
     
@@ -430,20 +420,24 @@
     
     //error image
     const BOOL error = [torrent isErrorOrWarning];
-    NSImage * errorImage = error ? [NSImage imageNamed: [NSApp isOnSnowLeopardOrBetter] ? NSImageNameCaution : @"Error.png"] : nil;
+    if (error && !fErrorImage)
+    {
+        fErrorImage = [NSImage imageNamed: @"Error.png"];
+        [fErrorImage setFlipped: YES];
+    }
     
     //icon
     if (!minimal || !(!fTracking && fHoverAction)) //don't show in minimal mode when hovered over
     {
-        NSImage * icon = (minimal && error) ? errorImage : [torrent icon];
-        [self drawImage: icon inRect: iconRect];
+        NSImage * icon = (minimal && error) ? fErrorImage : [torrent icon];
+        [icon drawInRect: iconRect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0f];
     }
     
     if (error && !minimal)
     {
-        NSRect errorRect = NSMakeRect(NSMaxX(iconRect) - ERROR_IMAGE_SIZE, NSMaxY(iconRect) - ERROR_IMAGE_SIZE,
-                                        ERROR_IMAGE_SIZE, ERROR_IMAGE_SIZE);
-        [self drawImage: errorImage inRect: errorRect];
+        NSRect errorRect = NSMakeRect(NSMaxX(iconRect) - IMAGE_SIZE_MIN, NSMaxY(iconRect) - IMAGE_SIZE_MIN,
+                                        IMAGE_SIZE_MIN, IMAGE_SIZE_MIN);
+        [fErrorImage drawInRect: errorRect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0f];
     }
     
     //text color
@@ -516,7 +510,9 @@
             controlImage = [NSImage imageNamed: [@"Resume" stringByAppendingString: controlImageSuffix]];
     }
     
-    [self drawImage: controlImage inRect: [self controlButtonRectForBounds: cellFrame]];
+    [controlImage setFlipped: YES];
+    [controlImage drawInRect: [self controlButtonRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver
+        fraction: 1.0f];
     
     //reveal button
     NSString * revealImageString;
@@ -528,7 +524,9 @@
         revealImageString = @"RevealOff.png";
     
     NSImage * revealImage = [NSImage imageNamed: revealImageString];
-    [self drawImage: revealImage inRect: [self revealButtonRectForBounds: cellFrame]];
+    [revealImage setFlipped: YES];
+    [revealImage drawInRect: [self revealButtonRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver
+        fraction: 1.0f];
     
     //action button
     NSString * actionImageString;
@@ -542,7 +540,9 @@
     if (actionImageString)
     {
         NSImage * actionImage = [NSImage imageNamed: actionImageString];
-        [self drawImage: actionImage inRect: [self actionButtonRectForBounds: cellFrame]];
+        [actionImage setFlipped: YES];
+        [actionImage drawInRect: [self actionButtonRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver
+            fraction: 1.0f];
     }
     
     //status
@@ -559,12 +559,13 @@
 
 - (void) drawBar: (NSRect) barRect
 {
-    const CGFloat piecesBarPercent = [(TorrentTableView *)[self controlView] piecesBarPercent];
-    if (piecesBarPercent > 0.0)
+    CGFloat piecesBarPercent = [(TorrentTableView *)[self controlView] piecesBarPercent];
+    if (piecesBarPercent > 0.0f)
     {
-        NSRect piecesBarRect, regularBarRect;
-        NSDivideRect(barRect, &piecesBarRect, &regularBarRect, floorf(NSHeight(barRect) * PIECES_TOTAL_PERCENT * piecesBarPercent),
-                    NSMaxYEdge);
+        NSRect regularBarRect = barRect, piecesBarRect = barRect;
+        piecesBarRect.size.height *= PIECES_TOTAL_PERCENT * piecesBarPercent;
+        regularBarRect.size.height -= piecesBarRect.size.height;
+        piecesBarRect.origin.y += regularBarRect.size.height;
         
         [self drawRegularBar: regularBarRect];
         [self drawPiecesBar: piecesBarRect];
@@ -577,75 +578,108 @@
     }
     
     [fBarBorderColor set];
-    [NSBezierPath strokeRect: NSInsetRect(barRect, 0.5, 0.5)];
+    [NSBezierPath strokeRect: NSInsetRect(barRect, 0.5f, 0.5f)];
 }
 
 - (void) drawRegularBar: (NSRect) barRect
 {
     Torrent * torrent = [self representedObject];
     
-    NSRect haveRect, missingRect;
-    NSDivideRect(barRect, &haveRect, &missingRect, floorf([torrent progress] * NSWidth(barRect)), NSMinXEdge);
+    NSInteger leftWidth = barRect.size.width;
+    CGFloat progress = [torrent progress];
     
-    if (!NSIsEmptyRect(haveRect))
+    if (progress < 1.0f)
     {
+        CGFloat rightProgress = 1.0f - progress, progressLeft = [torrent progressLeft];
+        NSInteger rightWidth = leftWidth * rightProgress;
+        leftWidth -= rightWidth;
+        
+        if (progressLeft < rightProgress)
+        {
+            NSInteger rightNoIncludeWidth = rightWidth * ((rightProgress - progressLeft) / rightProgress);
+            rightWidth -= rightNoIncludeWidth;
+            
+            NSRect noIncludeRect = barRect;
+            noIncludeRect.origin.x += barRect.size.width - rightNoIncludeWidth;
+            noIncludeRect.size.width = rightNoIncludeWidth;
+            
+            [[ProgressGradients progressLightGrayGradient] drawInRect: noIncludeRect angle: 90];
+        }
+        
+        if (rightWidth > 0)
+        {
+            if ([torrent isActive] && ![torrent allDownloaded] && ![torrent isChecking]
+                && [fDefaults boolForKey: @"DisplayProgressBarAvailable"])
+            {
+                NSInteger notAvailableWidth = ceil(rightWidth * [torrent notAvailableDesired]);
+                if (notAvailableWidth > 0)
+                {
+                    rightWidth -= notAvailableWidth;
+                    
+                    NSRect notAvailableRect = barRect;
+                    notAvailableRect.origin.x += leftWidth + rightWidth;
+                    notAvailableRect.size.width = notAvailableWidth;
+                    
+                    [[ProgressGradients progressRedGradient] drawInRect: notAvailableRect angle: 90];
+                }
+            }
+            
+            if (rightWidth > 0)
+            {
+                NSRect includeRect = barRect;
+                includeRect.origin.x += leftWidth;
+                includeRect.size.width = rightWidth;
+                
+                [[ProgressGradients progressWhiteGradient] drawInRect: includeRect angle: 90];
+            }
+        }
+    }
+    
+    if (leftWidth > 0)
+    {
+        NSRect completeRect = barRect;
+        completeRect.size.width = leftWidth;
+        
         if ([torrent isActive])
         {
             if ([torrent isChecking])
-                [[ProgressGradients progressYellowGradient] drawInRect: haveRect angle: 90];
+                [[ProgressGradients progressYellowGradient] drawInRect: completeRect angle: 90];
             else if ([torrent isSeeding])
             {
-                NSRect ratioHaveRect, ratioRemainingRect;
-                NSDivideRect(haveRect, &ratioHaveRect, &ratioRemainingRect, floorf([torrent progressStopRatio] * NSWidth(haveRect)),
-                            NSMinXEdge);
+                NSInteger ratioLeftWidth = leftWidth * (1.0f - [torrent progressStopRatio]);
+                leftWidth -= ratioLeftWidth;
                 
-                [[ProgressGradients progressGreenGradient] drawInRect: ratioHaveRect angle: 90];
-                [[ProgressGradients progressLightGreenGradient] drawInRect: ratioRemainingRect angle: 90];
+                if (ratioLeftWidth > 0)
+                {
+                    NSRect ratioLeftRect = barRect;
+                    ratioLeftRect.origin.x += leftWidth;
+                    ratioLeftRect.size.width = ratioLeftWidth;
+                    
+                    [[ProgressGradients progressLightGreenGradient] drawInRect: ratioLeftRect angle: 90];
+                }
+                
+                if (leftWidth > 0)
+                {
+                    completeRect.size.width = leftWidth;
+                    
+                    [[ProgressGradients progressGreenGradient] drawInRect: completeRect angle: 90];
+                }
             }
             else
-                [[ProgressGradients progressBlueGradient] drawInRect: haveRect angle: 90];
+                [[ProgressGradients progressBlueGradient] drawInRect: completeRect angle: 90];
         }
         else
         {
             if ([torrent waitingToStart])
             {
-                if ([torrent allDownloaded])
-                    [[ProgressGradients progressDarkGreenGradient] drawInRect: haveRect angle: 90];
+                if ([torrent progressLeft] <= 0.0f)
+                    [[ProgressGradients progressDarkGreenGradient] drawInRect: completeRect angle: 90];
                 else
-                    [[ProgressGradients progressDarkBlueGradient] drawInRect: haveRect angle: 90];
+                    [[ProgressGradients progressDarkBlueGradient] drawInRect: completeRect angle: 90];
             }
             else
-                [[ProgressGradients progressGrayGradient] drawInRect: haveRect angle: 90];
+                [[ProgressGradients progressGrayGradient] drawInRect: completeRect angle: 90];
         }
-    }
-    
-    if (!NSIsEmptyRect(missingRect))
-    {
-        if (![torrent allDownloaded])
-        {
-            //the ratio of total progress to total width equals ratio of progress of amount wanted to wanted width
-            const CGFloat widthRemaining = floorf(NSWidth(barRect) * (1.0 - [torrent progressDone]) / [torrent progress]);
-            
-            NSRect wantedRect;
-            NSDivideRect(missingRect, &wantedRect, &missingRect, widthRemaining, NSMinXEdge);
-            
-            //not-available section
-            if ([torrent isActive] && ![torrent isChecking] && [fDefaults boolForKey: @"DisplayProgressBarAvailable"]
-                && [torrent availableDesired] > 0.0)
-            {
-                NSRect unavailableRect;
-                NSDivideRect(wantedRect, &wantedRect, &unavailableRect, floorf([torrent availableDesired] * NSWidth(wantedRect)),
-                            NSMinXEdge);
-                
-                [[ProgressGradients progressRedGradient] drawInRect: unavailableRect angle: 90];
-            }
-            
-            //remaining section
-            [[ProgressGradients progressWhiteGradient] drawInRect: wantedRect angle: 90];
-        }
-        
-        //unwanted section
-        [[ProgressGradients progressLightGrayGradient] drawInRect: missingRect angle: 90];
     }
 }
 
@@ -804,17 +838,6 @@
     {
         Torrent * torrent = [self representedObject];
         return [fDefaults boolForKey: @"DisplaySmallStatusRegular"] ? [torrent shortStatusString] : [torrent remainingTimeString];
-    }
-}
-
-- (void) drawImage: (NSImage *) image inRect: (NSRect) rect
-{
-    if ([NSApp isOnSnowLeopardOrBetter])
-        [image drawInRect: rect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0 respectFlipped: YES hints: nil];
-    else
-    {
-        [image setFlipped: YES];
-        [image drawInRect: rect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
     }
 }
 

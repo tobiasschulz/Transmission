@@ -25,7 +25,6 @@
 #import "FilePriorityCell.h"
 #import "FileOutlineView.h"
 #import "FileListNode.h"
-#import "NSApplicationAdditions.h"
 #import "Torrent.h"
 
 @implementation FilePriorityCell
@@ -138,18 +137,8 @@
         }
         
         NSSize imageSize = [image size];
-        NSRect imageRect = NSMakeRect(cellFrame.origin.x + (cellFrame.size.width - imageSize.width) * 0.5,
-                                        cellFrame.origin.y + (cellFrame.size.height - imageSize.height) * 0.5,
-                                        imageSize.width, imageSize.height);
-        
-        if ([NSApp isOnSnowLeopardOrBetter])
-            [image drawInRect: imageRect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0
-                respectFlipped: YES hints: nil];
-        else
-        {
-            [image setFlipped: YES];
-            [image drawInRect: imageRect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
-        }
+        [image compositeToPoint: NSMakePoint(cellFrame.origin.x + (cellFrame.size.width - imageSize.width) * 0.5f,
+                cellFrame.origin.y + (cellFrame.size.height + imageSize.height) * 0.5f) operation: NSCompositeSourceOver];
     }
 }
 

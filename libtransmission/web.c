@@ -50,7 +50,7 @@ useCurlMultiSocketAction( void )
 enum
 {
     /* arbitrary number */
-    MAX_CONCURRENT_TASKS = 100,
+    MAX_CONCURRENT_TASKS = 256,
 
     /* arbitrary number */
     DEFAULT_TIMER_MSEC = 2500

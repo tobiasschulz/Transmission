@@ -352,13 +352,8 @@ TrOpenFile( int                      i,
 #ifdef HAVE_POSIX_FADVISE
     /* this doubles the OS level readahead buffer, which in practice
      * turns out to be a good thing, because many (most?) clients request
-     * chunks of blocks in order.
-     * It's okay for this to fail silently, so don't let it affect errno */
-    {
-        const int err = errno;
-        posix_fadvise( file->fd, 0, 0, POSIX_FADV_SEQUENTIAL );
-        errno = err;
-    }
+     * chunks of blocks in order */
+    posix_fadvise( file->fd, 0, 0, POSIX_FADV_SEQUENTIAL );
 #endif
 
     tr_free( filename );

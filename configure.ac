@@ -3,8 +3,8 @@ dnl STATUS: "X" for prerelease beta builds,
 dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
-m4_define([user_agent_prefix],[1.75+])
-m4_define([peer_id_prefix],[-TR175Z-])
+m4_define([user_agent_prefix],[1.75])
+m4_define([peer_id_prefix],[-TR1750-])
 
 AC_INIT([transmission],
         [user_agent_prefix],
@@ -93,7 +93,6 @@ PKG_CHECK_MODULES(LIBCURL, [libcurl >= $CURL_MINIMUM])
 AC_PATH_ZLIB
 
 AC_SYS_LARGEFILE
-AC_CHECK_FUNCS([lseek64])
 
 
 dnl ----------------------------------------------------------------------------
