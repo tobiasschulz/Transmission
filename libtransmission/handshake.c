@@ -868,7 +868,7 @@ readCryptoProvide( tr_handshake *    handshake,
         const tr_bool clientIsSeed = tr_torrentIsSeed( tor );
         const tr_bool peerIsSeed = tr_peerMgrPeerIsSeed( tor, tr_peerIoGetAddress( handshake->io, NULL ) );
         dbgmsg( handshake, "got INCOMING connection's encrypted handshake for torrent [%s]",
-                tr_torrentName( tor ) );
+                tor->info.name );
         tr_peerIoSetTorrentHash( handshake->io, tor->info.hash );
 
         if( clientIsSeed && peerIsSeed )
@@ -1031,8 +1031,6 @@ canRead( struct tr_peerIo * io, void * arg, size_t * piece )
     struct evbuffer * inbuf = tr_peerIoGetReadBuffer( io );
     ReadState         ret;
     tr_bool           readyForMore = TRUE;
-
-    assert( tr_isPeerIo( io ) );
 
     /* no piece data in handshake */
     *piece = 0;

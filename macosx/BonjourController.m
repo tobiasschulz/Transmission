@@ -44,7 +44,9 @@ BonjourController * fDefaultController = nil;
 {
     [self stop];
     
-    NSString * serviceName = [NSString stringWithFormat: @"Transmission Web Interface (%@)", NSUserName()];
+    CFStringRef userName = CSCopyUserName(TRUE);
+    NSString * serviceName = [NSString stringWithFormat: @"Transmission Web Interface (%@)", (NSString *)userName];
+    CFRelease(userName);
     
     fService = [[NSNetService alloc] initWithDomain: @"local." type: @"_http._tcp." name: serviceName port: port];
     [fService setDelegate: self];

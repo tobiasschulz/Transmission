@@ -24,7 +24,7 @@
 
 struct tr_bandwidth;
 struct tr_ratecontrol;
-struct tr_torrent_tiers;
+struct tr_torrent_peers;
 
 /**
 ***  Package-visible ctor API
@@ -50,6 +50,8 @@ void        tr_torrentInitFileDLs( tr_torrent *      tor,
                                    tr_bool           do_download );
 
 void        tr_torrentRecheckCompleteness( tr_torrent * );
+
+void        tr_torrentResetTransferStats( tr_torrent * );
 
 void        tr_torrentSetHasPiece( tr_torrent *     tor,
                                    tr_piece_index_t pieceIndex,
@@ -157,15 +159,8 @@ struct tr_torrent
      */
     uint8_t * peer_id;
 
-    /* Where the files will be when it's complete */
+    /* Where to download */
     char * downloadDir;
-
-    /* Where the files are when the torrent is incomplete */
-    char * incompleteDir;
-
-    /* Where the files are now.
-     * This pointer will be equal to downloadDir or incompleteDir */
-    const char * currentDir;
 
     /* How many bytes we ask for per request */
     uint32_t                   blockSize;
@@ -182,8 +177,8 @@ struct tr_torrent
     struct tr_bitfield         checkedPieces;
     tr_completeness            completeness;
 
-    struct tr_torrent_tiers  * tiers;
-    struct tr_publisher_tag  * tiersSubscription;
+    struct tr_tracker *        tracker;
+    struct tr_publisher_tag *  trackerSubscription;
 
     time_t                     dhtAnnounceAt;
     tr_bool                    dhtAnnounceInProgress;
@@ -331,7 +326,7 @@ enum
     TORRENT_MAGIC_NUMBER = 95549
 };
 
-static TR_INLINE tr_bool tr_isTorrent( const tr_torrent * tor )
+static inline tr_bool tr_isTorrent( const tr_torrent * tor )
 {
     return ( tor != NULL )
         && ( tor->magicNumber == TORRENT_MAGIC_NUMBER )
@@ -340,48 +335,11 @@ static TR_INLINE tr_bool tr_isTorrent( const tr_torrent * tor )
 
 /* set a flag indicating that the torrent's .resume file
  * needs to be saved when the torrent is closed */
-static TR_INLINE void tr_torrentSetDirty( tr_torrent * tor )
+static inline void tr_torrentSetDirty( tr_torrent * tor )
 {
     assert( tr_isTorrent( tor ) );
 
     tor->isDirty = TRUE;
 }
-
-static TR_INLINE const char * tr_torrentName( const tr_torrent * tor )
-{
-    assert( tr_isTorrent( tor ) );
-
-    return tor->info.name;
-}
-
-/**
- * Tell the tr_torrent that one of its files has become complete
- */
-void tr_torrentFileCompleted( tr_torrent * tor, tr_file_index_t fileNo );
-
-
-/**
- * @brief Like tr_torrentFindFile(), but splits the filename into base and subpath;
- *
- * If the file is found, "tr_buildPath( base, subpath, NULL )"
- * will generate the complete filename.
- *
- * @return true if the file is found, false otherwise.
- *
- * @param base if the torrent is found, this will be either
- *             tor->downloadDir or tor->incompleteDir
- * @param subpath on success, this pointer is assigned a newly-allocated
- *                string holding the second half of the filename.
- */
-tr_bool tr_torrentFindFile2( const tr_torrent *, tr_file_index_t fileNo,
-                             const char ** base, char ** subpath );
-
-
-/* Returns a newly-allocated version of the tr_file.name string
- * that's been modified to denote that it's not a complete file yet.
- * In the current implementation this is done by appending ".part"
- * a la Firefox. */
-char* tr_torrentBuildPartial( const tr_torrent *, tr_file_index_t fileNo );
-
 
 #endif

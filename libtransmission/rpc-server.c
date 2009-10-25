@@ -886,7 +886,8 @@ tr_rpcClose( tr_rpc_server ** ps )
 }
 
 tr_rpc_server *
-tr_rpcInit( tr_session  * session, tr_benc * settings )
+tr_rpcInit( tr_session  * session,
+            tr_benc * settings )
 {
     tr_rpc_server * s;
     tr_bool found;
@@ -908,11 +909,11 @@ tr_rpcInit( tr_session  * session, tr_benc * settings )
 
     found = tr_bencDictFindBool( settings, TR_PREFS_KEY_RPC_WHITELIST_ENABLED, &boolVal );
     assert( found );
-    tr_rpcSetWhitelistEnabled( s, boolVal );
+    s->isWhitelistEnabled = boolVal;
 
     found = tr_bencDictFindBool( settings, TR_PREFS_KEY_RPC_AUTH_REQUIRED, &boolVal );
     assert( found );
-    tr_rpcSetPasswordEnabled( s, boolVal );
+    s->isPasswordEnabled = boolVal;
 
     found = tr_bencDictFindStr( settings, TR_PREFS_KEY_RPC_WHITELIST, &str );
     assert( found );
@@ -920,11 +921,14 @@ tr_rpcInit( tr_session  * session, tr_benc * settings )
 
     found = tr_bencDictFindStr( settings, TR_PREFS_KEY_RPC_USERNAME, &str );
     assert( found );
-    tr_rpcSetUsername( s, str );
+    s->username = tr_strdup( str );
 
     found = tr_bencDictFindStr( settings, TR_PREFS_KEY_RPC_PASSWORD, &str );
     assert( found );
-    tr_rpcSetPassword( s, str );
+    if( *str != '{' )
+        s->password = tr_ssha1( str );
+    else
+        s->password = strdup( str );
 
     found = tr_bencDictFindStr( settings, TR_PREFS_KEY_RPC_BIND_ADDRESS, &str );
     assert( found );

@@ -190,11 +190,9 @@
 	<true/>
 	<key>WarningInvalidOpen</key>
 	<true/>
-	<key>WarningLegal</key>
-	<true/>
 	<key>WarningRemainingSpace</key>
 	<true/>
-	<key>WarningRemoveTrackers</key>
+	<key>WarningRemoveBuiltInTracker</key>
 	<true/>
 	<key>WarningResetStats</key>
 	<true/>

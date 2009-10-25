@@ -25,6 +25,7 @@
 #include "clients.h"
 #include "completion.h"
 #include "crypto.h"
+#include "fdlimit.h"
 #include "handshake.h"
 #include "inout.h" /* tr_ioTestPiece */
 #include "net.h"
@@ -170,7 +171,7 @@ struct tr_peerMgr
 #define tordbg( t, ... ) \
     do { \
         if( tr_deepLoggingIsActive( ) ) \
-            tr_deepLog( __FILE__, __LINE__, tr_torrentName( t->tor ), __VA_ARGS__ ); \
+            tr_deepLog( __FILE__, __LINE__, t->tor->info.name, __VA_ARGS__ ); \
     } while( 0 )
 
 #define dbgmsg( ... ) \
@@ -1154,13 +1155,20 @@ peerCallbackFunc( void * vpeer, void * vevent, void * vt )
                     for( i=0; i<peerCount; ++i )
                         tr_peerMsgsHave( peers[i]->msgs, p );
 
-                    for( fileIndex=0; fileIndex<tor->info.fileCount; ++fileIndex ) {
+                    for( fileIndex=0; fileIndex<tor->info.fileCount; ++fileIndex )
+                    {
                         const tr_file * file = &tor->info.files[fileIndex];
-                        if( ( file->firstPiece <= p ) && ( p <= file->lastPiece ) )
-                            if( tr_cpFileIsComplete( &tor->completion, fileIndex ) )
-                                tr_torrentFileCompleted( tor, fileIndex );
+                        if( ( file->firstPiece <= p ) && ( p <= file->lastPiece ) && tr_cpFileIsComplete( &tor->completion, fileIndex ) )
+                        {
+                            char * path = tr_buildPath( tor->downloadDir, file->name, NULL );
+                            tordbg( t, "closing recently-completed file \"%s\"", path );
+                            tr_fdFileClose( path );
+                            tr_free( path );
+                        }
                     }
                 }
+
+                tr_torrentRecheckCompleteness( tor );
             }
             break;
         }
@@ -1332,31 +1340,26 @@ tr_peerMgrAddIncoming( tr_peerMgr * manager,
                        tr_port      port,
                        int          socket )
 {
-    tr_session * session;
-
     managerLock( manager );
 
-    assert( tr_isSession( manager->session ) );
-    session = manager->session;
-
-    if( tr_sessionIsAddressBlocked( session, addr ) )
+    if( tr_sessionIsAddressBlocked( manager->session, addr ) )
     {
         tr_dbg( "Banned IP address \"%s\" tried to connect to us", tr_ntop_non_ts( addr ) );
-        tr_netClose( session, socket );
+        tr_netClose( socket );
     }
     else if( getExistingHandshake( &manager->incomingHandshakes, addr ) )
     {
-        tr_netClose( session, socket );
+        tr_netClose( socket );
     }
     else /* we don't have a connetion to them yet... */
     {
         tr_peerIo *    io;
         tr_handshake * handshake;
 
-        io = tr_peerIoNewIncoming( session, session->bandwidth, addr, port, socket );
+        io = tr_peerIoNewIncoming( manager->session, manager->session->bandwidth, addr, port, socket );
 
         handshake = tr_handshakeNew( io,
-                                     session->encryptionMode,
+                                     manager->session->encryptionMode,
                                      myHandshakeDoneCB,
                                      manager );
 
@@ -2360,7 +2363,7 @@ reconnectTorrent( Torrent * t )
                    "%d connection candidates, "
                    "%d atoms, "
                    "max per pulse is %d",
-                   tr_torrentName( t->tor ),
+                   t->tor->info.name,
                    mustCloseCount,
                    canCloseCount,
                    candidateCount,
@@ -2642,7 +2645,7 @@ bandwidthPulse( void * vmgr )
     /* possibly stop torrents that have an error */
     tor = NULL;
     while(( tor = tr_torrentNext( mgr->session, tor )))
-        if( tor->isRunning && ( tor->error == TR_STAT_LOCAL_ERROR ))
+        if( tor->isRunning && ( tor->error == TR_STAT_LOCAL_ERROR )) 
             tr_torrentStop( tor );
 
     managerUnlock( mgr );

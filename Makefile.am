@@ -92,8 +92,7 @@ clutch_buttons_DATA = \
   web/images/buttons/info_activity.png \
   web/images/buttons/file_priority_buttons.png \
   web/images/buttons/file_wanted_buttons.png \
-  web/images/buttons/info_files.png \
-  web/images/buttons/cancel.png
+  web/images/buttons/info_files.png
 
 DISTCLEANFILES = \
   intltool-extract \

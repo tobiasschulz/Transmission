@@ -24,9 +24,8 @@
 
 #import <Cocoa/Cocoa.h>
 #import <transmission.h>
+#import "Controller.h"
 
-@class Controller;
-@class Torrent;
 @class TorrentCell;
 
 #define GROUP_SEPARATOR_HEIGHT 18.0
@@ -86,6 +85,7 @@
 - (void) setPriority: (id) sender;
 
 - (void) checkFile: (id) sender;
+- (void) moveDataFile: (id) sender;
 
 - (void) togglePiecesBar;
 - (CGFloat) piecesBarPercent;

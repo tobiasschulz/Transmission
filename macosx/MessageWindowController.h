@@ -32,10 +32,13 @@
     IBOutlet NSButton * fSaveButton, * fClearButton;
     
     NSMutableArray * fMessages;
+    NSUInteger fIndex;
     
     NSDictionary * fAttributes;
     
     NSTimer * fTimer;
+    
+    NSImage * fErrorImage, * fInfoImage, * fDebugImage;
 }
 
 - (void) updateLog: (NSTimer *) timer;

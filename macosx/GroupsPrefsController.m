@@ -297,11 +297,13 @@
 
 - (void) ruleEditorRowsDidChange: (NSNotification *) notification
 {
-    const CGFloat heightDifference = [fRuleEditor numberOfRows] * [fRuleEditor rowHeight] - [fRuleEditor frame].size.height;
-    NSRect windowFrame = [fRuleEditor window].frame;
+    CGFloat rowHeight        = [fRuleEditor rowHeight];
+    NSInteger numberOfRows   = [fRuleEditor numberOfRows];
+    CGFloat ruleEditorHeight = numberOfRows * rowHeight;
+    CGFloat heightDifference = ruleEditorHeight - [fRuleEditor frame].size.height;
+    NSRect windowFrame       = [fRuleEditor window].frame;
     windowFrame.size.height += heightDifference;
-    windowFrame.origin.y -= heightDifference;
-    
+    windowFrame.origin.y    -= heightDifference;
     [fRuleEditor.window setFrame: windowFrame display: YES animate: YES];
 }
 

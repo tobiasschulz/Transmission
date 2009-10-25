@@ -27,13 +27,13 @@
 
 @class Torrent;
 @class TrackerTableView;
-@class TrackerCell;
 @class FileOutlineController;
 @class PiecesView;
 
 @interface InfoWindowController : NSWindowController
 {
     NSArray * fTorrents;
+    NSMutableArray * fTrackers;
     
     IBOutlet NSView * fInfoView, * fActivityView, * fTrackerView, * fPeersView, * fFilesView, * fOptionsView;
     NSInteger fCurrentTabTag;
@@ -42,7 +42,7 @@
     IBOutlet NSImageView * fImageView;
     IBOutlet NSTextField * fNameField, * fBasicInfoField;
     
-    IBOutlet NSTextField * fPiecesField, * fHashField, * fSecureField,
+    IBOutlet NSTextField * fTrackerField, * fPiecesField, * fHashField, * fSecureField,
                         * fDataLocationField,
                         * fDateAddedField, * fDateCompletedField, * fDateActivityField,
                         * fCreatorField, * fDateCreatedField,
@@ -52,14 +52,15 @@
     IBOutlet NSTextView * fCommentView;
     IBOutlet NSButton * fRevealDataButton;
     
-    NSMutableArray * fTrackers;
     IBOutlet TrackerTableView * fTrackerTable;
-    TrackerCell * fTrackerCell;
     IBOutlet NSSegmentedControl * fTrackerAddRemoveControl;
+    IBOutlet NSTextField * fAnnounceAddressField, * fAnnounceLastField, * fAnnounceResponseField, * fAnnounceNextField,
+                            * fScrapeAddressField, * fScrapeLastField, * fScrapeResponseField, * fScrapeNextField;
     
     NSArray * fPeers, * fWebSeeds;
     IBOutlet NSTableView * fPeerTable, * fWebSeedTable;
-    IBOutlet NSTextField * fConnectedPeersField, * fDownloadingFromField, * fUploadingToField, * fKnownField;
+    IBOutlet NSTextField * fConnectedPeersField, * fDownloadingFromField, * fUploadingToField, * fKnownField,
+                            * fSeedersField, * fLeechersField, * fCompletedFromTrackerField;
     IBOutlet NSTextView * fErrorMessageView;
     IBOutlet PiecesView * fPiecesView;
     IBOutlet NSSegmentedControl * fPiecesControl;
@@ -76,9 +77,6 @@
                         * fPeersConnectField;
     
     NSString * fInitialString;
-    
-    #warning change to QLPreviewPanel
-    id fPreviewPanel;
 }
 
 - (void) setInfoForTorrents: (NSArray *) torrents;
@@ -92,9 +90,10 @@
 
 - (void) addRemoveTracker: (id) sender;
 
+- (BOOL) shouldQuickLookFileView;
 - (NSArray *) quickLookURLs;
 - (BOOL) canQuickLook;
-- (NSRect) quickLookSourceFrameForPreviewItem: (id /*<QLPreviewItem>*/) item;
+- (NSRect) quickLookFrameWithURL: (NSURL*) url;
 
 - (void) setPiecesView: (id) sender;
 - (void) setPiecesViewForAvailable: (BOOL) available;

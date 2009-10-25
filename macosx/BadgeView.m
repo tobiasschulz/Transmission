@@ -116,9 +116,8 @@
         [stringShadow release];
     }
     
-    NSRect badgeRect;
+    NSRect badgeRect = NSZeroRect;
     badgeRect.size = [badge size];
-    badgeRect.origin.x = 0;
     badgeRect.origin.y = height;
     
     [badge drawInRect: badgeRect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0f];

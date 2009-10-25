@@ -27,6 +27,7 @@
 #include "torrent-delegate-min.h"
 #include "torrent-model.h"
 #include "utils.h"
+#include "qticonloader.h"
 
 enum
 {

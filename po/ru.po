@@ -10,15 +10,15 @@ msgstr ""
 "Project-Id-Version: Transmission HEAD\n"
 "Report-Msgid-Bugs-To: \n"
 "POT-Creation-Date: 2009-07-13 16:23-0500\n"
-"PO-Revision-Date: 2009-07-13 17:48+0000\n"
-"Last-Translator: Sergei Sedov <sedov@webmail.perm.ru>\n"
+"PO-Revision-Date: 2009-10-21 13:28+0000\n"
+"Last-Translator: Sergei Sedov <Unknown>\n"
 "Language-Team: Russian <gnome-cyr@gnome.org>\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
 "Plural-Forms: nplurals=3; plural=n%10==1 && n%100!=11 ? 0 : n%10>=2 && "
 "n%10<=4 && (n%100<10 || n%100>=20) ? 1 : 2;\n"
-"X-Launchpad-Export-Date: 2009-08-24 23:12+0000\n"
+"X-Launchpad-Export-Date: 2009-10-25 01:36+0000\n"
 "X-Generator: Launchpad (build Unknown)\n"
 "X-Poedit-Country: RUSSIAN FEDERATION\n"
 "X-Poedit-Language: Russian\n"
@@ -34,19 +34,19 @@ msgstr "Сортировать по _названию"
 
 #: ../gtk/actions.c:51
 msgid "Sort by _Progress"
-msgstr "Сортировать по _прогрессу"
+msgstr "Сортировать по степени _загрузки"
 
 #: ../gtk/actions.c:52
 msgid "Sort by Rati_o"
-msgstr ""
+msgstr "Сортировать по со_отношению"
 
 #: ../gtk/actions.c:53
 msgid "Sort by Stat_e"
-msgstr ""
+msgstr "Сортировать по сост_оянию"
 
 #: ../gtk/actions.c:54
 msgid "Sort by T_racker"
-msgstr ""
+msgstr "Сортировать по т_рекеру"
 
 #: ../gtk/actions.c:55
 msgid "Sort by A_ge"
@@ -54,7 +54,7 @@ msgstr "Сортировать по _возрасту"
 
 #: ../gtk/actions.c:56
 msgid "Sort by Time _Left"
-msgstr ""
+msgstr "Сортировать по _оставшемуся времени"
 
 #: ../gtk/actions.c:57
 msgid "Sort by Si_ze"
@@ -78,11 +78,11 @@ msgstr "_Минималистичный режим"
 
 #: ../gtk/actions.c:92
 msgid "Re_verse Sort Order"
-msgstr ""
+msgstr "Об_ратный порядок сортировки"
 
 #: ../gtk/actions.c:93
 msgid "_Filterbar"
-msgstr "_Фильтры"
+msgstr "_Панель _фильтров"
 
 #: ../gtk/actions.c:94
 msgid "_Statusbar"
@@ -162,7 +162,7 @@ msgstr "Запустить все торренты"
 
 #: ../gtk/actions.c:113
 msgid "Set _Location"
-msgstr ""
+msgstr "Установить _место загрузки"
 
 #: ../gtk/actions.c:114
 msgid "Remove torrent"
@@ -273,7 +273,7 @@ msgstr "%s уже запущен."
 #: ../gtk/conf.c:448 ../gtk/conf.c:453
 #, c-format
 msgid "Importing \"%s\""
-msgstr ""
+msgstr "Импортирование \"%s\""
 
 #: ../gtk/details.c:470 ../gtk/file-list.c:579
 msgid "High"
@@ -293,23 +293,23 @@ msgstr "Скорость"
 
 #: ../gtk/details.c:510
 msgid "Honor global _limits"
-msgstr ""
+msgstr "Соблюдать общие лимит_ы"
 
 #: ../gtk/details.c:515 ../gtk/tr-prefs.c:1180
 msgid "Limit _download speed (KB/s):"
-msgstr "Ограничить скорость _приёма (КБ/с):"
+msgstr "Ограничить скорость _приёма (Кб/с):"
 
 #: ../gtk/details.c:527 ../gtk/tr-prefs.c:1187
 msgid "Limit _upload speed (KB/s):"
-msgstr "Ограничить скорость _раздачи (КБ/с):"
+msgstr "Ограничить скорость _раздачи (Кб/с):"
 
 #: ../gtk/details.c:539
 msgid "Torrent _priority:"
-msgstr ""
+msgstr "Приоритет _торрента:"
 
 #: ../gtk/details.c:543
 msgid "Seed-Until Ratio"
-msgstr ""
+msgstr "Раздача до достижения рейтинга"
 
 #: ../gtk/details.c:546
 msgid "Use _global settings"
@@ -321,7 +321,7 @@ msgstr "Раздавать _несмотря на рейтинг"
 
 #: ../gtk/details.c:564 ../gtk/tr-prefs.c:311
 msgid "_Seed torrent until its ratio reaches:"
-msgstr ""
+msgstr "_Раздавать торрент до достижения рейтинга:"
 
 #: ../gtk/details.c:581
 msgid "Peer Connections"
@@ -333,15 +333,15 @@ msgstr "_Максимальное количество узлов:"
 
 #: ../gtk/details.c:603 ../gtk/torrent-cell-renderer.c:173
 msgid "Waiting to verify local data"
-msgstr "Ожидается проверка локальных данных"
+msgstr "Ожидается проверка загруженных данных"
 
 #: ../gtk/details.c:604
 msgid "Verifying local data"
-msgstr "Проверка локальных данных"
+msgstr "Проверка загруженных данных"
 
 #: ../gtk/details.c:605
 msgid "Downloading"
-msgstr "Приём"
+msgstr "Загрузка"
 
 #: ../gtk/details.c:606
 msgid "Seeding"
@@ -362,7 +362,7 @@ msgstr "Смешанный"
 
 #: ../gtk/details.c:639
 msgid "Private to this tracker -- DHT and PEX disabled"
-msgstr ""
+msgstr "Только для этого трэкера — DHT и PEX отключены"
 
 #: ../gtk/details.c:641
 msgid "Public torrent"
@@ -381,45 +381,47 @@ msgstr "Создано %1$s"
 #: ../gtk/details.c:667
 #, c-format
 msgid "Created by %1$s on %2$s"
-msgstr ""
+msgstr "Создан %1$s на %2$s"
 
 #: ../gtk/details.c:758
 #, c-format
 msgid "%1$s (%2$'d piece @ %3$s)"
 msgid_plural "%1$s (%2$'d pieces @ %3$s)"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%1$s (%2$'d часть @ %3$s)"
+msgstr[1] "%1$s (%2$'d части @ %3$s)"
+msgstr[2] "%1$s (%2$'d частей @ %3$s)"
 
 #: ../gtk/details.c:764
 #, c-format
 msgid "%1$s (%2$'d piece)"
 msgid_plural "%1$s (%2$'d pieces)"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "%1$s (%2$'d часть)"
+msgstr[1] "%1$s (%2$'d части)"
+msgstr[2] "%1$s (%2$'d частей)"
 
 #: ../gtk/details.c:798
 #, c-format
 msgid "%1$s (%2$.1f%%); %3$s Unverified"
-msgstr ""
+msgstr "%1$s (%2$.1f%%); %3$s Непроверено"
 
 #: ../gtk/details.c:800
 #, c-format
 msgid "%1$s (%2$.1f%%)"
-msgstr ""
+msgstr "%1$s (%2$.1f%%)"
 
 #: ../gtk/details.c:820
 #, c-format
 msgid "%1$s (+%2$s corrupt)"
-msgstr ""
+msgstr "%1$s (+%2$s повреждён)"
 
 #: ../gtk/details.c:893
 msgid "Active now"
-msgstr ""
+msgstr "Задействовать сейчас"
 
 #: ../gtk/details.c:897
 #, c-format
 msgid "%1$s ago"
-msgstr ""
+msgstr "%1$s тому назад"
 
 #: ../gtk/details.c:916
 msgid "Activity"
@@ -487,7 +489,7 @@ msgstr "Комментарий:"
 
 #: ../gtk/details.c:1028
 msgid "Webseeds"
-msgstr ""
+msgstr "Веб-сиды"
 
 #: ../gtk/details.c:1030 ../gtk/details.c:1070
 msgid "Down"
@@ -547,11 +549,11 @@ msgstr "Зашифрованное соединение"
 
 #: ../gtk/details.c:1411
 msgid "Peer was discovered through Peer Exchange (PEX)"
-msgstr "Узел был обнаружен с помощью обмена узлами (PEX)"
+msgstr "Узел был обнаружен с помощью Обмена узалми (PEX)"
 
 #: ../gtk/details.c:1412
 msgid "Peer was discovered through DHT"
-msgstr ""
+msgstr "Узел был найден через DHT"
 
 #: ../gtk/details.c:1413
 msgid "Peer is an incoming connection"
@@ -790,20 +792,16 @@ msgstr ""
 "Anton Shestakov <engored@ya.ru>\n"
 "\n"
 "Launchpad Contributions:\n"
-"   Anton Shestakov\n"
-"   Igor Zubarev\n"
-"   Pavels Sevcuks\n"
-"   Sergei Medvedev\n"
-"\n"
-"Launchpad Contributions:\n"
 "  Abaza https://launchpad.net/~abazinchik\n"
 "  Alexander Chumanov https://launchpad.net/~achumanov\n"
 "  Alexander Semyonov https://launchpad.net/~rotuka\n"
 "  Alexei Klimenko https://launchpad.net/~nimda7\n"
-"  Andrei Dziahel https://launchpad.net/~trickster2k4\n"
+"  Alexey Torkhov https://launchpad.net/~atorkhov\n"
+"  Andrei Dziahel https://launchpad.net/~develop7\n"
 "  Andrey Sitnik https://launchpad.net/~iskin\n"
 "  Anton Shestakov https://launchpad.net/~engored\n"
 "  Arseny Solokha https://launchpad.net/~raising-the-bar\n"
+"  ArtemZ https://launchpad.net/~zhirkow-yahoo\n"
 "  DooMka https://launchpad.net/~xpym-xpym\n"
 "  Egor Bushmelyov https://launchpad.net/~skipper95\n"
 "  Grigorev Mihail https://launchpad.net/~grigorevmn\n"
@@ -811,12 +809,13 @@ msgstr ""
 "  Ilya Barygin https://launchpad.net/~randomaction\n"
 "  Ivan Kliouchenkov https://launchpad.net/~quick\n"
 "  Kirill Holodilin https://launchpad.net/~charlie-chrl\n"
-"  Koptev Oleg https://launchpad.net/~koptev-oleg\n"
+"  Koterpillar https://launchpad.net/~koterpillar\n"
 "  Max Riveiro https://launchpad.net/~kavu\n"
 "  Max Schukin https://launchpad.net/~schukin\n"
 "  Maxim Prokopyev https://launchpad.net/~xjazz\n"
 "  Maxim S. https://launchpad.net/~luvme-nn\n"
 "  Novikov Andrey https://launchpad.net/~envek\n"
+"  Oleg Koptev https://launchpad.net/~koptev-oleg\n"
 "  Pavel Dmitriev https://launchpad.net/~dmitrievp\n"
 "  Pavels Sevcuks https://launchpad.net/~stlwrt\n"
 "  Phenomen https://launchpad.net/~xphenomen-ya\n"
@@ -979,7 +978,7 @@ msgstr "Добавлен торрент"
 #: ../gtk/relocate.c:68
 #, c-format
 msgid "Moving \"%s\""
-msgstr ""
+msgstr "Перемещаю \"%s\""
 
 #: ../gtk/relocate.c:70
 msgid "This may take a moment..."
@@ -987,7 +986,7 @@ msgstr "Это может занять некоторое время..."
 
 #: ../gtk/relocate.c:99 ../gtk/relocate.c:121
 msgid "Set Torrent Location"
-msgstr ""
+msgstr "Указать размещение торрентов"
 
 #: ../gtk/relocate.c:117
 msgid "Location"
@@ -995,15 +994,15 @@ msgstr "Расположение"
 
 #: ../gtk/relocate.c:124
 msgid "Torrent _location:"
-msgstr ""
+msgstr "Размещение торре_нтов:"
 
 #: ../gtk/relocate.c:125
 msgid "_Move from the current folder"
-msgstr ""
+msgstr "П_еремещать из текущего каталога"
 
 #: ../gtk/relocate.c:128
 msgid "Local data is _already there"
-msgstr ""
+msgstr "Локальные данные уже на ме_сте"
 
 #: ../gtk/stats.c:75 ../gtk/stats.c:156
 #, c-format
@@ -1054,7 +1053,7 @@ msgstr "%1$s из %2$s (%3$.2f%%), роздано %4$s (Рейтинг: %5$s)"
 #: ../gtk/torrent-cell-renderer.c:88
 #, c-format
 msgid "%1$s, uploaded %2$s (Ratio: %3$s Goal: %4$s)"
-msgstr ""
+msgstr "%1$s, загружено %2$s (рейтинг: %3$s, целевой рейтинг: %4$s)"
 
 #. %1$s is the torrent's total size,
 #. %2$s is how much we've uploaded,
@@ -1167,7 +1166,7 @@ msgstr "Разрешение ухода в спящий режим"
 #: ../gtk/tr-icon.c:77 ../gtk/tr-icon.c:92
 #, c-format
 msgid "(Limit: %s)"
-msgstr ""
+msgstr "(Лимит: %s)"
 
 #. %1$s: current upload speed
 #. * %2$s: current upload limit, if any
@@ -1180,6 +1179,9 @@ msgid ""
 "Up: %1$s %2$s\n"
 "Down: %3$s %4$s"
 msgstr ""
+"Transmission\n"
+"Исх: %1$s %2$s\n"
+"Вх: %3$s %4$s"
 
 #: ../gtk/tr-prefs.c:281
 msgid "Adding Torrents"
@@ -1195,7 +1197,7 @@ msgstr "Пере_мещать файлы-источники в корзину"
 
 #: ../gtk/tr-prefs.c:306
 msgid "Save to _Location:"
-msgstr ""
+msgstr "Сохранять в _каталог:"
 
 #: ../gtk/tr-prefs.c:309 ../gtk/tr-prefs.c:1354
 msgid "Limits"
@@ -1221,18 +1223,17 @@ msgstr "Показывать всплывающие _уведомления"
 #, c-format
 msgid "Enable _blocklist (contains %'d rule)"
 msgid_plural "Enable _blocklist (contains %'d rules)"
-msgstr[0] ""
-"Разрешить использование \"_чёрного списка\" (содержит %'d правило)"
-msgstr[1] ""
-"Разрешить использование \"_чёрного списка\" (содержит %'d правила)"
-msgstr[2] "Разрешить использование \"_чёрного списка\" (содержит %'d правил)"
+msgstr[0] "Разрешить использование «_чёрного списка» (содержит %'d правило)"
+msgstr[1] "Разрешить использование «_чёрного списка» (содержит %'d правила)"
+msgstr[2] "Разрешить использование «_чёрного списка» (содержит %'d правил)"
 
 #: ../gtk/tr-prefs.c:402
 #, c-format
 msgid "Blocklist now has %'d rule."
 msgid_plural "Blocklist now has %'d rules."
 msgstr[0] "В «чёрном списке» сейчас %'d правило."
-msgstr[1] "В «чёрном списке» сейчас %'d правил."
+msgstr[1] "В «чёрном списке» сейчас %'d правила."
+msgstr[2] "В «чёрном списке» сейчас %'d правил."
 
 #: ../gtk/tr-prefs.c:406
 msgid "<b>Update succeeded!</b>"
@@ -1286,6 +1287,7 @@ msgstr "Использовать PEX для поиска пиров"
 msgid ""
 "PEX is a tool for exchanging peer lists with the peers you're connected to."
 msgstr ""
+"PEX - это утилита обмена списками пиров с теми, к кому вы подключаетесь."
 
 #: ../gtk/tr-prefs.c:540
 msgid "Use _DHT to find more peers"
@@ -1293,7 +1295,7 @@ msgstr "Использовать DHT для поиска пиров"
 
 #: ../gtk/tr-prefs.c:542
 msgid "DHT is a tool for finding peers without a tracker."
-msgstr ""
+msgstr "DHT - это утилита поиска пиров без использования трекера."
 
 #: ../gtk/tr-prefs.c:753
 msgid "Web Client"
@@ -1330,7 +1332,7 @@ msgstr "Па_роль:"
 #. require authentication
 #: ../gtk/tr-prefs.c:798
 msgid "Only allow these IP a_ddresses to connect:"
-msgstr "Разрешать соединения только этим IP адресам:"
+msgstr "Разрешать соединения только c этих IP-адресов:"
 
 #: ../gtk/tr-prefs.c:823
 msgid "IP addresses may use wildcards, such as 192.168.*.*"
@@ -1419,15 +1421,15 @@ msgstr "Ограничить скорость р_аздачи (КБ/с):"
 
 #: ../gtk/tr-prefs.c:1220
 msgid "_Scheduled times:"
-msgstr ""
+msgstr "_По расписанию:"
 
 #: ../gtk/tr-prefs.c:1225
 msgid " _to "
-msgstr ""
+msgstr " _до "
 
 #: ../gtk/tr-prefs.c:1236
 msgid "_On days:"
-msgstr ""
+msgstr "_По дням:"
 
 #: ../gtk/tr-prefs.c:1270 ../gtk/tr-prefs.c:1335
 msgid "Status unknown"
@@ -1463,7 +1465,7 @@ msgstr "_Использовать перенаправление портов UP
 
 #: ../gtk/tr-prefs.c:1349
 msgid "Pick a _random port every time Transmission is started"
-msgstr ""
+msgstr "Указывать _случайный порт при каждом запуске программы"
 
 #: ../gtk/tr-prefs.c:1357
 msgid "Maximum peers per _torrent:"
@@ -1534,6 +1536,8 @@ msgid ""
 "Click to disable Temporary Speed Limits\n"
 "(%1$s down, %2$s up)"
 msgstr ""
+"Щёлкните, чтобы отключить временные ограничения скорости\n"
+"(%1$s загрузка, %2$s раздача)"
 
 #: ../gtk/tr-window.c:341
 #, c-format
@@ -1541,6 +1545,8 @@ msgid ""
 "Click to enable Temporary Speed Limits\n"
 "(%1$s down, %2$s up)"
 msgstr ""
+"Щёлкните, чтобы включить временные ограничения скорости\n"
+"(%1$s загрузка, %2$s раздача)"
 
 #: ../gtk/tr-window.c:590
 #, c-format
@@ -1549,11 +1555,11 @@ msgstr "Трекер разрешит запросы через %s"
 
 #: ../gtk/tr-window.c:661
 msgid "Unlimited"
-msgstr ""
+msgstr "Неограничено"
 
 #: ../gtk/tr-window.c:728
 msgid "Seed Forever"
-msgstr ""
+msgstr "Раздавать всегда"
 
 #: ../gtk/tr-window.c:766
 msgid "Limit Download Speed"
@@ -1739,7 +1745,7 @@ msgstr "Не удалось прочитать файл сеанса"
 #: ../libtransmission/fdlimit.c:296
 #, c-format
 msgid "Couldn't create \"%1$s\": \"%2$s\" is not a folder"
-msgstr ""
+msgstr "Не удалось создать \"%1$s\": \"%2$s\" не является каталогом"
 
 #: ../libtransmission/fdlimit.c:319
 #, c-format
@@ -1793,7 +1799,7 @@ msgstr "Невозможно изменить адрес источника с %
 #: ../libtransmission/net.c:339
 #, c-format
 msgid "Couldn't connect socket %d to %s, port %d (errno %d - %s)"
-msgstr "Не удалось подключить сокет %d к %s на порт %d (код ошибки %d — %s)"
+msgstr "Не удалось подключить сокет %d к %s на порт %d (код ошибки %d - %s)"
 
 #: ../libtransmission/net.c:392
 #, c-format
@@ -1806,7 +1812,7 @@ msgstr "Перенаправление портов"
 
 #: ../libtransmission/port-forwarding.c:59
 msgid "Starting"
-msgstr "Устанавливается"
+msgstr "Запускается"
 
 #: ../libtransmission/port-forwarding.c:60
 msgid "Forwarded"
@@ -1814,7 +1820,7 @@ msgstr "Перенаправлен"
 
 #: ../libtransmission/port-forwarding.c:61
 msgid "Stopping"
-msgstr "Сбрасывается"
+msgstr "Останавливается"
 
 #: ../libtransmission/port-forwarding.c:62
 msgid "Not forwarded"
@@ -1835,7 +1841,7 @@ msgstr "%s %s запущен"
 #: ../libtransmission/session.c:1578
 #, c-format
 msgid "Loaded %d torrents"
-msgstr "Загружено %d торрентов"
+msgstr "Загружено торрентов: %d"
 
 #: ../libtransmission/torrent.c:273
 #, c-format
@@ -1858,7 +1864,7 @@ msgstr "Готово"
 
 #: ../libtransmission/torrent.c:1442
 msgid "Complete"
-msgstr "Все задачи завершены"
+msgstr "Завершено"
 
 #: ../libtransmission/torrent.c:1445
 msgid "Incomplete"
@@ -1881,7 +1887,7 @@ msgstr "Локальный адрес: «%s»"
 #: ../libtransmission/upnp.c:144
 #, c-format
 msgid "Port %d isn't forwarded"
-msgstr ""
+msgstr "Порт %d не может быть перенаправлен"
 
 #: ../libtransmission/upnp.c:158
 #, c-format
@@ -1897,7 +1903,7 @@ msgstr ""
 
 #: ../libtransmission/upnp.c:197
 msgid "Port forwarding successful!"
-msgstr "Перенаправление портов удалось!"
+msgstr "Перенаправление портов работает!"
 
 #: ../libtransmission/utils.c:521
 msgid "Not a regular file"

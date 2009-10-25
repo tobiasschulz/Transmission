@@ -36,10 +36,8 @@ uint8_t*       tr_peerIdNew( void );
 const uint8_t* tr_getPeerId( void );
 
 struct tr_address;
-struct tr_announcer;
 struct tr_bandwidth;
 struct tr_bindsockets;
-struct tr_fdInfo;
 
 struct tr_session
 {
@@ -50,14 +48,12 @@ struct tr_session
     tr_bool                      isProxyEnabled;
     tr_bool                      isProxyAuthEnabled;
     tr_bool                      isClosed;
+    tr_bool                      isWaiting;
     tr_bool                      useLazyBitfield;
-    tr_bool                      isIncompleteFileNamingEnabled;
     tr_bool                      isRatioLimited;
-    tr_bool                      isIncompleteDirEnabled;
 
     tr_benc                      removedTorrents;
 
-    int                          waiting;
     int                          umask;
 
     int                          speedLimit[2];
@@ -75,7 +71,6 @@ struct tr_session
     tr_altSpeedFunc            * altCallback;
     void                       * altCallbackUserData;
 
-    struct tr_fdInfo           * fdInfo;
 
     int                          magicNumber;
 
@@ -86,6 +81,7 @@ struct tr_session
     struct tr_event_handle *     events;
 
     uint16_t                     peerLimitPerTorrent;
+    uint16_t                     openFileLimit;
 
     int                          uploadSlotsPerTorrent;
 
@@ -104,7 +100,6 @@ struct tr_session
     char *                       downloadDir;
     char *                       resumeDir;
     char *                       torrentDir;
-    char *                       incompleteDir;
 
     tr_proxy_type                proxyType;
     char *                       proxy;
@@ -124,13 +119,18 @@ struct tr_session
     void *                       rpc_func_user_data;
 
     struct tr_stats_handle     * sessionStats;
-
-    struct tr_announcer        * announcer;
+    struct tr_tracker_handle   * tracker;
 
     tr_benc                    * metainfoLookup;
 
     struct event               * altTimer;
     struct event               * saveTimer;
+
+    /* the size of the output buffer for peer connections */
+    int so_sndbuf;
+
+    /* the size of the input buffer for peer connections */
+    int so_rcvbuf;
 
     /* monitors the "global pool" speeds */
     struct tr_bandwidth        * bandwidth;

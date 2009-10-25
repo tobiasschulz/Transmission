@@ -72,7 +72,7 @@ tr_session * fLib;
                                             stringByAppendingString: @":"]];
     
     //size all elements
-    const CGFloat oldWidth = [fUploadedLabelField frame].size.width;
+    CGFloat oldWidth = [fUploadedLabelField frame].size.width;
     
     [fUploadedLabelField sizeToFit];
     [fDownloadedLabelField sizeToFit];
@@ -111,7 +111,7 @@ tr_session * fLib;
     [[self window] setFrame: windowRect display: YES];
     
     //resize reset button
-    const CGFloat oldButtonWidth = [fResetButton frame].size.width;
+    CGFloat oldButtonWidth = [fResetButton frame].size.width;
     
     [fResetButton setTitle: NSLocalizedString(@"Reset", "Stats window -> reset button")];
     [fResetButton sizeToFit];
@@ -149,11 +149,6 @@ tr_session * fLib;
     
     [alert beginSheetModalForWindow: [self window] modalDelegate: self
         didEndSelector: @selector(resetSheetClosed:returnCode:contextInfo:) contextInfo: nil];
-}
-
-- (NSString *) windowFrameAutosaveName
-{
-    return @"StatsWindow";
 }
 
 @end

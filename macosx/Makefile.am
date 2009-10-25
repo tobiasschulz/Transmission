@@ -13,6 +13,7 @@ EXTRA_DIST = \
     UKKQueue \
     TransmissionHelp \
     Images \
+    appcast \
     en.lproj \
     es.lproj \
     fr.lproj \
@@ -96,6 +97,9 @@ EXTRA_DIST = \
     PrefsWindow.m \
     ProgressGradients.h \
     ProgressGradients.m \
+    QuickLookController.h \
+    QuickLookController.m \
+    QuickLook.h \
     StatsWindowController.h \
     StatsWindowController.m \
     StatusBarView.h \
@@ -110,10 +114,6 @@ EXTRA_DIST = \
     Torrent.m \
     TorrentTableView.h \
     TorrentTableView.m \
-    TrackerCell.h \
-    TrackerCell.m \
-    TrackerNode.h \
-    TrackerNode.m \
     TrackerTableView.h \
     TrackerTableView.m
 

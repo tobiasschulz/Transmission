@@ -23,12 +23,11 @@
  *****************************************************************************/
 
 #import "AddWindowController.h"
-#import "Controller.h"
-#import "ExpandedPathToIconTransformer.h"
 #import "FileOutlineController.h"
+#import "Controller.h"
 #import "GroupsController.h"
 #import "NSStringAdditions.h"
-#import "Torrent.h"
+#import "ExpandedPathToIconTransformer.h"
 
 #define UPDATE_SECONDS 1.0
 
@@ -85,7 +84,10 @@
     [[self window] setTitle: name];
     [fNameField setStringValue: name];
     
-    [fIconView setImage: [fTorrent icon]];
+    NSImage * icon = [[fTorrent icon] copy];
+    [icon setFlipped: NO];
+    [fIconView setImage: icon];
+    [icon release];
     
     [self updateStatusField: nil];
     
@@ -254,7 +256,7 @@
         [fDestination release];
         fDestination = [destination retain];
         
-        [fTorrent changeDownloadFolderBeforeUsing: fDestination];
+        [fTorrent changeDownloadFolder: fDestination];
     }
     
     [fLocationField setStringValue: [fDestination stringByAbbreviatingWithTildeInPath]];

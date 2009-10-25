@@ -23,12 +23,11 @@
  *****************************************************************************/
 
 #import "TorrentTableView.h"
-#import "Controller.h"
-#import "FileListNode.h"
-#import "NSApplicationAdditions.h"
-#import "Torrent.h"
 #import "TorrentCell.h"
+#import "Torrent.h"
 #import "TorrentGroup.h"
+#import "FileListNode.h"
+#import "QuickLookController.h"
 
 #define MAX_GROUP 999999
 
@@ -39,6 +38,9 @@
 #define ACTION_MENU_PRIORITY_HIGH_TAG 101
 #define ACTION_MENU_PRIORITY_NORMAL_TAG 102
 #define ACTION_MENU_PRIORITY_LOW_TAG 103
+
+#define GROUP_SPEED_IMAGE_COLUMN_WIDTH 8.0f
+#define GROUP_RATIO_IMAGE_COLUMN_WIDTH 10.0f
 
 #define TOGGLE_PROGRESS_SECONDS 0.175
 
@@ -139,7 +141,7 @@
 
 - (NSCell *) outlineView: (NSOutlineView *) outlineView dataCellForTableColumn: (NSTableColumn *) tableColumn item: (id) item
 {
-    const BOOL group = ![item isKindOfClass: [Torrent class]];
+    BOOL group = ![item isKindOfClass: [Torrent class]];
     if (!tableColumn)
         return !group ? fTorrentCell : nil;
     else
@@ -165,18 +167,13 @@
         if ([ident isEqualToString: @"UL Image"] || [ident isEqualToString: @"DL Image"])
         {
             //ensure arrows are white only when selected
-            if ([NSApp isOnSnowLeopardOrBetter])
-                [[cell image] setTemplate: [cell backgroundStyle] == NSBackgroundStyleLowered];
-            else
+            NSImage * image = [cell image];
+            BOOL template = [cell backgroundStyle] == NSBackgroundStyleLowered;
+            if ([image isTemplate] != template)
             {
-                NSImage * image = [cell image];
-                const BOOL template = [cell backgroundStyle] == NSBackgroundStyleLowered;
-                if ([image isTemplate] != template)
-                {
-                    [image setTemplate: template];
-                    [cell setImage: nil];
-                    [cell setImage: image];
-                }
+                [image setTemplate: template];
+                [cell setImage: nil];
+                [cell setImage: image];
             }
         }
     }
@@ -499,10 +496,19 @@
     
     if (firstChar == 'f' && [event modifierFlags] & NSAlternateKeyMask && [event modifierFlags] & NSCommandKeyMask)
         [fController focusFilterField];
-    else if (firstChar == ' ')
-        [fController toggleQuickLook: nil];
     else
+    {
+        //handle quicklook
+        if (firstChar == ' ')
+            [[QuickLookController quickLook] toggleQuickLook];
+        else if (firstChar == NSRightArrowFunctionKey)
+            [[QuickLookController quickLook] pressRight];
+        else if (firstChar == NSLeftArrowFunctionKey)
+            [[QuickLookController quickLook] pressLeft];
+        else;
+        
         [super keyDown: event];
+    }
 }
 
 - (NSRect) iconRectForRow: (NSInteger) row
@@ -510,7 +516,6 @@
     return [fTorrentCell iconRectForBounds: [self rectOfRow: row]];
 }
 
-#warning catch string urls?
 - (void) paste: (id) sender
 {
     NSURL * url;
@@ -534,7 +539,7 @@
         [fController stopTorrents: [NSArray arrayWithObject: torrent]];
     else
     {
-        if (([NSApp isOnSnowLeopardOrBetter] ? [NSEvent modifierFlags] : [[NSApp currentEvent] modifierFlags]) & NSAlternateKeyMask)
+        if ([[NSApp currentEvent] modifierFlags] & NSAlternateKeyMask)
             [fController resumeTorrentsNoWait: [NSArray arrayWithObject: torrent]];
         else if ([torrent waitingToStart])
             [fController stopTorrents: [NSArray arrayWithObject: torrent]];
@@ -588,8 +593,7 @@
         NSMenuItem * item;
         if ([menu numberOfItems] == 3)
         {
-            const NSInteger speedLimitActionValue[] = { 0, 5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 250, 500,
-                                                        750, 1000, 1500, 2000, -1 };
+            const NSInteger speedLimitActionValue[] = { 0, 5, 10, 20, 30, 40, 50, 75, 100, 150, 200, 250, 500, 750, 1000, 1500, 2000, -1 };
             
             for (NSInteger i = 0; speedLimitActionValue[i] != -1; i++)
             {
@@ -672,14 +676,12 @@
 //alternating rows - first row after group row is white
 - (void) highlightSelectionInClipRect: (NSRect) clipRect
 {
+    NSColor * altColor = [[NSColor controlAlternatingRowBackgroundColors] objectAtIndex: 1];
+    [altColor set];
+    
     NSRect visibleRect = clipRect;
     NSRange rows = [self rowsInRect: visibleRect];
     BOOL start = YES;
-    
-    const CGFloat totalRowHeight = [self rowHeight] + [self intercellSpacing].height;
-    
-    NSRect gridRects[(NSInteger)(ceil(visibleRect.size.height / totalRowHeight / 2.0)) + 1]; //add one if partial rows at top and bottom
-    NSInteger rectNum = 0;
     
     if (rows.length > 0)
     {
@@ -709,33 +711,29 @@
             }
             
             if (!start && ![self isRowSelected: i])
-                gridRects[rectNum++] = [self rectOfRow: i];
+                NSRectFill([self rectOfRow: i]);
             
             start = !start;
         }
         
-        const CGFloat newY = NSMaxY([self rectOfRow: i-1]);
+        CGFloat newY = NSMaxY([self rectOfRow: i-1]);
         visibleRect.size.height -= newY - visibleRect.origin.y;
         visibleRect.origin.y = newY;
     }
-    
-    const NSInteger numberBlankRows = ceil(visibleRect.size.height / totalRowHeight);
-    
+        
     //remaining visible rows continue alternating
-    visibleRect.size.height = totalRowHeight;
+    const CGFloat height = [self rowHeight] + [self intercellSpacing].height;
+    const NSInteger numberOfRects = ceil(visibleRect.size.height / height);
+    
+    visibleRect.size.height = height;
     if (start)
-        visibleRect.origin.y += totalRowHeight;
+        visibleRect.origin.y += height;
     
-    for (NSInteger i = start ? 1 : 0; i < numberBlankRows; i += 2)
+    for (NSInteger i = start ? 1 : 0; i < numberOfRects; i += 2)
     {
-        gridRects[rectNum++] = visibleRect;
-        visibleRect.origin.y += 2.0 * totalRowHeight;
+        NSRectFill(visibleRect);
+        visibleRect.origin.y += 2.0 * height;
     }
-    
-    NSAssert([[NSColor controlAlternatingRowBackgroundColors] count] >= 2, @"There should be 2 alternating row colors");
-    
-    [[[NSColor controlAlternatingRowBackgroundColors] objectAtIndex: 1] set];
-    NSRectFillList(gridRects, rectNum);
     
     [super highlightSelectionInClipRect: clipRect];
 }
@@ -826,6 +824,11 @@
     [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateStats" object: nil];
 }
 
+- (void) moveDataFile: (id) sender
+{
+    [fController moveDataFiles: [NSArray arrayWithObject: fMenuTorrent]];
+}
+
 - (void) togglePiecesBar
 {
     //stop previous animation
@@ -888,10 +891,21 @@
 
 - (void) setGroupStatusColumns
 {
-    const BOOL ratio = [fDefaults boolForKey: @"DisplayGroupRowRatio"];
+    BOOL ratio = [fDefaults boolForKey: @"DisplayGroupRowRatio"];
     
     [[self tableColumnWithIdentifier: @"DL"] setHidden: ratio];
     [[self tableColumnWithIdentifier: @"DL Image"] setHidden: ratio];
+    
+    //change size of image column
+    NSTableColumn * ulImageTableColumn = [self tableColumnWithIdentifier: @"UL Image"];
+    CGFloat oldWidth = [ulImageTableColumn width], newWidth = ratio ? GROUP_RATIO_IMAGE_COLUMN_WIDTH : GROUP_SPEED_IMAGE_COLUMN_WIDTH;
+    if (oldWidth != newWidth)
+    {
+        [ulImageTableColumn setWidth: newWidth];
+        
+        NSTableColumn * groupTableColumn = [self tableColumnWithIdentifier: @"Group"];
+        [groupTableColumn setWidth: [groupTableColumn width] - (newWidth - oldWidth)];
+    }
 }
 
 - (void) createFileMenu: (NSMenu *) menu forFiles: (NSArray *) files
@@ -904,7 +918,7 @@
         
         NSImage * icon;
         if (![node isFolder])
-            icon = [node icon];
+            icon = [[NSWorkspace sharedWorkspace] iconForFileType: [name pathExtension]];
         else
         {
             NSMenu * itemMenu = [[NSMenu alloc] initWithTitle: name];
@@ -918,6 +932,7 @@
         
         [item setRepresentedObject: node];
         
+        [icon setScalesWhenResized: YES];
         [icon setSize: NSMakeSize(16.0, 16.0)];
         [item setImage: icon];
         

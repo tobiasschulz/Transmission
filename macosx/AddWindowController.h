@@ -23,10 +23,10 @@
  *****************************************************************************/
 
 #import <Cocoa/Cocoa.h>
+#import "Torrent.h"
 
-@class Controller;
 @class FileOutlineController;
-@class Torrent;
+@class Controller;
 
 @interface AddWindowController : NSWindowController
 {

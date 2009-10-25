@@ -104,7 +104,6 @@
 - (void) setDownloadLocation: (id) sender;
 - (void) folderSheetShow: (id) sender;
 - (void) incompleteFolderSheetShow: (id) sender;
-- (void) setUseIncompleteFolder: (id) sender;
 
 - (void) applyRatioSetting: (id) sender;
 - (void) updateRatioStopField;

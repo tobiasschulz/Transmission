@@ -13,8 +13,8 @@
 #include <iostream>
 
 #include <QDir>
-#include <QFileSystemWatcher>
 #include <QTimer>
+#include <QFileSystemWatcher>
 
 #include <libtransmission/transmission.h>
 

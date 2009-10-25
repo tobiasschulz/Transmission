@@ -14,11 +14,10 @@
 #include <iostream>
 
 #include <QApplication>
-#include <QFileIconProvider>
-#include <QFileInfo>
+#include <QStyle>
 #include <QSet>
 #include <QString>
-#include <QStyle>
+#include <QFileInfo>
 #include <QVariant>
 
 #include <libtransmission/transmission.h>
@@ -27,6 +26,7 @@
 
 #include "app.h"
 #include "prefs.h"
+#include "qticonloader.h"
 #include "torrent.h"
 #include "utils.h"
 
@@ -105,6 +105,9 @@ Torrent :: myProperties[] =
     { SCRAPE_RESPONSE, "scrapeResponse", QVariant::String, STAT_EXTRA },
     { ANNOUNCE_RESPONSE, "announceResponse", QVariant::String, STAT_EXTRA },
     { ANNOUNCE_URL, "announceURL", QVariant::String, STAT_EXTRA },
+    { SEEDERS, "seeders", QVariant::Int, STAT_EXTRA },
+    { LEECHERS, "leechers", QVariant::Int, STAT_EXTRA },
+    { TIMES_COMPLETED, "timesCompleted", QVariant::Int, STAT_EXTRA },
     { PEERS, "peers", TrTypes::PeerList, STAT_EXTRA },
     { TORRENT_FILE, "torrentFile", QVariant::String, STAT_EXTRA },
     { BANDWIDTH_PRIORITY, "bandwidthPriority", QVariant::Int, STAT_EXTRA }
@@ -413,7 +416,7 @@ Torrent :: updateMimeIcon( )
     QIcon icon;
 
     if( files.size( ) > 1 )
-        icon = QFileIconProvider().icon( QFileIconProvider::Folder );
+        icon = QtIconLoader :: icon( "folder", QApplication::style()->standardIcon( QStyle::SP_DirIcon ) );
     else
         icon = Utils :: guessMimeIcon( files.at(0).filename );
 

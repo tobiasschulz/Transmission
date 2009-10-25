@@ -23,7 +23,6 @@
  *****************************************************************************/
 
 #import "NSStringAdditions.h"
-#import "NSApplicationAdditions.h"
 #import "utils.h"
 #import <transmission.h>
 
@@ -42,12 +41,7 @@
 + (NSString *) stringForFileSize: (uint64_t) size
 {
     if (size < 1024)
-    {
-        if (size != 1)
-            return [NSString stringWithFormat: @"%lld %@", size, NSLocalizedString(@"bytes", "File size - bytes")];
-        else
-            return NSLocalizedString(@"1 byte", "File size - bytes");
-    }
+        return [NSString stringWithFormat: @"%lld %@", size, NSLocalizedString(@"bytes", "File size - bytes")];
 
     CGFloat convertedSize;
     NSString * unit;
@@ -115,7 +109,7 @@
 + (NSString *) timeString: (uint64_t) seconds showSeconds: (BOOL) showSeconds maxFields: (NSUInteger) max
 {
     NSMutableArray * timeArray = [NSMutableArray arrayWithCapacity: MIN(max, 4)];
-    uint64_t remaining = seconds;
+    NSUInteger remaining = seconds;
     
     if (max > 0 && seconds >= (24 * 60 * 60))
     {
@@ -145,16 +139,10 @@
     return [timeArray componentsJoinedByString: @" "];
 }
 
-//also used in InfoWindow.xib
 - (NSComparisonResult) compareFinder: (NSString *) string
 {
-    if ([NSApp isOnSnowLeopardOrBetter])
-        return [self localizedStandardCompare: string];
-    else
-    {
-        const NSInteger comparisonOptions = NSCaseInsensitiveSearch | NSNumericSearch | NSWidthInsensitiveSearch | NSForcedOrderingSearch;
-        return [self compare: string options: comparisonOptions range: NSMakeRange(0, [self length]) locale: [NSLocale currentLocale]];
-    }
+    const NSInteger comparisonOptions = NSCaseInsensitiveSearch | NSNumericSearch | NSWidthInsensitiveSearch | NSForcedOrderingSearch;
+    return [self compare: string options: comparisonOptions range: NSMakeRange(0, [self length]) locale: [NSLocale currentLocale]];
 }
 
 - (NSComparisonResult) compareNumeric: (NSString *) string

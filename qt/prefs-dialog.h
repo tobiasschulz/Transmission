@@ -52,8 +52,6 @@ class PrefsDialog: public QDialog
         void sessionUpdated( );
         void onWatchClicked( );
         void onWatchSelected( const QStringList& );
-        void onIncompleteClicked( );
-        void onIncompleteSelected( const QStringList& );
         void onDestinationClicked( );
         void onDestinationSelected( const QStringList& );
         void onPortTested( bool );
@@ -96,7 +94,6 @@ class PrefsDialog: public QDialog
         QLabel * myPortLabel;
         QPushButton * myPortButton;
         QPushButton * myWatchButton;
-        QPushButton * myIncompleteButton;
         QPushButton * myDestinationButton;
         QWidgetList myWebWidgets;
         QWidgetList myWebAuthWidgets;

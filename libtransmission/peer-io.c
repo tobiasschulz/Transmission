@@ -115,17 +115,13 @@ didWriteWrapper( tr_peerIo * io, size_t bytes_transferred )
 static void
 canReadWrapper( tr_peerIo * io )
 {
-    tr_bool err = 0;
     tr_bool done = 0;
-    tr_session * session;
+    tr_bool err = 0;
+    tr_session * session = io->session;
 
     dbgmsg( io, "canRead" );
 
-    assert( tr_isPeerIo( io ) );
-    assert( tr_isSession( io->session ) );
     tr_peerIoRef( io );
-
-    session = io->session;
 
     /* try to consume the input buffer */
     if( io->canRead )
@@ -164,8 +160,6 @@ canReadWrapper( tr_peerIo * io )
                     err = 1;
                     break;
             }
-
-            assert( tr_isPeerIo( io ) );
         }
 
         tr_globalUnlock( session );
@@ -177,7 +171,6 @@ canReadWrapper( tr_peerIo * io )
         io->inbuf = evbuffer_new( );
     }
 
-    assert( tr_isPeerIo( io ) );
     tr_peerIoUnref( io );
 }
 
@@ -457,7 +450,7 @@ io_dtor( void * vio )
     tr_bandwidthDestruct( &io->bandwidth );
     evbuffer_free( io->outbuf );
     evbuffer_free( io->inbuf );
-    tr_netClose( io->session, io->socket );
+    tr_netClose( io->socket );
     tr_cryptoFree( io->crypto );
     __tr_list_destroy( &io->outbuf_datatypes, trDatatypeFree );
 
@@ -548,20 +541,15 @@ tr_peerIoClear( tr_peerIo * io )
 int
 tr_peerIoReconnect( tr_peerIo * io )
 {
-    tr_session * session;
-
-    assert( tr_isPeerIo( io ) );
     assert( !tr_peerIoIsIncoming( io ) );
 
-    session = tr_peerIoGetSession( io );
-
     if( io->socket >= 0 )
-        tr_netClose( session, io->socket );
+        tr_netClose( io->socket );
 
-    io->socket = tr_netOpenTCP( session, &io->addr, io->port );
+    io->socket = tr_netOpenTCP( io->session, &io->addr, io->port );
     if( io->socket >= 0 )
     {
-        tr_netSetTOS( io->socket, session->peerSocketTOS );
+        tr_netSetTOS( io->socket, io->session->peerSocketTOS );
         return 0;
     }
 

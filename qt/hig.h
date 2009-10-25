@@ -46,16 +46,13 @@ class HIG: public QWidget
         void addWideControl( QWidget * );
         QCheckBox* addWideCheckBox( const QString&, bool isChecked );
         QLabel* addLabel( const QString& );
-        QLabel* addTallLabel( const QString& );
         void addLabel( QWidget * );
-        void addTallLabel( QWidget * );
         void addControl( QWidget * );
         void addControl( QLayout * );
         QLabel* addRow( const QString & label, QWidget * control, QWidget * buddy=0 );
         QLabel* addRow( const QString & label, QLayout * control, QWidget * buddy );
         void addRow( QWidget * label, QWidget * control, QWidget * buddy=0 );
         void addRow( QWidget * label, QLayout * control, QWidget * buddy );
-        QLabel* addTallRow( const QString & label, QWidget * control, QWidget * buddy=0 );
         void finish( );
 
     private:
@@ -63,7 +60,6 @@ class HIG: public QWidget
 
     private:
         int myRow;
-        bool myHasTall;
         QGridLayout * myGrid;
 };
 

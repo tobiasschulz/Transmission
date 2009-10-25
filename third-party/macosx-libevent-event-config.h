@@ -38,8 +38,8 @@
 /* Define to 1 if you have the <fcntl.h> header file. */
 #define _EVENT_HAVE_FCNTL_H 1
 
-/* Define to 1 if the system has the type `fd_mask'. */
-#define _EVENT_HAVE_FD_MASK 1
+/* Define to 1 if the system has the type `fd_mask'. */ 
+#define _EVENT_HAVE_FD_MASK 1 
 
 /* Define to 1 if you have the `getaddrinfo' function. */
 #define _EVENT_HAVE_GETADDRINFO 1
@@ -202,10 +202,6 @@
 
 /* Define if kqueue works correctly with pipes */
 #define _EVENT_HAVE_WORKING_KQUEUE 1
-
-/* Define to the sub-directory in which libtool stores uninstalled libraries.
-   */
-#define _EVENT_LT_OBJDIR ".libs/"
 
 /* Name of package */
 #define _EVENT_PACKAGE "libevent"

@@ -1,4 +1,4 @@
-/* $Id: miniwget.c,v 1.28 2009/10/10 19:15:35 nanard Exp $ */
+/* $Id: miniwget.c,v 1.25 2009/08/07 14:44:51 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas Bernard
  * Copyright (c) 2005-2009 Thomas Bernard
@@ -20,13 +20,11 @@
 #else
 #include <unistd.h>
 #include <sys/param.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <netdb.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <errno.h>
-#include <time.h>
 #define closesocket close
 #define MINIUPNPC_IGNORE_EINTR
 #endif
@@ -87,30 +85,12 @@ miniwget2(const char * url, const char * host,
 #endif
 	dest.sin_family = AF_INET;
 	dest.sin_port = htons(port);
-	n = connect(s, (struct sockaddr *)&dest, sizeof(struct sockaddr_in));
 #ifdef MINIUPNPC_IGNORE_EINTR
-	while(n < 0 && errno == EINTR)
-	{
-		socklen_t len;
-		fd_set wset;
-		int err;
-		FD_ZERO(&wset);
-		FD_SET(s, &wset);
-		if((n = select(s + 1, NULL, &wset, NULL, NULL)) == -1 && errno == EINTR)
-			continue;
-		/*len = 0;*/
-		/*n = getpeername(s, NULL, &len);*/
-		len = sizeof(err);
-		if(getsockopt(s, SOL_SOCKET, SO_ERROR, &err, &len) < 0) {
-			perror("getsockopt");
-			closesocket(s);
-			return NULL;
-		}
-		if(err != 0) {
-			errno = err;
-			n = -1;
-		}
-	}
+	do {
+#endif
+		n = connect(s, (struct sockaddr *)&dest, sizeof(struct sockaddr_in));
+#ifdef MINIUPNPC_IGNORE_EINTR
+	} while(n < 0 && errno == EINTR);
 #endif
 	if(n<0)
 	{

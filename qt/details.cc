@@ -16,28 +16,29 @@
 
 #include <QCheckBox>
 #include <QComboBox>
-#include <QDateTime>
+#include <QEvent>
+#include <QHeaderView>
+#include <QResizeEvent>
 #include <QDialogButtonBox>
 #include <QDoubleSpinBox>
-#include <QEvent>
 #include <QFont>
 #include <QFontMetrics>
 #include <QHBoxLayout>
-#include <QHBoxLayout>
-#include <QHeaderView>
+#include <QVBoxLayout>
 #include <QLabel>
 #include <QLocale>
 #include <QPushButton>
-#include <QRadioButton>
-#include <QResizeEvent>
 #include <QSpinBox>
+#include <QRadioButton>
 #include <QStyle>
 #include <QTabWidget>
-#include <QTextBrowser>
 #include <QTreeView>
+#include <QTextBrowser>
+#include <QDateTime>
 #include <QTreeWidget>
 #include <QTreeWidgetItem>
 #include <QVBoxLayout>
+#include <QHBoxLayout>
 
 #include <libtransmission/transmission.h>
 
@@ -210,6 +211,7 @@ Details :: onTorrentChanged( )
 void
 Details :: refresh( )
 {
+    int i;
     QLocale locale;
     const int n = myIds.size( );
     const bool single = n == 1;
@@ -327,28 +329,6 @@ Details :: refresh( )
             string = Utils::timeToString( baseline.secsTo( qdt_now ) );
     }
     myRunTimeLabel->setText( string );
-
-
-    // myETALabel
-    string.clear( );
-    if( torrents.empty( ) )
-        string = none;
-    else {
-        int baseline = torrents[0]->getETA( );
-        foreach( const Torrent * t, torrents ) {
-            if( baseline != t->getETA( ) ) {
-                string = mixed;
-                break;
-            }
-        }
-        if( string.isEmpty( ) ) {
-            if( baseline < 0 )
-                string = tr( "Unknown" );
-            else
-                string = Utils::timeToString( baseline );
-       } 
-    }
-    myETALabel->setText( string );
 
 
     // myLastActivityLabel
@@ -698,6 +678,18 @@ Details :: refresh( )
     ///  Peers tab
     ///
 
+    i = 0;
+    foreach( const Torrent * t, torrents ) i += t->seeders( );
+    mySeedersLabel->setText( locale.toString( i ) );
+
+    i = 0;
+    foreach( const Torrent * t, torrents ) i += t->leechers( );
+    myLeechersLabel->setText( locale.toString( i ) );
+
+    i = 0;
+    foreach( const Torrent * t, torrents ) i += t->timesCompleted( );
+    myTimesCompletedLabel->setText( locale.toString( i ) );
+
     QMap<QString,QTreeWidgetItem*> peers2;
     QList<QTreeWidgetItem*> newItems;
     foreach( const Torrent * t, torrents )
@@ -813,7 +805,6 @@ Details :: createInfoTab( )
     hig->addRow( tr( "Ratio:" ), myRatioLabel = new SqueezeLabel );
     hig->addRow( tr( "State:" ), myStateLabel = new SqueezeLabel );
     hig->addRow( tr( "Running time:" ), myRunTimeLabel = new SqueezeLabel );
-    hig->addRow( tr( "Remaining time:" ), myETALabel = new SqueezeLabel );
     hig->addRow( tr( "Last activity:" ), myLastActivityLabel = new SqueezeLabel );
     hig->addRow( tr( "Error:" ), myErrorLabel = new SqueezeLabel );
     hig->addSectionDivider( );
@@ -1058,6 +1049,30 @@ Details :: createPeersTab( )
     size = m.size( 0, "Some BitTorrent Client" );
     myPeerTree->setColumnWidth( COL_CLIENT, size.width( ) );
     myPeerTree->setAlternatingRowColors( true );
+
+    QHBoxLayout * h = new QHBoxLayout;
+    h->setSpacing( HIG :: PAD );
+    v->addLayout( h );
+
+    QLabel * l = new QLabel( "Seeders:" );
+    l->setStyleSheet( "font: bold" );
+    h->addWidget( l );
+    l = mySeedersLabel = new QLabel( "a" );
+    h->addWidget( l );
+    h->addStretch( 1 );
+    
+    l = new QLabel( "Leechers:" );
+    l->setStyleSheet( "font: bold" );
+    h->addWidget( l );
+    l = myLeechersLabel = new QLabel( "b" );
+    h->addWidget( l );
+    h->addStretch( 1 );
+    
+    l = new QLabel( "Times Completed:" );
+    l->setStyleSheet( "font: bold" );
+    h->addWidget( l );
+    l = myTimesCompletedLabel = new QLabel( "c" );
+    h->addWidget( l );
 
     return top;
 }

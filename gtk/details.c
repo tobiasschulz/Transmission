@@ -24,8 +24,8 @@
 #include "actions.h"
 #include "details.h"
 #include "file-list.h"
+#include "tracker-list.h"
 #include "hig.h"
-#include "tr-prefs.h"
 #include "util.h"
 
 #define DETAILS_KEY "details-data"
@@ -70,7 +70,6 @@ struct DetailsImpl
     GtkWidget * ratio_lb;
     GtkWidget * error_lb;
     GtkWidget * date_started_lb;
-    GtkWidget * eta_lb;
     GtkWidget * last_activity_lb;
 
     GtkWidget * hash_lb;
@@ -83,15 +82,20 @@ struct DetailsImpl
     GHashTable * webseed_hash;
     GtkListStore * peer_store;
     GtkListStore * webseed_store;
+    GtkWidget * seeders_lb;
+    GtkWidget * leechers_lb;
+    GtkWidget * completed_lb;
     GtkWidget * webseed_view;
 
-    GtkListStore * trackers;
-    GtkTreeModel * trackers_filtered;
-    GtkWidget * edit_trackers_button;
-    GtkWidget * tracker_view;
-    GtkWidget * scrape_check;
-    GtkWidget * all_check;
-    GtkTextBuffer * tracker_buffer;
+    GtkWidget * tracker_list;
+    GtkWidget * last_scrape_time_lb;
+    GtkWidget * last_scrape_response_lb;
+    GtkWidget * next_scrape_countdown_lb;
+    GtkWidget * last_announce_url_lb;
+    GtkWidget * last_announce_time_lb;
+    GtkWidget * last_announce_response_lb;
+    GtkWidget * next_announce_countdown_lb;
+    GtkWidget * manual_announce_countdown_lb;
 
     GtkWidget * file_list;
 
@@ -733,25 +737,6 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
     gtk_label_set_text( GTK_LABEL( di->date_started_lb ), str );
 
 
-    /* eta */
-    if( n <= 0 )
-        str = none;
-    else {
-        const int baseline = stats[0]->eta;
-        for( i=1; i<n; ++i )
-            if( baseline != stats[i]->eta )
-                break;
-        if( i!=n )
-            str = mixed;
-        else if( baseline < 0 )
-            str = _( "Unknown" );
-        else
-            str = tr_strltime( buf, baseline, sizeof( buf ) );
-    }
-    gtk_label_set_text( GTK_LABEL( di->eta_lb ), str );
-     
-
-
     /* size_lb */
     {
         char sizebuf[128];
@@ -960,10 +945,6 @@ info_page_new( struct DetailsImpl * di )
         /* running for */
         l = di->date_started_lb = gtk_label_new( NULL );
         hig_workarea_add_row( t, &row, _( "Running time:" ), l, NULL );
-
-        /* eta */
-        l = di->eta_lb = gtk_label_new( NULL );
-        hig_workarea_add_row( t, &row, _( "Remaining time:" ), l, NULL );
 
         /* last activity */
         l = di->last_activity_lb = gtk_label_new( NULL );
@@ -1363,6 +1344,35 @@ refreshWebseedList( struct DetailsImpl * di, tr_torrent ** torrents, int n )
 static void
 refreshPeers( struct DetailsImpl * di, tr_torrent ** torrents, int n )
 {
+    int i;
+    char buf[512];
+    const char * none = _( "None" );
+
+    /* seeders_lb */
+    /* leechers_lb */
+    /* completed_lb */
+    if( n<=0 ) {
+        gtk_label_set_text( GTK_LABEL( di->seeders_lb ), none );
+        gtk_label_set_text( GTK_LABEL( di->leechers_lb ), none );
+        gtk_label_set_text( GTK_LABEL( di->completed_lb ), none );
+    } else {
+        int seeders = 0;
+        int leechers = 0;
+        int completed = 0;
+        for( i=0; i<n; ++i ) {
+            const tr_stat * s = tr_torrentStat( torrents[i] );
+            seeders = s->seeders;
+            leechers = s->leechers;
+            completed += s->timesCompleted;
+        }
+        g_snprintf( buf, sizeof( buf ), "%'d", seeders );
+        gtk_label_set_text( GTK_LABEL( di->seeders_lb ), buf );
+        g_snprintf( buf, sizeof( buf ), "%'d", leechers );
+        gtk_label_set_text( GTK_LABEL( di->leechers_lb ), buf );
+        g_snprintf( buf, sizeof( buf ), "%'d", completed );
+        gtk_label_set_text( GTK_LABEL( di->completed_lb ), buf );
+    }
+
     refreshPeerList( di, torrents, n );
     refreshWebseedList( di, torrents, n );
 }
@@ -1426,7 +1436,7 @@ peer_page_new( struct DetailsImpl * di )
     guint i;
     const char * str;
     GtkListStore *store;
-    GtkWidget *v, *w, *ret, *sw, *vbox;
+    GtkWidget *v, *w, *ret, *sw, *l, *vbox, *hbox;
     GtkWidget *webtree = NULL;
     GtkTreeModel * m;
     GtkTreeViewColumn * c;
@@ -1589,6 +1599,28 @@ peer_page_new( struct DetailsImpl * di )
     gtk_paned_pack2( GTK_PANED( v ), sw, TRUE, TRUE );
     gtk_box_pack_start( GTK_BOX( vbox ), v, TRUE, TRUE, 0 );
 
+    hbox = gtk_hbox_new( FALSE, GUI_PAD );
+    l = gtk_label_new( NULL );
+    gtk_label_set_markup( GTK_LABEL( l ), _( "<b>Seeders:</b>" ) );
+    gtk_box_pack_start( GTK_BOX( hbox ), l, FALSE, FALSE, 0 );
+    l = di->seeders_lb = gtk_label_new( NULL );
+    gtk_box_pack_start( GTK_BOX( hbox ), l, FALSE, FALSE, 0 );
+    w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
+    gtk_box_pack_start( GTK_BOX( hbox ), w, TRUE, TRUE, 0 );
+    l = gtk_label_new( NULL );
+    gtk_label_set_markup( GTK_LABEL( l ), _( "<b>Leechers:</b>" ) );
+    gtk_box_pack_start( GTK_BOX( hbox ), l, FALSE, FALSE, 0 );
+    l = di->leechers_lb = gtk_label_new( NULL );
+    gtk_box_pack_start( GTK_BOX( hbox ), l, FALSE, FALSE, 0 );
+    w = gtk_alignment_new( 0.0f, 0.0f, 0.0f, 0.0f );
+    gtk_box_pack_start( GTK_BOX( hbox ), w, TRUE, TRUE, 0 );
+    l = gtk_label_new( NULL );
+    gtk_label_set_markup( GTK_LABEL( l ), _( "<b>Times Completed:</b>" ) );
+    gtk_box_pack_start( GTK_BOX( hbox ), l, FALSE, FALSE, 0 );
+    l = di->completed_lb = gtk_label_new( NULL );
+    gtk_box_pack_start( GTK_BOX( hbox ), l, FALSE, FALSE, 0 );
+    gtk_box_pack_start( GTK_BOX( vbox ), hbox, FALSE, FALSE, 0 );
+
     /* ip-to-GtkTreeRowReference */
     di->peer_hash = g_hash_table_new_full( g_str_hash,
                                            g_str_equal,
@@ -1610,462 +1642,231 @@ peer_page_new( struct DetailsImpl * di )
 *****  TRACKER
 ****/
 
-/* if it's been longer than a minute, don't bother showing the seconds */
-static void
-tr_strltime_rounded( char * buf, time_t t, size_t buflen )
-{
-    if( t > 60 ) t -= ( t % 60 );
-    tr_strltime( buf, t, buflen );
-}
-
-static char *
-buildTrackerSummary( const char * key, const tr_tracker_stat * st, gboolean showScrape )
-{
-    char * str;
-    char timebuf[256];
-    const time_t now = time( NULL );
-    GString * gstr = g_string_new( NULL );
-    const char * err_markup_begin = "<span color=\"red\">";
-    const char * err_markup_end = "</span>";
-    const char * success_markup_begin = "<span color=\"#008B00\">";
-    const char * success_markup_end = "</span>";
-
-    /* hostname */
-    {
-        const char * host = st->host;
-        const char * pch = strstr( host, "://" );
-        if( pch )
-            host = pch + 3;
-        g_string_append( gstr, st->isBackup ? "<i>" : "<b>" );
-        if( key )
-            str = g_markup_printf_escaped( "%s - %s", host, key );
-        else
-            str = g_markup_printf_escaped( "%s", host );
-        g_string_append( gstr, str );
-        g_free( str );
-        g_string_append( gstr, st->isBackup ? "</i>" : "</b>" );
-    }
-
-    if( !st->isBackup )
-    {
-        if( st->hasAnnounced )
-        {
-            g_string_append_c( gstr, '\n' );
-            tr_strltime_rounded( timebuf, now - st->lastAnnounceTime, sizeof( timebuf ) );
-            if( st->lastAnnounceSucceeded )
-                g_string_append_printf( gstr, _( "Got a list of %s%'d peers%s %s ago" ),
-                                        success_markup_begin, st->lastAnnouncePeerCount, success_markup_end,
-                                        timebuf );
-            else
-                g_string_append_printf( gstr, _( "Got an error %s\"%s\"%s %s ago" ),
-                                        err_markup_begin, st->lastAnnounceResult, err_markup_end,
-                                        timebuf );
-        }
-
-        switch( st->announceState )
-        {
-            case TR_TRACKER_INACTIVE:
-                if( !st->hasAnnounced ) {
-                    g_string_append_c( gstr, '\n' );
-                    g_string_append( gstr, _( "No updates scheduled" ) );
-                }
-                break;
-            case TR_TRACKER_WAITING:
-                tr_strltime_rounded( timebuf, st->nextAnnounceTime - now, sizeof( timebuf ) );
-                g_string_append_c( gstr, '\n' );
-                g_string_append_printf( gstr, _( "Asking for more peers in %s" ), timebuf );
-                break;
-            case TR_TRACKER_QUEUED:
-                g_string_append_c( gstr, '\n' );
-                g_string_append( gstr, _( "Queued to ask for more peers" ) );
-                break;
-            case TR_TRACKER_ACTIVE:
-                tr_strltime_rounded( timebuf, now - st->lastAnnounceStartTime, sizeof( timebuf ) );
-                g_string_append_printf( gstr, _( "Asking for more peers now... <small>%s</small>" ), timebuf );
-                break;
-        }
-
-        if( showScrape )
-        {
-            if( st->hasScraped ) {
-                g_string_append_c( gstr, '\n' );
-                tr_strltime_rounded( timebuf, now - st->lastScrapeTime, sizeof( timebuf ) );
-                if( st->lastScrapeSucceeded )
-                    g_string_append_printf( gstr, _( "Tracker had %s%'d seeders and %'d leechers%s %s ago" ),
-                                            success_markup_begin, st->seederCount, st->leecherCount, success_markup_end,
-                                            timebuf );
-                else
-                    g_string_append_printf( gstr, _( "Got a scrape error \"%s%s%s\" %s ago" ), err_markup_begin, st->lastScrapeResult, err_markup_end, timebuf );
-            }
-
-            switch( st->scrapeState )
-            {
-                case TR_TRACKER_INACTIVE:
-                    break;
-                case TR_TRACKER_WAITING:
-                    g_string_append_c( gstr, '\n' );
-                    tr_strltime_rounded( timebuf, now - st->lastScrapeStartTime, sizeof( timebuf ) );
-                    g_string_append_printf( gstr, _( "Asking for peer counts now... <small>%s</small>" ), timebuf );
-                    break;
-                case TR_TRACKER_QUEUED:
-                    g_string_append_c( gstr, '\n' );
-                    g_string_append( gstr, _( "Queued to ask for peer counts" ) );
-                    break;
-                case TR_TRACKER_ACTIVE:
-                    g_string_append_c( gstr, '\n' );
-                    tr_strltime_rounded( timebuf, st->nextScrapeTime - now, sizeof( timebuf ) );
-                    g_string_append_printf( gstr, _( "Asking for peer counts in %s" ), timebuf );
-                    break;
-            }
-        }
-    }
-
-    return g_string_free( gstr, FALSE );
-}
-
-enum
-{
-  TRACKER_COL_TORRENT_ID,
-  TRACKER_COL_TRACKER_INDEX,
-  TRACKER_COL_TEXT,
-  TRACKER_COL_BACKUP,
-  TRACKER_COL_TORRENT_NAME,
-  TRACKER_COL_TRACKER_NAME,
-  TRACKER_N_COLS
-};
-
-static gboolean
-trackerVisibleFunc( GtkTreeModel * model, GtkTreeIter * iter, gpointer data )
-{
-    gboolean isBackup;
-    struct DetailsImpl * di = data;
-
-    /* show all */
-    if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( di->all_check ) ) )
-        return TRUE;
-
-     /* don't show the backups... */
-     gtk_tree_model_get( model, iter, TRACKER_COL_BACKUP, &isBackup, -1 );
-     return !isBackup;
-}
-
-#define TORRENT_PTR_KEY "torrent-pointer"
-
 static void
 refreshTracker( struct DetailsImpl * di, tr_torrent ** torrents, int n )
 {
     int i;
-    int * statCount;
-    tr_tracker_stat ** stats;
-    GtkTreeIter iter;
-    GtkListStore * store = di->trackers;
-    GtkTreeModel * model;
-    const gboolean showScrape = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( di->scrape_check ) );
+    char buf[256];
+    const char * str;
+    const char * none = _("None" );
+    const char * nowStr = _("Now" );
+    const char * mixed = _( "Mixed" );
+    const char * noneSent = _( "None sent" );
+    const char * inProgress = _( "In progress" );
+    const time_t now = time( NULL );
+    const tr_stat ** stats;
 
-    statCount = g_new0( int, n );
-    stats = g_new0( tr_tracker_stat *, n );
+    stats = g_new( const tr_stat*, n );
     for( i=0; i<n; ++i )
-        stats[i] = tr_torrentTrackers( torrents[i], &statCount[i] );
+        stats[i] = tr_torrentStatCached( torrents[i] );
 
-    /* "edit trackers" button */
-    gtk_widget_set_sensitive( di->edit_trackers_button, n==1 );
-    if( n==1 )
-        g_object_set_data( G_OBJECT( di->edit_trackers_button ), TORRENT_PTR_KEY, torrents[0] );
-
-    /* build the store if we don't already have it */
-    if( store == NULL )
-    {
-        GtkTreeModel * filter;
-
-        store = gtk_list_store_new( TRACKER_N_COLS, G_TYPE_INT,
-                                                    G_TYPE_INT,
-                                                    G_TYPE_STRING,
-                                                    G_TYPE_BOOLEAN,
-                                                    G_TYPE_STRING,
-                                                    G_TYPE_STRING );
-
-        filter = gtk_tree_model_filter_new( GTK_TREE_MODEL( store ), NULL );
-        gtk_tree_model_filter_set_visible_func( GTK_TREE_MODEL_FILTER( filter ),
-                                                trackerVisibleFunc, di, NULL );
-
-        di->trackers = store;
-        di->trackers_filtered = filter;
-
-        gtk_tree_view_set_model( GTK_TREE_VIEW( di->tracker_view ), filter );
-    }
-
-    if( ( di->tracker_buffer == NULL ) && ( n == 1 ) )
-    {
-        int tier = 0;
-        GString * gstr = g_string_new( NULL );
-        const tr_info * inf = tr_torrentInfo( torrents[0] );
-        for( i=0; i<inf->trackerCount; ++i ) {
-            const tr_tracker_info * t = &inf->trackers[i];
-            if( tier != t->tier ) {
-                tier = t->tier;
-                g_string_append_c( gstr, '\n' );
-            }
-            g_string_append_printf( gstr, "%s\n", t->announce );
-        }
-        if( gstr->len > 0 )
-            g_string_truncate( gstr, gstr->len-1 );
-        di->tracker_buffer = gtk_text_buffer_new( NULL );
-        gtk_text_buffer_set_text( di->tracker_buffer, gstr->str, -1 );
-        g_string_free( gstr, TRUE );
-    }
-
-    /* add any missing rows (FIXME: doesn't handle edited trackers) */
-    model = GTK_TREE_MODEL( store );
-    if( n && !gtk_tree_model_get_iter_first( model, &iter ) )
-    {
-        for( i=0; i<n; ++i )
-        {
-            int j;
-            const tr_torrent * tor = torrents[i];
-            const int torrentId = tr_torrentId( tor );
-            const tr_info * inf = tr_torrentInfo( tor );
-
-            for( j=0; j<statCount[i]; ++j )
-                gtk_list_store_insert_with_values( store, &iter, -1,
-                    TRACKER_COL_TORRENT_ID, torrentId,
-                    TRACKER_COL_TRACKER_INDEX, j,
-                    TRACKER_COL_TORRENT_NAME, inf->name,
-                    TRACKER_COL_TRACKER_NAME, stats[i][j].host,
-                    -1 );
-        }
-    }
-
-    /* update the store */
-    if( gtk_tree_model_get_iter_first( model, &iter ) ) do
-    {
-        int torrentId;
-        int trackerIndex;
-
-        gtk_tree_model_get( model, &iter, TRACKER_COL_TORRENT_ID, &torrentId,
-                                          TRACKER_COL_TRACKER_INDEX, &trackerIndex,
-                                          -1 );
-
-        for( i=0; i<n; ++i )
-            if( tr_torrentId( torrents[i] ) == torrentId )
+    /* last_scrape_time_lb */
+    if( n<1 )
+        str = none;
+    else {
+        const time_t baseline = stats[0]->lastScrapeTime;
+        for( i=1; i<n; ++i )
+            if( baseline != stats[i]->lastScrapeTime )
                 break;
-
-        if( i<n && trackerIndex<statCount[i] )
-        {
-            const tr_tracker_stat * st = &stats[i][trackerIndex];
-            const char * key = n>1 ? tr_torrentInfo( torrents[i] )->name : NULL;
-            char * text = buildTrackerSummary( key, st, showScrape );
-            gtk_list_store_set( store, &iter, TRACKER_COL_TEXT, text,
-                                              TRACKER_COL_BACKUP, st->isBackup,
-                                              -1 );
-            g_free( text );
-        }
-    }
-    while( gtk_tree_model_iter_next( model, &iter ) );
-
-    /* cleanup */
-    for( i=0; i<n; ++i )
-        tr_torrentTrackersFree( stats[i], statCount[i] );
-    g_free( stats );
-    g_free( statCount );
-}
-
-static void refresh( struct DetailsImpl * di );
-
-static void
-onScrapeToggled( GtkToggleButton * button, struct DetailsImpl * di )
-{
-    const char * key = PREF_KEY_SHOW_MORE_TRACKER_INFO;
-    const gboolean value = gtk_toggle_button_get_active( button );
-    tr_core_set_pref_bool( di->core, key, value );
-    refresh( di );
-}
-
-static void
-onBackupToggled( GtkToggleButton * button, struct DetailsImpl * di )
-{
-    const char * key = PREF_KEY_SHOW_BACKUP_TRACKERS;
-    const gboolean value = gtk_toggle_button_get_active( button );
-    tr_core_set_pref_bool( di->core, key, value );
-    refresh( di );
-}
-
-static void
-onEditTrackersResponse( GtkDialog * dialog, int response, gpointer data )
-{
-    gboolean do_destroy = TRUE;
-    struct DetailsImpl * di = data;
-
-    if( response == GTK_RESPONSE_ACCEPT )
-    {
-        int i, n;
-        int tier;
-        GtkTextIter start, end;
-        tr_announce_list_err err;
-        char * tracker_text;
-        char ** tracker_strings;
-        tr_tracker_info * trackers;
-        tr_torrent * tor = g_object_get_data( G_OBJECT( dialog ), TORRENT_PTR_KEY );
-
-        /* build the array of trackers */
-        gtk_text_buffer_get_bounds( di->tracker_buffer, &start, &end );
-        tracker_text = gtk_text_buffer_get_text( di->tracker_buffer, &start, &end, FALSE );
-        tracker_strings = g_strsplit( tracker_text, "\n", 0 );
-        for( i=0; tracker_strings[i]; )
-            ++i;
-        trackers = g_new0( tr_tracker_info, i );
-        for( i=n=tier=0; tracker_strings[i]; ++i ) {
-            const char * str = tracker_strings[i];
-            if( !*str )
-                ++tier;
-            else {
-                trackers[n].tier = tier;
-                trackers[n].announce = tracker_strings[i];
-                ++n;
-            }
-        }
-
-        /* update the torrent */
-        err = tr_torrentSetAnnounceList( tor, trackers, n );
-        if( err )
-        {
-            GtkWidget * w;
-            const char * str = NULL;
-            if( err == TR_ANNOUNCE_LIST_HAS_DUPLICATES )
-                str = _( "List contains duplicate URLs" );
-            else if( err == TR_ANNOUNCE_LIST_HAS_BAD )
-                str = _( "List contains invalid URLs" );
-            else
-                assert( 0 && "unhandled condition" );
-            w = gtk_message_dialog_new( GTK_WINDOW( dialog ),
-                                        GTK_DIALOG_MODAL,
-                                        GTK_MESSAGE_ERROR,
-                                        GTK_BUTTONS_CLOSE, "%s", str );
-            gtk_dialog_run( GTK_DIALOG( w ) );
-            gtk_widget_destroy( w );
-            do_destroy = FALSE;
-        }
+        if( i!=n )
+            str = mixed;
+        else if( baseline==0 )
+            str = noneSent;
         else
-        {
-            di->trackers = NULL;
-            di->tracker_buffer = NULL;
-        }
-
-        /* cleanup */
-        g_free( trackers );
-        g_strfreev( tracker_strings );
-        g_free( tracker_text );
+            str = gtr_localtime2( buf, baseline, sizeof( buf ) );
     }
+    gtk_label_set_text( GTK_LABEL( di->last_scrape_time_lb ), str );
 
-    if( do_destroy )
-        gtk_widget_destroy( GTK_WIDGET( dialog ) );
-}
 
-static void
-onEditTrackers( GtkButton * button, gpointer data )
-{
-    int row;
-    GtkWidget *w, *d, *fr, *t, *l, *sw;
-    GtkWindow * win = GTK_WINDOW( gtk_widget_get_toplevel( GTK_WIDGET( button ) ) );
-    struct DetailsImpl * di = data;
+    /* last_scrape_response_lb */
+    if( n<1 )
+        str = none;
+    else {
+        const char * baseline = stats[0]->scrapeResponse;
+        for( i=1; i<n; ++i )
+            if( strcmp( baseline, stats[i]->scrapeResponse ) )
+                break;
+        if( i==n )
+            str = baseline;
+        else
+            str = mixed;
+    }
+    gtk_label_set_text( GTK_LABEL( di->last_scrape_response_lb ), str );
 
-    d = gtk_dialog_new_with_buttons( _( "Edit Trackers" ), win,
-                                     GTK_DIALOG_MODAL|GTK_DIALOG_DESTROY_WITH_PARENT,
-                                     GTK_STOCK_CANCEL, GTK_RESPONSE_CANCEL,
-                                     GTK_STOCK_SAVE, GTK_RESPONSE_ACCEPT,
-                                     NULL );
-    g_object_set_data( G_OBJECT( d ), TORRENT_PTR_KEY,
-                       g_object_get_data( G_OBJECT( button ), TORRENT_PTR_KEY ) );
-    g_signal_connect( d, "response",
-                      G_CALLBACK( onEditTrackersResponse ), data );
 
-    row = 0;
-    t = hig_workarea_create( );
-    hig_workarea_add_section_title( t, &row, _( "Tracker Announce URLs" ) );
+    /* next_scrape_countdown_lb */
+    if( n<1 )
+        str = none;
+    else {
+        const time_t baseline = stats[0]->nextScrapeTime;
+        for( i=1; i<n; ++i )
+            if( baseline != stats[i]->nextScrapeTime )
+                break;
+        if( i!=n )
+            str = mixed;
+        else if( baseline <= now )
+            str = inProgress;
+        else
+            str = tr_strltime( buf, baseline - now, sizeof( buf ) );
+    }
+    gtk_label_set_text( GTK_LABEL( di->next_scrape_countdown_lb ), str );
 
-        l = gtk_label_new( NULL );
-        gtk_label_set_markup( GTK_LABEL( l ), _( "To add a backup URL, add it on the line after the primary URL.\n"
-                                                 "To add another primary URL, add it after a blank line." ) );
-        gtk_label_set_justify( GTK_LABEL( l ), GTK_JUSTIFY_LEFT );
-        gtk_misc_set_alignment( GTK_MISC( l ), 0.0, 0.5 );
-        hig_workarea_add_wide_control( t, &row, l );
+    /* last_announce_url_lb */
+    if( n<1 )
+        str = none;
+    else {
+        const char * baseline = stats[0]->announceURL;
+        for( i=1; i<n; ++i)
+            if( strcmp( baseline, stats[i]->announceURL ) )
+                break;
+        if( i==n )
+            str = baseline;
+        else
+            str = mixed;
+    }
+    gtk_label_set_text( GTK_LABEL( di->last_announce_url_lb ), str );
 
-        w = gtk_text_view_new_with_buffer( di->tracker_buffer );
-        gtk_widget_set_size_request( w, 500u, 66u );
-        fr = gtk_frame_new( NULL );
-        gtk_frame_set_shadow_type( GTK_FRAME( fr ), GTK_SHADOW_IN );
-        sw = gtk_scrolled_window_new( NULL, NULL );
-        gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW( sw ),
-                                        GTK_POLICY_AUTOMATIC,
-                                        GTK_POLICY_AUTOMATIC );
-        gtk_container_add( GTK_CONTAINER( sw ), w );
-        gtk_container_add( GTK_CONTAINER( fr ), sw );
-        hig_workarea_add_wide_control( t, &row, fr );
+    /* last_announce_time_lb */
+    if( n<1 )
+        str = none;
+    else {
+        const time_t baseline = stats[0]->lastAnnounceTime;
+        for( i=1; i<n; ++i )
+            if( baseline != stats[i]->lastAnnounceTime )
+                break;
+        if( i!=n )
+            str = mixed;
+        else if( baseline==0 )
+            str = noneSent;
+        else
+            str = gtr_localtime2( buf, baseline, sizeof( buf ) );
+    }
+    gtk_label_set_text( GTK_LABEL( di->last_announce_time_lb ), str );
 
-    hig_workarea_finish( t, &row );
-    gtk_box_pack_start( GTK_BOX( GTK_DIALOG( d )->vbox ), t, TRUE, TRUE, GUI_PAD_SMALL );
-    gtk_widget_show_all( d );
+
+    /* last_announce_response_lb */
+    if( n<1 )
+        str = none;
+    else {
+        const char * baseline = stats[0]->announceResponse;
+        for( i=1; i<n; ++i )
+            if( strcmp( baseline, stats[i]->announceResponse ) )
+                break;
+        if( i==n )
+            str = baseline;
+        else
+            str = mixed;
+    }
+    gtk_label_set_text( GTK_LABEL( di->last_announce_response_lb ), str );
+
+
+    /* next_announce_countdown_lb */
+    if( n<1 )
+        str = none;
+    else {
+        const time_t baseline = stats[0]->nextAnnounceTime;
+        for( i=1; i<n; ++i )
+            if( baseline != stats[i]->nextAnnounceTime )
+                break;
+        if( i!=n )
+            str = mixed;
+        else if( baseline==0 )
+            str = none;
+        else if( baseline==1 || baseline<=now )
+            str = inProgress;
+        else
+            str = tr_strltime( buf, baseline - now, sizeof( buf ) );
+    }
+    gtk_label_set_text( GTK_LABEL( di->next_announce_countdown_lb ), str );
+
+
+    /* manual_announce_countdown_lb */
+    if( n<1 )
+        str = none;
+    else {
+        const time_t baseline = stats[0]->manualAnnounceTime;
+        for( i=1; i<n; ++i )
+            if( baseline != stats[i]->manualAnnounceTime )
+                break;
+        if( i!=n )
+            str = mixed;
+        else if( baseline<1 )
+            str = none;
+        else if( baseline<=now )
+            str = nowStr;
+        else
+            str = tr_strltime( buf, baseline - now, sizeof( buf ) );
+    }
+    gtk_label_set_text( GTK_LABEL( di->manual_announce_countdown_lb ), str );
+
+
+    g_free( stats );
 }
 
 static GtkWidget*
 tracker_page_new( struct DetailsImpl * di )
 {
-    gboolean b;
-    GtkWidget *vbox, *sw, *w, *v, *hbox;
-    GtkCellRenderer *r;
-    GtkTreeViewColumn *c;
+    int row = 0;
+    const char * s;
+    GtkWidget *t, *l, *w;
 
-    vbox = gtk_vbox_new( FALSE, GUI_PAD );
-    gtk_container_set_border_width( GTK_CONTAINER( vbox ), GUI_PAD_BIG );
+    t = hig_workarea_create( );
+    hig_workarea_add_section_title( t, &row, _( "Trackers" ) );
 
-    v = di->tracker_view = gtk_tree_view_new( );
-    g_signal_connect( v, "button-press-event",
-                      G_CALLBACK( on_tree_view_button_pressed ), NULL );
-    g_signal_connect( v, "button-release-event",
-                      G_CALLBACK( on_tree_view_button_released ), NULL );
-    gtk_tree_view_set_rules_hint( GTK_TREE_VIEW( v ), TRUE );
-    r = gtk_cell_renderer_text_new( );
-    g_object_set( r, "ellipsize", PANGO_ELLIPSIZE_END, NULL );
-    c = gtk_tree_view_column_new_with_attributes( _( "Trackers" ), r, "markup", TRACKER_COL_TEXT, NULL );
-    gtk_tree_view_append_column( GTK_TREE_VIEW( v ), c );
-    g_object_set( G_OBJECT( r ), "ypad", (GUI_PAD+GUI_PAD_BIG)/2,
-                                 "xpad", (GUI_PAD+GUI_PAD_BIG)/2,
-                                 NULL );
-   
-    sw = gtk_scrolled_window_new( NULL, NULL );
-    gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW( sw ),
-                                    GTK_POLICY_AUTOMATIC,
-                                    GTK_POLICY_AUTOMATIC );
-    gtk_container_add( GTK_CONTAINER( sw ), v );
-    w = gtk_frame_new( NULL );
-    gtk_frame_set_shadow_type( GTK_FRAME( w ), GTK_SHADOW_IN );
-    gtk_container_add( GTK_CONTAINER( w ), sw );
-    gtk_box_pack_start( GTK_BOX( vbox ), w, TRUE, TRUE, 0 );
+        w = tracker_list_new( tr_core_session( di->core ), -1, FALSE );
+        hig_workarea_add_wide_control( t, &row, w );
+        di->tracker_list = w;
 
-    hbox = gtk_hbox_new( FALSE, 0 );
+    hig_workarea_add_section_divider( t, &row );
+    hig_workarea_add_section_title( t, &row, _( "Scrape" ) );
 
-      w = gtk_check_button_new_with_mnemonic( _( "Show _more details" ) );
-      di->scrape_check = w;
-      b = pref_flag_get( PREF_KEY_SHOW_MORE_TRACKER_INFO );
-      gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( w ), b );
-      g_signal_connect( w, "toggled", G_CALLBACK( onScrapeToggled ), di );
-      gtk_box_pack_start( GTK_BOX( hbox ), w, FALSE, FALSE, 0 );
+        s = _( "Last scrape at:" );
+        l = gtk_label_new( NULL );
+        di->last_scrape_time_lb = l;
+        hig_workarea_add_row( t, &row, s, l, NULL );
 
-      w = gtk_button_new_with_mnemonic( _( "_Edit URLs" ) );
-      gtk_button_set_image( GTK_BUTTON( w ), gtk_image_new_from_stock( GTK_STOCK_EDIT, GTK_ICON_SIZE_BUTTON ) );
-      g_signal_connect( w, "clicked", G_CALLBACK( onEditTrackers ), di );
-      gtk_box_pack_end( GTK_BOX( hbox ), w, FALSE, FALSE, 0 );
-      di->edit_trackers_button = w;
+        s = _( "Tracker responded:" );
+        l = gtk_label_new( NULL );
+        di->last_scrape_response_lb = l;
+        hig_workarea_add_row( t, &row, s, l, NULL );
 
-    gtk_box_pack_start( GTK_BOX( vbox ), hbox, FALSE, FALSE, 0 );
+        s = _( "Next scrape in:" );
+        l = gtk_label_new( NULL );
+        di->next_scrape_countdown_lb = l;
+        hig_workarea_add_row( t, &row, s, l, NULL );
 
-    w = gtk_check_button_new_with_mnemonic( _( "Show _backup trackers" ) );
-    di->all_check = w;
-    b = pref_flag_get( PREF_KEY_SHOW_BACKUP_TRACKERS );
-    gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( w ), b );
-    g_signal_connect( w, "toggled", G_CALLBACK( onBackupToggled ), di );
-    gtk_box_pack_start( GTK_BOX( vbox ), w, FALSE, FALSE, 0 );
-    
-    return vbox;
+    hig_workarea_add_section_divider( t, &row );
+    hig_workarea_add_section_title( t, &row, _( "Announce" ) );
+
+        l = gtk_label_new( NULL );
+        gtk_label_set_ellipsize( GTK_LABEL( l ), PANGO_ELLIPSIZE_END );
+        di->last_announce_url_lb = l;
+        hig_workarea_add_row( t, &row, _( "Tracker:" ), l, NULL );
+
+        s = _( "Last announce at:" );
+        l = gtk_label_new( NULL );
+        di->last_announce_time_lb = l;
+        hig_workarea_add_row( t, &row, s, l, NULL );
+
+        s = _( "Tracker responded:" );
+        l = gtk_label_new( NULL );
+        di->last_announce_response_lb = l;
+        hig_workarea_add_row( t, &row, s, l, NULL );
+
+        s = _( "Next announce in:" );
+        l = gtk_label_new( NULL );
+        di->next_announce_countdown_lb = l;
+        hig_workarea_add_row( t, &row, s, l, NULL );
+
+        /* how long until the tracker will honor user
+         * pressing the "ask for more peers" button */
+        s = _( "Manual announce allowed in:" );
+        l = gtk_label_new( NULL );
+        di->manual_announce_countdown_lb = l;
+        hig_workarea_add_row( t, &row, s, l, NULL );
+
+    hig_workarea_finish( t, &row );
+    return t;
 }
 
 
@@ -2100,7 +1901,6 @@ details_free( gpointer gdata )
     struct DetailsImpl * data = gdata;
     g_source_remove( data->periodic_refresh_tag );
     g_hash_table_destroy( data->webseed_hash );
-    g_hash_table_destroy( data->peer_hash );
     g_slist_free( data->ids );
     g_free( data );
 }
@@ -2183,12 +1983,12 @@ torrent_inspector_set_torrents( GtkWidget * w, GSList * ids )
         g_snprintf( title, sizeof( title ), _( "%s Properties" ), inf->name );
 
         file_list_set_torrent( di->file_list, id );
-        //tracker_list_set_torrent( di->tracker_list, id );
+        tracker_list_set_torrent( di->tracker_list, id );
     }
    else
    {
         file_list_clear( di->file_list );
-        //tracker_list_clear( di->tracker_list );
+        tracker_list_clear( di->tracker_list );
         g_snprintf( title, sizeof( title ), _( "%'d Torrent Properties" ), len );
     }
 

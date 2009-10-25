@@ -168,8 +168,6 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_DHT_ENABLED                "dht-enabled"
 #define TR_PREFS_KEY_DOWNLOAD_DIR               "download-dir"
 #define TR_PREFS_KEY_ENCRYPTION                 "encryption"
-#define TR_PREFS_KEY_INCOMPLETE_DIR             "incomplete-dir"
-#define TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED     "incomplete-dir-enabled"
 #define TR_PREFS_KEY_LAZY_BITFIELD              "lazy-bitfield-enabled"
 #define TR_PREFS_KEY_MSGLEVEL                   "message-level"
 #define TR_PREFS_KEY_OPEN_FILE_LIMIT            "open-file-limit"
@@ -192,7 +190,6 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_PROXY_USERNAME             "proxy-auth-username"
 #define TR_PREFS_KEY_RATIO                      "ratio-limit"
 #define TR_PREFS_KEY_RATIO_ENABLED              "ratio-limit-enabled"
-#define TR_PREFS_KEY_RENAME_PARTIAL_FILES       "rename-partial-files"
 #define TR_PREFS_KEY_RPC_AUTH_REQUIRED          "rpc-authentication-required"
 #define TR_PREFS_KEY_RPC_BIND_ADDRESS           "rpc-bind-address"
 #define TR_PREFS_KEY_RPC_ENABLED                "rpc-enabled"
@@ -229,7 +226,7 @@ const char* tr_getDefaultDownloadDir( void );
  * @see tr_sessionInit()
  * @see tr_getDefaultConfigDir()
  */
-void tr_sessionGetDefaultSettings( const char * configDir, struct tr_benc * dictionary );
+void tr_sessionGetDefaultSettings( struct tr_benc * dictionary );
 
 /**
  * Add the session's current configuration settings to the benc dictionary.
@@ -303,9 +300,6 @@ tr_session * tr_sessionInit( const char     * tag,
                              tr_bool          messageQueueingEnabled,
                              struct tr_benc * settings );
 
-void tr_sessionSet( tr_session      * session,
-                    struct tr_benc  * settings );
-
 /** @brief End a libtransmission session
     @see tr_sessionInit() */
 void tr_sessionClose( tr_session * );
@@ -334,47 +328,6 @@ void tr_sessionSetDownloadDir( tr_session * session, const char * downloadDir );
  * and can be overridden on a per-torrent basis by tr_ctorSetDownloadDir().
  */
 const char * tr_sessionGetDownloadDir( const tr_session * session );
-
-/**
- * @brief Set the per-session incomplete download folder.
- *
- * When you add a new torrent and the session's incomplete directory is enabled,
- * the new torrent will start downloading into that directory, and then be moved
- * to tr_torrent.downloadDir when the torrent is finished downloading.
- *
- * Torrents are not moved as a result of changing the session's incomplete dir --
- * it's applied to new torrents, not existing ones.
- *
- * tr_torrentSetLocation() overrules the incomplete dir: when a user specifies
- * a new location, that becomes the torrent's new downloadDir and the torrent
- * is moved there immediately regardless of whether or not it's complete.
- *
- * @see tr_sessionInit()
- * @see tr_sessionGetIncompleteDir()
- * @see tr_sessionSetIncompleteDirEnabled()
- * @see tr_sessionGetIncompleteDirEnabled()
- */
-void tr_sessionSetIncompleteDir( tr_session * session, const char * dir );
-
-const char* tr_sessionGetIncompleteDir( const tr_session * session );
-
-void tr_sessionSetIncompleteDirEnabled( tr_session * session, tr_bool );
-
-tr_bool tr_sessionIsIncompleteDirEnabled( const tr_session * session );
-
-
-/**
- * @brief When enabled, newly-created files will have ".part" appended
- *        to their filename until the file is fully downloaded
- *
- * This is not retroactive -- toggling this will not rename existing files.
- * It only applies to new files created by Transmission after this API call.
- *
- * @see tr_sessionIsIncompleteFileNamingEnabled()
- */
-void tr_sessionSetIncompleteFileNamingEnabled( tr_session * session, tr_bool );
-
-tr_bool tr_sessionIsIncompleteFileNamingEnabled( const tr_session * session );
 
 /**
  * @brief Set whether or not RPC calls are allowed in this session.
@@ -455,7 +408,6 @@ typedef enum
     TR_RPC_TORRENT_STOPPED,
     TR_RPC_TORRENT_REMOVING,
     TR_RPC_TORRENT_CHANGED, /* catch-all for the "torrent-set" rpc method */
-    TR_RPC_TORRENT_MOVED,
     TR_RPC_SESSION_CHANGED
 }
 tr_rpc_callback_type;
@@ -881,16 +833,6 @@ void        tr_ctorSetDownloadDir( tr_ctor *    ctor,
                                    tr_ctorMode  mode,
                                    const char * directory );
 
-/**
- * @brief Set the incompleteDir for this torrent.
- *
- * This is not a supported API call.
- * It only exists so the mac client can migrate
- * its older incompleteDir settings, and that's
- * the only place where it should be used.
- */
-void tr_ctorSetIncompleteDir( tr_ctor * ctor, const char * directory );
- 
 /** Set whether or not the torrent begins downloading/seeding when created.
     (Default: not paused) */
 void        tr_ctorSetPaused( tr_ctor      * ctor,
@@ -919,9 +861,6 @@ int         tr_ctorGetPaused( const tr_ctor * ctor,
 int         tr_ctorGetDownloadDir( const tr_ctor  * ctor,
                                    tr_ctorMode      mode,
                                    const char    ** setmeDownloadDir );
-
-int         tr_ctorGetIncompleteDir( const tr_ctor  * ctor,
-                                     const char    ** setmeIncompleteDir );
 
 int         tr_ctorGetMetainfo( const tr_ctor         * ctor,
                                 const struct tr_benc ** setme );
@@ -1040,17 +979,6 @@ int tr_torrentId( const tr_torrent * torrent );
 tr_torrent* tr_torrentFindFromId( tr_session * session, int id );
 
 
-/**
- * @brief find the location of a torrent's file by looking with and without
- *        the ".part" suffix, looking in downloadDir and incompleteDir, etc.
- * @return a newly-allocated string (that must be tr_freed() by the caller when done)
- *         that gives the location of this file on disk, or NULL if no file exists yet.
- * @param tor the torrent whose file we're looking for
- * @param fileNum the fileIndex, in [0...tr_info.fileCount)
- */
-char* tr_torrentFindFile( const tr_torrent * tor, tr_file_index_t fileNo );
-
-
 /***
 ****  Torrent speed limits
 ****
@@ -1145,10 +1073,10 @@ int tr_torrentGetFileDL( const tr_torrent  * torrent,
                          tr_file_index_t     file );
 
 /** @brief Set a batch of files to be downloaded or not. */
-void tr_torrentSetFileDLs( tr_torrent       * torrent,
-                           tr_file_index_t  * files,
-                           tr_file_index_t    fileCount,
-                           tr_bool            do_download );
+void            tr_torrentSetFileDLs( tr_torrent       * torrent,
+                                      tr_file_index_t  * files,
+                                      tr_file_index_t    fileCount,
+                                      tr_bool            do_download );
 
 
 const tr_info * tr_torrentInfo( const tr_torrent * torrent );
@@ -1159,15 +1087,6 @@ const tr_info * tr_torrentInfo( const tr_torrent * torrent );
 void tr_torrentSetDownloadDir( tr_torrent  * torrent, const char * path );
 
 const char * tr_torrentGetDownloadDir( const tr_torrent * torrent );
-
-/**
- * This returns the the root directory of where the torrent is.
- *
- * This will usually be the downloadDir.  However if the torrent
- * has an incompleteDir enabled and hasn't finished downloading
- * yet, that will be returned instead.
- */
-const char * tr_torrentGetCurrentDir( const tr_torrent * tor );
 
 /**
 ***
@@ -1182,15 +1101,6 @@ typedef struct tr_tracker_info
 }
 tr_tracker_info;
 
-
-typedef enum
-{
-  TR_ANNOUNCE_LIST_OK,
-  TR_ANNOUNCE_LIST_HAS_DUPLICATES,
-  TR_ANNOUNCE_LIST_HAS_BAD
-}
-tr_announce_list_err;
-
 /**
  * @brief Modify a torrent's tracker list.
  *
@@ -1203,10 +1113,9 @@ tr_announce_list_err;
  *                 libtransmission derives `scrape' from `announce'.
  * @param trackerCount size of the `trackers' array
  */
-tr_announce_list_err
-tr_torrentSetAnnounceList( tr_torrent             * torrent,
-                           const tr_tracker_info  * trackers,
-                           int                      trackerCount );
+void tr_torrentSetAnnounceList( tr_torrent *            torrent,
+                                const tr_tracker_info * trackers,
+                                int                     trackerCount );
 
 
 /**
@@ -1281,9 +1190,9 @@ void tr_torrentManualUpdate( tr_torrent * torrent );
 
 tr_bool tr_torrentCanManualUpdate( const tr_torrent * torrent );
 
-/***
-****  tr_peer_stat
-***/
+/***********************************************************************
+* tr_torrentPeers
+***********************************************************************/
 
 typedef struct tr_peer_stat
 {
@@ -1316,120 +1225,6 @@ tr_peer_stat * tr_torrentPeers( const tr_torrent * torrent,
 
 void           tr_torrentPeersFree( tr_peer_stat * peerStats,
                                     int            peerCount );
-
-/***
-****  tr_tracker_stat
-***/
-
-typedef enum
-{
-    /* we won't (announce,scrape) this torrent to this tracker because
-     * the torrent is stopped, or because of an error, or whatever */
-    TR_TRACKER_INACTIVE,
-
-    /* we will (announce,scrape) this torrent to this tracker, and are
-     * waiting for enough time to pass to satisfy the tracker's interval */
-    TR_TRACKER_WAITING,
-
-    /* it's time to (announce,scrape) this torrent, and we're waiting on a
-     * a free slot to open up in the announce manager */
-    TR_TRACKER_QUEUED,
-
-    /* we're (announcing,scraping) this torrent right now */
-    TR_TRACKER_ACTIVE
-}
-tr_tracker_state;
-
-typedef struct
-{
-    /* how many downloads this tracker knows of (-1 means it does not know) */
-    int downloadCount;
-
-    /* whether or not we've ever sent this tracker an announcement */
-    tr_bool hasAnnounced;
-
-    /* whether or not we've ever scraped to this tracker */
-    tr_bool hasScraped;
-
-    /* ex: http://www.legaltorrents.com:7070 */
-    char host[1024];
-
-    /* the full announce URL */
-    char announce[1024];
-
-    /* Transmission uses one tracker per tier,
-     * and the others are kept as backups */
-    tr_bool isBackup;
-
-    /* is the tracker announcing, waiting, queued, etc */
-    tr_tracker_state announceState;
-
-    /* is the tracker scraping, waiting, queued, etc */
-    tr_tracker_state scrapeState;
-
-    /* number of peers the tracker told us about last time.
-     * if "lastAnnounceSucceeded" is false, this field is undefined */
-    int lastAnnouncePeerCount;
-
-    /* human-readable string with the result of the last announce.
-       if "hasAnnounced" is false, this field is undefined */ 
-    char lastAnnounceResult[128];
-
-    /* when the last announce was sent to the tracker.
-     * if "hasAnnounced" is false, this field is undefined */
-    time_t lastAnnounceStartTime;
-   
-    /* whether or not the last announce was a success.
-       if "hasAnnounced" is false, this field is undefined */ 
-    tr_bool lastAnnounceSucceeded;
-
-    /* when the last announce was completed.
-       if "hasAnnounced" is false, this field is undefined */
-    time_t lastAnnounceTime;
-
-    /* human-readable string with the result of the last scrape.
-     * if "hasScraped" is false, this field is undefined */
-    char lastScrapeResult[128];
-
-    /* when the last scrape was sent to the tracker.
-     * if "hasScraped" is false, this field is undefined */
-    time_t lastScrapeStartTime;
-
-    /* whether or not the last scrape was a success.
-       if "hasAnnounced" is false, this field is undefined */ 
-    tr_bool lastScrapeSucceeded;
-
-    /* when the last scrape was completed.
-       if "hasScraped" is false, this field is undefined */
-    time_t lastScrapeTime;
-
-    /* number of leechers this tracker knows of (-1 means it does not know) */
-    int leecherCount;
-
-    /* when the next periodic announce message will be sent out.
-       if announceState isn't TR_TRACKER_WAITING, this field is undefined */
-    time_t nextAnnounceTime;
-
-    /* when the next periodic scrape message will be sent out.
-       if scrapeState isn't TR_TRACKER_WAITING, this field is undefined */
-    time_t nextScrapeTime;
-
-    /* number of seeders this tracker knows of (-1 means it does not know) */
-    int seederCount;
-
-    /* which tier this tracker is in */
-    int tier;
-}
-tr_tracker_stat;
-
-tr_tracker_stat * tr_torrentTrackers( const tr_torrent * torrent,
-                                      int              * setmeTrackerCount );
-
-void tr_torrentTrackersFree( tr_tracker_stat * trackerStats,
-                             int               trackerCount );
-
-
-    
 
 /**
  * @brief get the download speeds for each of this torrent's webseed sources.
@@ -1538,9 +1333,6 @@ struct tr_info
     uint8_t            hash[SHA_DIGEST_LENGTH];
     char               hashString[2 * SHA_DIGEST_LENGTH + 1];
 
-    /* hash, escaped as per rfc2396 for tracker announces */
-    char               hashEscaped[3 * SHA_DIGEST_LENGTH + 1];
-
     /* Flags */
     tr_bool            isPrivate;
     tr_bool            isMultifile;
@@ -1576,16 +1368,9 @@ enum
 
 typedef enum
 {
-    /* everything's fine */
     TR_STAT_OK               = 0,
-
-    /* when we anounced to the tracker, we got a warning in the response */
     TR_STAT_TRACKER_WARNING  = 1,
-
-    /* when we anounced to the tracker, we got an error in the response */
     TR_STAT_TRACKER_ERROR    = 2,
-
-    /* local trouble, such as disk full or permissions error */
     TR_STAT_LOCAL_ERROR      = 3
 }
 tr_stat_errtype;
@@ -1602,6 +1387,18 @@ typedef struct tr_stat
 
     /** What is this torrent doing right now? */
     tr_torrent_activity activity;
+
+    /** Our current announce URL, or NULL if none.
+        This URL may change during the session if the torrent's
+        metainfo has multiple trackers and the current one
+        becomes unreachable. */
+    char *  announceURL;
+
+    /** Our current scrape URL, or NULL if none.
+        This URL may change during the session if the torrent's
+        metainfo has multiple trackers and the current one
+        becomes unreachable. */
+    char *  scrapeURL;
 
     /** Defines what kind of text is in errorString.
         @see errorString */
@@ -1674,6 +1471,20 @@ typedef struct tr_stat
     /** Number of webseeds that are sending data to us. */
     int    webseedsSendingToUs;
 
+    /** Number of seeders that the tracker says this torrent has */
+    int    seeders;
+
+    /** Number of leechers that the tracker says this torrent has */
+    int    leechers;
+
+    /** Number of downloaders that the tracker says this torrent has.
+        This is a new key introduced in BEP 21 and may not be supported by some trackers.
+        If the tracker doesn't support this key, the value here will be -1. */
+    int    downloaders;
+
+    /** Number of finished downloads that the tracker says torrent has */
+    int    timesCompleted;
+
     /** Byte count of all the piece data we'll have downloaded when we're done,
         whether or not we have it yet.  This may be less than tr_info.totalSize
         if only some of the torrent's files are wanted.
@@ -1710,10 +1521,45 @@ typedef struct tr_stat
         are moved to `corrupt' or `haveValid'. */
     uint64_t    haveUnchecked;
 
-    /** time when one or more of the torrent's trackers will
-        allow you to manually ask for more peers,
-        or 0 if you can't */
-    time_t manualAnnounceTime;
+    /**
+     * This is a human-readable string with the last scrape's results.
+     * 1. If an http error occurred, the response code and description is given.
+     * 2. If the tracker gave an error or warning messae, that is given.
+     * 3. If everything went fine, "Success" is given.
+     */
+    char    scrapeResponse[128];
+
+    /** This is a human-readable string with the last announce's results.
+        Its contents have the same form as scrapeResponse. */
+    char    announceResponse[128];
+
+    /** Time the most recent scrape request was sent,
+        or zero if one hasn't been sent yet. */
+    time_t    lastScrapeTime;
+
+    /** Time when the next scrape request will be sent,
+        or 0 if an error has occured that stops scraping,
+        or 1 if a scrape is currently in progress s.t.
+        we haven't set a timer for the next one yet. */
+    time_t    nextScrapeTime;
+
+    /** Time the most recent announce request was sent,
+        or zero if one hasn't been sent yet. */
+    time_t    lastAnnounceTime;
+
+    /** Time when the next reannounce request will be sent,
+        or 0 if the torrent is stopped,
+        or 1 if an announce is currently in progress s.t.
+        we haven't set a timer for the next one yet */
+    time_t    nextAnnounceTime;
+
+    /** If the torrent is running, this is the time at which
+        the client can manually ask the torrent's tracker
+        for more peers,
+        or 0 if the torrent is stopped or doesn't allow manual,
+        or 1 if an announce is currently in progress s.t.
+        we haven't set a timer for the next one yet */
+    time_t    manualAnnounceTime;
 
     /** A very rough estimate in KiB/s of how quickly data is being
         passed around between all the peers we're connected to.

@@ -65,7 +65,6 @@ class Prefs: public QObject
             SESSION_REMOTE_AUTH,
             SESSION_REMOTE_USERNAME,
             SESSION_REMOTE_PASSWORD,
-            USER_HAS_GIVEN_INFORMED_CONSENT,
 
             /* core prefs */
             FIRST_CORE_PREF,
@@ -81,8 +80,6 @@ class Prefs: public QObject
             DSPEED_ENABLED,
             DOWNLOAD_DIR,
             ENCRYPTION,
-            INCOMPLETE_DIR,
-            INCOMPLETE_DIR_ENABLED,
             LAZY_BITFIELD,
             MSGLEVEL,
             OPEN_FILE_LIMIT,

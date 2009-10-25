@@ -1,30 +1,3 @@
-18 October 2009: dht-0.10
-
-  * Send nodes even when sending values.  This is a violation of the
-    protocol, but I have been assured that it doesn't break any deployed
-    implementation.  This is also what both libtorrent and uTorrent do.
-  * Give up immediately on a search peer when no token was provided.  This
-    is a very reasonable extension to the protocol, and certainly doesn't
-    break anything.
-  * Parse heterogeneous values lists correctly.  This is mandated by BEP 32.
-
-20 September 2009: dht-0.9
-
-  * Fixed incorrect computation of number of nodes.
-  * Made the initial bucket split eagerly (speeds up bootstrapping).
-  * Fixed initial filling of search buckets (speeds up searches).
-
-28 July 2009: dht-0.8
-
-  * Fixed a crash when expiring the first search on the list.
-  * Fixed freeing of the search list when uniniting with dofree = 1.
-
-24 June 2009: dht-0.7
-
-  * Removed the fixed limit on the number of concurrent searches, we now
-    use a linked list.
-  * Fixed build on FreeBSD (thanks to Humihara and Charles Kerr).
-
 22 May 2009: dht-0.6
 
   * Fixed a buffer overflow (when reading) in parse_message.

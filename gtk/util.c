@@ -408,8 +408,7 @@ on_tree_view_button_pressed( GtkWidget *      view,
             gtk_tree_path_free( path );
         }
 
-        if( func != NULL )
-            ( (PopupFunc*)func )( view, event );
+        ( (PopupFunc*)func )( view, event );
 
         return TRUE;
     }
@@ -510,9 +509,7 @@ gtr_open_file( const char * path )
         }
 
         if( !opened )
-        {
             g_message( "Unable to open \"%s\"", path );
-        }
     }
 }
 

@@ -27,7 +27,6 @@
 #import "BlocklistScheduler.h"
 #import "PortChecker.h"
 #import "BonjourController.h"
-#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "UKKQueue.h"
 #import "utils.h"
@@ -419,13 +418,10 @@ tr_session * fHandle;
 {
     NSMutableArray * sounds = [NSMutableArray array];
     
-    NSArray * directories = NSSearchPathForDirectoriesInDomains(NSAllLibrariesDirectory,
-                                NSUserDomainMask | NSLocalDomainMask | NSSystemDomainMask, YES);
+    NSArray * directories = [NSArray arrayWithObjects: @"/System/Library/Sounds", @"/Library/Sounds", @"Library/Sounds", nil];
     
     for (NSString * directory in directories)
     {
-        directory = [directory stringByAppendingPathComponent: @"Sounds"];
-        
         BOOL isDirectory;
         if ([[NSFileManager defaultManager] fileExistsAtPath: directory isDirectory: &isDirectory] && isDirectory)
         {
@@ -528,18 +524,12 @@ tr_session * fHandle;
         NSDate * updatedDate = [fDefaults objectForKey: @"BlocklistLastUpdate"];
         if (updatedDate)
         {
-            if ([NSApp isOnSnowLeopardOrBetter])
-                updatedDateString = [NSDateFormatter localizedStringFromDate: updatedDate dateStyle: NSDateFormatterFullStyle
-                                        timeStyle: NSDateFormatterShortStyle];
-            else
-            {
-                NSDateFormatter * dateFormatter = [[NSDateFormatter alloc] init];
-                [dateFormatter setDateStyle: NSDateFormatterFullStyle];
-                [dateFormatter setTimeStyle: NSDateFormatterShortStyle];
-                
-                updatedDateString = [dateFormatter stringFromDate: updatedDate];
-                [dateFormatter release];
-            }
+            NSDateFormatter * dateFormatter = [[NSDateFormatter alloc] init];
+            [dateFormatter setDateStyle: NSDateFormatterFullStyle];
+            [dateFormatter setTimeStyle: NSDateFormatterShortStyle];
+            
+            updatedDateString = [dateFormatter stringFromDate: updatedDate];
+            [dateFormatter release];
         }
         else
             updatedDateString = NSLocalizedString(@"N/A", "Prefs -> blocklist -> message");
@@ -678,10 +668,9 @@ tr_session * fHandle;
     [fDefaults removeObjectForKey: @"WarningFolderDataSameName"];
     [fDefaults removeObjectForKey: @"WarningResetStats"];
     [fDefaults removeObjectForKey: @"WarningCreatorBlankAddress"];
-    [fDefaults removeObjectForKey: @"WarningRemoveTrackers"];
+    [fDefaults removeObjectForKey: @"WarningRemoveBuiltInTracker"];
     [fDefaults removeObjectForKey: @"WarningInvalidOpen"];
     [fDefaults removeObjectForKey: @"WarningDonate"];
-    //[fDefaults removeObjectForKey: @"WarningLegal"];
 }
 
 - (void) setQueue: (id) sender
@@ -739,11 +728,6 @@ tr_session * fHandle;
     [panel beginSheetForDirectory: nil file: nil types: nil
         modalForWindow: [self window] modalDelegate: self didEndSelector:
         @selector(incompleteFolderSheetClosed:returnCode:contextInfo:) contextInfo: nil];
-}
-
-- (void) setUseIncompleteFolder: (id) sender
-{
-    tr_sessionSetIncompleteDirEnabled(fHandle, [fDefaults boolForKey: @"UseIncompleteDownloadFolder"]);
 }
 
 - (void) setAutoImport: (id) sender
@@ -1096,12 +1080,6 @@ tr_session * fHandle;
     NSString * downloadLocation = [[NSString stringWithUTF8String: tr_sessionGetDownloadDir(fHandle)] stringByStandardizingPath];
     [fDefaults setObject: downloadLocation forKey: @"DownloadFolder"];
     
-    NSString * incompleteLocation = [[NSString stringWithUTF8String: tr_sessionGetIncompleteDir(fHandle)] stringByStandardizingPath];
-    [fDefaults setObject: incompleteLocation forKey: @"IncompleteDownloadFolder"];
-    
-    const BOOL useIncomplete = tr_sessionIsIncompleteDirEnabled(fHandle);
-    [fDefaults setBool: useIncomplete forKey: @"UseIncompleteDownloadFolder"];
-    
     //peers
     const uint16_t peersTotal = tr_sessionGetPeerLimit(fHandle);
     [fDefaults setInteger: peersTotal forKey: @"PeersTotal"];
@@ -1310,12 +1288,7 @@ tr_session * fHandle;
 - (void) incompleteFolderSheetClosed: (NSOpenPanel *) openPanel returnCode: (int) code contextInfo: (void *) info
 {
     if (code == NSOKButton)
-    {
-        NSString * folder = [[openPanel filenames] objectAtIndex: 0];
-        [fDefaults setObject: folder forKey: @"IncompleteDownloadFolder"];
-        
-        tr_sessionSetIncompleteDir(fHandle, [folder UTF8String]);
-    }
+        [fDefaults setObject: [[openPanel filenames] objectAtIndex: 0] forKey: @"IncompleteDownloadFolder"];
     [fIncompleteFolderPopUp selectItemAtIndex: 0];
 }
 

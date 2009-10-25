@@ -42,7 +42,6 @@ class MyApp: public QApplication
         time_t myLastFullUpdateTime;
 
     private slots:
-        void consentGiven( );
         void refreshPref( int key );
         void refreshTorrents( );
         void addTorrent( const QString& );

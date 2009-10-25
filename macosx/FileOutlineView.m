@@ -23,13 +23,12 @@
  *****************************************************************************/
 
 #import "InfoWindowController.h"
-#import "FileListNode.h"
-#import "FileNameCell.h"
 #import "FileOutlineView.h"
+#import "FileNameCell.h"
 #import "FilePriorityCell.h"
 #import "Torrent.h"
-#import "NSApplicationAdditions.h"
-#import <Quartz/Quartz.h>
+#import "FileListNode.h"
+#import "QuickLookController.h"
 
 @implementation FileOutlineView
 
@@ -91,14 +90,13 @@
     const unichar firstChar = [[event charactersIgnoringModifiers] characterAtIndex: 0];
     
     //don't allow quick look on add window
-    #warning get rid of conversion of protocol and replace with @protocol(QLPreviewPanelDataSource)
-    if ([NSApp isOnSnowLeopardOrBetter] && firstChar == ' ' && [[[self window] windowController] conformsToProtocol: NSProtocolFromString(@"QLPreviewPanelDataSource")])
-    {
-        if ([[QLPreviewPanelSL sharedPreviewPanel] isVisible])
-            [[QLPreviewPanelSL sharedPreviewPanel] orderOut: nil];
-        else
-            [[QLPreviewPanelSL sharedPreviewPanel] makeKeyAndOrderFront: nil];
-    }
+    if (firstChar == ' ' && [[[self window] windowController] isKindOfClass: [InfoWindowController class]])
+        [[QuickLookController quickLook] toggleQuickLook];
+    else if (firstChar == NSRightArrowFunctionKey)
+        [[QuickLookController quickLook] pressRight];
+    else if (firstChar == NSLeftArrowFunctionKey)
+        [[QuickLookController quickLook] pressLeft];
+    else;
     
     [super keyDown: event];  
 }

@@ -61,7 +61,7 @@ BlocklistScheduler * fScheduler = nil;
     
     NSDate * lastUpdateDate = [[NSUserDefaults standardUserDefaults] objectForKey: @"BlocklistLastUpdate"];
     if (lastUpdateDate)
-        lastUpdateDate = [lastUpdateDate dateByAddingTimeInterval: FULL_WAIT];
+        lastUpdateDate = [lastUpdateDate addTimeInterval: FULL_WAIT];
     NSDate * closeDate = [NSDate dateWithTimeIntervalSinceNow: SMALL_DELAY];
     
     NSDate * useDate = lastUpdateDate ? [lastUpdateDate laterDate: closeDate] : closeDate;

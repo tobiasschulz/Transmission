@@ -27,8 +27,7 @@
 #import "FileOutlineView.h"
 #import "FilePriorityCell.h"
 #import "FileListNode.h"
-#import "NSApplicationAdditions.h"
-#import <Quartz/Quartz.h>
+#import "QuickLookController.h"
 
 #define ROW_SMALL_HEIGHT 18.0
 
@@ -132,9 +131,7 @@ typedef enum
 
 - (void) outlineViewSelectionDidChange: (NSNotification *) notification
 {
-    if ([NSApp isOnSnowLeopardOrBetter] && [QLPreviewPanelSL sharedPreviewPanelExists]
-        && [[QLPreviewPanelSL sharedPreviewPanel] isVisible])
-        [[QLPreviewPanelSL sharedPreviewPanel] reloadData];
+    [[QuickLookController quickLook] updateQuickLook];
 }
 
 - (NSInteger) outlineView: (NSOutlineView *) outlineView numberOfChildrenOfItem: (id) item
@@ -189,7 +186,7 @@ typedef enum
     if ([identifier isEqualToString: @"Check"])
     {
         NSIndexSet * indexSet;
-        if (([NSApp isOnSnowLeopardOrBetter] ? [NSEvent modifierFlags] : [[NSApp currentEvent] modifierFlags]) & NSAlternateKeyMask)
+        if ([[NSApp currentEvent] modifierFlags] & NSAlternateKeyMask)
             indexSet = [NSIndexSet indexSetWithIndexesInRange: NSMakeRange(0, [fTorrent fileCount])];
         else
             indexSet = [(FileListNode *)item indexes];
@@ -211,7 +208,7 @@ typedef enum
 {
     NSString * ident = [tableColumn identifier];
     if ([ident isEqualToString: @"Name"])
-        return [fTorrent fileLocation: item];
+        return [[fTorrent downloadFolder] stringByAppendingPathComponent: [(FileListNode *)item fullPath]];
     else if ([ident isEqualToString: @"Check"])
     {
         switch ([cell state])
@@ -314,29 +311,11 @@ typedef enum
 
 - (void) revealFile: (id) sender
 {
+    NSString * folder = [fTorrent downloadFolder];
     NSIndexSet * indexes = [fOutline selectedRowIndexes];
-    if ([NSApp isOnSnowLeopardOrBetter])
-    {
-        NSMutableArray * paths = [NSMutableArray arrayWithCapacity: [indexes count]];
-        for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
-        {
-            NSString * path = [fTorrent fileLocation: [fOutline itemAtRow: i]];
-            if (path)
-                [paths addObject: [NSURL fileURLWithPath: path]];
-        }
-        
-        if ([paths count])
-            [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs: paths];
-    }
-    else
-    {
-        for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
-        {
-            NSString * path = [fTorrent fileLocation: [fOutline itemAtRow: i]];
-            if (path)
-                [[NSWorkspace sharedWorkspace] selectFile: path inFileViewerRootedAtPath: nil];
-        }
-    }
+    for (NSInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
+        [[NSWorkspace sharedWorkspace] selectFile: [folder stringByAppendingPathComponent:
+            [[fOutline itemAtRow: i] fullPath]] inFileViewerRootedAtPath: nil];
 }
 
 #warning make real view controller (Leopard-only) so that Command-R will work
@@ -349,9 +328,11 @@ typedef enum
     
     if (action == @selector(revealFile:))
     {
+        NSString * downloadFolder = [fTorrent downloadFolder];
         NSIndexSet * indexSet = [fOutline selectedRowIndexes];
         for (NSInteger i = [indexSet firstIndex]; i != NSNotFound; i = [indexSet indexGreaterThanIndex: i])
-            if ([fTorrent fileLocation: [fFileList objectAtIndex: i]] != nil)
+            if ([[NSFileManager defaultManager] fileExistsAtPath:
+                    [downloadFolder stringByAppendingPathComponent: [[fFileList objectAtIndex: i] fullPath]]])
                 return YES;
         return NO;
     }

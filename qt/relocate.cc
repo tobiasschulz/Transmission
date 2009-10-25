@@ -10,22 +10,22 @@
  * $Id$
  */
 
-#include <QApplication>
-#include <QDialogButtonBox>
-#include <QDir>
-#include <QFileDialog>
-#include <QFileIconProvider>
 #include <QLabel>
 #include <QPushButton>
-#include <QRadioButton>
-#include <QSet>
-#include <QStyle>
 #include <QVBoxLayout>
+#include <QRadioButton>
+#include <QDir>
+#include <QFileDialog>
+#include <QSet>
+#include <QDialogButtonBox>
 #include <QWidget>
+#include <QApplication>
+#include <QStyle>
 
 #include "hig.h"
 #include "relocate.h"
 #include "session.h"
+#include "qticonloader.h"
 
 QString RelocateDialog :: myPath;
 
@@ -67,8 +67,7 @@ RelocateDialog :: RelocateDialog( Session& session, const QSet<int>& ids, QWidge
     myIds( ids )
 {
     const int iconSize( style( )->pixelMetric( QStyle :: PM_SmallIconSize ) );
-    const QFileIconProvider iconProvider;
-    const QIcon folderIcon = iconProvider.icon( QFileIconProvider::Folder );
+    const QIcon folderIcon = QtIconLoader :: icon( "folder", style()->standardIcon( QStyle::SP_DirIcon ) );
     const QPixmap folderPixmap = folderIcon.pixmap( iconSize );
 
     QRadioButton * find_rb;

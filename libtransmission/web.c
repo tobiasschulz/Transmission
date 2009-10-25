@@ -51,8 +51,12 @@ useCurlMultiSocketAction( void )
     return useMultiSocketAction;
 }
 
+
 enum
 {
+    /* arbitrary number */
+    MAX_CONCURRENT_TASKS = 256,
+
     /* arbitrary number */
     DEFAULT_TIMER_MSEC = 2500
 };
@@ -86,9 +90,8 @@ struct tr_web
     long timer_ms;
     CURLM * multi;
     tr_session * session;
-    tr_bool haveAddr;
-    tr_address addr;
     struct event timer_event;
+    tr_list * easy_queue;
     tr_list * fds;
 };
 
@@ -161,11 +164,10 @@ struct tr_web_task
 };
 
 static size_t
-writeFunc( void * ptr, size_t size, size_t nmemb, void * vtask )
+writeFunc( void * ptr, size_t size, size_t nmemb, void * task )
 {
     const size_t byteCount = size * nmemb;
-    struct tr_web_task * task = vtask;
-    evbuffer_add( task->response, ptr, byteCount );
+    evbuffer_add( ((struct tr_web_task*)task)->response, ptr, byteCount );
     dbgmsg( "wrote %zu bytes to task %p's buffer", byteCount, task );
     return byteCount;
 }
@@ -191,7 +193,6 @@ addTask( void * vtask )
     {
         struct tr_web * web = session->web;
         CURL * easy;
-        long timeout;
 
         dbgmsg( "adding task #%lu [%s]", task->tag, task->url );
 
@@ -212,19 +213,17 @@ addTask( void * vtask )
         }
 
         curl_easy_setopt( easy, CURLOPT_IPRESOLVE, CURL_IPRESOLVE_V4 );
+        curl_easy_setopt( easy, CURLOPT_DNS_CACHE_TIMEOUT, 360L );
+        curl_easy_setopt( easy, CURLOPT_CONNECTTIMEOUT, 60L );
 
         /* set a time limit for announces & scrapes */
-        if( strstr( task->url, "scrape" ) != NULL )
-            timeout = 20L;
-        else if( strstr( task->url, "announce" ) != NULL )
-            timeout = 30L;
+        if( strstr( task->url, "scrape" ) )
+            curl_easy_setopt( easy, CURLOPT_TIMEOUT, 15L );
+        else if( strstr( task->url, "announce" ) )
+            curl_easy_setopt( easy, CURLOPT_TIMEOUT, 30L );
         else
-            timeout = 240L;
-        curl_easy_setopt( easy, CURLOPT_TIMEOUT, timeout );
-        curl_easy_setopt( easy, CURLOPT_CONNECTTIMEOUT, timeout-5 );
-        dbgmsg( "new task's timeout is %ld\n", timeout );
+            curl_easy_setopt( easy, CURLOPT_TIMEOUT, 240L );
 
-        curl_easy_setopt( easy, CURLOPT_DNS_CACHE_TIMEOUT, 600L );
         curl_easy_setopt( easy, CURLOPT_FOLLOWLOCATION, 1L );
         curl_easy_setopt( easy, CURLOPT_AUTOREFERER, 1L );
         curl_easy_setopt( easy, CURLOPT_FORBID_REUSE, 1L );
@@ -238,8 +237,6 @@ addTask( void * vtask )
                                            TR_NAME "/" LONG_VERSION_STRING );
         curl_easy_setopt( easy, CURLOPT_VERBOSE,
                                        getenv( "TR_CURL_VERBOSE" ) != NULL );
-        if( web->haveAddr )
-            curl_easy_setopt( easy, CURLOPT_INTERFACE, tr_ntop_non_ts( &web->addr ) );
         curl_easy_setopt( easy, CURLOPT_WRITEDATA, task );
         curl_easy_setopt( easy, CURLOPT_WRITEFUNCTION, writeFunc );
         if( task->range )
@@ -247,7 +244,10 @@ addTask( void * vtask )
         else /* don't set encoding on webseeds; it messes up binary data */
             curl_easy_setopt( easy, CURLOPT_ENCODING, "" );
 
-        {
+        if( web->still_running >= MAX_CONCURRENT_TASKS ) {
+            tr_list_append( &web->easy_queue, easy );
+            dbgmsg( ">> enqueueing a task... size is now %d", tr_list_size( web->easy_queue ) );
+        } else {
             const CURLMcode mcode = curl_multi_add_handle( web->multi, easy );
             tr_assert( mcode == CURLM_OK, "curl_multi_add_handle() failed: %d (%s)", mcode, curl_multi_strerror( mcode ) );
             if( mcode == CURLM_OK )
@@ -276,13 +276,11 @@ task_finish( struct tr_web_task * task, long response_code )
 {
     dbgmsg( "finished a web task... response code is %ld", response_code );
     dbgmsg( "===================================================" );
-
-    if( task->done_func != NULL )
-        task->done_func( task->session,
-                         response_code,
-                         EVBUFFER_DATA( task->response ),
-                         EVBUFFER_LENGTH( task->response ),
-                         task->done_func_user_data );
+    task->done_func( task->session,
+                     response_code,
+                     EVBUFFER_DATA( task->response ),
+                     EVBUFFER_LENGTH( task->response ),
+                     task->done_func_user_data );
     task_free( task );
 }
 
@@ -354,9 +352,30 @@ restart_timer( tr_web * g )
     assert( g->session->events != NULL );
 
     stop_timer( g );
-    dbgmsg( "adding a timeout for %.1f seconds from now", g->timer_ms/1000.0 );
+    dbgmsg( "adding a timeout for %ld seconds from now", g->timer_ms/1000L );
     tr_timevalMsec( g->timer_ms, &interval );
     evtimer_add( &g->timer_event, &interval );
+}
+
+static void
+add_tasks_from_queue( tr_web * g )
+{
+    while( ( g->still_running < MAX_CONCURRENT_TASKS )
+        && ( tr_list_size( g->easy_queue ) > 0 ) )
+    {
+        CURL * easy = tr_list_pop_front( &g->easy_queue );
+        if( easy )
+        {
+            const CURLMcode rc = curl_multi_add_handle( g->multi, easy );
+            if( rc != CURLM_OK )
+                tr_err( "%s", curl_multi_strerror( rc ) );
+            else {
+                dbgmsg( "pumped the task queue, %d remain",
+                        tr_list_size( g->easy_queue ) );
+                ++g->still_running;
+            }
+        }
+    }
 }
 
 static void
@@ -409,6 +428,8 @@ tr_multi_perform( tr_web * g, int fd )
         tr_err( "%s", curl_multi_strerror( mcode ) );
 
     remove_finished_tasks( g );
+
+    add_tasks_from_queue( g );
 
     if( !g->still_running ) {
         assert( tr_list_size( g->fds ) == 0 );
@@ -523,13 +544,6 @@ tr_webRun( tr_session         * session,
 
         tr_runInEventThread( session, addTask, task );
     }
-}
-
-void
-tr_webSetInterface( tr_web * web, const tr_address * addr )
-{
-    if(( web->haveAddr = ( addr != NULL )))
-        web->addr = *addr;
 }
 
 tr_web*

@@ -30,9 +30,9 @@ Torrent._ErrLocalError         = 3;
 Torrent._StaticFields = [ 'addedDate', 'announceURL', 'comment', 'creator',
     'dateCreated', 'hashString', 'id', 'isPrivate', 'name', 'totalSize' ]
 Torrent._DynamicFields = [ 'downloadedEver', 'error', 'errorString', 'eta',
-    'haveUnchecked', 'haveValid', 'leftUntilDone', 'peersConnected',
+    'haveUnchecked', 'haveValid', 'leechers', 'leftUntilDone', 'peersConnected',
     'peersGettingFromUs', 'peersSendingToUs', 'rateDownload', 'rateUpload',
-    'recheckProgress', 'sizeWhenDone', 'status', 'swarmSpeed',
+    'recheckProgress', 'seeders', 'sizeWhenDone', 'status', 'swarmSpeed',
     'uploadedEver', 'uploadRatio', 'seedRatioLimit', 'seedRatioMode', 'downloadDir' ]
 
 Torrent.prototype =
@@ -62,7 +62,6 @@ Torrent.prototype =
 		top_e.id = 'torrent_' + data.id;
 		top_e._torrent = this;
 		var element = $(top_e);
-                $(element).bind('dblclick', function(e) { transmission.toggleInspector(); });
 		element._torrent = this;
 		this._element = element;
 		this._controller = controller;
@@ -206,6 +205,8 @@ Torrent.prototype =
 		}
 	},
 	swarmSpeed: function() { return this._swarm_speed; },
+	totalLeechers: function() { return this._total_leechers; },
+	totalSeeders: function() { return this._total_seeders; },
 	uploadSpeed: function() { return this._upload_speed; },
 	uploadTotal: function() { return this._upload_total; },
 	showFileList: function() {
@@ -330,6 +331,8 @@ Torrent.prototype =
 		this._error_string          = data.errorString;
 		this._eta                   = data.eta;
 		this._swarm_speed           = data.swarmSpeed;
+		this._total_leechers        = Math.max( 0, data.leechers );
+		this._total_seeders         = Math.max( 0, data.seeders );
 		this._state                 = data.status;
 		this._download_dir          = data.downloadDir;
 

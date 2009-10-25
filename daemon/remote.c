@@ -72,8 +72,6 @@ static tr_option opts[] =
     { 976, "alt-speed-time-begin", "Time to start using the alt speed limits (in hhmm)", NULL,  1, "<time>" },
     { 977, "alt-speed-time-end",   "Time to stop using the alt speed limits (in hhmm)", NULL,  1, "<time>" },
     { 978, "alt-speed-days",       "Numbers for any/all days of the week - eg. \"1-7\"", NULL,  1, "<days>" },
-    { 'c', "incomplete-dir",       "Where to store new torrents until they're complete", "c", 1, "<dir>" },
-    { 'C', "no-incomplete-dir",    "Don't store incomplete torrents in a different location", "C", 0, NULL },
     { 'b', "debug",                "Print debugging information", "b",  0, NULL },
     { 'd', "downlimit",            "Set the maximum global download speed in KB/s", "d",  1, "<speed>" },
     { 'D', "no-downlimit",         "Don't limit the global download speed", "D",  0, NULL },
@@ -308,6 +306,8 @@ static const char * files_keys[] = {
 static const char * details_keys[] = {
     "activityDate",
     "addedDate",
+    "announceResponse",
+    "announceURL",
     "comment",
     "corruptEver",
     "creator",
@@ -323,8 +323,13 @@ static const char * details_keys[] = {
     "haveValid",
     "id",
     "isPrivate",
+    "lastAnnounceTime",
+    "lastScrapeTime",
+    "leechers",
     "leftUntilDone",
     "name",
+    "nextAnnounceTime",
+    "nextScrapeTime",
     "peersConnected",
     "peersGettingFromUs",
     "peersSendingToUs",
@@ -333,11 +338,13 @@ static const char * details_keys[] = {
     "rateDownload",
     "rateUpload",
     "recheckProgress",
+    "scrapeResponse",
+    "seeders",
     "sizeWhenDone",
     "startDate",
     "status",
+    "timesCompleted",
     "totalSize",
-    "trackerStats",
     "uploadedEver",
     "pieces",
     "webseeds",
@@ -414,17 +421,6 @@ readargs( int           argc,
             case 'b':
                 debug = 1;
                 addArg = FALSE;
-                break;
-
-            case 'c':
-                tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddStr( args, TR_PREFS_KEY_INCOMPLETE_DIR, optarg );
-                tr_bencDictAddBool( args, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED, TRUE );
-                break;
-
-            case 'C':
-                tr_bencDictAddStr( &top, "method", "session-set" );
-                tr_bencDictAddBool( args, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED, FALSE );
                 break;
 
             case 'd':
@@ -974,6 +970,18 @@ getStatusString( tr_benc * t, char * buf, size_t buflen )
     return buf;
 }
 
+static const char*
+getTrackerDateStr( const time_t t, tr_bool isStopped )
+{
+    const char * str;
+    switch( t ) {
+        case 0: str = isStopped ? "None (Stopped)\n" : "None\n"; break;
+        case 1: str = "In Progress\n"; break;
+        default: str = ctime( &t ); break;
+    }
+    return str;
+}
+
 static void
 printSession( tr_benc * top )
 {
@@ -1248,129 +1256,26 @@ printDetails( tr_benc * top )
             }
             printf( "\n" );
 
-            printf( "TRACKERS\n" );
-
-            if( tr_bencDictFindList( t, "trackerStats", &l ) )
-            {
-                tr_benc * t;
-                for( i=0; (( t = tr_bencListChild( l, i ))); ++i )
-                {
-                    int64_t downloadCount; 
-                    tr_bool hasAnnounced; 
-                    tr_bool hasScraped; 
-                    const char * host;
-                    tr_bool isBackup; 
-                    int64_t lastAnnouncePeerCount; 
-                    const char * lastAnnounceResult; 
-                    int64_t lastAnnounceStartTime; 
-                    tr_bool lastAnnounceSucceeded; 
-                    int64_t lastAnnounceTime; 
-                    const char * lastScrapeResult; 
-                    tr_bool lastScrapeSucceeded; 
-                    int64_t lastScrapeStartTime; 
-                    int64_t lastScrapeTime; 
-                    int64_t leecherCount; 
-                    int64_t nextAnnounceTime; 
-                    int64_t nextScrapeTime; 
-                    int64_t seederCount;
-                    int64_t tier;
-                    int64_t announceState;
-                    int64_t scrapeState;
-           
-                    if( tr_bencDictFindInt ( t, "downloadCount", &downloadCount ) &&
-                        tr_bencDictFindBool( t, "hasAnnounced", &hasAnnounced ) &&
-                        tr_bencDictFindBool( t, "hasScraped", &hasScraped ) &&
-                        tr_bencDictFindStr ( t, "host", &host ) &&
-                        tr_bencDictFindBool( t, "isBackup", &isBackup ) &&
-                        tr_bencDictFindInt ( t, "announceState", &announceState ) &&
-                        tr_bencDictFindInt ( t, "scrapeState", &scrapeState ) &&
-                        tr_bencDictFindInt ( t, "lastAnnouncePeerCount", &lastAnnouncePeerCount ) &&
-                        tr_bencDictFindStr ( t, "lastAnnounceResult", &lastAnnounceResult ) &&
-                        tr_bencDictFindInt ( t, "lastAnnounceStartTime", &lastAnnounceStartTime ) &&
-                        tr_bencDictFindBool( t, "lastAnnounceSucceeded", &lastAnnounceSucceeded ) &&
-                        tr_bencDictFindInt ( t, "lastAnnounceTime", &lastAnnounceTime ) &&
-                        tr_bencDictFindStr ( t, "lastScrapeResult", &lastScrapeResult ) &&
-                        tr_bencDictFindInt ( t, "lastScrapeStartTime", &lastScrapeStartTime ) &&
-                        tr_bencDictFindBool( t, "lastScrapeSucceeded", &lastScrapeSucceeded ) &&
-                        tr_bencDictFindInt ( t, "lastScrapeTime", &lastScrapeTime ) &&
-                        tr_bencDictFindInt ( t, "leecherCount", &leecherCount ) &&
-                        tr_bencDictFindInt ( t, "nextAnnounceTime", &nextAnnounceTime ) &&
-                        tr_bencDictFindInt ( t, "nextScrapeTime", &nextScrapeTime ) &&
-                        tr_bencDictFindInt ( t, "seederCount", &seederCount ) &&
-                        tr_bencDictFindInt ( t, "tier", &tier ) )
-                    {
-                        const time_t now = time( NULL );
-
-                        printf( "\n" );
-                        printf( "  Tracker #%d: %s\n", (int)(i+1), host );
-                        if( isBackup )
-                          printf( "  Backup on tier #%d\n", (int)tier );
-                        else
-                          printf( "  Active in tier #%d\n", (int)tier );
-
-                        if( !isBackup )
-                        {
-                            if( hasAnnounced )
-                            {
-                                tr_strltime( buf, now - lastAnnounceTime, sizeof( buf ) );
-                                if( lastAnnounceSucceeded )
-                                    printf( "  Got a list of %'d peers %s ago\n",
-                                            (int)lastAnnouncePeerCount, buf );
-                                else
-                                    printf( "  Got an error \"%s\" %s ago\n",
-                                            lastAnnounceResult, buf );
-                            }
-
-                            switch( announceState )
-                            {
-                                case TR_TRACKER_INACTIVE:
-                                    printf( "  No updates scheduled\n" );
-                                    break;
-                                case TR_TRACKER_WAITING:
-                                    tr_strltime( buf, nextAnnounceTime - now, sizeof( buf ) );
-                                    printf( "  Asking for more peers in %s\n", buf );
-                                    break;
-                                case TR_TRACKER_QUEUED:
-                                    printf( "  Queued to ask for more peers\n" );
-                                    break;
-                                case TR_TRACKER_ACTIVE:
-                                    tr_strltime( buf, now - lastAnnounceStartTime, sizeof( buf ) );
-                                    printf( "  Asking for more peers now... %s\n", buf );
-                                    break;
-                            }
-
-                            if( hasScraped )
-                            {
-                                tr_strltime( buf, now - lastScrapeTime, sizeof( buf ) );
-                                if( lastScrapeSucceeded )
-                                    printf( "  Tracker had %'d seeders and %'d leechers %s ago\n",
-                                            (int)seederCount, (int)leecherCount, buf );
-                                else
-                                    printf( "  Got a scrape error \"%s\" %s ago\n", 
-                                            lastScrapeResult, buf );
-                            }
-
-                            switch( scrapeState )
-                            {
-                                case TR_TRACKER_INACTIVE:
-                                    break;
-                                case TR_TRACKER_WAITING:
-                                    tr_strltime( buf, nextScrapeTime - now, sizeof( buf ) );
-                                    printf( "  Asking for peer counts in %s\n", buf );
-                                    break;
-                                case TR_TRACKER_QUEUED:
-                                    printf( "  Queued to ask for peer counts\n" );
-                                    break;
-                                case TR_TRACKER_ACTIVE:
-                                    tr_strltime( buf, now - lastScrapeStartTime, sizeof( buf ) );
-                                    printf( "  Asking for peer counts now... %s\n", buf );
-                                    break;
-                            }
-                        }
-                    }
-                }
-                printf( "\n" );
-            }
+            printf( "TRACKER\n" );
+            if( tr_bencDictFindInt( t, "lastAnnounceTime", &i ) )
+                printf( "  Latest announce: %s", getTrackerDateStr( (time_t)i, isStopped ) );
+            if( tr_bencDictFindStr( t, "announceURL", &str ) )
+                printf( "  Announce URL: %s\n", str );
+            if( tr_bencDictFindStr( t, "announceResponse", &str ) && str && *str )
+                printf( "  Announce response: %s\n", str );
+            if( tr_bencDictFindInt( t, "nextAnnounceTime", &i ) )
+                printf( "  Next announce:   %s", getTrackerDateStr( (time_t)i, isStopped ) );
+            if( tr_bencDictFindInt( t, "lastScrapeTime", &i ) )
+                printf( "  Latest scrape:   %s", getTrackerDateStr( (time_t)i, isStopped ) );
+            if( tr_bencDictFindStr( t, "scrapeResponse", &str ) )
+                printf( "  Scrape response: %s\n", str );
+            if( tr_bencDictFindInt( t, "nextScrapeTime", &i ) )
+                printf( "  Next scrape:     %s", getTrackerDateStr( (time_t)i, isStopped ) );
+            if( tr_bencDictFindInt( t, "seeders", &i ) && tr_bencDictFindInt( t, "leechers", &j ) )
+                printf( "  Tracker knows of %" PRId64 " seeders and %" PRId64 " leechers\n", i, j );
+            if( tr_bencDictFindInt( t, "timesCompleted", &i ) )
+                printf( "  Tracker has seen %" PRId64 " clients complete this torrent\n", i );
+            printf( "\n" );
 
             printf( "ORIGINS\n" );
             if( tr_bencDictFindInt( t, "dateCreated", &i ) && i )

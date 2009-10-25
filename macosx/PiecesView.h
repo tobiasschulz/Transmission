@@ -30,6 +30,7 @@
 {
     int8_t  * fPieces;
     
+    NSImage * fBack;
     NSColor * fGreenAvailabilityColor, * fBluePieceColor;
     
     Torrent * fTorrent;

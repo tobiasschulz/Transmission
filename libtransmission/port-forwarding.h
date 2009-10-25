@@ -29,7 +29,7 @@ struct tr_bindsockets;
 
 typedef struct tr_shared tr_shared;
 
-tr_shared* tr_sharedInit( tr_session* );
+tr_shared* tr_sharedInit( tr_session*, tr_bool isEnabled );
 
 void       tr_sharedClose( tr_session * );
 

@@ -23,9 +23,6 @@
  *****************************************************************************/
 
 #import "TrackerTableView.h"
-#import "NSApplicationAdditions.h"
-#import "Torrent.h"
-#import "TrackerNode.h"
 
 @implementation TrackerTableView
 
@@ -35,108 +32,20 @@
     [super mouseDown: event];
 }
 
-- (void) setTorrent: (Torrent *) torrent
-{
-    fTorrent = torrent;
-}
-
 - (void) setTrackers: (NSArray *) trackers
 {
     fTrackers = trackers;
 }
 
-- (void) copy: (id) sender
-{
-    NSMutableArray * addresses = [NSMutableArray arrayWithCapacity: [fTrackers count]];
-    NSIndexSet * indexes = [self selectedRowIndexes];
-    for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
-    {
-        id item = [fTrackers objectAtIndex: i];
-        if ([item isKindOfClass: [NSNumber class]])
-        {
-            for (++i; i < [fTrackers count] && ![[fTrackers objectAtIndex: i] isKindOfClass: [NSNumber class]]; ++i)
-                [addresses addObject: [(TrackerNode *)[fTrackers objectAtIndex: i] fullAnnounceAddress]];
-            --i;
-        }
-        else
-            [addresses addObject: [(TrackerNode *)item fullAnnounceAddress]];
-    }
-    
-    NSString * text = [addresses componentsJoinedByString: @"\n"];
-    
-    NSPasteboard * pb = [NSPasteboard generalPasteboard];
-    if ([NSApp isOnSnowLeopardOrBetter])
-    {
-        [pb clearContents];
-        [pb writeObjects: [NSArray arrayWithObject: text]];
-    }
-    else
-    {
-        [pb declareTypes: [NSArray arrayWithObject: NSStringPboardType] owner: nil];
-        [pb setString: text forType: NSStringPboardType];
-    }
-}
-
-- (void) paste: (id) sender
-{
-    NSAssert(fTorrent != nil, @"no torrent but trying to paste; should not be able to call this method");
-    
-    BOOL added = NO;
-    
-    if ([NSApp isOnSnowLeopardOrBetter])
-    {
-        NSArray * items = [[NSPasteboard generalPasteboard] readObjectsForClasses:
-                            [NSArray arrayWithObject: [NSString class]] options: nil];
-        NSAssert(items != nil, @"no string items to paste; should not be able to call this method");
-        
-        for (NSString * pbItem in items)
-        {
-            for (NSString * item in [pbItem componentsSeparatedByString: @"\n"])
-                if ([fTorrent addTrackerToNewTier: item])
-                    added = YES;
-        }
-    }
-    else
-    {
-        NSString * pbItem =[[NSPasteboard generalPasteboard] stringForType: NSStringPboardType];
-        NSAssert(pbItem != nil, @"no string items to paste; should not be able to call this method");
-        
-        for (NSString * item in [pbItem componentsSeparatedByString: @"\n"])
-            if ([fTorrent addTrackerToNewTier: item])
-                added = YES;
-    }
-    
-    //none added
-    if (!added)
-        NSBeep();
-}
-
-- (BOOL) validateMenuItem: (NSMenuItem *) menuItem
-{
-    const SEL action = [menuItem action];
-    
-    if (action == @selector(copy:))
-        return [self numberOfSelectedRows] > 0;
-    
-    if (action == @selector(paste:))
-        return fTorrent && ([NSApp isOnSnowLeopardOrBetter]
-                ? [[NSPasteboard generalPasteboard] canReadObjectForClasses: [NSArray arrayWithObject: [NSString class]] options: nil]
-                : [[NSPasteboard generalPasteboard] availableTypeFromArray: [NSArray arrayWithObject: NSStringPboardType]] != nil);
-    
-    return YES;
-}
-
 //alternating rows - first row after group row is white
 - (void) highlightSelectionInClipRect: (NSRect) clipRect
 {
+    NSColor * altColor = [[NSColor controlAlternatingRowBackgroundColors] objectAtIndex: 1];
+    [altColor set];
+    
     NSRect visibleRect = clipRect;
     NSRange rows = [self rowsInRect: visibleRect];
     BOOL start = YES;
-    
-    const CGFloat totalRowHeight = [self rowHeight] + [self intercellSpacing].height;
-    
-    NSRect gridRects[(NSInteger)(ceil(visibleRect.size.height / totalRowHeight / 2.0)) + 1]; //add one if partial rows at top and bottom
-    NSInteger rectNum = 0;
     
     if (rows.length > 0)
     {
@@ -166,33 +75,29 @@
             }
             
             if (!start && ![self isRowSelected: i])
-                gridRects[rectNum++] = [self rectOfRow: i];
+                NSRectFill([self rectOfRow: i]);
             
             start = !start;
         }
         
-        const CGFloat newY = NSMaxY([self rectOfRow: i-1]);
+        CGFloat newY = NSMaxY([self rectOfRow: i-1]);
         visibleRect.size.height -= newY - visibleRect.origin.y;
         visibleRect.origin.y = newY;
     }
     
-    const NSInteger numberBlankRows = ceil(visibleRect.size.height / totalRowHeight);
-    
     //remaining visible rows continue alternating
-    visibleRect.size.height = totalRowHeight;
+    const CGFloat height = [self rowHeight] + [self intercellSpacing].height;
+    const NSInteger numberOfRects = ceil(visibleRect.size.height / height);
+    
+    visibleRect.size.height = height;
     if (start)
-        visibleRect.origin.y += totalRowHeight;
+        visibleRect.origin.y += height;
     
-    for (NSInteger i = start ? 1 : 0; i < numberBlankRows; i += 2)
+    for (NSInteger i = start ? 1 : 0; i < numberOfRects; i += 2)
     {
-        gridRects[rectNum++] = visibleRect;
-        visibleRect.origin.y += 2.0 * totalRowHeight;
+        NSRectFill(visibleRect);
+        visibleRect.origin.y += 2.0 * height;
     }
-    
-    NSAssert([[NSColor controlAlternatingRowBackgroundColors] count] >= 2, @"There should be 2 alternating row colors");
-    
-    [[[NSColor controlAlternatingRowBackgroundColors] objectAtIndex: 1] set];
-    NSRectFillList(gridRects, rectNum);
     
     [super highlightSelectionInClipRect: clipRect];
 }

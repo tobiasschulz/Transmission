@@ -34,15 +34,8 @@
  * @{
  */
 
-void tr_fdSetFileLimit( tr_session * session, int limit );
-
-int tr_fdGetFileLimit( const tr_session * session );
-
-void tr_fdSetGlobalPeerLimit( tr_session * session, int limit );
-
-/***
-****
-***/
+void tr_fdInit( size_t openFileLimit,
+                size_t globalPeerLimit );
 
 int tr_open_file_for_scanning( const char * filename );
 
@@ -62,6 +55,7 @@ int64_t tr_lseek( int fd, int64_t offset, int whence );
  * continually opening and closing the same files when downloading
  * piece data.
  *
+ * - if `folder' doesn't exist, errno is set to ENOENT.
  * - if doWrite is true, subfolders in torrentFile are created if necessary.
  * - if doWrite is true, the target file is created if necessary.
  *
@@ -70,18 +64,12 @@ int64_t tr_lseek( int fd, int64_t offset, int whence );
  *
  * @see tr_fdFileClose
  */
-int  tr_fdFileCheckout( tr_session             * session,
-                        int                      torrentId,
-                        tr_file_index_t          fileNum,
-                        const char             * fileName,
+int  tr_fdFileCheckout( int                      torrentId,
+                        const char             * folder,
+                        const char             * torrentFile,
                         tr_bool                  doWrite,
                         tr_preallocation_mode    preallocationMode,
                         uint64_t                 desiredFileSize );
-
-int tr_fdFileGetCached( tr_session             * session,
-                        int                      torrentId,
-                        tr_file_index_t          fileNum,
-                        tr_bool                  doWrite );
 
 /**
  * Closes a file that's being held by our file repository.
@@ -91,39 +79,36 @@ int tr_fdFileGetCached( tr_session             * session,
  *
  * @see tr_fdFileCheckout
  */
-void tr_fdFileClose( tr_session        * session,
-                     const tr_torrent  * tor,
-                     tr_file_index_t     fileNo );
+void     tr_fdFileClose( const char * filename );
 
 
 /**
  * Closes all the files associated with a given torrent id
  */
-void tr_fdTorrentClose( tr_session * session, int torrentId );
+void tr_fdTorrentClose( int torrentId );
 
 
 /***********************************************************************
  * Sockets
  **********************************************************************/
-int      tr_fdSocketCreate( tr_session * session, int domain, int type );
+int      tr_fdSocketCreate( int domain, int type );
 
-int      tr_fdSocketAccept( tr_session  * session,
-                            int           b,
+int      tr_fdSocketAccept( int           b,
                             tr_address  * addr,
                             tr_port     * port );
 
-void     tr_fdSocketClose( tr_session * session, int s );
+void     tr_fdSocketClose( int s );
 
 /***********************************************************************
  * tr_fdClose
  ***********************************************************************
  * Frees resources allocated by tr_fdInit.
  **********************************************************************/
-void     tr_fdClose( tr_session * session );
+void     tr_fdClose( void );
 
 
-void     tr_fdSetPeerLimit( tr_session * session, int n );
+void     tr_fdSetPeerLimit( uint16_t n );
 
-int      tr_fdGetPeerLimit( const tr_session * );
+uint16_t tr_fdGetPeerLimit( void );
 
 /* @} */

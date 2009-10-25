@@ -23,8 +23,7 @@
  *****************************************************************************/
 
 #import <Cocoa/Cocoa.h>
-
-@class Torrent;
+#import "Torrent.h"
 
 @interface GroupsController : NSObject
 {

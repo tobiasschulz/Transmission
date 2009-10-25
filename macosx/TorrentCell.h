@@ -25,11 +25,14 @@
 @interface TorrentCell : NSActionCell
 {
     NSUserDefaults * fDefaults;
+    NSImage * fErrorImage;
     
     NSMutableDictionary * fTitleAttributes, * fStatusAttributes;
     
     BOOL fTracking, fMouseDownControlButton, fMouseDownRevealButton, fMouseDownActionButton,
             fHoverControl, fHoverReveal, fHoverAction;
+    
+    NSImage * fHighPriorityImage, * fLowPriorityImage;
     
     NSColor * fBarBorderColor, * fBluePieceColor;
 }

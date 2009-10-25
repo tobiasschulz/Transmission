@@ -24,19 +24,18 @@
 
 #import <Cocoa/Cocoa.h>
 #import <transmission.h>
-#import <Quartz/Quartz.h>
+#import "PrefsController.h"
+#import "InfoWindowController.h"
+#import "MessageWindowController.h"
+#import "AddWindowController.h"
+#import "DragOverlayWindow.h"
+#import "Badger.h"
+
 #import <Growl/Growl.h>
 
-@class AddWindowController;
-@class Badger;
-@class DragOverlayWindow;
-@class FilterButton;
-@class InfoWindowController;
-@class MessageWindowController;
-@class PrefsController;
-@class StatusBarView;
-@class Torrent;
 @class TorrentTableView;
+@class StatusBarView;
+@class FilterButton;
 
 typedef enum
 {
@@ -47,10 +46,9 @@ typedef enum
     ADD_CREATED
 } addType;
 
-#warning uncomment
-@interface Controller : NSObject <GrowlApplicationBridgeDelegate> //, QLPreviewPanelDataSource, QLPreviewPanelDelegate>
+@interface Controller : NSObject <GrowlApplicationBridgeDelegate>
 {
-    tr_session                      * fLib;
+    tr_session                       * fLib;
     
     NSMutableArray                  * fTorrents, * fDisplayedTorrents;
     
@@ -97,10 +95,6 @@ typedef enum
     IBOutlet NSWindow               * fURLSheetWindow;
     IBOutlet NSTextField            * fURLSheetTextField;
     IBOutlet NSButton               * fURLSheetOpenButton;
-    
-    #warning change to QLPreviewPanel
-    id                              fPreviewPanel;
-    BOOL                            fQuitting;
     
     BOOL                            fUpdateInProgress;
     BOOL                            fPauseOnLaunch;
@@ -186,7 +180,7 @@ typedef enum
 - (void) updateSpeedFieldsToolTips;
 
 - (void) updateTorrentsInQueue;
-- (NSUInteger) numToStartFromQueue: (BOOL) downloadQueue;
+- (NSInteger) numToStartFromQueue: (BOOL) downloadQueue;
 
 - (void) torrentFinishedDownloading: (NSNotification *) notification;
 - (void) torrentRestartedDownloading: (NSNotification *) notification;
@@ -253,6 +247,10 @@ typedef enum
 
 - (void) showMainWindow: (id) sender;
 
+- (NSArray *) quickLookURLs;
+- (BOOL) canQuickLook;
+- (BOOL) canQuickLookTorrent: (Torrent *) torrent;
+- (NSRect) quickLookFrameWithURL: (NSURL*) url;
 - (void) toggleQuickLook: (id) sender;
 
 - (void) linkHomepage: (id) sender;
@@ -265,6 +263,5 @@ typedef enum
 - (void) rpcRemoveTorrent: (Torrent *) torrent;
 - (void) rpcStartedStoppedTorrent: (Torrent *) torrent;
 - (void) rpcChangedTorrent: (Torrent *) torrent;
-- (void) rpcMovedTorrent: (Torrent *) torrent;
 
 @end

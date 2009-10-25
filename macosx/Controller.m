@@ -29,15 +29,13 @@
 #import "Controller.h"
 #import "Torrent.h"
 #import "TorrentGroup.h"
+#import "TorrentCell.h"
 #import "TorrentTableView.h"
 #import "CreatorWindowController.h"
 #import "StatsWindowController.h"
-#import "InfoWindowController.h"
-#import "PrefsController.h"
+#import "QuickLookController.h"
 #import "GroupsController.h"
 #import "AboutWindowController.h"
-#import "AddWindowController.h"
-#import "MessageWindowController.h"
 #import "ButtonToolbarItem.h"
 #import "GroupToolbarItem.h"
 #import "ToolbarSegmentedCell.h"
@@ -45,9 +43,6 @@
 #import "StatusBarView.h"
 #import "FilterButton.h"
 #import "BonjourController.h"
-#import "Badger.h"
-#import "DragOverlayWindow.h"
-#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "ExpandedPathToPathTransformer.h"
 #import "ExpandedPathToIconTransformer.h"
@@ -142,7 +137,7 @@ typedef enum
 #define DOCK_SEEDING_TAG        101
 #define DOCK_DOWNLOADING_TAG    102
 
-#define TRANSFER_PLIST  @"/Library/Application Support/Transmission/Transfers.plist"
+#define SUPPORT_FOLDER  @"/Library/Application Support/Transmission/Transfers.plist"
 
 #define WEBSITE_URL @"http://www.transmissionbt.com/"
 #define FORUM_URL   @"http://forum.transmissionbt.com/"
@@ -175,41 +170,28 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 + (void) initialize
 {
     //make sure another Transmission.app isn't running already
-    BOOL othersRunning = NO;
-    
-    if ([NSApp isOnSnowLeopardOrBetter])
-    {
-        NSArray * apps = [NSRunningApplicationSL runningApplicationsWithBundleIdentifier: [[NSBundle mainBundle] bundleIdentifier]];
-        othersRunning = [apps count] > 1;
-    }
-    else
-    {
-        NSString * bundleIdentifier = [[NSBundle mainBundle] bundleIdentifier];
-        const int processIdentifier = [[NSProcessInfo processInfo] processIdentifier];
+    NSString * bundleIdentifier = [[NSBundle mainBundle] bundleIdentifier];
+    int processIdentifier = [[NSProcessInfo processInfo] processIdentifier];
 
-        for (NSDictionary * dic in [[NSWorkspace sharedWorkspace] launchedApplications])
-        {
-            if ([[dic objectForKey: @"NSApplicationBundleIdentifier"] isEqualToString: bundleIdentifier]
-                    && [[dic objectForKey: @"NSApplicationProcessIdentifier"] intValue] != processIdentifier)
-                othersRunning = YES;
-        }
-    }
-    
-    if (othersRunning)
+    for (NSDictionary * dic in [[NSWorkspace sharedWorkspace] launchedApplications])
     {
-        NSAlert * alert = [[NSAlert alloc] init];
-        [alert addButtonWithTitle: NSLocalizedString(@"Quit", "Transmission already running alert -> button")];
-        [alert setMessageText: NSLocalizedString(@"Transmission is already running.",
-                                                "Transmission already running alert -> title")];
-        [alert setInformativeText: NSLocalizedString(@"There is already a copy of Transmission running. "
-            "This copy cannot be opened until that instance is quit.", "Transmission already running alert -> message")];
-        [alert setAlertStyle: NSCriticalAlertStyle];
-        
-        [alert runModal];
-        [alert release];
-        
-        //kill ourselves right away
-        exit(0);
+        if ([[dic objectForKey: @"NSApplicationBundleIdentifier"] isEqualToString: bundleIdentifier]
+            && [[dic objectForKey: @"NSApplicationProcessIdentifier"] intValue] != processIdentifier)
+        {
+            NSAlert * alert = [[NSAlert alloc] init];
+            [alert addButtonWithTitle: NSLocalizedString(@"Quit", "Transmission already running alert -> button")];
+            [alert setMessageText: NSLocalizedString(@"Transmission is already running.",
+                                                    "Transmission already running alert -> title")];
+            [alert setInformativeText: NSLocalizedString(@"There is already a copy of Transmission running. "
+                "This copy cannot be opened until that instance is quit.", "Transmission already running alert -> message")];
+            [alert setAlertStyle: NSWarningAlertStyle];
+            
+            [alert runModal];
+            [alert release];
+            
+            //kill ourselves right away
+            exit(0);
+        }
     }
     
     [[NSUserDefaults standardUserDefaults] registerDefaults: [NSDictionary dictionaryWithContentsOfFile:
@@ -221,27 +203,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     
     ExpandedPathToIconTransformer * iconTransformer = [[[ExpandedPathToIconTransformer alloc] init] autorelease];
     [NSValueTransformer setValueTransformer: iconTransformer forName: @"ExpandedPathToIconTransformer"];
-    
-    //cover our asses
-    if ([[NSUserDefaults standardUserDefaults] boolForKey: @"WarningLegal"])
-    {
-        NSAlert * alert = [[NSAlert alloc] init];
-        [alert addButtonWithTitle: NSLocalizedString(@"I Accept", "Legal alert -> button")];
-        [alert addButtonWithTitle: NSLocalizedString(@"Quit", "Legal alert -> button")];
-        [alert setMessageText: NSLocalizedString(@"Hear ye, hear ye!", "Legal alert -> title")];
-        [alert setInformativeText: [NSString stringWithFormat: @"%@\n\n%@",
-            NSLocalizedString(@"Transmission is a file-sharing program. When you run a torrent, its data will"
-            " be made available to others by means of upload."
-            " And of course, any content you choose to share is your sole responsibility.", "Legal alert -> message"),
-            NSLocalizedString(@"You probably knew this already, so we won't tell you again.", "Legal alert -> message")]];
-        [alert setAlertStyle: NSInformationalAlertStyle];
-        
-        if ([alert runModal] == NSAlertSecondButtonReturn)
-            exit(0);
-        [alert release];
-        
-        [[NSUserDefaults standardUserDefaults] setBool: NO forKey: @"WarningLegal"];
-    }
 }
 
 - (id) init
@@ -263,9 +224,8 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         }
         
         tr_benc settings;
-        tr_bencInitDict(&settings, 36);
-        const char * configDir = tr_getDefaultConfigDir("Transmission");
-        tr_sessionGetDefaultSettings(configDir, &settings);
+        tr_bencInitDict(&settings, 34);
+        tr_sessionGetDefaultSettings(&settings);
         
         const BOOL usesSpeedLimitSched = [fDefaults boolForKey: @"SpeedLimitAuto"];
         if (!usesSpeedLimitSched)
@@ -290,9 +250,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         tr_bencDictAddBool(&settings, TR_PREFS_KEY_DHT_ENABLED, [fDefaults boolForKey: @"DHTGlobal"]);
         tr_bencDictAddStr(&settings, TR_PREFS_KEY_DOWNLOAD_DIR, [[[fDefaults stringForKey: @"DownloadFolder"]
                                                                     stringByExpandingTildeInPath] UTF8String]);
-        tr_bencDictAddStr(&settings, TR_PREFS_KEY_INCOMPLETE_DIR, [[[fDefaults stringForKey: @"IncompleteDownloadFolder"]
-                                                                    stringByExpandingTildeInPath] UTF8String]);
-        tr_bencDictAddBool(&settings, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED, [fDefaults boolForKey: @"UseIncompleteDownloadFolder"]);
         
         tr_bencDictAddInt(&settings, TR_PREFS_KEY_MSGLEVEL, [fDefaults integerForKey: @"MessageLevel"]);
         tr_bencDictAddInt(&settings, TR_PREFS_KEY_PEER_LIMIT_GLOBAL, [fDefaults integerForKey: @"PeersTotal"]);
@@ -318,11 +275,11 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         tr_bencDictAddReal(&settings, TR_PREFS_KEY_RATIO, [fDefaults floatForKey: @"RatioLimit"]);
         tr_bencDictAddBool(&settings, TR_PREFS_KEY_RATIO_ENABLED, [fDefaults boolForKey: @"RatioCheck"]);
         tr_bencDictAddBool(&settings, TR_PREFS_KEY_RPC_ENABLED,  [fDefaults boolForKey: @"RPC"]);
-        tr_bencDictAddInt(&settings, TR_PREFS_KEY_RPC_PORT, [fDefaults integerForKey: @"RPCPort"]);
+        tr_bencDictAddInt(&settings, TR_PREFS_KEY_RPC_PORT,  [fDefaults integerForKey: @"RPCPort"]);
         tr_bencDictAddStr(&settings, TR_PREFS_KEY_RPC_USERNAME,  [[fDefaults stringForKey: @"RPCUsername"] UTF8String]);
         tr_bencDictAddBool(&settings, TR_PREFS_KEY_RPC_WHITELIST_ENABLED,  [fDefaults boolForKey: @"RPCUseWhitelist"]);
         
-        fLib = tr_sessionInit("macosx", configDir, YES, &settings);
+        fLib = tr_sessionInit("macosx", tr_getDefaultConfigDir("Transmission"), YES, &settings);
         tr_bencFree(&settings);
         
         [NSApp setDelegate: self];
@@ -336,7 +293,8 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [PrefsController setHandle: fLib];
         fPrefsController = [[PrefsController alloc] init];
         
-        fQuitting = NO;
+        [QuickLookController quickLookControllerInitializeWithController: self infoController: fInfoController];
+        
         fSoundPlaying = NO;
         
         tr_sessionSetAltSpeedFunc(fLib, altSpeedToggledCallback, self);
@@ -431,7 +389,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         NSLog(@"Could not IORegisterForSystemPower");
     
     //load previous transfers
-    NSArray * history = [[NSArray alloc] initWithContentsOfFile: [NSHomeDirectory() stringByAppendingPathComponent: TRANSFER_PLIST]];
+    NSArray * history = [[NSArray alloc] initWithContentsOfFile: [NSHomeDirectory() stringByAppendingPathComponent: SUPPORT_FOLDER]];
     
     //old version saved transfer info in prefs file
     if (!history)
@@ -589,8 +547,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         
         if (!firstLaunch && timePassed)
         {
-            [fDefaults setObject: [NSDate date] forKey: @"DonateAskDate"];
-            
             NSAlert * alert = [[NSAlert alloc] init];
             [alert setMessageText: NSLocalizedString(@"Support open-source indie software", "Donation beg -> title")];
             
@@ -620,13 +576,15 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                 [fDefaults setBool: ([[alert suppressionButton] state] != NSOnState) forKey: @"WarningDonate"];
             
             [alert release];
+            
+            [fDefaults setObject: [NSDate date] forKey: @"DonateAskDate"];
         }
     }
 }
 
 - (BOOL) applicationShouldHandleReopen: (NSApplication *) app hasVisibleWindows: (BOOL) visibleWindows
 {
-    if (!visibleWindows)
+    if (![fWindow isVisible] && ![[fPrefsController window] isVisible])
         [fWindow makeKeyAndOrderFront: nil];
     return NO;
 }
@@ -670,8 +628,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) applicationWillTerminate: (NSNotification *) notification
 {
-    fQuitting = YES;
-    
     //stop the Bonjour service
     [[BonjourController defaultController] stop];
 
@@ -702,20 +658,12 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             [download cancel];
             [download release];
         }
-        [fPendingTorrentDownloads release];
+        [fPendingTorrentDownloads removeAllObjects];
     }
     
     //remember window states and close all windows
     [fDefaults setBool: [[fInfoController window] isVisible] forKey: @"InfoVisible"];
-    
-    const BOOL quickLookOpen = [NSApp isOnSnowLeopardOrBetter] && [QLPreviewPanelSL sharedPreviewPanelExists]
-                                && [[QLPreviewPanelSL sharedPreviewPanel] isVisible];
-    if (quickLookOpen)
-        [[QLPreviewPanelSL sharedPreviewPanel] updateController];
-    
-    for (NSWindow * window in [NSApp windows])
-        [window orderOut: nil];
-    
+    [[NSApp windows] makeObjectsPerformSelector: @selector(close)];
     [self showStatusBar: NO animate: NO];
     [self showFilterBar: NO animate: NO];
     
@@ -735,8 +683,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [fBadger release];
     
     [fAutoImportedNames release];
-    
-    [fPreviewPanel release];
+    [fPendingTorrentDownloads release];
     
     //complete cleanup
     tr_sessionClose(fLib);
@@ -749,7 +696,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     NSAppleEventDescriptor * directObject = [event paramDescriptorForKeyword: keyDirectObject];
     if ([directObject descriptorType] == typeAEList)
     {
-        for (NSInteger i = 1; i <= [directObject numberOfItems]; i++)
+        for (NSUInteger i = 1; i <= [directObject numberOfItems]; i++)
             if ((urlString = [[directObject descriptorAtIndex: i] stringValue]))
                 break;
     }
@@ -897,7 +844,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         //ensure torrent doesn't already exist
         tr_ctor * ctor = tr_ctorNew(fLib);
         tr_ctorSetMetainfoFromFile(ctor, [torrentPath UTF8String]);
-        tr_parse_result result = tr_torrentParse(ctor, &info);
+        int result = tr_torrentParse(ctor, &info);
         if (result != TR_PARSE_OK)
         {
             if (result == TR_PARSE_DUPLICATE)
@@ -907,8 +854,8 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                 if (type != ADD_AUTO)
                     [self invalidOpenAlert: [torrentPath lastPathComponent]];
             }
-            else
-                NSAssert2(NO, @"Unknown error code (%d) when attempting to open \"%@\"", result, torrentPath);
+            else //this shouldn't happen
+                NSLog(@"Unknown error code (%d) when attempting to open \"%@\"", result, torrentPath);
             
             tr_ctorFree(ctor);
             tr_metainfoFree(&info);
@@ -943,11 +890,11 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                             deleteTorrentFile: showWindow ? NO : deleteTorrentFile lib: fLib]))
             continue;
         
-        //change the location if the group calls for it (this has to wait until after the torrent is created)
+        //change the location if the group calls for it (this has to wait until after the torrent is create)
         if (!lockDestination && [[GroupsController groups] usesCustomDownloadLocationForIndex: [torrent groupValue]])
         {
             location = [[GroupsController groups] customDownloadLocationForIndex: [torrent groupValue]];
-            [torrent changeDownloadFolderBeforeUsing: location];
+            [torrent changeDownloadFolder: location];
         }
         
         //verify the data right away if it was newly created
@@ -1462,29 +1409,8 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) revealFile: (id) sender
 {
-    NSArray * selected = [fTableView selectedTorrents];
-    if ([NSApp isOnSnowLeopardOrBetter])
-    {
-        NSMutableArray * paths = [NSMutableArray arrayWithCapacity: [selected count]];
-        for (Torrent * torrent in [fTableView selectedTorrents])
-        {
-            NSString * location = [torrent dataLocation];
-            if (location)
-                [paths addObject: [NSURL fileURLWithPath: location]];
-        }
-        
-        if ([paths count] > 0)
-            [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs: paths];
-    }
-    else
-    {
-        for (Torrent * torrent in selected)
-        {
-            NSString * location = [torrent dataLocation];
-            if (location)
-                [[NSWorkspace sharedWorkspace] selectFile: location inFileViewerRootedAtPath: nil];
-        }
-    }
+    for (Torrent * torrent in [fTableView selectedTorrents])
+        [torrent revealData];
 }
 
 - (void) announceSelectedTorrents: (id) sender
@@ -1531,21 +1457,13 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     {
         [fInfoController updateInfoStats];
         [[fInfoController window] orderFront: nil];
-        
-        if ([fInfoController canQuickLook]
-            && [QLPreviewPanelSL sharedPreviewPanelExists] && [[QLPreviewPanelSL sharedPreviewPanel] isVisible])
-            [[QLPreviewPanelSL sharedPreviewPanel] reloadData];
-        
     }
 }
 
 - (void) resetInfo
 {
     [fInfoController setInfoForTorrents: [fTableView selectedTorrents]];
-    
-    if ([NSApp isOnSnowLeopardOrBetter] && [QLPreviewPanelSL sharedPreviewPanelExists]
-        && [[QLPreviewPanelSL sharedPreviewPanel] isVisible])
-        [[QLPreviewPanelSL sharedPreviewPanel] reloadData];
+    [[QuickLookController quickLook] updateQuickLook];
 }
 
 - (void) setInfoTab: (id) sender
@@ -1701,33 +1619,33 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
 
 - (void) updateTorrentsInQueue
 {
-    NSUInteger desiredDownloadActive = [fDefaults boolForKey: @"Queue"] ? [self numToStartFromQueue: YES] : NSUIntegerMax,
-                desiredSeedActive = [fDefaults boolForKey: @"QueueSeed"] ? [self numToStartFromQueue: NO] : NSUIntegerMax;
+    BOOL download = [fDefaults boolForKey: @"Queue"],
+        seed = [fDefaults boolForKey: @"QueueSeed"];
+    
+    NSInteger desiredDownloadActive = [self numToStartFromQueue: YES],
+        desiredSeedActive = [self numToStartFromQueue: NO];
     
     for (Torrent * torrent in fTorrents)
     {
-        if (desiredDownloadActive == 0 && desiredSeedActive == 0)
-            break;
-        
         if (![torrent isActive] && ![torrent isChecking] && [torrent waitingToStart])
         {
             if (![torrent allDownloaded])
             {
-                if (desiredDownloadActive > 0)
+                if (!download || desiredDownloadActive > 0)
                 {
                     [torrent startTransfer];
                     if ([torrent isActive])
-                        --desiredDownloadActive;
+                        desiredDownloadActive--;
                     [torrent update];
                 }
             }
             else
             {
-                if (desiredSeedActive > 0)
+                if (!seed || desiredSeedActive > 0)
                 {
                     [torrent startTransfer];
                     if ([torrent isActive])
-                        --desiredSeedActive;
+                        desiredSeedActive--;
                     [torrent update];
                 }
             }
@@ -1739,24 +1657,29 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [self updateTorrentHistory];
 }
 
-- (NSUInteger) numToStartFromQueue: (BOOL) downloadQueue
+- (NSInteger) numToStartFromQueue: (BOOL) downloadQueue
 {
     if (![fDefaults boolForKey: downloadQueue ? @"Queue" : @"QueueSeed"])
         return 0;
     
-    NSUInteger desired = [fDefaults integerForKey: downloadQueue ? @"QueueDownloadNumber" : @"QueueSeedNumber"];
+    NSInteger desired = [fDefaults integerForKey: downloadQueue ? @"QueueDownloadNumber" : @"QueueSeedNumber"];
         
     for (Torrent * torrent in fTorrents)
     {
-        if (desired == 0)
-            break;
-        
         if ([torrent isChecking])
-            --desired;
+        {
+            desired--;
+            if (desired <= 0)
+                return 0;
+        }
         else if ([torrent isActive] && ![torrent isStalled] && ![torrent isError])
         {
             if ([torrent allDownloaded] != downloadQueue)
-                --desired;
+            {
+                desired--;
+                if (desired <= 0)
+                    return 0;
+            }
         }
         else;
     }
@@ -1781,7 +1704,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             }
         }
         
-        #warning dataLocation could return nil
         NSDictionary * clickContext = [NSDictionary dictionaryWithObjectsAndKeys: GROWL_DOWNLOAD_COMPLETE, @"Type",
                                         [torrent dataLocation] , @"Location", nil];
         [GrowlApplicationBridge notifyWithTitle: NSLocalizedString(@"Download Complete", "Growl notification title")
@@ -1793,9 +1715,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         
         //bounce download stack
         [[NSDistributedNotificationCenter defaultCenter] postNotificationName: @"com.apple.DownloadFileFinished"
-            object: [torrent dataLocation]];
+            object: [[torrent downloadFolder] stringByAppendingPathComponent: [torrent name]]];
         
-        if ([fDefaults boolForKey: @"QueueSeed"] && [self numToStartFromQueue: NO] == 0)
+        if ([fDefaults boolForKey: @"QueueSeed"] && [self numToStartFromQueue: NO] <= 0)
         {
             [torrent stopTransfer];
             [torrent setWaitToStart: YES];
@@ -1810,7 +1732,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     Torrent * torrent = [notification object];
     if ([torrent isActive])
     {
-        if ([fDefaults boolForKey: @"Queue"] && [self numToStartFromQueue: YES] == 0)
+        if ([fDefaults boolForKey: @"Queue"] && [self numToStartFromQueue: YES] <= 0)
         {
             [torrent stopTransfer];
             [torrent setWaitToStart: YES];
@@ -1843,7 +1765,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         }
     }
     
-    #warning dataLocation could return nil
     NSDictionary * clickContext = [NSDictionary dictionaryWithObjectsAndKeys: GROWL_SEEDING_COMPLETE, @"Type",
                                     [torrent dataLocation], @"Location", nil];
     [GrowlApplicationBridge notifyWithTitle: NSLocalizedString(@"Seeding Complete", "Growl notification title")
@@ -1858,7 +1779,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     for (Torrent * torrent in fTorrents)
         [history addObject: [torrent history]];
     
-    [history writeToFile: [NSHomeDirectory() stringByAppendingPathComponent: TRANSFER_PLIST] atomically: YES];
+    [history writeToFile: [NSHomeDirectory() stringByAppendingPathComponent: SUPPORT_FOLDER] atomically: YES];
 }
 
 - (void) setSort: (id) sender
@@ -1889,7 +1810,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             sortType = SORT_ACTIVITY;
             break;
         default:
-            NSAssert1(NO, @"Unknown sort tag received: %d", [sender tag]);
             return;
     }
     
@@ -1957,7 +1877,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         }
         else if ([sortType isEqualToString: SORT_TRACKER])
         {
-            NSSortDescriptor * trackerDescriptor = [[[NSSortDescriptor alloc] initWithKey: @"trackerSortKey" ascending: asc
+            NSSortDescriptor * trackerDescriptor = [[[NSSortDescriptor alloc] initWithKey: @"trackerAddressAnnounce" ascending: asc
                                                     selector: @selector(localizedCaseInsensitiveCompare:)] autorelease];
             
             descriptors = [[NSArray alloc] initWithObjects: trackerDescriptor, nameDescriptor, nil];
@@ -2078,10 +1998,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             if (filterTracker)
             {
                 BOOL removeTextField = YES;
-                for (NSString * tracker in [torrent allTrackersFlat])
+                for (NSString * tracker in [torrent allTrackers: NO])
                 {
-                    if ([tracker rangeOfString: searchString options:
-                            (NSCaseInsensitiveSearch | NSDiacriticInsensitiveSearch)].location != NSNotFound)
+                    if ([tracker rangeOfString: searchString options: NSCaseInsensitiveSearch].location != NSNotFound)
                     {
                         removeTextField = NO;
                         break;
@@ -2093,8 +2012,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             }
             else
             {
-                if ([[torrent name] rangeOfString: searchString options:
-                        (NSCaseInsensitiveSearch | NSDiacriticInsensitiveSearch)].location == NSNotFound)
+                if ([[torrent name] rangeOfString: searchString options: NSCaseInsensitiveSearch].location == NSNotFound)
                     continue;
             }
         }
@@ -2298,7 +2216,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             statusLabel = STATUS_TRANSFER_SESSION;
             break;
         default:
-            NSAssert1(NO, @"Unknown status label tag received: %d", [sender tag]);
             return;
     }
     
@@ -3131,89 +3048,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [self toggleFilterBar: self];
 }
 
-#warning change from id to QLPreviewPanel
-- (BOOL) acceptsPreviewPanelControl: (id) panel
-{
-    return !fQuitting;
-}
-
-- (void) beginPreviewPanelControl: (id) panel
-{
-    fPreviewPanel = [panel retain];
-    [fPreviewPanel setDelegate: self];
-    [fPreviewPanel setDataSource: self];
-}
-
-- (void) endPreviewPanelControl: (id) panel
-{
-    [fPreviewPanel release];
-    fPreviewPanel = nil;
-}
-
-- (NSArray *) quickLookableTorrents
-{
-    NSArray * selectedTorrents = [fTableView selectedTorrents];
-    NSMutableArray * qlArray = [NSMutableArray arrayWithCapacity: [selectedTorrents count]];
-    
-    for (Torrent * torrent in selectedTorrents)
-        if (([torrent isFolder] || [torrent isComplete]) && [torrent dataLocation])
-            [qlArray addObject: torrent];
-    
-    return qlArray;
-}
-
-- (NSInteger) numberOfPreviewItemsInPreviewPanel: (id) panel
-{
-    if ([fInfoController canQuickLook])
-        return [[fInfoController quickLookURLs] count];
-    else
-        return [[self quickLookableTorrents] count];
-}
-
-- (id /*<QLPreviewItem>*/) previewPanel: (id) panel previewItemAtIndex: (NSInteger) index
-{
-    if ([fInfoController canQuickLook])
-        return [[fInfoController quickLookURLs] objectAtIndex: index];
-    else
-        return [[self quickLookableTorrents] objectAtIndex: index];
-}
-
-- (BOOL) previewPanel: (id) panel handleEvent: (NSEvent *) event
-{
-    /*if ([event type] == NSKeyDown)
-    {
-        [super keyDown: event];
-        return YES;
-    }*/
-    
-    return NO;
-}
-
-- (NSRect) previewPanel: (id) panel sourceFrameOnScreenForPreviewItem: (id /*<QLPreviewItem>*/) item
-{
-    if ([fInfoController canQuickLook])
-        return [fInfoController quickLookSourceFrameForPreviewItem: item];
-    else
-    {
-        if (![fWindow isVisible])
-            return NSZeroRect;
-        
-        const NSInteger row = [fTableView rowForItem: item];
-        if (row == -1)
-            return NSZeroRect;
-        
-        NSRect frame = [fTableView iconRectForRow: row];
-        
-        if (!NSIntersectsRect([fTableView visibleRect], frame))
-            return NSZeroRect;
-        
-        frame.origin = [fTableView convertPoint: frame.origin toView: nil];
-        frame.origin = [fWindow convertBaseToScreen: frame.origin];
-        frame.origin.y -= frame.size.height;
-        return frame;
-    }
-}
-
 - (ButtonToolbarItem *) standardToolbarButtonWithIdentifier: (NSString *) ident
 {
     ButtonToolbarItem * item = [[ButtonToolbarItem alloc] initWithItemIdentifier: ident];
@@ -3398,7 +3232,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     else if ([ident isEqualToString: TOOLBAR_QUICKLOOK])
     {
         ButtonToolbarItem * item = [self standardToolbarButtonWithIdentifier: ident];
-        [[(NSButton *)[item view] cell] setShowsStateBy: NSContentsCellMask]; //blue when enabled
         
         [item setLabel: NSLocalizedString(@"Quick Look", "QuickLook toolbar item -> label")];
         [item setPaletteLabel: NSLocalizedString(@"Quick Look", "QuickLook toolbar item -> palette label")];
@@ -3521,13 +3354,9 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         return YES;
     }
     
-    //set quick look image
+    //enable quicklook item
     if ([ident isEqualToString: TOOLBAR_QUICKLOOK])
-    {
-        [(NSButton *)[toolbarItem view] setState: [NSApp isOnSnowLeopardOrBetter] && [QLPreviewPanelSL sharedPreviewPanelExists]
-                                                    && [[QLPreviewPanelSL sharedPreviewPanel] isVisible]];
-        return [NSApp isOnSnowLeopardOrBetter];
-    }
+        return [[QuickLookController quickLook] canQuickLook];
 
     return YES;
 }
@@ -3575,9 +3404,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                 break;
             case SORT_ACTIVITY_TAG:
                 sortType = SORT_ACTIVITY;
-                break;
-            default:
-                NSAssert1(NO, @"Unknown sort tag received: %d", [menuItem tag]);
         }
         
         [menuItem setState: [sortType isEqualToString: [fDefaults stringForKey: @"Sort"]] ? NSOnState : NSOffState];
@@ -3601,8 +3427,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
                 break;
             case STATUS_TRANSFER_SESSION_TAG:
                 statusLabel = STATUS_TRANSFER_SESSION;
-            default:
-                NSAssert1(NO, @"Unknown status label tag received: %d", [menuItem tag]);
         }
         
         [menuItem setState: [statusLabel isEqualToString: [fDefaults stringForKey: @"StatusLabel"]] ? NSOnState : NSOffState];
@@ -3726,6 +3550,10 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     //enable prev/next filter button
     if (action == @selector(switchFilter:))
         return [fWindow isVisible] && ![fFilterBar isHidden];
+    
+    //enable quicklook item
+    if (action == @selector(toggleQuickLook:))
+        return [[QuickLookController quickLook] canQuickLook];
     
     //enable reveal in finder
     if (action == @selector(revealFile:))
@@ -3883,18 +3711,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         return YES;
     }
     
-    if (action == @selector(toggleQuickLook:))
-    {
-        const BOOL visible = [NSApp isOnSnowLeopardOrBetter] && [QLPreviewPanelSL sharedPreviewPanelExists]
-                                && [[QLPreviewPanelSL sharedPreviewPanel] isVisible];
-        //text consistent with Finder
-        NSString * title = !visible ? NSLocalizedString(@"Quick Look", "View menu -> Quick Look")
-                                    : NSLocalizedString(@"Close Quick Look", "View menu -> Quick Look");
-        [menuItem setTitle: title];
-        
-        return [NSApp isOnSnowLeopardOrBetter];
-    }
-    
     return YES;
 }
 
@@ -3998,7 +3814,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     if (seeding > 0 || downloading > 0)
     {
         if (!hasSeparator)
-            [fDockMenu insertItem: [NSMenuItem separatorItem] atIndex: (seeding > 0 && downloading > 0) ? 2 : 1];
+            [fDockMenu insertItem: [NSMenuItem separatorItem] atIndex: seeding > 0 && downloading > 0 ? 2 : 1];
     }
     else
     {
@@ -4142,15 +3958,62 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     [self updateUI];
 }
 
+- (NSArray *) quickLookURLs
+{
+    NSArray * selectedTorrents = [fTableView selectedTorrents];
+    NSMutableArray * urlArray = [NSMutableArray arrayWithCapacity: [selectedTorrents count]];
+    
+    for (Torrent * torrent in selectedTorrents)
+        if ([self canQuickLookTorrent: torrent])
+            [urlArray addObject: [NSURL fileURLWithPath: [torrent dataLocation]]];
+    
+    return urlArray;
+}
+
+- (BOOL) canQuickLook
+{
+    for (Torrent * torrent in [fTableView selectedTorrents])
+        if ([self canQuickLookTorrent: torrent])
+            return YES;
+    
+    return NO;
+}
+
+- (BOOL) canQuickLookTorrent: (Torrent *) torrent
+{
+    if (![[NSFileManager defaultManager] fileExistsAtPath: [torrent dataLocation]])
+        return NO;
+    
+    return [torrent isFolder] || [torrent isComplete];
+}
+
+- (NSRect) quickLookFrameWithURL: (NSURL *) url
+{
+    if ([fWindow isVisible])
+    {
+        NSString * fullPath = [url path];
+        NSRange visibleRows = [fTableView rowsInRect: [fTableView bounds]];
+        
+        for (NSInteger row = 0; row < NSMaxRange(visibleRows); row++)
+        {
+            id item = [fTableView itemAtRow: row];
+            if ([item isKindOfClass: [Torrent class]] && [[(Torrent *)item dataLocation] isEqualToString: fullPath])
+            {
+                NSRect frame = [fTableView iconRectForRow: row];
+                frame.origin = [fTableView convertPoint: frame.origin toView: nil];
+                frame.origin = [fWindow convertBaseToScreen: frame.origin];
+                frame.origin.y -= frame.size.height;
+                return frame;
+            }
+        }
+    }
+    
+    return NSZeroRect;
+}
+
 - (void) toggleQuickLook: (id) sender
 {
-    if (![NSApp isOnSnowLeopardOrBetter])
-        return;
-    
-    if ([[QLPreviewPanelSL sharedPreviewPanel] isVisible])
-        [[QLPreviewPanelSL sharedPreviewPanel] orderOut: nil];
-    else
-        [[QLPreviewPanelSL sharedPreviewPanel] makeKeyAndOrderFront: nil];
+    [[QuickLookController quickLook] toggleQuickLook];
 }
 
 - (void) linkHomepage: (id) sender
@@ -4194,15 +4057,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
     NSString * type = [clickContext objectForKey: @"Type"], * location;
     if (([type isEqualToString: GROWL_DOWNLOAD_COMPLETE] || [type isEqualToString: GROWL_SEEDING_COMPLETE])
             && (location = [clickContext objectForKey: @"Location"]))
-    {
-        if ([NSApp isOnSnowLeopardOrBetter])
-        {
-            NSURL * file = [NSURL fileURLWithPath: location];
-            [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs: [NSArray arrayWithObject: file]];
-        }
-        else
-            [[NSWorkspace sharedWorkspace] selectFile: location inFileViewerRootedAtPath: nil];
-    }
+        [[NSWorkspace sharedWorkspace] selectFile: location inFileViewerRootedAtPath: nil];
 }
 
 - (void) rpcCallback: (tr_rpc_callback_type) type forTorrentStruct: (struct tr_torrent *) torrentStruct
@@ -4222,7 +4077,7 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         
         if (!torrent)
         {
-            [pool drain];
+            [pool release];
             
             NSLog(@"No torrent found matching the given torrent struct from the RPC callback!");
             return;
@@ -4249,16 +4104,12 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
             [self performSelectorOnMainThread: @selector(rpcChangedTorrent:) withObject: torrent waitUntilDone: NO];
             break;
         
-        case TR_RPC_TORRENT_MOVED:
-            [self performSelectorOnMainThread: @selector(rpcMovedTorrent:) withObject: torrent waitUntilDone: NO];
-            break;
-        
         case TR_RPC_SESSION_CHANGED:
             [fPrefsController performSelectorOnMainThread: @selector(rpcUpdatePrefs) withObject: nil waitUntilDone: NO];
             break;
         
         default:
-            NSAssert1(NO, @"Unknown RPC command received: %d", type);
+            NSLog(@"Unknown RPC command received (%d)", type);
             [torrent release];
     }
     
@@ -4308,17 +4159,6 @@ static void sleepCallback(void * controller, io_service_t y, natural_t messageTy
         [fInfoController updateInfoStats]; //this will reload the file table
         [fInfoController updateOptions];
     }
-    
-    [torrent release];
-}
-
-- (void) rpcMovedTorrent: (Torrent *) torrent
-{
-    [torrent update];
-    [torrent updateTimeMachineExclude];
-    
-    if ([[fTableView selectedTorrents] containsObject: torrent])
-        [fInfoController updateInfoStats];
     
     [torrent release];
 }

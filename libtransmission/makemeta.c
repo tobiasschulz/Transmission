@@ -379,13 +379,9 @@ tr_realMakeMetaInfo( tr_metainfo_builder * builder )
     tr_benc top;
 
     /* allow an empty set, but if URLs *are* listed, verify them. #814, #971 */
-    for( i = 0; i < builder->trackerCount && !builder->result; ++i ) {
-        if( !tr_httpIsValidURL( builder->trackers[i].announce ) ) {
-            tr_strlcpy( builder->errfile, builder->trackers[i].announce,
-                       sizeof( builder->errfile ) );
+    for( i = 0; i < builder->trackerCount && !builder->result; ++i )
+        if( !tr_httpIsValidURL( builder->trackers[i].announce ) )
             builder->result = TR_MAKEMETA_URL;
-        }
-    }
 
     tr_bencInitDict( &top, 6 );
 
@@ -510,9 +506,7 @@ tr_makeMetaInfo( tr_metainfo_builder *   builder,
 
     /* initialize the builder variables */
     builder->abortFlag = 0;
-    builder->result = 0;
     builder->isDone = 0;
-    builder->pieceIndex = 0;
     builder->trackerCount = trackerCount;
     builder->trackers = tr_new0( tr_tracker_info, builder->trackerCount );
     for( i = 0; i < builder->trackerCount; ++i )

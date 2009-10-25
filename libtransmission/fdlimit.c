@@ -63,8 +63,6 @@
 #include "list.h"
 #include "net.h"
 #include "platform.h" /* MAX_PATH_LENGTH, TR_PATH_DELIMITER */
-#include "session.h"
-#include "torrent.h" /* tr_isTorrent() */
 #include "utils.h"
 
 #define dbgmsg( ... ) \
@@ -85,22 +83,22 @@ enum
 
 struct tr_openfile
 {
-    tr_bool          isWritable;
-    int              torrentId;
-    tr_file_index_t  fileNum;
-    char             filename[MAX_PATH_LENGTH];
-    int              fd;
-    uint64_t         date;
+    tr_bool    isWritable;
+    int        torrentId;
+    char       filename[MAX_PATH_LENGTH];
+    int        fd;
+    uint64_t   date;
 };
 
-struct tr_fdInfo
+struct tr_fd_s
 {
     int                   socketCount;
     int                   socketLimit;
-    int                   publicSocketLimit;
     int                   openFileLimit;
     struct tr_openfile  * openFiles;
 };
+
+static struct tr_fd_s * gFd = NULL;
 
 /***
 ****
@@ -278,34 +276,39 @@ tr_close_file( int fd )
  * plus the errno values set by tr_mkdirp() and open().
  */
 static int
-TrOpenFile( tr_session             * session,
-            int                      i,
-            const char             * filename,
+TrOpenFile( int                      i,
+            const char             * folder,
+            const char             * torrentFile,
             tr_bool                  doWrite,
             tr_preallocation_mode    preallocationMode,
             uint64_t                 desiredFileSize )
 {
-    int flags;
-    struct stat sb;
-    tr_bool alreadyExisted;
-    struct tr_openfile * file;
+    struct tr_openfile * file = &gFd->openFiles[i];
+    int                  flags;
+    char               * filename;
+    struct stat          sb;
+    tr_bool              alreadyExisted;
 
-    assert( tr_isSession( session ) );
-    assert( session->fdInfo != NULL );
-
-    file = &session->fdInfo->openFiles[i];
+    /* confirm the parent folder exists */
+    if( stat( folder, &sb ) || !S_ISDIR( sb.st_mode ) )
+    {
+        tr_err( _( "Couldn't create \"%1$s\": \"%2$s\" is not a folder" ), torrentFile, folder );
+        return ENOENT;
+    }
 
     /* create subfolders, if any */
+    filename = tr_buildPath( folder, torrentFile, NULL );
     if( doWrite )
     {
-        char * dir = tr_dirname( filename );
-        const int err = tr_mkdirp( dir, 0777 ) ? errno : 0;
+        char * tmp = tr_dirname( filename );
+        const int err = tr_mkdirp( tmp, 0777 ) ? errno : 0;
         if( err ) {
-            tr_err( _( "Couldn't create \"%1$s\": %2$s" ), dir, tr_strerror( err ) );
-            tr_free( dir );
+            tr_err( _( "Couldn't create \"%1$s\": %2$s" ), tmp, tr_strerror( err ) );
+            tr_free( tmp );
+            tr_free( filename );
             return err;
         }
-        tr_free( dir );
+        tr_free( tmp );
     }
 
     alreadyExisted = !stat( filename, &sb ) && S_ISREG( sb.st_mode );
@@ -330,6 +333,7 @@ TrOpenFile( tr_session             * session,
     {
         const int err = errno;
         tr_err( _( "Couldn't open \"%1$s\": %2$s" ), filename, tr_strerror( err ) );
+        tr_free( filename );
         return err;
     }
 
@@ -348,15 +352,11 @@ TrOpenFile( tr_session             * session,
 #ifdef HAVE_POSIX_FADVISE
     /* this doubles the OS level readahead buffer, which in practice
      * turns out to be a good thing, because many (most?) clients request
-     * chunks of blocks in order.
-     * It's okay for this to fail silently, so don't let it affect errno */
-    {
-        const int err = errno;
-        posix_fadvise( file->fd, 0, 0, POSIX_FADV_SEQUENTIAL );
-        errno = err;
-    }
+     * chunks of blocks in order */
+    posix_fadvise( file->fd, 0, 0, POSIX_FADV_SEQUENTIAL );
 #endif
 
+    tr_free( filename );
     return 0;
 }
 
@@ -376,73 +376,25 @@ TrCloseFile( struct tr_openfile * o )
     o->fd = -1;
 }
 
-int
-tr_fdFileGetCached( tr_session       * session,
-                    int                torrentId,
-                    tr_file_index_t    fileNum,
-                    tr_bool            doWrite )
-{
-    struct tr_openfile * match = NULL;
-    struct tr_fdInfo * gFd;
-
-    assert( tr_isSession( session ) );
-    assert( session->fdInfo != NULL );
-    assert( torrentId > 0 );
-    assert( tr_isBool( doWrite ) );
-
-    gFd = session->fdInfo;
-
-    /* is it already open? */
-    {
-        int i;
-        struct tr_openfile * o;
-        for( i=0; i<gFd->openFileLimit; ++i )
-        {
-            o = &gFd->openFiles[i];
-
-            if( torrentId != o->torrentId )
-                continue;
-            if( fileNum != o->fileNum )
-                continue;
-            if( !fileIsOpen( o ) )
-                continue;
-
-            match = o;
-            break;
-        }
-    }
-
-    if( ( match != NULL ) && ( !doWrite || match->isWritable ) )
-    {
-        match->date = tr_date( );
-        return match->fd;
-    }
-
-    return -1;
-}
-
 /* returns an fd on success, or a -1 on failure and sets errno */
 int
-tr_fdFileCheckout( tr_session             * session,
-                   int                      torrentId,
-                   tr_file_index_t          fileNum,
-                   const char             * filename,
+tr_fdFileCheckout( int                      torrentId,
+                   const char             * folder,
+                   const char             * torrentFile,
                    tr_bool                  doWrite,
                    tr_preallocation_mode    preallocationMode,
                    uint64_t                 desiredFileSize )
 {
     int i, winner = -1;
-    struct tr_fdInfo * gFd;
     struct tr_openfile * o;
+    char filename[MAX_PATH_LENGTH];
 
-    assert( tr_isSession( session ) );
-    assert( session->fdInfo != NULL );
     assert( torrentId > 0 );
-    assert( filename && *filename );
+    assert( folder && *folder );
+    assert( torrentFile && *torrentFile );
     assert( tr_isBool( doWrite ) );
 
-    gFd = session->fdInfo;
-
+    tr_snprintf( filename, sizeof( filename ), "%s%c%s", folder, TR_PATH_DELIMITER, torrentFile );
     dbgmsg( "looking for file '%s', writable %c", filename, doWrite ? 'y' : 'n' );
 
     /* is it already open? */
@@ -450,11 +402,11 @@ tr_fdFileCheckout( tr_session             * session,
     {
         o = &gFd->openFiles[i];
 
+        if( !fileIsOpen( o ) )
+            continue;
         if( torrentId != o->torrentId )
             continue;
-        if( fileNum != o->fileNum )
-            continue;
-        if( !fileIsOpen( o ) )
+        if( strcmp( filename, o->filename ) )
             continue;
 
         if( doWrite && !o->isWritable )
@@ -506,7 +458,7 @@ tr_fdFileCheckout( tr_session             * session,
     o = &gFd->openFiles[winner];
     if( !fileIsOpen( o ) )
     {
-        const int err = TrOpenFile( session, winner, filename, doWrite,
+        const int err = TrOpenFile( winner, folder, torrentFile, doWrite,
                                     preallocationMode, desiredFileSize );
         if( err ) {
             errno = err;
@@ -521,56 +473,33 @@ tr_fdFileCheckout( tr_session             * session,
 
     dbgmsg( "checking out '%s' in slot %d", filename, winner );
     o->torrentId = torrentId;
-    o->fileNum = fileNum;
     o->date = tr_date( );
     return o->fd;
 }
 
 void
-tr_fdFileClose( tr_session        * session,
-                const tr_torrent  * tor,
-                tr_file_index_t     fileNum )
+tr_fdFileClose( const char * filename )
 {
     struct tr_openfile * o;
-    struct tr_fdInfo * gFd;
     const struct tr_openfile * end;
-    const int torrentId = tr_torrentId( tor );
-
-    assert( tr_isSession( session ) );
-    assert( session->fdInfo != NULL );
-    assert( tr_isTorrent( tor ) );
-    assert( fileNum < tor->info.fileCount );
-
-    gFd = session->fdInfo;
 
     for( o=gFd->openFiles, end=o+gFd->openFileLimit; o!=end; ++o )
     {
-        if( torrentId != o->torrentId )
+        if( !fileIsOpen( o ) || strcmp( filename, o->filename ) )
             continue;
-        if( fileNum != o->fileNum )
-            continue;
-        if( !fileIsOpen( o ) )
-            continue;
-
-        dbgmsg( "tr_fdFileClose closing \"%s\"", o->filename );
+        dbgmsg( "tr_fdFileClose closing \"%s\"", filename );
         TrCloseFile( o );
     }
 }
 
 void
-tr_fdTorrentClose( tr_session * session, int torrentId )
+tr_fdTorrentClose( int torrentId )
 {
     struct tr_openfile * o;
-    struct tr_fdInfo * gFd;
     const struct tr_openfile * end;
 
-    assert( tr_isSession( session ) );
-    assert( session->fdInfo != NULL );
-
-    gFd = session->fdInfo;
-
     for( o=gFd->openFiles, end=o+gFd->openFileLimit; o!=end; ++o )
-        if( fileIsOpen( o ) && ( o->torrentId == torrentId ) )
+        if( fileIsOpen( o ) && o->torrentId == torrentId )
             TrCloseFile( o );
 }
 
@@ -580,18 +509,18 @@ tr_fdTorrentClose( tr_session * session, int torrentId )
 ****
 ***/
 
+static TR_INLINE int
+getSocketMax( struct tr_fd_s * gFd )
+{
+    return gFd->socketLimit;
+}
+
 int
-tr_fdSocketCreate( tr_session * session, int domain, int type )
+tr_fdSocketCreate( int domain, int type )
 {
     int s = -1;
-    struct tr_fdInfo * gFd;
 
-    assert( tr_isSession( session ) );
-    assert( session->fdInfo != NULL );
-
-    gFd = session->fdInfo;
-
-    if( gFd->socketCount < gFd->socketLimit )
+    if( gFd->socketCount < getSocketMax( gFd ) )
         if( ( s = socket( domain, type, 0 ) ) < 0 )
         {
             if( sockerrno != EAFNOSUPPORT )
@@ -603,31 +532,26 @@ tr_fdSocketCreate( tr_session * session, int domain, int type )
         ++gFd->socketCount;
 
     assert( gFd->socketCount >= 0 );
+
     return s;
 }
 
 int
-tr_fdSocketAccept( tr_session  * session,
-                   int           b,
+tr_fdSocketAccept( int           b,
                    tr_address  * addr,
                    tr_port     * port )
 {
     int s;
     unsigned int len;
-    struct tr_fdInfo * gFd;
     struct sockaddr_storage sock;
 
-    assert( tr_isSession( session ) );
-    assert( session->fdInfo != NULL );
     assert( addr );
     assert( port );
-
-    gFd = session->fdInfo;
 
     len = sizeof( struct sockaddr_storage );
     s = accept( b, (struct sockaddr *) &sock, &len );
 
-    if( ( s >= 0 ) && gFd->socketCount > gFd->socketLimit )
+    if( ( s >= 0 ) && gFd->socketCount > getSocketMax( gFd ) )
     {
         EVUTIL_CLOSESOCKET( s );
         s = -1;
@@ -664,15 +588,8 @@ tr_fdSocketAccept( tr_session  * session,
 }
 
 void
-tr_fdSocketClose( tr_session * session, int fd )
+tr_fdSocketClose( int fd )
 {
-    struct tr_fdInfo * gFd;
-
-    assert( tr_isSession( session ) );
-    assert( session->fdInfo != NULL );
-
-    gFd = session->fdInfo;
-
     if( fd >= 0 )
     {
         EVUTIL_CLOSESOCKET( fd );
@@ -688,26 +605,40 @@ tr_fdSocketClose( tr_session * session, int fd )
 ****
 ***/
 
-static void
-ensureSessionFdInfoExists( tr_session * session )
+void
+tr_fdInit( size_t openFileLimit, size_t socketLimit )
 {
-    assert( tr_isSession( session ) );
+    int i;
 
-    if( session->fdInfo == NULL )
-        session->fdInfo = tr_new0( struct tr_fdInfo, 1 );
+    assert( gFd == NULL );
+    gFd = tr_new0( struct tr_fd_s, 1 );
+    gFd->openFiles = tr_new0( struct tr_openfile, openFileLimit );
+    gFd->openFileLimit = openFileLimit;
+
+#ifdef HAVE_GETRLIMIT
+    {
+        struct rlimit rlim;
+        getrlimit( RLIMIT_NOFILE, &rlim );
+        rlim.rlim_cur = MIN( rlim.rlim_max,
+                            (rlim_t)( socketLimit + NOFILE_BUFFER ) );
+        setrlimit( RLIMIT_NOFILE, &rlim );
+        gFd->socketLimit = rlim.rlim_cur - NOFILE_BUFFER;
+        tr_dbg( "setrlimit( RLIMIT_NOFILE, %d )", (int)rlim.rlim_cur );
+    }
+#else
+    gFd->socketLimit = socketLimit;
+#endif
+    tr_dbg( "%zu usable file descriptors", socketLimit );
+
+    for( i = 0; i < gFd->openFileLimit; ++i )
+        gFd->openFiles[i].fd = -1;
 }
 
 void
-tr_fdClose( tr_session * session )
+tr_fdClose( void )
 {
-    struct tr_fdInfo * gFd;
     struct tr_openfile * o;
     const struct tr_openfile * end;
-
-    assert( tr_isSession( session ) );
-    assert( session->fdInfo != NULL );
-
-    gFd = session->fdInfo;
 
     for( o=gFd->openFiles, end=o+gFd->openFileLimit; o!=end; ++o )
         if( fileIsOpen( o ) )
@@ -715,76 +646,18 @@ tr_fdClose( tr_session * session )
 
     tr_free( gFd->openFiles );
     tr_free( gFd );
-    session->fdInfo = NULL;
-}
-
-/***
-****
-***/
-
-void
-tr_fdSetFileLimit( tr_session * session, int limit )
-{
-    struct tr_fdInfo * gFd;
-
-    ensureSessionFdInfoExists( session );
-
-    gFd = session->fdInfo;
-
-    if( gFd->openFileLimit != limit )
-    {
-        int i;
-        struct tr_openfile * o;
-        const struct tr_openfile * end;
-
-        /* close any files we've got open  */
-        for( o=gFd->openFiles, end=o+gFd->openFileLimit; o!=end; ++o )
-            if( fileIsOpen( o ) )
-                TrCloseFile( o );
-
-        /* rebuild the openFiles array */
-        tr_free( gFd->openFiles );
-        gFd->openFiles = tr_new0( struct tr_openfile, limit );
-        gFd->openFileLimit = limit;
-        for( i=0; i<gFd->openFileLimit; ++i )
-            gFd->openFiles[i].fd = -1;
-    }
-}
-
-int
-tr_fdGetFileLimit( const tr_session * session )
-{
-    return session && session->fdInfo ? session->fdInfo->openFileLimit : -1;
+    gFd = NULL;
 }
 
 void
-tr_fdSetPeerLimit( tr_session * session, int limit )
+tr_fdSetPeerLimit( uint16_t n )
 {
-    struct tr_fdInfo * gFd;
-
-    ensureSessionFdInfoExists( session );
-
-    gFd = session->fdInfo;
-
-#ifdef HAVE_GETRLIMIT
-    {
-        struct rlimit rlim;
-        getrlimit( RLIMIT_NOFILE, &rlim );
-        rlim.rlim_cur = MIN( rlim.rlim_max, (rlim_t)( limit + NOFILE_BUFFER ) );
-        setrlimit( RLIMIT_NOFILE, &rlim );
-        gFd->socketLimit = rlim.rlim_cur - NOFILE_BUFFER;
-        tr_dbg( "setrlimit( RLIMIT_NOFILE, %d )", (int)rlim.rlim_cur );
-    }
-#else
-    gFd->socketLimit = limit;
-#endif
-    gFd->publicSocketLimit = limit;
-
-    tr_dbg( "%d usable file descriptors", limit );
+    assert( gFd != NULL && "tr_fdInit() must be called first!" );
+    gFd->socketLimit = n;
 }
 
-int
-tr_fdGetPeerLimit( const tr_session * session )
+uint16_t
+tr_fdGetPeerLimit( void )
 {
-    return session && session->fdInfo ? session->fdInfo->publicSocketLimit : -1;
+    return gFd ? gFd->socketLimit : -1;
 }

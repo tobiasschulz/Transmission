@@ -1,11 +1,11 @@
-/* $Id: miniupnpc.c,v 1.66 2009/10/10 19:15:34 nanard Exp $ */
+/* $Id: miniupnpc.c,v 1.63 2009/08/07 14:44:50 nanard Exp $ */
 /* Project : miniupnp
  * Author : Thomas BERNARD
  * copyright (c) 2005-2009 Thomas Bernard
  * This software is subjet to the conditions detailed in the
  * provided LICENCE file. */
 #define __EXTENSIONS__ 1
-#if !defined(MACOSX) && !defined(__sun)
+#ifndef MACOSX
 #if !defined(_XOPEN_SOURCE) && !defined(__OpenBSD__) && !defined(__NetBSD__)
 #ifndef __cplusplus
 #define _XOPEN_SOURCE 600
@@ -34,7 +34,6 @@
 #else
 /* Standard POSIX includes */
 #include <unistd.h>
-#include <sys/select.h>
 #include <sys/socket.h>
 #include <sys/types.h>
 #include <sys/param.h>
@@ -264,32 +263,12 @@ int simpleUPnPcommand(int s, const char * url, const char * service,
 		dest.sin_family = AF_INET;
 		dest.sin_port = htons(port);
 		dest.sin_addr.s_addr = inet_addr(hostname);
-        n = connect(s, (struct sockaddr *)&dest, sizeof(struct sockaddr));
 #ifdef MINIUPNPC_IGNORE_EINTR
-        while(n < 0 && errno == EINTR)
-		{
-			socklen_t len;
-			fd_set wset;
-			int err;
-			FD_ZERO(&wset);
-			FD_SET(s, &wset);
-			if((n = select(s + 1, NULL, &wset, NULL, NULL)) == -1 && errno == EINTR)
-				continue;
-			/*len = 0;*/
-			/*n = getpeername(s, NULL, &len);*/
-			len = sizeof(err);
-			if(getsockopt(s, SOL_SOCKET, SO_ERROR, &err, &len) < 0) {
-				PRINT_SOCKET_ERROR("getsockopt");
-				closesocket(s);
-				return -1;
-			}
-			if(err != 0) {
-				errno = err;
-				n = -1;
-			} else {
-				n = 0;
-			}
-		}
+        do {
+#endif
+            n = connect(s, (struct sockaddr *)&dest, sizeof(struct sockaddr));
+#ifdef MINIUPNPC_IGNORE_EINTR
+        } while(n < 0 && errno == EINTR);
 #endif
 		if(n < 0)
         {
@@ -698,7 +677,7 @@ int ReceiveData(int socket, char * data, int length, int timeout)
 	return n;
 }
 
-int
+static int
 UPNPIGD_IsConnected(struct UPNPUrls * urls, struct IGDdatas * data)
 {
 	char status[64];

@@ -44,8 +44,6 @@ struct tr_ctor
 
     struct optional_args    optionalArgs[2];
 
-    char                  * incompleteDir;
-
     tr_file_index_t       * want;
     tr_file_index_t         wantSize;
     tr_file_index_t       * notWant;
@@ -302,19 +300,12 @@ tr_ctorSetDownloadDir( tr_ctor *    ctor,
     }
 }
 
-void
-tr_ctorSetIncompleteDir( tr_ctor * ctor, const char * directory )
-{
-    tr_free( ctor->incompleteDir );
-    ctor->incompleteDir = tr_strdup( directory );
-}
-
 int
 tr_ctorGetPeerLimit( const tr_ctor * ctor,
                      tr_ctorMode     mode,
                      uint16_t *      setmeCount )
 {
-    int err = 0;
+    int                          err = 0;
     const struct optional_args * args = &ctor->optionalArgs[mode];
 
     if( !args->isSet_connected )
@@ -353,20 +344,6 @@ tr_ctorGetDownloadDir( const tr_ctor * ctor,
         err = 1;
     else if( setmeDownloadDir )
         *setmeDownloadDir = args->downloadDir;
-
-    return err;
-}
-
-int
-tr_ctorGetIncompleteDir( const tr_ctor  * ctor,
-                         const char    ** setmeIncompleteDir )
-{
-    int err = 0;
-
-    if( ctor->incompleteDir == NULL )
-        err = 1;
-    else
-        *setmeIncompleteDir = ctor->incompleteDir;
 
     return err;
 }
@@ -416,7 +393,6 @@ tr_ctorFree( tr_ctor * ctor )
     clearMetainfo( ctor );
     tr_free( ctor->optionalArgs[1].downloadDir );
     tr_free( ctor->optionalArgs[0].downloadDir );
-    tr_free( ctor->incompleteDir );
     tr_free( ctor->want );
     tr_free( ctor->notWant );
     tr_free( ctor->low );

@@ -13,19 +13,19 @@
 #include <cstdio>
 #include <iostream>
 
-#include <QCheckBox>
-#include <QDialogButtonBox>
 #include <QEvent>
+#include <QResizeEvent>
 #include <QFileDialog>
-#include <QFileIconProvider>
-#include <QFileInfo>
 #include <QGridLayout>
 #include <QLabel>
+#include <QCheckBox>
+#include <QFileInfo>
+#include <QDialogButtonBox>
 #include <QPushButton>
-#include <QResizeEvent>
+#include <QLabel>
 #include <QSet>
-#include <QVBoxLayout>
 #include <QWidget>
+#include <QVBoxLayout>
 
 #include <libtransmission/transmission.h>
 #include <libtransmission/bencode.h>
@@ -35,6 +35,7 @@
 #include "hig.h"
 #include "options.h"
 #include "prefs.h"
+#include "qticonloader.h"
 #include "session.h"
 #include "torrent.h"
 
@@ -78,8 +79,7 @@ Options :: Options( Session& session, const Prefs& prefs, const QString& filenam
   
     if( session.isLocal( ) ) 
     {
-        const QFileIconProvider iconProvider;
-        const QIcon folderIcon = iconProvider.icon( QFileIconProvider::Folder );
+        const QIcon folderIcon = QtIconLoader :: icon( "folder", style()->standardIcon( QStyle::SP_DirIcon ) );
         const QPixmap folderPixmap = folderIcon.pixmap( iconSize );
 
         l = new QLabel( tr( "&Destination folder:" ) );
@@ -110,7 +110,7 @@ Options :: Options( Session& session, const Prefs& prefs, const QString& filenam
     c->setChecked( prefs.getBool( Prefs :: START ) );
     layout->addWidget( c, ++row, 0, 1, 2, Qt::AlignLeft );
 
-    c = myTrashCheck = new QCheckBox( tr( "Mo&ve .torrent file to the trash" ) );
+    c = myTrashCheck = new QCheckBox( tr( "&Delete source file" ) );
     c->setChecked( prefs.getBool( Prefs :: TRASH_ORIGINAL ) );
     layout->addWidget( c, ++row, 0, 1, 2, Qt::AlignLeft );
 

@@ -119,18 +119,11 @@ tr_bandwidthSetParent( tr_bandwidth  * b,
     assert( tr_isBandwidth( b ) );
     assert( b != parent );
 
-//fprintf( stderr, "setting parent for %p: %p\n", b, parent );
     if( b->parent )
     {
-        void * removed;
-
         assert( tr_isBandwidth( b->parent ) );
 
-        removed = tr_ptrArrayRemoveSorted( &b->parent->children, b, comparePointers );
-        assert( removed == b );
-        assert( tr_ptrArrayFindSorted( &b->parent->children, b, comparePointers ) == NULL );
-//fprintf( stderr, "removed child bandwidth %p from old parent %p\n", b, b->parent );
-
+        tr_ptrArrayRemoveSorted( &b->parent->children, b, comparePointers );
         b->parent = NULL;
     }
 
@@ -140,8 +133,6 @@ tr_bandwidthSetParent( tr_bandwidth  * b,
         assert( parent->parent != b );
 
         tr_ptrArrayInsertSorted( &parent->children, b, comparePointers );
-        assert( tr_ptrArrayFindSorted( &parent->children, b, comparePointers ) == b );
-//fprintf( stderr, "set new parent for %p: %p\n", b, parent );
         b->parent = parent;
     }
 }

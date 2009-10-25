@@ -17,6 +17,7 @@
 #include "transmission.h"
 #include "bencode.h"
 #include "completion.h"
+#include "fastresume.h"
 #include "peer-mgr.h" /* pex */
 #include "platform.h" /* tr_getResumeDir */
 #include "resume.h"
@@ -31,7 +32,6 @@
 #define KEY_DOWNLOAD_DIR        "destination"
 #define KEY_DND                 "dnd"
 #define KEY_DOWNLOADED          "downloaded"
-#define KEY_INCOMPLETE_DIR      "incomplete-dir"
 #define KEY_MAX_PEERS           "max-peers"
 #define KEY_PAUSED              "paused"
 #define KEY_PEERS               "peers"
@@ -69,7 +69,7 @@ getResumeFilename( const tr_torrent * tor )
     return tr_strdup_printf( "%s%c%s.%16.16s.resume",
                              tr_getResumeDir( tor->session ),
                              TR_PATH_DELIMITER,
-                             tr_torrentName( tor ),
+                             tor->info.name,
                              tor->info.hashString );
 }
 
@@ -501,20 +501,27 @@ tr_torrentSaveResume( const tr_torrent * tor )
     if( !tr_isTorrent( tor ) )
         return;
 
-    tr_tordbg( tor, "Saving .resume file for \"%s\"", tr_torrentName( tor ) );
+    tr_tordbg( tor, "Saving .resume file for \"%s\"", tor->info.name );
 
-    tr_bencInitDict( &top, 33 ); /* arbitrary "big enough" number */
-    tr_bencDictAddInt( &top, KEY_ACTIVITY_DATE, tor->activityDate );
-    tr_bencDictAddInt( &top, KEY_ADDED_DATE, tor->addedDate );
-    tr_bencDictAddInt( &top, KEY_CORRUPT, tor->corruptPrev + tor->corruptCur );
-    tr_bencDictAddInt( &top, KEY_DONE_DATE, tor->doneDate );
-    tr_bencDictAddStr( &top, KEY_DOWNLOAD_DIR, tor->downloadDir );
-    if( tor->incompleteDir != NULL )
-        tr_bencDictAddStr( &top, KEY_INCOMPLETE_DIR, tor->incompleteDir );
-    tr_bencDictAddInt( &top, KEY_DOWNLOADED, tor->downloadedPrev + tor->downloadedCur );
-    tr_bencDictAddInt( &top, KEY_UPLOADED, tor->uploadedPrev + tor->uploadedCur );
-    tr_bencDictAddInt( &top, KEY_MAX_PEERS, tor->maxConnectedPeers );
-    tr_bencDictAddInt( &top, KEY_BANDWIDTH_PRIORITY, tr_torrentGetPriority( tor ) );
+    tr_bencInitDict( &top, 32 ); /* arbitrary "big enough" number */
+    tr_bencDictAddInt( &top, KEY_ACTIVITY_DATE,
+                       tor->activityDate );
+    tr_bencDictAddInt( &top, KEY_ADDED_DATE,
+                       tor->addedDate );
+    tr_bencDictAddInt( &top, KEY_CORRUPT,
+                       tor->corruptPrev + tor->corruptCur );
+    tr_bencDictAddInt( &top, KEY_DONE_DATE,
+                       tor->doneDate );
+    tr_bencDictAddStr( &top, KEY_DOWNLOAD_DIR,
+                       tor->downloadDir );
+    tr_bencDictAddInt( &top, KEY_DOWNLOADED,
+                       tor->downloadedPrev + tor->downloadedCur );
+    tr_bencDictAddInt( &top, KEY_UPLOADED,
+                       tor->uploadedPrev + tor->uploadedCur );
+    tr_bencDictAddInt( &top, KEY_MAX_PEERS,
+                       tor->maxConnectedPeers );
+    tr_bencDictAddInt( &top, KEY_BANDWIDTH_PRIORITY,
+                       tr_torrentGetPriority( tor ) );
     tr_bencDictAddBool( &top, KEY_PAUSED, !tor->isRunning );
     savePeers( &top, tor );
     saveFilePriorities( &top, tor );
@@ -542,13 +549,20 @@ loadFromFile( tr_torrent * tor,
     tr_bool boolVal;
     const tr_bool  wasDirty = tor->isDirty;
 
-    assert( tr_isTorrent( tor ) );
-
     filename = getResumeFilename( tor );
 
     if( tr_bencLoadFile( &top, TR_FMT_BENC, filename ) )
     {
-        tr_tordbg( tor, "Couldn't read \"%s\"", filename );
+        tr_tordbg( tor, "Couldn't read \"%s\"; trying old format.",
+                   filename );
+        fieldsLoaded = tr_fastResumeLoad( tor, fieldsToLoad );
+
+        if( ( fieldsLoaded != 0 ) && ( fieldsToLoad == ~(uint64_t)0 ) )
+        {
+            tr_torrentSaveResume( tor );
+            tr_fastResumeRemove( tor );
+            tr_tordbg( tor, "Migrated resume file to \"%s\"", filename );
+        }
 
         tr_free( filename );
         return fieldsLoaded;
@@ -570,15 +584,6 @@ loadFromFile( tr_torrent * tor,
         tr_free( tor->downloadDir );
         tor->downloadDir = tr_strdup( str );
         fieldsLoaded |= TR_FR_DOWNLOAD_DIR;
-    }
-
-    if( ( fieldsToLoad & ( TR_FR_PROGRESS | TR_FR_INCOMPLETE_DIR ) )
-      && ( tr_bencDictFindStr( &top, KEY_INCOMPLETE_DIR, &str ) )
-      && ( str && *str ) )
-    {
-        tr_free( tor->incompleteDir );
-        tor->incompleteDir = tr_strdup( str );
-        fieldsLoaded |= TR_FR_INCOMPLETE_DIR;
     }
 
     if( ( fieldsToLoad & TR_FR_DOWNLOADED )
@@ -725,8 +730,6 @@ tr_torrentLoadResume( tr_torrent *    tor,
 {
     uint64_t ret = 0;
 
-    assert( tr_isTorrent( tor ) );
-
     ret |= useManditoryFields( tor, fieldsToLoad, ctor );
     fieldsToLoad &= ~ret;
     ret |= loadFromFile( tor, fieldsToLoad );
@@ -740,7 +743,9 @@ void
 tr_torrentRemoveResume( const tr_torrent * tor )
 {
     char * filename = getResumeFilename( tor );
+
     unlink( filename );
+    tr_fastResumeRemove( tor );
     tr_free( filename );
 }
 

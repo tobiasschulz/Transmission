@@ -21,11 +21,9 @@ struct QPlainTextEdit;
 struct QLineEdit;
 struct QCheckBox;
 struct QLabel;
-struct QPushButton;
-struct QRadioButton;
-struct Session;
 struct QProgressBar;
-struct QDialogButtonBox;
+struct QPushButton;
+struct Session;
 
 extern "C"
 {
@@ -37,48 +35,35 @@ class MakeDialog: public QDialog
         Q_OBJECT
 
     private slots:
+        void onFolderButtonPressed( );
+        void onFileButtonPressed( );
+        void onFileSelectedInDialog( const QString& path );
         void onSourceChanged( );
         void onButtonBoxClicked( QAbstractButton* );
-        void onNewButtonBoxClicked( QAbstractButton* );
-        void onNewDialogDestroyed( QObject* );
         void onProgress( );
-
-        void onFolderClicked( );
-        void onFolderSelected( const QStringList& );
-        void onFileClicked( );
-        void onFileSelected( const QStringList& );
-        void onDestinationClicked( );
-        void onDestinationSelected( const QStringList& );
+        void refresh( );
 
     private:
         void makeTorrent( );
-        QString getSource( ) const;
-        void enableBuddyWhenChecked( QCheckBox *, QWidget * );
-        void enableBuddyWhenChecked( QRadioButton *, QWidget * );
+        void refreshButtons( );
+        void setIsBuilding( bool );
+        QString getResult( ) const;
+
 
     private:
-        Session& mySession;
-        QString myDestination;
-        QString myTarget;
-        QString myFile;
-        QString myFolder;
         QTimer myTimer;
-        QRadioButton * myFolderRadio;
-        QRadioButton * myFileRadio;
-        QPushButton * myDestinationButton;
-        QPushButton * myFileButton;
-        QPushButton * myFolderButton;
+        QLineEdit * mySourceEdit;
+        QLabel * mySourceLabel;
         QPlainTextEdit * myTrackerEdit;
-        QCheckBox * myCommentCheck;
         QLineEdit * myCommentEdit;
         QCheckBox * myPrivateCheck;
-        QLabel * mySourceLabel;
-        QDialogButtonBox * myButtonBox;
-        QProgressBar * myNewProgress;
-        QLabel * myNewLabel;
-        QDialogButtonBox * myNewButtonBox;
-        QDialog * myNewDialog;
+        QProgressBar * myProgressBar;
+        QLabel * myProgressLabel;
+        QPushButton * myMakeButton;
+        QPushButton * myCloseButton;
+        QPushButton * myStopButton;
         struct tr_metainfo_builder * myBuilder;
+        bool myIsBuilding;
 
     public:
         MakeDialog( Session&, QWidget * parent = 0 );

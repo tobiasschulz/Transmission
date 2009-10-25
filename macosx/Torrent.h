@@ -24,16 +24,22 @@
 
 #import <Cocoa/Cocoa.h>
 #import <transmission.h>
-#import <Quartz/Quartz.h>
 
 @class FileListNode;
 
-#warning uncomment
-@interface Torrent : NSObject //<QLPreviewItem>
+#define STAT_TIME_NONE -1
+#define STAT_TIME_NOW -2
+
+@interface Torrent : NSObject
 {
     tr_torrent * fHandle;
     const tr_info * fInfo;
     const tr_stat * fStat;
+    
+    BOOL fResumeOnWake;
+    
+    BOOL fUseIncompleteFolder;
+    NSString * fDownloadFolder, * fIncompleteFolder;
 	
     NSUserDefaults * fDefaults;
 
@@ -51,9 +57,9 @@
     
     NSInteger fGroupValue;
     
-    BOOL fResumeOnWake;
+    BOOL fAddedTrackers;
     
-    NSString * fTimeMachineExclude;
+    NSDictionary * fQuickPauseDict;
 }
 
 - (id) initWithPath: (NSString *) path location: (NSString *) location deleteTorrentFile: (BOOL) torrentDelete
@@ -65,9 +71,9 @@
 
 - (void) closeRemoveTorrent;
 
-- (void) changeDownloadFolderBeforeUsing: (NSString *) folder;
-
-- (NSString *) currentDirectory;
+- (void) changeIncompleteDownloadFolder: (NSString *) folder;
+- (void) changeDownloadFolder: (NSString *) folder;
+- (NSString *) downloadFolder;
 
 - (void) getAvailability: (int8_t *) tab size: (NSInteger) size;
 - (void) getAmountFinished: (float *) tab size: (NSInteger) size;
@@ -110,12 +116,15 @@
 - (tr_priority_t) priority;
 - (void) setPriority: (tr_priority_t) priority;
 
+- (void) revealData;
 + (void) trashFile: (NSString *) path;
 - (void) trashData;
 - (void) moveTorrentDataFileTo: (NSString *) folder;
 - (void) copyTorrentFileTo: (NSString *) path;
 
 - (BOOL) alertForRemainingDiskSpace;
+- (BOOL) alertForFolderAvailable;
+- (BOOL) alertForMoveFolderAvailable;
 
 - (NSImage *) icon;
 
@@ -124,10 +133,21 @@
 - (uint64_t) size;
 - (uint64_t) sizeLeft;
 
-- (NSMutableArray *) allTrackerStats;
-- (NSArray *) allTrackersFlat; //used by GroupRules
-- (BOOL) addTrackerToNewTier: (NSString *) tracker;
-- (void) removeTrackersWithAnnounceAddresses: (NSSet *) trackers;
+- (NSString *) trackerAddressAnnounce;
+- (NSDate *) lastAnnounceTime;
+- (NSInteger) nextAnnounceTime;
+- (NSString *) announceResponse;
+
+- (NSString *) trackerAddressScrape;
+- (NSDate *) lastScrapeTime;
+- (NSInteger) nextScrapeTime;
+- (NSString *) scrapeResponse;
+
+- (NSMutableArray *) allTrackers: (BOOL) separators;
+- (NSArray *) allTrackersFlat;
+- (BOOL) updateAllTrackersForAdd: (NSMutableArray *) trackers;
+- (void) updateAllTrackersForRemove: (NSMutableArray *) trackers;
+- (BOOL) hasAddedTrackers;
 
 - (NSString *) comment;
 - (NSString *) creator;
@@ -139,17 +159,16 @@
 - (BOOL) privateTorrent;
 
 - (NSString *) torrentLocation;
-#warning needed?
 - (NSString *) dataLocation;
-- (NSString *) fileLocation: (FileListNode *) node;
 
 - (CGFloat) progress;
 - (CGFloat) progressDone;
+- (CGFloat) progressLeft;
 - (CGFloat) checkingProgress;
 
 - (NSInteger) eta;
 
-- (CGFloat) availableDesired;
+- (CGFloat) notAvailableDesired;
 
 - (BOOL) isActive;
 - (BOOL) isSeeding;
@@ -158,7 +177,7 @@
 - (BOOL) allDownloaded;
 - (BOOL) isComplete;
 - (BOOL) isError;
-- (BOOL) isAnyErrorOrWarning;
+- (BOOL) isErrorOrWarning;
 - (NSString *) errorMessage;
 
 - (NSArray *) peers;
@@ -172,6 +191,11 @@
 - (NSString *) remainingTimeString;
 
 - (NSString *) stateString;
+
+- (NSInteger) seeders;
+- (NSInteger) leechers;
+- (NSInteger) completedFromTracker;
+
 - (NSInteger) totalPeersConnected;
 - (NSInteger) totalPeersTracker;
 - (NSInteger) totalPeersIncoming;
@@ -222,10 +246,7 @@
 - (NSInteger) stalledMinutes;
 - (BOOL) isStalled;
 
-- (void) updateTimeMachineExclude;
-
 - (NSInteger) stateSortKey;
-- (NSString *) trackerSortKey;
 
 - (tr_torrent *) torrentStruct;
 

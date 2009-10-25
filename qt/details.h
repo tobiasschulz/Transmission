@@ -76,7 +76,6 @@ class Details: public QDialog
         QLabel * myRatioLabel;
         QLabel * myErrorLabel;
         QLabel * myRunTimeLabel;
-        QLabel * myETALabel;
         QLabel * myLastActivityLabel;
 
         QCheckBox * mySessionLimitCheck;
@@ -107,6 +106,9 @@ class Details: public QDialog
         QLabel * myAnnounceResponseLabel;
         QLabel * myAnnounceManualLabel;
 
+        QLabel * mySeedersLabel;
+        QLabel * myLeechersLabel;
+        QLabel * myTimesCompletedLabel;
         QTreeWidget * myPeerTree;
         QMap<QString,QTreeWidgetItem*> myPeers;
         QWidgetList myWidgets;

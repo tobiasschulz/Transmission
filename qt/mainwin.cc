@@ -17,13 +17,13 @@
 #include <QCloseEvent>
 #include <QDesktopServices>
 #include <QFileDialog>
-#include <QHBoxLayout>
 #include <QLabel>
-#include <QSignalMapper>
 #include <QSize>
 #include <QStyle>
+#include <QHBoxLayout>
 #include <QSystemTrayIcon>
 #include <QUrl>
+#include <QSignalMapper>
 
 #include <libtransmission/version.h>
 
@@ -1064,8 +1064,8 @@ TrMainWindow :: refreshPref( int key )
 void
 TrMainWindow :: newTorrent( )
 {
-    MakeDialog * dialog = new MakeDialog( mySession, this );
-    dialog->show( );
+    MakeDialog * d = new MakeDialog( mySession, this );
+    d->show( );
 }
 
 void
@@ -1080,7 +1080,7 @@ TrMainWindow :: openTorrent( )
         myFileDialog->setFileMode( QFileDialog::ExistingFiles );
 
 
-        QCheckBox * button = new QCheckBox( tr( "Show &options dialog" ) );
+        QCheckBox * button = new QCheckBox( tr( "Display &options dialog" ) );
         button->setChecked( myPrefs.getBool( Prefs::OPTIONS_PROMPT ) );
         QGridLayout * layout = dynamic_cast<QGridLayout*>(myFileDialog->layout());
         layout->addWidget( button, layout->rowCount( ), 0, 1, -1, Qt::AlignLeft );

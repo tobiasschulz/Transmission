@@ -14,8 +14,9 @@
 #define MAKE_META_UI__H
 
 #include <gtk/gtk.h>
-#include "tr-core.h"
+#include <libtransmission/transmission.h>
 
-GtkWidget* make_meta_ui( GtkWindow  * parent, TrCore * core );
+GtkWidget* make_meta_ui( GtkWindow  * parent,
+                         tr_session * session );
 
 #endif
