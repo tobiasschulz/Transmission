@@ -1094,35 +1094,51 @@ updateBandwidth( tr_session * session, tr_direction dir )
     tr_bandwidthSetDesiredSpeed( session->bandwidth, dir, limit );
 }
 
-enum
-{
-    MINUTES_PER_HOUR = 60,
-    MINUTES_PER_DAY = MINUTES_PER_HOUR * 24,
-    MINUTES_PER_WEEK = MINUTES_PER_DAY * 7
-};
-
 static void
-turtleUpdateTable( struct tr_turtle_info * t )
+turtleFindNextChange( struct tr_turtle_info * t )
 {
     int day;
-    tr_bitfield * b = &t->minutes;
+    struct tm tm;
+    time_t today_began_at;
+    time_t next_begin;
+    time_t next_end;
+    const time_t now = tr_time( );
+    const int SECONDS_PER_DAY = 86400;
 
-    tr_bitfieldClear( b );
+    tr_localtime_r( &now, &tm );
+    tm.tm_hour = tm.tm_min = tm.tm_sec = 0;
+    today_began_at = mktime( &tm );
 
-    for( day=0; day<7; ++day )
-    {
-        if( t->days & (1<<day) )
-        {
-            int i;
-            const time_t begin = t->beginMinute;
-            time_t end = t->endMinute;
+    next_begin = today_began_at + ( t->beginMinute * 60 );
+    if( next_begin <= now )
+        next_begin += SECONDS_PER_DAY;
 
-            if( end <= begin )
-                end += MINUTES_PER_DAY;
+    next_end = today_began_at + ( t->endMinute * 60 );
+    if( next_end <= now )
+        next_end += SECONDS_PER_DAY;
 
-            for( i=begin; i<end; ++i )
-                tr_bitfieldAdd( b, (i+day*MINUTES_PER_DAY) % MINUTES_PER_WEEK );
-        }
+    if( next_begin < next_end ) {
+        t->_nextChangeAt = next_begin;
+        t->_nextChangeValue = TRUE;
+    } else {
+        t->_nextChangeAt = next_end;
+        t->_nextChangeValue = FALSE;
+    }
+
+    /* if the next change is today, look for today in t->days.
+       if the next change is tomorrow to turn limits OFF, look for today in t->days.
+       if the next change is tomorrow to turn limits ON, look for tomorrow in t->days. */
+    if( t->_nextChangeValue && (( t->_nextChangeAt >= today_began_at + SECONDS_PER_DAY )))
+        day = ( tm.tm_wday + 1 ) % 7;
+    else
+        day = tm.tm_wday;
+    t->_nextChangeAllowed = ( t->days & (1<<day) ) != 0;
+
+    if( t->isClockEnabled && t->_nextChangeAllowed ) {
+        char buf[128];
+        tr_localtime_r( &t->_nextChangeAt, &tm );
+        strftime( buf, sizeof( buf ), "%a %b %d %T %Y", &tm );
+        tr_inf( "Turtle clock updated: at %s we'll turn limits %s", buf, (t->_nextChangeValue?"on":"off") );
     }
 }
 
@@ -1136,6 +1152,7 @@ altSpeedToggled( void * vsession )
 
     updateBandwidth( session, TR_UP );
     updateBandwidth( session, TR_DOWN );
+    turtleFindNextChange( t );
 
     if( t->callback != NULL )
         (*t->callback)( session, t->isEnabled, t->changedByUser, t->callbackUserData );
@@ -1157,37 +1174,25 @@ useAltSpeed( tr_session * s, struct tr_turtle_info * t, tr_bool enabled, tr_bool
     }
 }
 
-static tr_bool
-testTurtleTime( const struct tr_turtle_info * t )
-{
-    struct tm tm;
-    size_t minute_of_the_week;
-    const time_t now = tr_time( );
-
-    tr_localtime_r( &now, &tm );
-
-    minute_of_the_week = tm.tm_wday * MINUTES_PER_DAY
-                       + tm.tm_hour * MINUTES_PER_HOUR
-                       + tm.tm_min;
-
-    if( minute_of_the_week >= MINUTES_PER_WEEK ) /* leap minutes? */
-        minute_of_the_week = MINUTES_PER_WEEK - 1;
-
-    return tr_bitfieldHasFast( &t->minutes, minute_of_the_week );
-}
-
 static void
 turtleCheckClock( tr_session * session, struct tr_turtle_info * t, tr_bool byUser )
 {
-    if( t->isClockEnabled )
-    {
-        const tr_bool hit = testTurtleTime( t );
+    const time_t now = tr_time( );
+    const tr_bool hit = ( t->testedAt < t->_nextChangeAt ) && ( t->_nextChangeAt <= tr_time( ));
 
-        if( hit != t->isEnabled )
+    t->testedAt = now;
+
+    if( hit )
+    {
+        const tr_bool enabled = t->_nextChangeValue;
+
+        if( t->isClockEnabled && t->_nextChangeAllowed )
         {
-            tr_inf( "Time to turn %s turtle mode!", (hit?"on":"off") );
-            useAltSpeed( session, t, hit, byUser );
+            tr_inf( "Time to turn %s turtle mode!", (enabled?"on":"off") );
+            useAltSpeed( session, t, enabled, byUser );
         }
+
+        turtleFindNextChange( t );
     }
 }
 
@@ -1197,14 +1202,12 @@ turtleCheckClock( tr_session * session, struct tr_turtle_info * t, tr_bool byUse
 static void
 turtleBootstrap( tr_session * session, struct tr_turtle_info * turtle )
 {
+    turtleFindNextChange( turtle );
+
     turtle->changedByUser = FALSE;
 
-    tr_bitfieldConstruct( &turtle->minutes, MINUTES_PER_WEEK );
-
-    turtleUpdateTable( turtle );
-
     if( turtle->isClockEnabled )
-        turtle->isEnabled = testTurtleTime( turtle );
+        turtle->isEnabled = !turtle->_nextChangeValue;
 
     altSpeedToggled( session );
 }
@@ -1285,10 +1288,11 @@ userPokedTheClock( tr_session * s, struct tr_turtle_info * t )
 {
     tr_dbg( "Refreshing the turtle mode clock due to user changes" );
 
-    turtleUpdateTable( t );
+    t->testedAt = 0;
+    turtleFindNextChange( t );
 
-    if( t->isClockEnabled )
-        useAltSpeed( s, t, testTurtleTime( t ), TRUE );
+    if( t->isClockEnabled && t->_nextChangeAllowed )
+        useAltSpeed( s, t, !t->_nextChangeValue, TRUE );
 }
 
 void
@@ -1588,7 +1592,6 @@ tr_sessionClose( tr_session * session )
     /* free the session memory */
     tr_bencFree( &session->removedTorrents );
     tr_bandwidthFree( session->bandwidth );
-    tr_bitfieldDestruct( &session->turtle.minutes );
     tr_lockFree( session->lock );
     if( session->metainfoLookup ) {
         tr_bencFree( session->metainfoLookup );
