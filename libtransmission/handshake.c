@@ -101,7 +101,6 @@ enum
 
 struct tr_handshake
 {
-    tr_bool               haveReadAnythingFromPeer;
     tr_bool               havePeerID;
     tr_bool               haveSentBitTorrentHandshake;
     tr_peerIo *           io;
@@ -432,8 +431,6 @@ readYb( tr_handshake *    handshake,
         return READ_NOW;
     }
 
-    handshake->haveReadAnythingFromPeer = TRUE;
-
     /* compute the secret */
     evbuffer_remove( inbuf, yb, KEY_LEN );
     secret = tr_cryptoComputeSecret( handshake->crypto, yb );
@@ -615,8 +612,6 @@ readHandshake( tr_handshake *    handshake,
 
     if( EVBUFFER_LENGTH( inbuf ) < INCOMING_HANDSHAKE_LEN )
         return READ_LATER;
-
-    handshake->haveReadAnythingFromPeer = TRUE;
 
     pstrlen = EVBUFFER_DATA( inbuf )[0]; /* peek, don't read.  We may be
                                           handing inbuf to AWAITING_YA */
@@ -1105,7 +1100,6 @@ fireDoneFunc( tr_handshake * handshake,
                             : NULL;
     const int success = ( *handshake->doneCB )( handshake,
                                                 handshake->io,
-                                                handshake->haveReadAnythingFromPeer,
                                                 isConnected,
                                                 peer_id,
                                                 handshake->doneUserData );
@@ -1143,8 +1137,7 @@ tr_handshakeDone( tr_handshake * handshake,
 void
 tr_handshakeAbort( tr_handshake * handshake )
 {
-    if( handshake != NULL )
-        tr_handshakeDone( handshake, FALSE );
+    tr_handshakeDone( handshake, FALSE );
 }
 
 static void

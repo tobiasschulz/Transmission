@@ -308,8 +308,6 @@ recalculateHash( tr_torrent       * tor,
     SHA1_Init( &sha );
     bytesLeft = tr_torPieceCountBytes( tor, pieceIndex );
 
-    tr_ioPrefetch( tor, pieceIndex, offset, bytesLeft );
-
     while( bytesLeft )
     {
         const int len = MIN( bytesLeft, buflen );

@@ -24,9 +24,8 @@
 
 #import "NSStringAdditions.h"
 #import "NSApplicationAdditions.h"
-
-#import <transmission.h>
 #import "utils.h"
+#import <transmission.h>
 
 @implementation NSString (NSStringAdditions)
 

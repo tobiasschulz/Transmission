@@ -52,8 +52,6 @@
 #include "version.h"
 
 
-time_t transmission_now = 0;
-
 int                   messageLevel = TR_MSG_INF;
 static tr_lock *      messageLock = NULL;
 static tr_bool        messageQueuing = FALSE;
@@ -66,6 +64,18 @@ static int            messageQueueCount = 0;
     static inline int IsDebuggerPresent( void ) { return FALSE; }
     static inline void OutputDebugString( const void * unused UNUSED ) { }
 #endif
+
+/***
+****
+***/
+
+time_t transmission_now = 0;
+
+void
+tr_timeUpdate( time_t now )
+{
+    transmission_now = now;
+}
 
 /***
 ****
@@ -939,7 +949,7 @@ tr_urlIsValidTracker( const char * url )
     tr_bool valid;
     char * scheme = NULL;
 
-    valid = isValidURLChars( url )
+    valid = isValidURLChars( url ) 
          && !tr_urlParse( url, -1, &scheme, NULL, NULL, NULL )
          && ( scheme != NULL )
          && ( !strcmp(scheme,"http") || !strcmp(scheme,"https") );
@@ -955,7 +965,7 @@ tr_urlIsValid( const char * url )
     tr_bool valid;
     char * scheme = NULL;
 
-    valid = isValidURLChars( url )
+    valid = isValidURLChars( url ) 
          && !tr_urlParse( url, -1, &scheme, NULL, NULL, NULL )
          && ( scheme != NULL )
          && ( !strcmp(scheme,"http") || !strcmp(scheme,"https") || !strcmp(scheme,"ftp") || !strcmp(scheme,"sftp") );

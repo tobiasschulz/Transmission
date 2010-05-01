@@ -23,7 +23,6 @@
 
 #include "actions.h"
 #include "details.h"
-#include "favicon.h" /* gtr_get_favicon() */
 #include "file-list.h"
 #include "hig.h"
 #include "tr-prefs.h"
@@ -451,7 +450,7 @@ options_page_new( struct DetailsImpl * d )
     tag = g_signal_connect( tb, "toggled", G_CALLBACK( global_speed_toggled_cb ), d );
     d->honorLimitsCheckTag = tag;
 
-    tb = gtk_check_button_new_with_mnemonic( _( "Limit _download speed (KiB/s):" ) );
+    tb = gtk_check_button_new_with_mnemonic( _( "Limit _download speed (KB/s):" ) );
     gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( tb ), FALSE );
     d->downLimitedCheck = tb;
     tag = g_signal_connect( tb, "toggled", G_CALLBACK( down_speed_toggled_cb ), d );
@@ -463,7 +462,7 @@ options_page_new( struct DetailsImpl * d )
     hig_workarea_add_row_w( t, &row, tb, w, NULL );
     d->downLimitSpin = w;
 
-    tb = gtk_check_button_new_with_mnemonic( _( "Limit _upload speed (KiB/s):" ) );
+    tb = gtk_check_button_new_with_mnemonic( _( "Limit _upload speed (KB/s):" ) );
     d->upLimitedCheck = tb;
     tag = g_signal_connect( tb, "toggled", G_CALLBACK( up_speed_toggled_cb ), d );
     d->upLimitedCheckTag = tag;
@@ -532,16 +531,15 @@ options_page_new( struct DetailsImpl * d )
 *****
 ****/
 
-static const char *
-activityString( int activity, tr_bool finished )
+static const char * activityString( int activity )
 {
     switch( activity )
     {
-        case TR_STATUS_CHECK_WAIT: return _( "Waiting to verify local data" );
-        case TR_STATUS_CHECK:      return _( "Verifying local data" );
-        case TR_STATUS_DOWNLOAD:   return _( "Downloading" );
-        case TR_STATUS_SEED:       return _( "Seeding" );
-        case TR_STATUS_STOPPED:    return finished ? _( "Finished" ) : _( "Paused" );
+        case TR_STATUS_CHECK_WAIT: return _( "Waiting to verify local data" ); break;
+        case TR_STATUS_CHECK:      return _( "Verifying local data" ); break;
+        case TR_STATUS_DOWNLOAD:   return _( "Downloading" ); break;
+        case TR_STATUS_SEED:       return _( "Seeding" ); break;
+        case TR_STATUS_STOPPED:    return _( "Paused" ); break;
     }
 
     return "";
@@ -585,7 +583,6 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
     const char * str;
     const char * none = _( "None" );
     const char * mixed = _( "Mixed" );
-    const char * stateString;
     char buf[512];
     double available = 0;
     double sizeWhenDone = 0;
@@ -674,35 +671,33 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
     gtr_label_set_text( GTK_LABEL( di->destination_lb ), str );
 
     /* state_lb */
-    if( n < 1 )
+    if( n <= 0 )
         str = none;
     else {
-        const tr_torrent_activity activity = stats[0]->activity;
-        tr_bool allFinished = stats[0]->finished;
-        for( i=1; i<n; ++i ) {
-            if( activity != stats[i]->activity )
+        const int baseline = stats[0]->activity;
+        for( i=1; i<n; ++i )
+            if( baseline != (int)stats[i]->activity )
                 break;
-            if( !stats[i]->finished )
-                allFinished = FALSE;
-        }
-        str = i<n ? mixed : activityString( activity, allFinished );
+        if( i==n )
+            str = activityString( baseline );
+        else
+            str = mixed;
     }
-    stateString = str;
     gtr_label_set_text( GTK_LABEL( di->state_lb ), str );
 
 
     /* date started */
-    if( n < 1 )
+    if( n <= 0 )
         str = none;
     else {
         const time_t baseline = stats[0]->startDate;
         for( i=1; i<n; ++i )
             if( baseline != stats[i]->startDate )
                 break;
-        if( i != n )
+        if( i!=n )
             str = mixed;
         else if( ( baseline<=0 ) || ( stats[0]->activity == TR_STATUS_STOPPED ) )
-            str = stateString;
+            str = activityString( TR_STATUS_STOPPED );
         else
             str = tr_strltime( buf, time(NULL)-baseline, sizeof( buf ) );
     }
@@ -1070,14 +1065,6 @@ enum
     PEER_COL_UPLOAD_REQUEST_COUNT_STRING,
     PEER_COL_DOWNLOAD_REQUEST_COUNT_INT,
     PEER_COL_DOWNLOAD_REQUEST_COUNT_STRING,
-    PEER_COL_BLOCKS_DOWNLOADED_COUNT_INT,
-    PEER_COL_BLOCKS_DOWNLOADED_COUNT_STRING,
-    PEER_COL_BLOCKS_UPLOADED_COUNT_INT,
-    PEER_COL_BLOCKS_UPLOADED_COUNT_STRING,
-    PEER_COL_REQS_CANCELLED_BY_CLIENT_COUNT_INT,
-    PEER_COL_REQS_CANCELLED_BY_CLIENT_COUNT_STRING,
-    PEER_COL_REQS_CANCELLED_BY_PEER_COUNT_INT,
-    PEER_COL_REQS_CANCELLED_BY_PEER_COUNT_STRING,
     PEER_COL_ENCRYPTION_STOCK_ID,
     PEER_COL_STATUS,
     N_PEER_COLS
@@ -1099,14 +1086,6 @@ getPeerColumnName( int column )
         case PEER_COL_UPLOAD_REQUEST_COUNT_STRING: return _( "Up Reqs" );
         case PEER_COL_DOWNLOAD_REQUEST_COUNT_INT:
         case PEER_COL_DOWNLOAD_REQUEST_COUNT_STRING: return _( "Dn Reqs" );
-        case PEER_COL_BLOCKS_DOWNLOADED_COUNT_INT:
-        case PEER_COL_BLOCKS_DOWNLOADED_COUNT_STRING: return _( "Dn Blocks" );
-        case PEER_COL_BLOCKS_UPLOADED_COUNT_INT:
-        case PEER_COL_BLOCKS_UPLOADED_COUNT_STRING: return _( "Up Blocks" );
-        case PEER_COL_REQS_CANCELLED_BY_CLIENT_COUNT_INT:
-        case PEER_COL_REQS_CANCELLED_BY_CLIENT_COUNT_STRING: return _( "We Cancelled" );
-        case PEER_COL_REQS_CANCELLED_BY_PEER_COUNT_INT:
-        case PEER_COL_REQS_CANCELLED_BY_PEER_COUNT_STRING: return _( "They Cancelled" );
         case PEER_COL_STATUS: return _( "Status" );
         default: return "";
     }
@@ -1130,14 +1109,6 @@ peer_store_new( void )
                                G_TYPE_STRING,   /* upload request count string */
                                G_TYPE_INT,      /* download request count int */
                                G_TYPE_STRING,   /* download request count string */
-                               G_TYPE_INT,      /* # blocks downloaded int */
-                               G_TYPE_STRING,   /* # blocks downloaded string */
-                               G_TYPE_INT,      /* # blocks uploaded int */
-                               G_TYPE_STRING,   /* # blocks uploaded string */
-                               G_TYPE_INT,      /* # blocks cancelled by client int */
-                               G_TYPE_STRING,   /* # blocks cancelled by client string */
-                               G_TYPE_INT,      /* # blocks cancelled by peer int */
-                               G_TYPE_STRING,   /* # blocks cancelled by peer string */
                                G_TYPE_STRING,   /* encryption stock id */
                                G_TYPE_STRING);  /* flagString */
 }
@@ -1179,14 +1150,10 @@ refreshPeerRow( GtkListStore        * store,
                 GtkTreeIter         * iter,
                 const tr_peer_stat  * peer )
 {
-    char up_speed[64];
-    char down_speed[64];
-    char up_count[64];
-    char down_count[64];
-    char blocks_to_peer[64];
-    char blocks_to_client[64];
-    char cancelled_by_peer[64];
-    char cancelled_by_client[64];
+    char up_speed[128];
+    char down_speed[128];
+    char up_count[128];
+    char down_count[128];
 
     if( peer->rateToPeer > 0.01 )
         tr_strlspeed( up_speed, peer->rateToPeer, sizeof( up_speed ) );
@@ -1208,26 +1175,6 @@ refreshPeerRow( GtkListStore        * store,
     else
         *up_count = '\0';
 
-    if( peer->blocksToPeer > 0 )
-        g_snprintf( blocks_to_peer, sizeof( blocks_to_peer ), "%"PRIu32, peer->blocksToPeer );
-    else
-        *blocks_to_peer = '\0';
-
-    if( peer->blocksToClient > 0 )
-        g_snprintf( blocks_to_client, sizeof( blocks_to_client ), "%"PRIu32, peer->blocksToClient );
-    else
-        *blocks_to_client = '\0';
-
-    if( peer->cancelsToPeer > 0 )
-        g_snprintf( cancelled_by_client, sizeof( cancelled_by_client ), "%"PRIu32, peer->cancelsToPeer );
-    else
-        *cancelled_by_client = '\0';
-
-    if( peer->cancelsToClient > 0 )
-        g_snprintf( cancelled_by_peer, sizeof( cancelled_by_peer ), "%"PRIu32, peer->cancelsToClient );
-    else
-        *cancelled_by_peer = '\0';
-
     gtk_list_store_set( store, iter,
                         PEER_COL_PROGRESS, (int)( 100.0 * peer->progress ),
                         PEER_COL_UPLOAD_REQUEST_COUNT_INT, peer->pendingReqsToClient,
@@ -1240,14 +1187,6 @@ refreshPeerRow( GtkListStore        * store,
                         PEER_COL_UPLOAD_RATE_STRING, up_speed,
                         PEER_COL_STATUS, peer->flagStr,
                         PEER_COL_WAS_UPDATED, TRUE,
-                        PEER_COL_BLOCKS_DOWNLOADED_COUNT_INT, (int)peer->blocksToClient,
-                        PEER_COL_BLOCKS_DOWNLOADED_COUNT_STRING, blocks_to_client,
-                        PEER_COL_BLOCKS_UPLOADED_COUNT_INT, (int)peer->blocksToPeer,
-                        PEER_COL_BLOCKS_UPLOADED_COUNT_STRING, blocks_to_peer,
-                        PEER_COL_REQS_CANCELLED_BY_CLIENT_COUNT_INT, (int)peer->cancelsToPeer,
-                        PEER_COL_REQS_CANCELLED_BY_CLIENT_COUNT_STRING, cancelled_by_client,
-                        PEER_COL_REQS_CANCELLED_BY_PEER_COUNT_INT, (int)peer->cancelsToClient,
-                        PEER_COL_REQS_CANCELLED_BY_PEER_COUNT_STRING, cancelled_by_peer,
                         -1 );
 }
 
@@ -1508,10 +1447,6 @@ setPeerViewColumns( GtkTreeView * peer_view )
     if( more ) view_columns[n++] = PEER_COL_UPLOAD_REQUEST_COUNT_STRING;
     view_columns[n++] = PEER_COL_DOWNLOAD_RATE_STRING;
     if( more ) view_columns[n++] = PEER_COL_DOWNLOAD_REQUEST_COUNT_STRING;
-    if( more ) view_columns[n++] = PEER_COL_BLOCKS_DOWNLOADED_COUNT_STRING;
-    if( more ) view_columns[n++] = PEER_COL_BLOCKS_UPLOADED_COUNT_STRING;
-    if( more ) view_columns[n++] = PEER_COL_REQS_CANCELLED_BY_CLIENT_COUNT_STRING;
-    if( more ) view_columns[n++] = PEER_COL_REQS_CANCELLED_BY_PEER_COUNT_STRING;
     view_columns[n++] = PEER_COL_PROGRESS;
     view_columns[n++] = PEER_COL_STATUS;
     view_columns[n++] = PEER_COL_ADDRESS;
@@ -1560,37 +1495,16 @@ setPeerViewColumns( GtkTreeView * peer_view )
                 gtk_tree_view_column_set_fixed_width( c, 20 );
                 break;
 
-            case PEER_COL_DOWNLOAD_REQUEST_COUNT_STRING:
-                r = gtk_cell_renderer_text_new( );
-                c = gtk_tree_view_column_new_with_attributes( t, r, "text", col, NULL );
-                sort_col = PEER_COL_DOWNLOAD_REQUEST_COUNT_INT;
-                break;
             case PEER_COL_UPLOAD_REQUEST_COUNT_STRING:
                 r = gtk_cell_renderer_text_new( );
                 c = gtk_tree_view_column_new_with_attributes( t, r, "text", col, NULL );
                 sort_col = PEER_COL_UPLOAD_REQUEST_COUNT_INT;
                 break;
 
-            case PEER_COL_BLOCKS_DOWNLOADED_COUNT_STRING:
+            case PEER_COL_DOWNLOAD_REQUEST_COUNT_STRING:
                 r = gtk_cell_renderer_text_new( );
                 c = gtk_tree_view_column_new_with_attributes( t, r, "text", col, NULL );
-                sort_col = PEER_COL_BLOCKS_DOWNLOADED_COUNT_INT;
-                break;
-            case PEER_COL_BLOCKS_UPLOADED_COUNT_STRING:
-                r = gtk_cell_renderer_text_new( );
-                c = gtk_tree_view_column_new_with_attributes( t, r, "text", col, NULL );
-                sort_col = PEER_COL_BLOCKS_UPLOADED_COUNT_INT;
-                break;
-
-            case PEER_COL_REQS_CANCELLED_BY_CLIENT_COUNT_STRING:
-                r = gtk_cell_renderer_text_new( );
-                c = gtk_tree_view_column_new_with_attributes( t, r, "text", col, NULL );
-                sort_col = PEER_COL_REQS_CANCELLED_BY_CLIENT_COUNT_INT;
-                break;
-            case PEER_COL_REQS_CANCELLED_BY_PEER_COUNT_STRING:
-                r = gtk_cell_renderer_text_new( );
-                c = gtk_tree_view_column_new_with_attributes( t, r, "text", col, NULL );
-                sort_col = PEER_COL_REQS_CANCELLED_BY_PEER_COUNT_INT;
+                sort_col = PEER_COL_DOWNLOAD_REQUEST_COUNT_INT;
                 break;
 
             case PEER_COL_DOWNLOAD_RATE_STRING:
@@ -1598,6 +1512,7 @@ setPeerViewColumns( GtkTreeView * peer_view )
                 c = gtk_tree_view_column_new_with_attributes( t, r, "text", col, NULL );
                 sort_col = PEER_COL_DOWNLOAD_RATE_DOUBLE;
                 break;
+
             case PEER_COL_UPLOAD_RATE_STRING:
                 r = gtk_cell_renderer_text_new( );
                 c = gtk_tree_view_column_new_with_attributes( t, r, "text", col, NULL );
@@ -1886,7 +1801,6 @@ enum
   TRACKER_COL_BACKUP,
   TRACKER_COL_TORRENT_NAME,
   TRACKER_COL_TRACKER_NAME,
-  TRACKER_COL_FAVICON,
   TRACKER_N_COLS
 };
 
@@ -1929,30 +1843,6 @@ populate_tracker_buffer( GtkTextBuffer * buffer, const tr_torrent * tor )
 #define TORRENT_PTR_KEY "torrent-pointer"
 
 static void
-favicon_ready_cb( gpointer pixbuf, gpointer vreference )
-{
-    GtkTreeIter iter;
-    GtkTreeRowReference * reference = vreference;
-
-    if( pixbuf != NULL )
-    {
-        GtkTreePath * path = gtk_tree_row_reference_get_path( reference );
-        GtkTreeModel * model = gtk_tree_row_reference_get_model( reference );
-
-        if( gtk_tree_model_get_iter( model, &iter, path ) )
-            gtk_list_store_set( GTK_LIST_STORE( model ), &iter,
-                                TRACKER_COL_FAVICON, pixbuf,
-                                -1 );
-
-        gtk_tree_path_free( path );
-
-        g_object_unref( pixbuf );
-    }
-
-    gtk_tree_row_reference_free( reference );
-}
-
-static void
 refreshTracker( struct DetailsImpl * di, tr_torrent ** torrents, int n )
 {
     int i;
@@ -1983,8 +1873,7 @@ refreshTracker( struct DetailsImpl * di, tr_torrent ** torrents, int n )
                                                     G_TYPE_STRING,
                                                     G_TYPE_BOOLEAN,
                                                     G_TYPE_STRING,
-                                                    G_TYPE_STRING,
-                                                    GDK_TYPE_PIXBUF );
+                                                    G_TYPE_STRING );
 
         filter = gtk_tree_model_filter_new( GTK_TREE_MODEL( store ), NULL );
         gtk_tree_model_filter_set_visible_func( GTK_TREE_MODEL_FILTER( filter ),
@@ -2006,8 +1895,6 @@ refreshTracker( struct DetailsImpl * di, tr_torrent ** torrents, int n )
     model = GTK_TREE_MODEL( store );
     if( n && !gtk_tree_model_get_iter_first( model, &iter ) )
     {
-        tr_session * session = tr_core_session( di->core );
-
         for( i=0; i<n; ++i )
         {
             int j;
@@ -2016,23 +1903,12 @@ refreshTracker( struct DetailsImpl * di, tr_torrent ** torrents, int n )
             const tr_info * inf = tr_torrentInfo( tor );
 
             for( j=0; j<statCount[i]; ++j )
-            {
-                GtkTreePath * path;
-                GtkTreeRowReference * reference;
-                const tr_tracker_stat * st = &stats[i][j];
-
                 gtk_list_store_insert_with_values( store, &iter, -1,
                     TRACKER_COL_TORRENT_ID, torrentId,
                     TRACKER_COL_TRACKER_INDEX, j,
                     TRACKER_COL_TORRENT_NAME, inf->name,
-                    TRACKER_COL_TRACKER_NAME, st->host,
+                    TRACKER_COL_TRACKER_NAME, stats[i][j].host,
                     -1 );
-
-                path = gtk_tree_model_get_path( model, &iter );
-                reference = gtk_tree_row_reference_new( model, path );
-                gtr_get_favicon_from_url( session, st->announce, favicon_ready_cb, reference );
-                gtk_tree_path_free( path );
-            }
         }
     }
 
@@ -2141,7 +2017,6 @@ onEditTrackersResponse( GtkDialog * dialog, int response, gpointer data )
         {
             di->trackers = NULL;
             di->tracker_buffer = NULL;
-            tr_core_torrent_changed( di->core, tr_torrentId( tor ) );
         }
 
         /* cleanup */
@@ -2210,10 +2085,9 @@ static GtkWidget*
 tracker_page_new( struct DetailsImpl * di )
 {
     gboolean b;
+    GtkWidget *vbox, *sw, *w, *v, *hbox;
     GtkCellRenderer *r;
     GtkTreeViewColumn *c;
-    GtkWidget *vbox, *sw, *w, *v, *hbox;
-    const int pad = ( GUI_PAD + GUI_PAD_BIG ) / 2;
 
     vbox = gtk_vbox_new( FALSE, GUI_PAD );
     gtk_container_set_border_width( GTK_CONTAINER( vbox ), GUI_PAD_BIG );
@@ -2224,20 +2098,13 @@ tracker_page_new( struct DetailsImpl * di )
     g_signal_connect( v, "button-release-event",
                       G_CALLBACK( on_tree_view_button_released ), NULL );
     gtk_tree_view_set_rules_hint( GTK_TREE_VIEW( v ), TRUE );
-
-    c = gtk_tree_view_column_new( );
-    gtk_tree_view_column_set_title( c, _( "Trackers" ) );
-    gtk_tree_view_append_column( GTK_TREE_VIEW( v ), c );
-
-    r = gtk_cell_renderer_pixbuf_new( );
-    g_object_set( r, "width", 20 + (GUI_PAD_SMALL*2), "xpad", GUI_PAD_SMALL, "ypad", pad, "yalign", 0.0f, NULL );
-    gtk_tree_view_column_pack_start( c, r, FALSE );
-    gtk_tree_view_column_add_attribute( c, r, "pixbuf", TRACKER_COL_FAVICON );
-
     r = gtk_cell_renderer_text_new( );
-    g_object_set( G_OBJECT( r ), "ellipsize", PANGO_ELLIPSIZE_END, "xpad", GUI_PAD_SMALL, "ypad", pad, NULL );
-    gtk_tree_view_column_pack_start( c, r, TRUE );
-    gtk_tree_view_column_add_attribute( c, r, "markup", TRACKER_COL_TEXT );
+    g_object_set( r, "ellipsize", PANGO_ELLIPSIZE_END, NULL );
+    c = gtk_tree_view_column_new_with_attributes( _( "Trackers" ), r, "markup", TRACKER_COL_TEXT, NULL );
+    gtk_tree_view_append_column( GTK_TREE_VIEW( v ), c );
+    g_object_set( G_OBJECT( r ), "ypad", (GUI_PAD+GUI_PAD_BIG)/2,
+                                 "xpad", (GUI_PAD+GUI_PAD_BIG)/2,
+                                 NULL );
 
     sw = gtk_scrolled_window_new( NULL, NULL );
     gtk_scrolled_window_set_policy( GTK_SCROLLED_WINDOW( sw ),

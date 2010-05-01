@@ -21,7 +21,6 @@ class TrTypes
 
         enum
         {
-            TrackerStatsList = QVariant::UserType,
             PeerList = QVariant::UserType,
             FileList,
             FilterModeType,

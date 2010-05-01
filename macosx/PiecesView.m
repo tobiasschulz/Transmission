@@ -25,8 +25,6 @@
 #import "PiecesView.h"
 #import "Torrent.h"
 #import "InfoWindowController.h"
-
-#import "transmission.h"
 #import "utils.h"
 
 #define MAX_ACROSS 18
@@ -212,13 +210,8 @@ enum
 - (void) mouseDown: (NSEvent *) event
 {
     if (fTorrent)
-    {
-        const BOOL availability = ![[NSUserDefaults standardUserDefaults] boolForKey: @"PiecesViewShowAvailability"];
-        [[NSUserDefaults standardUserDefaults] setBool: availability forKey: @"PiecesViewShowAvailability"];
-        
-        [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdatePiecesView" object: self];
-    }
-    
+        [[[self window] windowController] setPiecesViewForAvailable:
+            ![[NSUserDefaults standardUserDefaults] boolForKey: @"PiecesViewShowAvailability"]];
     [super mouseDown: event];
 }
 

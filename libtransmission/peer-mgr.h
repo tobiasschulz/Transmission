@@ -25,7 +25,6 @@
 
 #include "bitfield.h"
 #include "bitset.h"
-#include "history.h"
 #include "net.h"
 #include "peer-common.h" /* struct peer_request */
 #include "publish.h" /* tr_publisher_tag */
@@ -111,18 +110,6 @@ typedef struct tr_peer
 
     time_t                   chokeChangedAt;
 
-    time_t                   lastBlocksAtTime;
-    int                      blocksAt[60];
-
-    time_t                   lastCancelTime;
-    int                      cancelAt[60];
-
-    tr_recentHistory       * blocksSentToClient;
-    tr_recentHistory       * blocksSentToPeer;
-
-    tr_recentHistory       * cancelsSentToClient;
-    tr_recentHistory       * cancelsSentToPeer;
-
     struct tr_peermsgs     * msgs;
     tr_publisher_tag         msgsTag;
 }
@@ -172,15 +159,9 @@ tr_pex * tr_peerMgrArrayToPex( const void * array,
                                size_t       arrayLen,
                                size_t      * setme_pex_count );
 
-/**
- * @param seedProbability [0..100] for likelihood that the peer is a seed; -1 for unknown
- */
 void tr_peerMgrAddPex( tr_torrent     * tor,
                        uint8_t          from,
-                       const tr_pex   * pex,
-                       int8_t           seedProbability );
-
-void tr_peerMgrMarkAllAsSeeds( tr_torrent * tor );
+                       const tr_pex   * pex );
 
 void tr_peerMgrSetBlame( tr_torrent        * tor,
                          tr_piece_index_t    pieceIndex,

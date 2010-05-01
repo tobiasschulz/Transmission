@@ -3,8 +3,8 @@ dnl STATUS: "X" for prerelease beta builds,
 dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
-m4_define([user_agent_prefix],[1.93+])
-m4_define([peer_id_prefix],[-TR193Z-])
+m4_define([user_agent_prefix],[1.93])
+m4_define([peer_id_prefix],[-TR1930-])
 
 AC_INIT([transmission],
         [user_agent_prefix],
@@ -346,8 +346,8 @@ if test "x$build_gtk" = "xyes"; then
     AC_ARG_ENABLE([gconf2], 
                   AS_HELP_STRING([--enable-gconf2],[enable GConf support]),, 
                   [enable_gconf2=yes]) 
-    if test "x$have_gconf2" = "xyes"; then
-        if test "x$enable_gconf2" = "xyes" ; then
+    if test "x$have_gconf2" = "xyes" ; then
+        if test "x$enable_gconf2" = "xyes"; then
             use_gconf2=yes
             AC_DEFINE([HAVE_GCONF2], 1) 
         else
@@ -393,7 +393,7 @@ dnl it should be safe to re-edit 0.40 back down to 0.23
 use_nls=no
 if test "x$enable_nls" = "xyes" ; then
     use_nls=yes
-    IT_PROG_INTLTOOL([0.35.0],[no-xml])
+    IT_PROG_INTLTOOL([0.40.0],[no-xml])
     AC_CHECK_HEADERS([libintl.h])
     GETTEXT_PACKAGE=transmission
     AC_SUBST(GETTEXT_PACKAGE)
@@ -511,27 +511,22 @@ echo "
 
 Configuration:
 
-   Source code location:                              ${srcdir}
-   Compiler:                                          ${CXX}
-   System or bundled libevent:                        ${libevent_source}
+   Source code location:                                       ${srcdir}
+   Compiler:                                                   ${CXX}
+   System or bundled libevent:                                 ${libevent_source}
 
-   Build Command-Line client:                         ${build_cli}
+   Build Command-Line client:                                  ${build_cli}
 
-   Build GTK+ client:                                 ${build_gtk}
+   Build GTK+ client:                                          ${build_gtk}
+      optional dbus support:                                   ${use_dbus_glib}
+      optional gio for optional watchdir support:              ${use_gio}
+      optional libnotify for 'download completed' popups:      ${use_libnotify}
+      optional libcanberra for 'download completed' sounds:    ${use_canberra}
+      optional gconf2 to tell GNOME we handle magnet links:    ${use_gconf2}
+      optional libappindicator for Ubuntu-style system tray:   ${use_libappindicator}
 
-      dbus support:                                   ${use_dbus_glib}
-      gio for watchdir support:                       ${use_gio}
-      libnotify for 'download completed' popups:      ${use_libnotify}
-      libcanberra for 'download completed' sounds:    ${use_canberra}
-      gconf2 to tell GNOME we handle magnet links:    ${use_gconf2}
-      libappindicator for Ubuntu-style system tray:   ${use_libappindicator}
+   Build Daemon:                                               ${build_daemon}
 
-      THESE ARE ALL OPTIONAL. If you're a packager
-      or user who doesn't want these dependencies,
-      use the ones you want and skip all the rest.
-
-   Build Daemon:                                      ${build_daemon}
-
-   Build Mac client:                                  ${build_mac}
+   Build Mac client:                                           ${build_mac}
 
 "

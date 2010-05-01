@@ -24,77 +24,101 @@
 
 #import "ProgressGradients.h"
 
-@implementation ProgressGradients (Private)
+@implementation ProgressGradients
 
 + (NSGradient *) progressGradientForRed: (CGFloat) redComponent green: (CGFloat) greenComponent blue: (CGFloat) blueComponent
 {
-    const CGFloat alpha = [[NSUserDefaults standardUserDefaults] boolForKey: @"SmallView"] ? 0.27 : 1.0;
-    
-    NSColor * baseColor = [NSColor colorWithCalibratedRed: redComponent green: greenComponent blue: blueComponent alpha: alpha];
+    NSColor * baseColor = [NSColor colorWithCalibratedRed: redComponent green: greenComponent blue: blueComponent alpha: 1.0];
     
     NSColor * color2 = [NSColor colorWithCalibratedRed: redComponent * 0.95 green: greenComponent * 0.95 blue: blueComponent * 0.95
-                        alpha: alpha];
+                        alpha: 1.0];
     
     NSColor * color3 = [NSColor colorWithCalibratedRed: redComponent * 0.85 green: greenComponent * 0.85 blue: blueComponent * 0.85
-                        alpha: alpha];
+                        alpha: 1.0];
     
     NSGradient * progressGradient = [[NSGradient alloc] initWithColorsAndLocations: baseColor, 0.0, color2, 0.5, color3, 0.5,
                                         baseColor, 1.0, nil];
     return [progressGradient autorelease];
 }
 
-@end
-
-@implementation ProgressGradients
-
+NSGradient * fProgressWhiteGradient = nil;
 + (NSGradient *) progressWhiteGradient
 {
-    return [[self class] progressGradientForRed: 0.95 green: 0.95 blue: 0.95];
+    if (!fProgressWhiteGradient)
+        fProgressWhiteGradient = [[[self class] progressGradientForRed: 0.95 green: 0.95 blue: 0.95] retain];
+    return fProgressWhiteGradient;
 }
 
+NSGradient * fProgressGrayGradient = nil;
 + (NSGradient *) progressGrayGradient
 {
-    return [[self class] progressGradientForRed: 0.7 green: 0.7 blue: 0.7];
+    if (!fProgressGrayGradient)
+        fProgressGrayGradient = [[[self class] progressGradientForRed: 0.7 green: 0.7 blue: 0.7] retain];
+    return fProgressGrayGradient;
 }
 
+NSGradient * fProgressLightGrayGradient = nil;
 + (NSGradient *) progressLightGrayGradient
 {
-    return [[self class] progressGradientForRed: 0.87 green: 0.87 blue: 0.87];
+    if (!fProgressLightGrayGradient)
+        fProgressLightGrayGradient = [[[self class] progressGradientForRed: 0.87 green: 0.87 blue: 0.87] retain];
+    return fProgressLightGrayGradient;
 }
 
+NSGradient * fProgressBlueGradient = nil;
 + (NSGradient *) progressBlueGradient
 {
-    return [[self class] progressGradientForRed: 0.35 green: 0.67 blue: 0.98];
+    if (!fProgressBlueGradient)
+        fProgressBlueGradient = [[[self class] progressGradientForRed: 0.35 green: 0.67 blue: 0.98] retain];
+    return fProgressBlueGradient;
 }
 
+NSGradient * fProgressDarkBlueGradient = nil;
 + (NSGradient *) progressDarkBlueGradient
 {
-    return [[self class] progressGradientForRed: 0.616 green: 0.722 blue: 0.776];
+    if (!fProgressDarkBlueGradient)
+        fProgressDarkBlueGradient = [[[self class] progressGradientForRed: 0.616 green: 0.722 blue: 0.776] retain];
+    return fProgressDarkBlueGradient;
 }
 
+NSGradient * fProgressGreenGradient = nil;
 + (NSGradient *) progressGreenGradient
 {
-    return [[self class] progressGradientForRed: 0.44 green: 0.89 blue: 0.40];
+    if (!fProgressGreenGradient)
+        fProgressGreenGradient = [[[self class] progressGradientForRed: 0.44 green: 0.89 blue: 0.40] retain];
+    return fProgressGreenGradient;
 }
 
+NSGradient * fProgressLightGreenGradient = nil;
 + (NSGradient *) progressLightGreenGradient
 {
-    return [[self class] progressGradientForRed: 0.62 green: 0.99 blue: 0.58];
+    if (!fProgressLightGreenGradient)
+        fProgressLightGreenGradient = [[[self class] progressGradientForRed: 0.62 green: 0.99 blue: 0.58] retain];
+    return fProgressLightGreenGradient;
 }
 
+NSGradient * fProgressDarkGreenGradient = nil;
 + (NSGradient *) progressDarkGreenGradient
 {
-    return [[self class] progressGradientForRed: 0.627 green: 0.714 blue: 0.639];
+    if (!fProgressDarkGreenGradient)
+        fProgressDarkGreenGradient = [[[self class] progressGradientForRed: 0.627 green: 0.714 blue: 0.639] retain];
+    return fProgressDarkGreenGradient;
 }
 
+NSGradient * fProgressRedGradient = nil;
 + (NSGradient *) progressRedGradient
 {
-    return [[self class] progressGradientForRed: 0.902 green: 0.439 blue: 0.451];
+    if (!fProgressRedGradient)
+        fProgressRedGradient = [[[self class] progressGradientForRed: 0.902 green: 0.439 blue: 0.451] retain];
+    return fProgressRedGradient;
 }
 
+NSGradient * fProgressYellowGradient = nil;
 + (NSGradient *) progressYellowGradient
 {
-    return [[self class] progressGradientForRed: 0.933 green: 0.890 blue: 0.243];
+    if (!fProgressYellowGradient)
+        fProgressYellowGradient = [[[self class] progressGradientForRed: 0.933 green: 0.890 blue: 0.243] retain];
+    return fProgressYellowGradient;
 }
 
 @end

@@ -66,7 +66,6 @@
         else
             fCollapsedGroups = [[NSMutableIndexSet alloc] init];
         
-        fMouseRow = -1;
         fMouseControlRow = -1;
         fMouseRevealRow = -1;
         fMouseActionRow = -1;
@@ -153,7 +152,6 @@
         [cell setRepresentedObject: item];
         
         const NSInteger row = [self rowForItem: item];
-        [cell setHover: row == fMouseRow];
         [cell setControlHover: row == fMouseControlRow];
         [cell setRevealHover: row == fMouseRevealRow];
         [cell setActionHover: row == fMouseActionRow];
@@ -228,9 +226,9 @@
 - (void) updateTrackingAreas
 {
     [super updateTrackingAreas];
-    [self removeTrackingAreas];
+    [self removeButtonTrackingAreas];
     
-    const NSRange rows = [self rowsInRect: [self visibleRect]];
+    NSRange rows = [self rowsInRect: [self visibleRect]];
     if (rows.length == 0)
         return;
     
@@ -246,9 +244,8 @@
     }
 }
 
-- (void) removeTrackingAreas
+- (void) removeButtonTrackingAreas
 {
-    fMouseRow = -1;
     fMouseControlRow = -1;
     fMouseRevealRow = -1;
     fMouseActionRow = -1;
@@ -258,15 +255,6 @@
         if ([area owner] == self && [[area userInfo] objectForKey: @"Row"])
             [self removeTrackingArea: area];
     }
-}
-
-- (void) setRowHover: (NSInteger) row
-{
-    NSAssert([fDefaults boolForKey: @"SmallView"], @"cannot set a hover row when not in compact view");
-    
-    fMouseRow = row;
-    if (row >= 0)
-        [self setNeedsDisplayInRect: [self rectOfRow: row]];
 }
 
 - (void) setControlButtonHover: (NSInteger) row
@@ -303,14 +291,8 @@
             fMouseActionRow = rowVal;
         else if ([type isEqualToString: @"Control"])
             fMouseControlRow = rowVal;
-        else if ([type isEqualToString: @"Reveal"])
-            fMouseRevealRow = rowVal;
         else
-        {
-            fMouseRow = rowVal;
-            if (![fDefaults boolForKey: @"SmallView"])
-                return;
-        }
+            fMouseRevealRow = rowVal;
         
         [self setNeedsDisplayInRect: [self rectOfRow: rowVal]];
     }
@@ -328,14 +310,8 @@
             fMouseActionRow = -1;
         else if ([type isEqualToString: @"Control"])
             fMouseControlRow = -1;
-        else if ([type isEqualToString: @"Reveal"])
-            fMouseRevealRow = -1;
         else
-        {
-            fMouseRow = -1;
-            if (![fDefaults boolForKey: @"SmallView"])
-                return;
-        }
+            fMouseRevealRow = -1;
         
         [self setNeedsDisplayInRect: [self rectOfRow: [row integerValue]]];
     }
@@ -684,73 +660,70 @@
 //alternating rows - first row after group row is white
 - (void) highlightSelectionInClipRect: (NSRect) clipRect
 {
-    if (![fDefaults boolForKey: @"SmallView"])
+    NSRect visibleRect = clipRect;
+    NSRange rows = [self rowsInRect: visibleRect];
+    BOOL start = YES;
+    
+    const CGFloat totalRowHeight = [self rowHeight] + [self intercellSpacing].height;
+    
+    NSRect gridRects[(NSInteger)(ceil(visibleRect.size.height / totalRowHeight / 2.0)) + 1]; //add one if partial rows at top and bottom
+    NSInteger rectNum = 0;
+    
+    if (rows.length > 0)
     {
-        NSRect visibleRect = clipRect;
-        NSRange rows = [self rowsInRect: visibleRect];
-        BOOL start = YES;
-        
-        const CGFloat totalRowHeight = [self rowHeight] + [self intercellSpacing].height;
-        
-        NSRect gridRects[(NSInteger)(ceil(visibleRect.size.height / totalRowHeight / 2.0)) + 1]; //add one if partial rows at top and bottom
-        NSInteger rectNum = 0;
-        
-        if (rows.length > 0)
+        //determine what the first row color should be
+        if ([[self itemAtRow: rows.location] isKindOfClass: [Torrent class]])
         {
-            //determine what the first row color should be
-            if ([[self itemAtRow: rows.location] isKindOfClass: [Torrent class]])
-            {
-                for (NSInteger i = rows.location-1; i>=0; i--)
-                {
-                    if (![[self itemAtRow: i] isKindOfClass: [Torrent class]])
-                        break;
-                    start = !start;
-                }
-            }
-            else
-            {
-                rows.location++;
-                rows.length--;
-            }
-            
-            NSInteger i;
-            for (i = rows.location; i < NSMaxRange(rows); i++)
+            for (NSInteger i = rows.location-1; i>=0; i--)
             {
                 if (![[self itemAtRow: i] isKindOfClass: [Torrent class]])
-                {
-                    start = YES;
-                    continue;
-                }
-                
-                if (!start && ![self isRowSelected: i])
-                    gridRects[rectNum++] = [self rectOfRow: i];
-                
+                    break;
                 start = !start;
             }
-            
-            const CGFloat newY = NSMaxY([self rectOfRow: i-1]);
-            visibleRect.size.height -= newY - visibleRect.origin.y;
-            visibleRect.origin.y = newY;
         }
-        
-        const NSInteger numberBlankRows = ceil(visibleRect.size.height / totalRowHeight);
-        
-        //remaining visible rows continue alternating
-        visibleRect.size.height = totalRowHeight;
-        if (start)
-            visibleRect.origin.y += totalRowHeight;
-        
-        for (NSInteger i = start ? 1 : 0; i < numberBlankRows; i += 2)
+        else
         {
-            gridRects[rectNum++] = visibleRect;
-            visibleRect.origin.y += 2.0 * totalRowHeight;
+            rows.location++;
+            rows.length--;
         }
         
-        NSAssert([[NSColor controlAlternatingRowBackgroundColors] count] >= 2, @"There should be 2 alternating row colors");
+        NSInteger i;
+        for (i = rows.location; i < NSMaxRange(rows); i++)
+        {
+            if (![[self itemAtRow: i] isKindOfClass: [Torrent class]])
+            {
+                start = YES;
+                continue;
+            }
+            
+            if (!start && ![self isRowSelected: i])
+                gridRects[rectNum++] = [self rectOfRow: i];
+            
+            start = !start;
+        }
         
-        [[[NSColor controlAlternatingRowBackgroundColors] objectAtIndex: 1] set];
-        NSRectFillList(gridRects, rectNum);
+        const CGFloat newY = NSMaxY([self rectOfRow: i-1]);
+        visibleRect.size.height -= newY - visibleRect.origin.y;
+        visibleRect.origin.y = newY;
     }
+    
+    const NSInteger numberBlankRows = ceil(visibleRect.size.height / totalRowHeight);
+    
+    //remaining visible rows continue alternating
+    visibleRect.size.height = totalRowHeight;
+    if (start)
+        visibleRect.origin.y += totalRowHeight;
+    
+    for (NSInteger i = start ? 1 : 0; i < numberBlankRows; i += 2)
+    {
+        gridRects[rectNum++] = visibleRect;
+        visibleRect.origin.y += 2.0 * totalRowHeight;
+    }
+    
+    NSAssert([[NSColor controlAlternatingRowBackgroundColors] count] >= 2, @"There should be 2 alternating row colors");
+    
+    [[[NSColor controlAlternatingRowBackgroundColors] objectAtIndex: 1] set];
+    NSRectFillList(gridRects, rectNum);
     
     [super highlightSelectionInClipRect: clipRect];
 }

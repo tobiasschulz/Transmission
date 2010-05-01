@@ -47,7 +47,7 @@
     NSIndexSet * fPreviousFinishedIndexes;
     NSDate * fPreviousFinishedIndexesDate;
     
-    BOOL fWaitToStart, fStalled;
+    BOOL fFinishedSeeding, fWaitToStart, fStalled;
     
     NSInteger fGroupValue;
     
@@ -161,7 +161,6 @@
 - (BOOL) isCheckingWaiting;
 - (BOOL) allDownloaded;
 - (BOOL) isComplete;
-- (BOOL) isFinishedSeeding;
 - (BOOL) isError;
 - (BOOL) isAnyErrorOrWarning;
 - (NSString *) errorMessage;
@@ -183,7 +182,6 @@
 - (NSInteger) totalPeersCache;
 - (NSInteger) totalPeersPex;
 - (NSInteger) totalPeersDHT;
-- (NSInteger) totalPeersLocal;
 - (NSInteger) totalPeersLTEP;
 - (NSInteger) totalPeersKnown;
 

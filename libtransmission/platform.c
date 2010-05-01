@@ -516,10 +516,10 @@ tr_getDefaultDownloadDir( void )
 ***/
 
 static int
-isWebClientDir( const char * path )
+isClutchDir( const char * path )
 {
     struct stat sb;
-    char * tmp = tr_buildPath( path, "index.html", NULL );
+    char * tmp = tr_buildPath( path, "javascript", "transmission.js", NULL );
     const int ret = !stat( tmp, &sb );
     tr_inf( _( "Searching for web interface file \"%s\"" ), tmp );
     tr_free( tmp );
@@ -527,7 +527,7 @@ isWebClientDir( const char * path )
 }
 
 const char *
-tr_getWebClientDir( const tr_session * session UNUSED )
+tr_getClutchDir( const tr_session * session UNUSED )
 {
     static char * s = NULL;
 
@@ -544,38 +544,27 @@ tr_getWebClientDir( const tr_session * session UNUSED )
         else
         {
 
-#ifdef SYS_DARWIN /* on Mac, look in the Application Support folder first, then in the app bundle. */
+#ifdef SYS_DARWIN /* on Mac, look in the app package first, then the Application Support folder (for daemon, etc) */
 
-            /* Look in the Application Support folder */
-            s = tr_buildPath( tr_sessionGetConfigDir( session ), "web", NULL );
+            CFURLRef appURL = CFBundleCopyBundleURL( CFBundleGetMainBundle( ) );
+            CFStringRef appRef = CFURLCopyFileSystemPath( appURL,
+                                                         kCFURLPOSIXPathStyle );
+            const char * appString = CFStringGetCStringPtr( appRef,
+                                         CFStringGetFastestEncoding( appRef ) );
+            CFRelease( appURL );
+            CFRelease( appRef );
 
-            if( !isWebClientDir( s ) ) {
+            s = tr_buildPath( appString, "Contents", "Resources", "web", NULL );
+
+            if( !isClutchDir( s ) ) {
                 tr_free( s );
 
-                CFURLRef appURL = CFBundleCopyBundleURL( CFBundleGetMainBundle( ) );
-                CFStringRef appRef = CFURLCopyFileSystemPath( appURL,
-                                                              kCFURLPOSIXPathStyle );
-                CFIndex appLength = CFStringGetMaximumSizeForEncoding( CFStringGetLength(appRef),
-                                                                       CFStringGetFastestEncoding( appRef ));
-
-                char * appString = tr_malloc( appLength + 1 );
-                tr_bool success = CFStringGetCString( appRef,
-                                              appString,
-                                              appLength + 1,
-                                              CFStringGetFastestEncoding( appRef ));
-                assert( success );
-
-                CFRelease( appURL );
-                CFRelease( appRef );
-
-                /* Fallback to the app bundle */
-                s = tr_buildPath( appString, "Contents", "Resources", "web", NULL );
-                if( !isWebClientDir( s ) ) {
+                /* Fallback to the Application Support folder */
+                s = tr_buildPath( tr_sessionGetConfigDir( session ), "web", NULL );
+                if( !isClutchDir( s ) ) {
                     tr_free( s );
                     s = NULL;
                 }
-
-                tr_free( appString );
             }
 
 #elif defined( WIN32 )
@@ -590,7 +579,7 @@ tr_getWebClientDir( const tr_session * session UNUSED )
                 /* First, we should check personal AppData/Transmission/Web */
                 SHGetFolderPath( NULL, CSIDL_COMMON_APPDATA, NULL, 0, dir );
                 s = tr_buildPath( dir, "Transmission", "Web", NULL );
-                if( !isWebClientDir( s ) ) {
+                if( !isClutchDir( s ) ) {
                     tr_free( s );
                     s = NULL;
                 }
@@ -600,7 +589,7 @@ tr_getWebClientDir( const tr_session * session UNUSED )
                 /* check personal AppData */
                 SHGetFolderPath( NULL, CSIDL_APPDATA, NULL, 0, dir );
                 s = tr_buildPath( dir, "Transmission", "Web", NULL );
-                if( !isWebClientDir( s ) ) {
+                if( !isClutchDir( s ) ) {
                     tr_free( s );
                     s = NULL;
                 }
@@ -610,7 +599,7 @@ tr_getWebClientDir( const tr_session * session UNUSED )
                 /* check calling module place */
                 GetModuleFileName( GetModuleHandle( NULL ), dir, sizeof( dir ) );
                 s = tr_buildPath( dirname( dir ), "Web", NULL );
-                if( !isWebClientDir( s ) ) {
+                if( !isClutchDir( s ) ) {
                     tr_free( s );
                     s = NULL;
                 }
@@ -654,7 +643,7 @@ tr_getWebClientDir( const tr_session * session UNUSED )
             /* walk through the candidates & look for a match */
             for( l=candidates; l; l=l->next ) {
                 char * path = tr_buildPath( l->data, "transmission", "web", NULL );
-                const int found = isWebClientDir( path );
+                const int found = isClutchDir( path );
                 if( found ) {
                     s = path;
                     break;

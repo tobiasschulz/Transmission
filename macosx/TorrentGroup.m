@@ -24,9 +24,7 @@
 
 #import "TorrentGroup.h"
 #import "Torrent.h"
-
-#include "transmission.h" // required by utils.h
-#include "utils.h" // tr_getRatio()
+#include "utils.h" //tr_getRatio()
 
 @implementation TorrentGroup
 

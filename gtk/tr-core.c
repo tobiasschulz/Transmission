@@ -455,11 +455,11 @@ static void
 tr_core_apply_defaults( tr_ctor * ctor )
 {
     if( tr_ctorGetPaused( ctor, TR_FORCE, NULL ) )
-        tr_ctorSetPaused( ctor, TR_FORCE, !pref_flag_get( TR_PREFS_KEY_START ) );
+        tr_ctorSetPaused( ctor, TR_FORCE, !pref_flag_get( PREF_KEY_START ) );
 
     if( tr_ctorGetDeleteSource( ctor, NULL ) )
         tr_ctorSetDeleteSource( ctor,
-                               pref_flag_get( TR_PREFS_KEY_TRASH_ORIGINAL ) );
+                               pref_flag_get( PREF_KEY_TRASH_ORIGINAL ) );
 
     if( tr_ctorGetPeerLimit( ctor, TR_FORCE, NULL ) )
         tr_ctorSetPeerLimit( ctor, TR_FORCE,
@@ -948,7 +948,7 @@ add_ctor( TrCore * core, tr_ctor * ctor, gboolean doPrompt, gboolean doNotify )
 void
 tr_core_add_ctor( TrCore * core, tr_ctor * ctor )
 {
-    const gboolean doStart = pref_flag_get( TR_PREFS_KEY_START );
+    const gboolean doStart = pref_flag_get( PREF_KEY_START );
     const gboolean doPrompt = pref_flag_get( PREF_KEY_OPTIONS_PROMPT );
     tr_core_apply_defaults( ctor );
     add_ctor( core, ctor, doStart, doPrompt );
@@ -1124,10 +1124,7 @@ tr_core_present_window( TrCore      * core UNUSED,
                         gboolean *         success,
                         GError     ** err  UNUSED )
 {
-    /* Setting the toggle-main-window GtkCheckMenuItem to
-       make sure its state is correctly set */
-    action_toggle( "toggle-main-window", TRUE);
-    
+    action_activate( "present-main-window" );
     *success = TRUE;
     return TRUE;
 }
@@ -1139,7 +1136,7 @@ tr_core_add_list( TrCore       * core,
                   pref_flag_t    prompt,
                   gboolean       doNotify )
 {
-    const gboolean doStart = pref_flag_eval( start, TR_PREFS_KEY_START );
+    const gboolean doStart = pref_flag_eval( start, PREF_KEY_START );
     const gboolean doPrompt = pref_flag_eval( prompt, PREF_KEY_OPTIONS_PROMPT );
     GSList * l;
 
@@ -1181,40 +1178,48 @@ findTorrentInModel( TrCore *      core,
 }
 
 void
-tr_core_remove_torrent( TrCore * core, TrTorrent * gtor, gboolean deleteFiles )
-{
-    const tr_torrent * tor = tr_torrent_handle( gtor );
-
-    if( tor != NULL )
-        tr_core_remove_torrent_from_id( core, tr_torrentId( tor ), deleteFiles );
-}
-
-void
-tr_core_remove_torrent_from_id( TrCore * core, int id, gboolean deleteFiles )
+tr_core_torrent_destroyed( TrCore * core,
+                           int      id )
 {
     GtkTreeIter iter;
 
     if( findTorrentInModel( core, id, &iter ) )
     {
-        TrTorrent * gtor = NULL;
-        tr_torrent * tor = NULL;
+        TrTorrent * gtor;
         GtkTreeModel * model = tr_core_model( core );
-
-        gtk_tree_model_get( model, &iter, MC_TORRENT, &gtor,
-                                          MC_TORRENT_RAW, &tor,
-                                          -1 );
-
-        /* remove from the gui */
+        gtk_tree_model_get( model, &iter, MC_TORRENT, &gtor, -1 );
+        tr_torrent_clear( gtor );
         gtk_list_store_remove( GTK_LIST_STORE( model ), &iter );
+        g_object_unref( G_OBJECT( gtor ) );
+    }
+}
 
-        /* maybe delete the downloaded files */
-        if( deleteFiles )
-            tr_torrentDeleteLocalData( tor, gtr_file_trash_or_remove );
+void
+tr_core_remove_torrent( TrCore *    core,
+                        TrTorrent * gtor,
+                        int         deleteFiles )
+{
+    const tr_torrent * tor = tr_torrent_handle( gtor );
 
-        /* remove the torrent */
-        tr_torrent_set_remove_flag( gtor, TRUE );
-        gtr_warn_if_fail( G_OBJECT( gtor )->ref_count == 1 );
-        g_object_unref( G_OBJECT( gtor ) ); /* remove the last refcount */
+    if( tor )
+    {
+        int         id = tr_torrentId( tor );
+        GtkTreeIter iter;
+        if( findTorrentInModel( core, id, &iter ) )
+        {
+            GtkTreeModel * model = tr_core_model( core );
+
+            /* remove from the gui */
+            gtk_list_store_remove( GTK_LIST_STORE( model ), &iter );
+
+            /* maybe delete the downloaded files */
+            if( deleteFiles )
+                tr_torrent_delete_files( gtor );
+
+            /* remove the torrent */
+            tr_torrent_set_remove_flag( gtor, TRUE );
+            g_object_unref( G_OBJECT( gtor ) );
+        }
     }
 }
 
@@ -1417,9 +1422,15 @@ tr_core_set_hibernation_allowed( TrCore * core,
 static void
 maybeInhibitHibernation( TrCore * core )
 {
-    /* inhibit if it's enabled *AND* all the torrents are paused */
-    const gboolean inhibit = pref_flag_get( PREF_KEY_INHIBIT_HIBERNATION )
-                          && ( tr_core_get_active_torrent_count( core ) == 0 );
+    gboolean inhibit = pref_flag_get( PREF_KEY_INHIBIT_HIBERNATION );
+
+    /* always allow hibernation when all the torrents are paused */
+    if( inhibit ) {
+        tr_session * session = tr_core_session( core );
+
+        if( tr_sessionGetActiveTorrentCount( session ) == 0 )
+            inhibit = FALSE;
+    }
 
     tr_core_set_hibernation_allowed( core, !inhibit );
 }
@@ -1655,55 +1666,3 @@ tr_core_exec( TrCore * core, const tr_benc * top )
     tr_core_exec_json( core, json );
     tr_free( json );
 }
-
-/***
-****
-***/
-
-void
-tr_core_torrent_changed( TrCore * core, int id )
-{
-    GtkTreeIter iter;
-    GtkTreeModel * model = tr_core_model( core );
-
-    if( gtk_tree_model_get_iter_first( model, &iter ) ) do
-    {
-        tr_torrent * tor;
-        gtk_tree_model_get( model, &iter, MC_TORRENT_RAW, &tor, -1 );
-        if( tr_torrentId( tor ) == id )
-        {
-            GtkTreePath * path = gtk_tree_model_get_path( model, &iter );
-            gtk_tree_model_row_changed( model, path, &iter );
-            gtk_tree_path_free( path );
-            break;
-        }
-    }
-    while( gtk_tree_model_iter_next( model, &iter ) );
-}
-
-int
-tr_core_get_torrent_count( TrCore * core )
-{
-    return gtk_tree_model_iter_n_children( tr_core_model( core ), NULL );
-}
-
-int
-tr_core_get_active_torrent_count( TrCore * core )
-{
-    GtkTreeIter iter;
-    GtkTreeModel * model = tr_core_model( core );
-    int activeCount = 0;
-
-    if( gtk_tree_model_get_iter_first( model, &iter ) ) do
-    {
-        int activity;
-        gtk_tree_model_get( model, &iter, MC_ACTIVITY, &activity, -1 );
-
-        if( activity != TR_STATUS_STOPPED )
-            ++activeCount;
-    }
-    while( gtk_tree_model_iter_next( model, &iter ) );
-
-    return activeCount;
-}
-

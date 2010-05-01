@@ -48,9 +48,7 @@ typedef struct
     /* for TR_TRACKER_PEERS */
     const uint8_t *  compact;
     int              compactLen;
-
-    /* [0...100] for probability a peer is a seed.  calculated by the leecher/seeder ratio */
-    int8_t           seedProbability;
+    int              allAreSeeds;
 }
 tr_tracker_event;
 

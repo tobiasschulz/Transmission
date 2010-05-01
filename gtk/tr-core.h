@@ -99,10 +99,6 @@ GtkTreeModel * tr_core_model( TrCore * self );
 
 tr_session *   tr_core_session( TrCore * self );
 
-int            tr_core_get_active_torrent_count( TrCore * self );
-
-int            tr_core_get_torrent_count( TrCore * self );
-
 /******
 *******
 ******/
@@ -163,9 +159,12 @@ void     tr_core_torrents_added( TrCore * self );
 *******
 ******/
 
+/* we've gotten notice from RPC that a torrent has been destroyed;
+   update our gui accordingly */
+void  tr_core_torrent_destroyed( TrCore * self, int torrentId );
+
 /* remove a torrent */
-void  tr_core_remove_torrent( TrCore * self, TrTorrent * gtor, gboolean deleteFiles );
-void  tr_core_remove_torrent_from_id( TrCore * self, int id, gboolean deleteFiles );
+void  tr_core_remove_torrent( TrCore * self, TrTorrent * gtor, int deleteFiles );
 
 /* update the model with current torrent status */
 void  tr_core_update( TrCore * self );
@@ -185,8 +184,6 @@ void tr_core_set_pref_double( TrCore * self, const char * key, double val );
 /**
 ***
 **/
-
-void tr_core_torrent_changed( TrCore * core, int id );
 
 void tr_core_port_test( TrCore * core );
 

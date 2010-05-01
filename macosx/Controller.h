@@ -27,7 +27,6 @@
 #import <Quartz/Quartz.h>
 #import <Growl/Growl.h>
 
-@class AddMagnetWindowController;
 @class AddWindowController;
 @class Badger;
 @class DragOverlayWindow;
@@ -118,14 +117,12 @@ typedef enum
 }
 
 - (void) openFiles: (NSArray *) filenames addType: (addType) type forcePath: (NSString *) path;
+- (void) openMagnet: (NSString *) address;
 
 - (void) askOpenConfirmed: (AddWindowController *) addController add: (BOOL) add;
 - (void) openCreatedFile: (NSNotification *) notification;
 - (void) openFilesWithDict: (NSDictionary *) dictionary;
 - (void) openShowSheet: (id) sender;
-
-- (void) openMagnet: (NSString *) address;
-- (void) askOpenMagnetConfirmed: (AddMagnetWindowController *) addController add: (BOOL) add;
 
 - (void) invalidOpenAlert: (NSString *) filename;
 - (void) invalidOpenMagnetAlert: (NSString *) address;

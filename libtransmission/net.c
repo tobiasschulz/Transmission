@@ -35,9 +35,6 @@
  #include <winsock2.h> /* inet_addr */
  #include <WS2tcpip.h>
 #else
- #include <sys/socket.h>
- #include <netinet/in.h>
- #include <netinet/tcp.h>
  #include <arpa/inet.h> /* inet_addr */
  #include <netdb.h>
  #include <fcntl.h>
@@ -213,18 +210,6 @@ tr_netSetTOS( int s, int tos )
 #endif
 }
 
-int
-tr_netSetCongestionControl( int s, const char *algorithm )
-{
-#ifdef TCP_CONGESTION
-    return setsockopt( s, IPPROTO_TCP, TCP_CONGESTION,
-                       algorithm, strlen(algorithm) + 1 );
-#else
-    errno = ENOSYS;
-    return -1;
-#endif
-}
-
 static socklen_t
 setup_sockaddr( const tr_address        * addr,
                 tr_port                   port,
@@ -380,7 +365,7 @@ tr_netBindTCPImpl( const tr_address * addr, tr_port port, tr_bool suppressMsgs, 
                 fmt = _( "Couldn't bind port %d on %s: %s" );
             else
                 fmt = _( "Couldn't bind port %d on %s: %s (%s)" );
-
+            
             tr_err( fmt, port, tr_ntop_non_ts( addr ), tr_strerror( err ), hint );
         }
         tr_netCloseSocket( fd );

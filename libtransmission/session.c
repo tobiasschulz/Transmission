@@ -42,7 +42,6 @@
 #include "stats.h"
 #include "torrent.h"
 #include "tr-dht.h"
-#include "tr-lds.h"
 #include "trevent.h"
 #include "utils.h"
 #include "verify.h"
@@ -245,7 +244,6 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictReserve( d, 35 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_BLOCKLIST_ENABLED,        FALSE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DHT_ENABLED,              TRUE );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_LDS_ENABLED,              FALSE );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_DOWNLOAD_DIR,             tr_getDefaultDownloadDir( ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_DSPEED,                   100 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DSPEED_ENABLED,           FALSE );
@@ -296,8 +294,6 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, 14 );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV4,        TR_DEFAULT_BIND_ADDRESS_IPV4 );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV6,        TR_DEFAULT_BIND_ADDRESS_IPV6 );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_START,                    TRUE );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_TRASH_ORIGINAL,           FALSE );
 }
 
 void
@@ -308,7 +304,6 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictReserve( d, 30 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_BLOCKLIST_ENABLED,        tr_blocklistIsEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DHT_ENABLED,              s->isDHTEnabled );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_LDS_ENABLED,              s->isLDSEnabled );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_DOWNLOAD_DIR,             s->downloadDir );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_DSPEED,                   tr_sessionGetSpeedLimit( s, TR_DOWN ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DSPEED_ENABLED,           tr_sessionIsSpeedLimited( s, TR_DOWN ) );
@@ -325,8 +320,6 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT_RANDOM_LOW,     s->randomPortLow );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT_RANDOM_HIGH,    s->randomPortHigh );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_SOCKET_TOS,          s->peerSocketTOS );
-    if(s->peer_congestion_algorithm && s->peer_congestion_algorithm[0])
-        tr_bencDictAddStr ( d, TR_PREFS_KEY_PEER_CONGESTION_ALGORITHM, s->peer_congestion_algorithm );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEX_ENABLED,              s->isPexEnabled );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PORT_FORWARDING,          tr_sessionIsPortForwardingEnabled( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PREALLOCATION,            s->preallocationMode );
@@ -361,8 +354,6 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddInt ( d, TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, s->uploadSlotsPerTorrent );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV4,        tr_ntop_non_ts( &s->public_ipv4->addr ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_BIND_ADDRESS_IPV6,        tr_ntop_non_ts( &s->public_ipv6->addr ) );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_START,                    !tr_sessionGetPaused( s ) );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_TRASH_ORIGINAL,           tr_sessionGetDeleteSource( s ) );
 }
 
 tr_bool
@@ -628,14 +619,6 @@ tr_sessionInitImpl( void * vdata )
         tr_dhtInit( session, &session->public_ipv4->addr );
     }
 
-    if( session->isLDSEnabled )
-    {
-        if( tr_ldsInit( session, &session->public_ipv4->addr ) )
-            tr_ninf( "LDS", "Local Peer Discovery active" );
-    }
-    else
-        tr_ndbg( "LDS", "Local Peer Discovery disabled" );
-
     /* cleanup */
     tr_bencFree( &settings );
     data->done = TRUE;
@@ -678,20 +661,12 @@ sessionSetImpl( void * vdata )
         tr_sessionSetPexEnabled( session, boolVal );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_DHT_ENABLED, &boolVal ) )
         tr_sessionSetDHTEnabled( session, boolVal );
-    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_LDS_ENABLED, &boolVal ) )
-        tr_sessionSetLDSEnabled( session, boolVal );
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_ENCRYPTION, &i ) )
         tr_sessionSetEncryption( session, i );
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PEER_SOCKET_TOS, &i ) )
         session->peerSocketTOS = i;
-    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PEER_CONGESTION_ALGORITHM, &str ) )
-        session->peer_congestion_algorithm = tr_strdup(str);
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_BLOCKLIST_ENABLED, &boolVal ) )
         tr_blocklistSetEnabled( session, boolVal );
-    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_START, &boolVal ) )
-        tr_sessionSetPaused( session, !boolVal );
-    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_TRASH_ORIGINAL, &boolVal) )
-        tr_sessionSetDeleteSource( session, boolVal );
 
     /* files and directories */
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PREALLOCATION, &i ) )
@@ -1043,12 +1018,22 @@ tr_sessionGetPortForwarding( const tr_session * session )
 ****
 ***/
 
+static void
+updateSeedRatio( tr_session * session )
+{
+    tr_torrent * tor = NULL;
+
+    while(( tor = tr_torrentNext( session, tor )))
+        tor->needsSeedRatioCheck = TRUE;
+}
+
 void
 tr_sessionSetRatioLimited( tr_session * session, tr_bool isLimited )
 {
     assert( tr_isSession( session ) );
 
     session->isRatioLimited = isLimited;
+    updateSeedRatio( session );
 }
 
 void
@@ -1057,6 +1042,7 @@ tr_sessionSetRatioLimit( tr_session * session, double desiredRatio )
     assert( tr_isSession( session ) );
 
     session->desiredRatio = desiredRatio;
+    updateSeedRatio( session );
 }
 
 tr_bool
@@ -1227,7 +1213,7 @@ turtleCheckClock( tr_session * s, struct tr_turtle_info * t )
 }
 
 /* Called after the turtle's fields are loaded from an outside source.
- * It initializes the implementation fields
+ * It initializes the implementation fields 
  * and turns on turtle mode if the clock settings say to. */
 static void
 turtleBootstrap( tr_session * session, struct tr_turtle_info * turtle )
@@ -1482,42 +1468,6 @@ tr_sessionGetPeerLimitPerTorrent( const tr_session * session )
 ****
 ***/
 
-void
-tr_sessionSetPaused( tr_session * session, tr_bool isPaused )
-{
-    assert( tr_isSession( session ) );
-
-    session->pauseAddedTorrent = isPaused;
-}
-
-tr_bool
-tr_sessionGetPaused( const tr_session * session )
-{
-    assert( tr_isSession( session ) );
-
-    return session->pauseAddedTorrent;
-}
-
-void
-tr_sessionSetDeleteSource( tr_session * session, tr_bool deleteSource )
-{
-    assert( tr_isSession( session ) );
-
-    session->deleteSourceTorrent = deleteSource;
-}
-
-tr_bool
-tr_sessionGetDeleteSource( const tr_session * session )
-{
-    assert( tr_isSession( session ) );
-
-    return session->deleteSourceTorrent;
-}
-
-/***
-****
-***/
-
 double
 tr_sessionGetPieceSpeed( const tr_session * session, tr_direction dir )
 {
@@ -1563,9 +1513,6 @@ sessionCloseImpl( void * vsession )
     assert( tr_isSession( session ) );
 
     free_incoming_peer_port( session );
-
-    if( session->isLDSEnabled )
-        tr_ldsUninit( session );
 
     if( session->isDHTEnabled )
         tr_dhtUninit( session );
@@ -1682,7 +1629,6 @@ tr_sessionClose( tr_session * session )
     tr_free( session->proxy );
     tr_free( session->proxyUsername );
     tr_free( session->proxyPassword );
-    tr_free( session->peer_congestion_algorithm );
     tr_free( session );
 }
 
@@ -1799,29 +1745,6 @@ tr_sessionSetDHTEnabled( tr_session * session, tr_bool enabled )
 
     if( ( enabled != 0 ) != ( session->isDHTEnabled != 0 ) )
         tr_runInEventThread( session, toggleDHTImpl, session );
-}
-
-void
-tr_sessionSetLDSEnabled( tr_session * session,
-                         tr_bool      enabled )
-{
-    assert( tr_isSession( session ) );
-
-    session->isLDSEnabled = ( enabled != 0 );
-}
-
-tr_bool
-tr_sessionIsLDSEnabled( const tr_session * session )
-{
-    assert( tr_isSession( session ) );
-
-    return session->isLDSEnabled;
-}
-
-tr_bool
-tr_sessionAllowsLDS( const tr_session * session )
-{
-    return tr_sessionIsLDSEnabled( session );
 }
 
 /***
@@ -2433,4 +2356,19 @@ tr_sessionSetProxyPassword( tr_session * session,
         tr_free( session->proxyPassword );
         session->proxyPassword = tr_strdup( password );
     }
+}
+
+int
+tr_sessionGetActiveTorrentCount( tr_session * session )
+{
+    int ret = 0;
+    tr_torrent * tor = NULL;
+
+    assert( tr_isSession( session ) );
+
+    while(( tor = tr_torrentNext( session, tor )))
+        if( tr_torrentGetActivity( tor ) != TR_STATUS_STOPPED )
+            ++ret;
+
+    return ret;
 }

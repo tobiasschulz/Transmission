@@ -24,6 +24,7 @@ and
 .Op Fl er | ep | et
 .Op Fl f
 .Op Fl g Ar files
+.Op Fl gpr Ar peers
 .Op Fl G Ar files
 .Op Fl gsr Ar ratio
 .Op Fl GSR
@@ -48,6 +49,10 @@ and
 .Op Fl si
 .Op Fl st
 .Op Fl t Ar all | Ar id | Ar hash
+.Op Fl td Ar number
+.Op Fl TD
+.Op Fl tu Ar number
+.Op Fl TU
 .Op Fl hl
 .Op Fl HL
 .Op Fl u Ar number | Fl U
@@ -55,7 +60,6 @@ and
 .Op Fl V
 .Op Fl w Ar download-dir
 .Op Fl x | X
-.Op Fl z | Z
 .Op Fl pi
 .Ek
 .Sh DESCRIPTION
@@ -108,13 +112,11 @@ until the torrent is done.
 .It Fl C Fl -no-incomplete-dir
 Don't store incomplete torrents in a different directory.
 .It Fl d Fl -downlimit Ar limit
-Limit the maximum download speed to
+Limit the global download speed to
 .Ar limit
-KiB/s.
-If current torrent(s) are selected this operates on them.  Otherwise, it changes the global setting.
+kilobytes per second.
 .It Fl D Fl -no-downlimit
-Disable download speed limits.
-If current torrent(s) are selected this operates on them.  Otherwise, it changes the global setting.
+Remove the global download limit.
 .It Fl er Fl -encryption-required
 Encrypt all peer connections.
 .It Fl ep Fl -encryption-preferred
@@ -185,8 +187,9 @@ Mark file(s) as high priority.
 .It Fl pl Fl -priority-low Ar all | file-index | files
 Mark file(s) as low priority.
 .It Fl pr Fl -peers Ar number
-Set the maximum number of peers.
-If current torrent(s) are selected this operates on them.  Otherwise, it changes the global setting.
+Set the current torrent(s)' maximum number of peers
+.It Fl gpr Fl -global-peers Ar number
+Set the maximum number of peers allowed globally
 .It Fl r Fl -remove
 Remove the current torrent(s).  This does not delete the downloaded data.
 .It Fl -remove-and-delete
@@ -206,10 +209,6 @@ Let the current torrent(s) use the global seedratio settings
 Start the current torrent(s)
 .It Fl S Fl -stop
 Stop the current torrent(s) from downloading or seeding
-.It Fl -start-paused
-Start added torrents paused
-.It fl -no-start-paused
-Start added torrents unpaused
 .It Fl t Fl -torrent Ar all | id | torrent-hash
 Set the current torrent(s) for use by subsequent options.
 .Ar all
@@ -219,22 +218,28 @@ or
 .Ar hash .
 To set more than one current torrent, join their ids together in a list, such as
 "\-t2,4,6-8" to operate on the torrents whose IDs are 2, 4, 6, 7, and 8.
-.It Fl -trash-torrent
-Delete torrents after adding
-.It Fl -no-trash-torrent
-Do not delete torrents after adding
+.It Fl td Fl -torrent-downlimit Ar limit
+Limit the current torrent(s) download speed to
+.Ar limit
+kilobytes per second.
+.It Fl TD Fl -no-torrent-downlimit
+Don't use the current torrent(s) download limit.
+.It Fl tu Fl -torrent-uplimit Ar limit
+Limit the current torrent(s) upload speed to
+.Ar limit
+kilobytes per second.
+.It Fl TU Fl -no-torrent-uplimit
+Don't use the current torrent(s) upload limit.
 .It Fl hl Fl -honor-session
 Make the current torrent(s) honor the session limits.
 .It Fl HL Fl -no-honor-session
 Make the current torrent(s) not honor the session limits.
 .It Fl u Fl -uplimit Ar limit
-Limit the maximum upload speed to
+Limit the global upload speed to
 .Ar limit
-KiB/s.
-If current torrent(s) are selected this operates on them.  Otherwise, it changes the global setting.
+kilobytes per second.
 .It Fl U Fl -no-uplimit
-Disable upload speed limits.
-If current torrent(s) are selected this operates on them.  Otherwise, it changes the global setting.
+Remove the global upload limit.
 .It Fl v Fl -verify
 Verify the current torrent(s)
 .It Fl V Fl -version
@@ -247,10 +252,6 @@ as the default location for newly added torrents to download files to.
 Enable peer exchange (PEX).
 .It Fl X Fl -no-pex
 Disable peer exchange (PEX).
-.It Fl z Fl -lds
-Enable local peer discovery (LDS).
-.It Fl Z Fl -no-lds
-Disable local peer discovery (LDS).
 .It Fl pi Fl -peer-info
 List the current torrent's connected peers.
 In the `status' section of the list, the following shorthand is used:

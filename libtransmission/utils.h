@@ -20,6 +20,8 @@
 #include <stdlib.h> /* malloc() */
 #include <time.h> /* time_t */
 
+#include "transmission.h"
+
 #ifdef __cplusplus
 extern "C" {
 #endif
@@ -539,8 +541,8 @@ extern time_t transmission_now;
  */
 static inline time_t tr_time( void ) { return transmission_now; }
 
-/** @brief Private libtransmission function to update tr_time()'s counter */
-static inline void tr_timeUpdate( time_t now ) { transmission_now = now; }
+/** @brief Private libtransmission function to update the second counter used by tr_time() */
+void tr_timeUpdate( time_t now );
 
 /***
 ****

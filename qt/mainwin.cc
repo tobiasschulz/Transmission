@@ -20,7 +20,6 @@
 #include <QHBoxLayout>
 #include <QInputDialog>
 #include <QLabel>
-#include <QMessageBox>
 #include <QSignalMapper>
 #include <QSize>
 #include <QStyle>
@@ -137,7 +136,7 @@ TrMainWindow :: TrMainWindow( Session& session, Prefs& prefs, TorrentModel& mode
     connect( ui.action_TrayIcon, SIGNAL(toggled(bool)), this, SLOT(setTrayIconVisible(bool)));
     connect( ui.action_Filterbar, SIGNAL(toggled(bool)), this, SLOT(setFilterbarVisible(bool)));
     connect( ui.action_Statusbar, SIGNAL(toggled(bool)), this, SLOT(setStatusbarVisible(bool)));
-    connect( ui.action_CompactView, SIGNAL(toggled(bool)), this, SLOT(setCompactView(bool)));
+    connect( ui.action_MinimalView, SIGNAL(toggled(bool)), this, SLOT(setMinimalView(bool)));
     connect( ui.action_SortByActivity, SIGNAL(toggled(bool)), this, SLOT(onSortByActivityToggled(bool)));
     connect( ui.action_SortByAge,      SIGNAL(toggled(bool)), this, SLOT(onSortByAgeToggled(bool)));
     connect( ui.action_SortByETA,      SIGNAL(toggled(bool)), this, SLOT(onSortByETAToggled(bool)));
@@ -260,7 +259,7 @@ TrMainWindow :: TrMainWindow( Session& session, Prefs& prefs, TorrentModel& mode
              << Prefs :: STATUSBAR_STATS
              << Prefs :: TOOLBAR
              << Prefs :: ALT_SPEED_LIMIT_ENABLED
-             << Prefs :: COMPACT_VIEW
+             << Prefs :: MINIMAL_VIEW
              << Prefs :: DSPEED
              << Prefs :: DSPEED_ENABLED
              << Prefs :: USPEED
@@ -639,7 +638,7 @@ void
 TrMainWindow :: openProperties( )
 {
     if( myDetailsDialog == 0 ) {
-        myDetailsDialog = new Details( mySession, myPrefs, myModel, this );
+        myDetailsDialog = new Details( mySession, myModel, this );
         connect( myDetailsDialog, SIGNAL(destroyed(QObject*)), this, SLOT(onDetailsDestroyed()));
     }
 
@@ -844,12 +843,12 @@ TrMainWindow :: pauseAll( )
 void
 TrMainWindow :: removeSelected( )
 {
-    removeTorrents( false );
+    mySession.removeTorrents( getSelectedTorrents( ), false );
 }
 void
 TrMainWindow :: deleteSelected( )
 {
-    removeTorrents( true );
+    mySession.removeTorrents( getSelectedTorrents( ), true );
 }
 void
 TrMainWindow :: verifySelected( )
@@ -887,9 +886,9 @@ void TrMainWindow :: showSessionTransfer ( ) { myPrefs.set( Prefs::STATUSBAR_STA
 **/
 
 void
-TrMainWindow :: setCompactView( bool visible )
+TrMainWindow :: setMinimalView( bool visible )
 {
-    myPrefs.set( Prefs :: COMPACT_VIEW, visible );
+    myPrefs.set( Prefs :: MINIMAL_VIEW, visible );
 }
 void
 TrMainWindow :: setTrayIconVisible( bool visible )
@@ -1039,9 +1038,9 @@ TrMainWindow :: refreshPref( int key )
             myTrayIcon.setVisible( b );
             break;
 
-        case Prefs::COMPACT_VIEW:
+        case Prefs::MINIMAL_VIEW:
             b = myPrefs.getBool( key );
-            ui.action_CompactView->setChecked( b );
+            ui.action_MinimalView->setChecked( b );
             ui.listView->setItemDelegate( b ? myTorrentDelegateMin : myTorrentDelegate );
             ui.listView->reset( ); // force the rows to resize
             break;
@@ -1115,19 +1114,12 @@ TrMainWindow :: openTorrent( )
 void
 TrMainWindow :: openURL( )
 {
-    QString tmp;
-    openURL( tmp );
-}
-
-void
-TrMainWindow :: openURL( QString url )
-{
     bool ok;
     const QString key = QInputDialog::getText( this,
                                                tr( "Add URL or Magnet Link" ),
                                                tr( "Add URL or Magnet Link" ),
                                                QLineEdit::Normal,
-                                               url,
+                                               QString( ),
                                                &ok );
     if( ok && !key.isEmpty( ) )
         mySession.addTorrent( key );
@@ -1151,98 +1143,6 @@ TrMainWindow :: addTorrent( const QString& filename )
         o->show( );
         QApplication :: alert( o );
     }
-}
-
-void
-TrMainWindow :: removeTorrents( const bool deleteFiles )
-{
-    QSet<int> ids;
-    QMessageBox msgBox( this );
-    QString primary_text, secondary_text;
-    int incomplete = 0;
-    int connected  = 0;
-    int count;
-
-    foreach( QModelIndex index, ui.listView->selectionModel( )->selectedRows( ) )
-    {
-        const Torrent * tor( index.model()->data( index, TorrentModel::TorrentRole ).value<const Torrent*>( ) );
-        ids.insert( tor->id( ) );
-        if( tor->connectedPeers( ) )
-            ++connected;
-        if( !tor->isDone( ) )
-            ++incomplete;
-    }
-
-    if( ids.isEmpty() )
-        return;
-    count = ids.size();
-
-    if( !deleteFiles )
-    {
-        primary_text = ( count == 1 )
-            ? tr( "Remove torrent?" )
-            : tr( "Remove %1 torrents?" ).arg( count );
-    }
-    else
-    {
-        primary_text = ( count == 1 )
-            ? tr( "Delete this torrent's downloaded files?" )
-            : tr( "Delete these %1 torrents' downloaded files?" ).arg( count );
-    }
-
-    if( !incomplete && !connected )
-    {
-        secondary_text = ( count == 1 )
-            ? tr( "Once removed, continuing the transfer will require the torrent file or magnet link." )
-            : tr( "Once removed, continuing the transfers will require the torrent files or magnet links." );
-    }
-    else if( count == incomplete )
-    {
-        secondary_text = ( count == 1 )
-            ? tr( "This torrent has not finished downloading." )
-            : tr( "These torrents have not finished downloading." );
-    }
-    else if( count == connected )
-    {
-        secondary_text = ( count == 1 )
-            ? tr( "This torrent is connected to peers." )
-            : tr( "These torrents are connected to peers." );
-    }
-    else
-    {
-        if( connected )
-        {
-            secondary_text = ( connected == 1 )
-                ? tr( "One of these torrents is connected to peers." )
-                : tr( "Some of these torrents are connected to peers." );
-        }
-
-        if( connected && incomplete )
-        {
-            secondary_text += "\n";
-        }
-
-        if( incomplete )
-        {
-            secondary_text += ( incomplete == 1 )
-                ? tr( "One of these torrents has not finished downloading." )
-                : tr( "Some of these torrents have not finished downloading." );
-        }
-    }
-
-    msgBox.setWindowTitle( QString(" ") );
-    msgBox.setText( QString( "<big><b>%1</big></b>" ).arg( primary_text ) );
-    msgBox.setInformativeText( secondary_text );
-    msgBox.setStandardButtons( QMessageBox::Ok | QMessageBox::Cancel );
-    msgBox.setDefaultButton( QMessageBox::Cancel );
-    msgBox.setIcon( QMessageBox::Question );
-    /* hack needed to keep the dialog from being too narrow */
-    QGridLayout* layout = (QGridLayout*)msgBox.layout();
-    QSpacerItem* spacer = new QSpacerItem( 450, 0, QSizePolicy::Minimum, QSizePolicy::Expanding );
-    layout->addItem( spacer, layout->rowCount(), 0, 1, layout->columnCount() );
-
-    if( msgBox.exec() == QMessageBox::Ok )
-        mySession.removeTorrents( ids, deleteFiles );
 }
 
 /***

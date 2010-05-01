@@ -157,8 +157,6 @@ void      tr_cpBlockAdd( tr_completion * completion,
 tr_bool   tr_cpBlockBitfieldSet( tr_completion      * completion,
                                  struct tr_bitfield * blocks );
 
-void      tr_cpSetHaveAll( tr_completion * completion );
-
 /***
 ****
 ***/

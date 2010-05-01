@@ -109,7 +109,7 @@ function setInnerHTML( e, html )
 
 /*
  *   Converts file & folder byte size values to more
- *   readable values (bytes, KiB, MiB, GiB or TiB).
+ *   readable values (bytes, KB, MB, GB or TB).
  *
  *   @param integer bytes
  *   @returns string
@@ -118,30 +118,30 @@ Math.formatBytes = function(bytes) {
     var size;
     var unit;
 
-    // Terabytes (TiB).
+    // Terabytes (TB).
     if ( bytes >= 1099511627776 ) {
         size = bytes / 1099511627776;
-        unit = ' TiB';
+		unit = ' TB';
 
-    // Gigabytes (GiB).
+    // Gigabytes (GB).
     } else if ( bytes >= 1073741824 ) {
         size = bytes / 1073741824;
-        unit = ' GiB';
+		unit = ' GB';
 
-    // Megabytes (MiB).
+    // Megabytes (MB).
     } else if ( bytes >= 1048576 ) {
         size = bytes / 1048576;
-        unit = ' MiB';
+		unit = ' MB';
 
-    // Kilobytes (KiB).
+    // Kilobytes (KB).
     } else if ( bytes >= 1024 ) {
         size = bytes / 1024;
-        unit = ' KiB';
+		unit = ' KB';
 
-    // The file is less than one KiB
+    // The file is less than one KB
     } else {
         size = bytes;
-        unit = ' bytes';
+		unit = ' bytes';
     }
 	
 	// Single-digit numbers have greater precision
@@ -330,6 +330,8 @@ function changeTab(tab, id) {
 function Prefs() { }
 Prefs.prototype = { };
 
+Prefs._AutoStart          = 'auto-start-torrents';
+
 Prefs._RefreshRate        = 'refresh_rate';
 Prefs._SessionRefreshRate        = 'session_refresh_rate';
 
@@ -360,6 +362,7 @@ Prefs._TurtleState        = 'turtle-state';
 
 Prefs._Defaults =
 {
+	'auto-start-torrents': true,
 	'filter': 'all',
 	'refresh_rate' : 5,
 	'show_filter': true,

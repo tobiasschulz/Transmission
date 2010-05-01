@@ -85,8 +85,6 @@ static const struct tr_option options[] =
     { 800, "paused", "Pause all torrents on startup", NULL, 0, NULL },
     { 'o', "dht", "Enable distributed hash tables (DHT)", "o", 0, NULL },
     { 'O', "no-dht", "Disable distributed hash tables (DHT)", "O", 0, NULL },
-    { 'z', "lds", "Enable local peer discovery (LDS)", "z", 0, NULL },
-    { 'Z', "no-lds", "Disable local peer discovery (LDS)", "Z", 0, NULL },
     { 'P', "peerport", "Port for incoming peers (Default: " TR_DEFAULT_PEER_PORT_STR ")", "P", 1, "<port>" },
     { 'm', "portmap", "Enable portmapping via NAT-PMP or UPnP", "m", 0, NULL },
     { 'M', "no-portmap", "Disable portmapping", "M", 0, NULL },
@@ -220,34 +218,18 @@ getConfigDir( int argc, const char ** argv )
 static void
 onFileAdded( tr_session * session, const char * dir, const char * file )
 {
-    char * filename = tr_buildPath( dir, file, NULL );
-    tr_ctor * ctor = tr_ctorNew( session );
-    int err = tr_ctorSetMetainfoFromFile( ctor, filename );
-
-    if( !err )
+    if( strstr( file, ".torrent" ) != NULL )
     {
-        tr_torrentNew( ctor, &err );
+        char * filename = tr_buildPath( dir, file, NULL );
+        tr_ctor * ctor = tr_ctorNew( session );
 
-        if( err == TR_PARSE_ERR )
-            tr_err( "Error parsing .torrent file \"%s\"", file );
-        else
-        {
-            tr_bool trash = FALSE;
-            int test = tr_ctorGetDeleteSource( ctor, &trash );
+        int err = tr_ctorSetMetainfoFromFile( ctor, filename );
+        if( !err )
+            tr_torrentNew( ctor, &err );
 
-            tr_inf( "Parsing .torrent file successful \"%s\"", file );
-
-            if( !test && trash )
-            {
-                tr_inf( "Deleting input .torrent file \"%s\"", file );
-                if( remove( filename ) )
-                    tr_err( "Error deleting .torrent file: %s", tr_strerror( errno ) );
-            }
-        }
+        tr_ctorFree( ctor );
+        tr_free( filename );
     }
-
-    tr_ctorFree( ctor );
-    tr_free( filename );
 }
 
 static void
@@ -407,10 +389,6 @@ main( int argc, char ** argv )
 		      break;
 	    case 954:
 		      tr_bencDictAddBool( &settings, TR_PREFS_KEY_RATIO_ENABLED, FALSE );
-		      break;
-	    case 'z': tr_bencDictAddBool( &settings, TR_PREFS_KEY_LDS_ENABLED, TRUE );
-		      break;
-	    case 'Z': tr_bencDictAddBool( &settings, TR_PREFS_KEY_LDS_ENABLED, FALSE );
 		      break;
             default:  showUsage( );
                       break;

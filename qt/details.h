@@ -46,7 +46,7 @@ class Details: public QDialog
         void onTimer( );
 
     public:
-        Details( Session&, Prefs&, TorrentModel&, QWidget * parent = 0 );
+        Details( Session&, TorrentModel&, QWidget * parent = 0 );
         ~Details( );
         void setIds( const QSet<int>& ids );
 
@@ -58,14 +58,12 @@ class Details: public QDialog
         QWidget * createOptionsTab( );
 
     private:
-        QString timeToStringRounded( int seconds );
         QString trimToDesiredWidth( const QString& str );
         void enableWhenChecked( QCheckBox *, QWidget * );
 
     private:
 
         Session& mySession;
-        Prefs& myPrefs;
         TorrentModel& myModel;
         QSet<int> myIds;
         QTimer myTimer;
@@ -85,8 +83,6 @@ class Details: public QDialog
         QCheckBox * mySessionLimitCheck;
         QCheckBox * mySingleDownCheck;
         QCheckBox * mySingleUpCheck;
-        QCheckBox * myShowTrackerScrapesCheck;
-        QCheckBox * myShowBackupTrackersCheck;
         QSpinBox * mySingleDownSpin;
         QSpinBox * mySingleUpSpin;
         QRadioButton * mySeedGlobalRadio;
@@ -112,9 +108,7 @@ class Details: public QDialog
         QLabel * myAnnounceResponseLabel;
         QLabel * myAnnounceManualLabel;
 
-        QTreeWidget * myTrackerTree;
         QTreeWidget * myPeerTree;
-        QMap<QString,QTreeWidgetItem*> myTrackerStats;
         QMap<QString,QTreeWidgetItem*> myPeers;
         QWidgetList myWidgets;
 
@@ -131,8 +125,6 @@ class Details: public QDialog
         void onUploadLimitChanged( int );
         void onSeedUntilChanged( bool );
         void onSeedRatioLimitChanged( double );
-        void onShowBackupTrackersToggled( bool );
-        void onShowTrackerScrapesToggled( bool );
         void onMaxPeersChanged( int );
         void refresh( );
 };

@@ -54,7 +54,7 @@
     if ((self = [super init]))
     {
         NSMutableParagraphStyle * paragraphStyle = [[NSParagraphStyle defaultParagraphStyle] mutableCopy];
-        [paragraphStyle setLineBreakMode: NSLineBreakByTruncatingMiddle];
+        [paragraphStyle setLineBreakMode: NSLineBreakByTruncatingTail];
         
         fTitleAttributes = [[NSMutableDictionary alloc] initWithObjectsAndKeys:
                             [NSFont messageFontOfSize: 12.0], NSFontAttributeName,

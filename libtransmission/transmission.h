@@ -164,7 +164,6 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_BIND_ADDRESS_IPV6          "bind-address-ipv6"
 #define TR_PREFS_KEY_BLOCKLIST_ENABLED          "blocklist-enabled"
 #define TR_PREFS_KEY_DHT_ENABLED                "dht-enabled"
-#define TR_PREFS_KEY_LDS_ENABLED                "lds-enabled"
 #define TR_PREFS_KEY_DOWNLOAD_DIR               "download-dir"
 #define TR_PREFS_KEY_ENCRYPTION                 "encryption"
 #define TR_PREFS_KEY_INCOMPLETE_DIR             "incomplete-dir"
@@ -179,7 +178,6 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_PEER_PORT_RANDOM_LOW       "peer-port-random-low"
 #define TR_PREFS_KEY_PEER_PORT_RANDOM_HIGH      "peer-port-random-high"
 #define TR_PREFS_KEY_PEER_SOCKET_TOS            "peer-socket-tos"
-#define TR_PREFS_KEY_PEER_CONGESTION_ALGORITHM  "peer-congestion-algorithm"
 #define TR_PREFS_KEY_PEX_ENABLED                "pex-enabled"
 #define TR_PREFS_KEY_PORT_FORWARDING            "port-forwarding-enabled"
 #define TR_PREFS_KEY_PROXY_AUTH_ENABLED         "proxy-auth-enabled"
@@ -207,8 +205,6 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_USPEED                     "speed-limit-up"
 #define TR_PREFS_KEY_UMASK                      "umask"
 #define TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT   "upload-slots-per-torrent"
-#define TR_PREFS_KEY_START                      "start-added-torrents"
-#define TR_PREFS_KEY_TRASH_ORIGINAL             "trash-original-torrent-files"
 
 
 /**
@@ -558,7 +554,7 @@ void          tr_sessionSetProxyPassword( tr_session * session,
 ***
 **/
 
-/** @brief Used by tr_sessionGetStats() and tr_sessionGetCumulativeStats() to give bandwidth statistics */
+/** @brief Used by tr_sessionGetStats() and tr_sessionGetCumulativeStats() to give bandwidth statistics */ 
 typedef struct tr_session_stats
 {
     float       ratio;        /* TR_RATIO_INF, TR_RATIO_NA, or total up/down */
@@ -591,10 +587,6 @@ tr_bool            tr_sessionIsPexEnabled( const tr_session * session );
 tr_bool            tr_sessionIsDHTEnabled( const tr_session * session );
 
 void               tr_sessionSetDHTEnabled( tr_session * session, tr_bool );
-
-tr_bool            tr_sessionIsLDSEnabled( const tr_session * session );
-
-void               tr_sessionSetLDSEnabled( tr_session * session, tr_bool enabled );
 
 void               tr_sessionSetLazyBitfieldEnabled( tr_session * session,
                                                      tr_bool       enabled );
@@ -639,6 +631,8 @@ typedef enum
 tr_port_forwarding;
 
 tr_port_forwarding tr_sessionGetPortForwarding( const tr_session * session );
+
+int tr_sessionCountTorrents( const tr_session * session );
 
 typedef enum
 {
@@ -732,11 +726,6 @@ uint16_t   tr_sessionGetPeerLimitPerTorrent( const tr_session * );
 tr_priority_t   tr_torrentGetPriority( const tr_torrent * );
 void            tr_torrentSetPriority( tr_torrent *, tr_priority_t );
 
-void       tr_sessionSetPaused        ( tr_session *, tr_bool isPaused );
-tr_bool    tr_sessionGetPaused        ( const tr_session * );
-
-void       tr_sessionSetDeleteSource  ( tr_session *, tr_bool deleteSource );
-tr_bool    tr_sessionGetDeleteSource  ( const tr_session * );
 
 /**
  *  Load all the torrents in tr_getTorrentDir().
@@ -746,6 +735,8 @@ tr_bool    tr_sessionGetDeleteSource  ( const tr_session * );
 tr_torrent ** tr_sessionLoadTorrents( tr_session  * session,
                                       tr_ctor     * ctor,
                                       int         * setmeCount );
+
+int tr_sessionGetActiveTorrentCount( tr_session * session );
 
 /** @} */
 
@@ -1052,7 +1043,7 @@ enum
 
 /**
  * @brief Tell transmsision where to find this torrent's local data.
- *
+ * 
  * if move_from_previous_location is `true', the torrent's incompleteDir
  * will be clobberred s.t. additional files being added will be saved
  * to the torrent's downloadDir.
@@ -1363,21 +1354,6 @@ typedef struct tr_peer_stat
     float    rateToPeer;
     float    rateToClient;
 
-
-/***
-****  THESE NEXT FOUR FIELDS ARE EXPERIMENTAL.
-****  They're currently being used in the GTK+ client to help tune the new download congestion code
-****  and probably won't make the cut for 2.0.
-***/
-    /* how many blocks we've sent to this peer in the last 120 seconds */
-    uint32_t  blocksToPeer;
-    /* how many blocks this client's sent to us in the last 120 seconds */
-    uint32_t  blocksToClient;
-    /* how many requests to this peer that we've cancelled in the last 120 seconds */
-    uint32_t  cancelsToPeer;
-    /* how many requests this peer made of us, then cancelled, in the last 120 seconds */
-    uint32_t  cancelsToClient;
-
     /* how many requests the peer has made that we haven't responded to yet */
     int      pendingReqsToClient;
 
@@ -1500,7 +1476,7 @@ typedef struct
 
     /* which tier this tracker is in */
     int tier;
-
+    
     /* used to match to a tr_tracker_info */
     uint32_t id;
 }
@@ -1650,15 +1626,16 @@ typedef enum
 }
 tr_torrent_activity;
 
+tr_torrent_activity tr_torrentGetActivity( tr_torrent * );
+
 enum
 {
-    TR_PEER_FROM_INCOMING  = 0, /* connections made to the listening port */
-    TR_PEER_FROM_LDS,           /* peers discovered by local announcements */
-    TR_PEER_FROM_TRACKER,       /* peers received from a tracker */
-    TR_PEER_FROM_DHT,           /* peers learnt from the DHT */
-    TR_PEER_FROM_RESUME,        /* peers read from the .resume file */
-    TR_PEER_FROM_PEX,           /* peers discovered via PEX */
-    TR_PEER_FROM_LTEP,          /* peer address provided in an LTEP handshake */
+    TR_PEER_FROM_INCOMING  = 0,  /* connections made to the listening port */
+    TR_PEER_FROM_TRACKER   = 1,  /* peers received from a tracker */
+    TR_PEER_FROM_DHT       = 2,  /* peers learnt from the DHT */
+    TR_PEER_FROM_RESUME    = 3,  /* peers read from the .resume file */
+    TR_PEER_FROM_PEX       = 4,  /* peers discovered via PEX */
+    TR_PEER_FROM_LTEP      = 5,  /* peer address provided in an LTEP handshake */
     TR_PEER_FROM__MAX
 };
 
@@ -1719,10 +1696,10 @@ typedef struct tr_stat
         @see tr_stat.leftUntilDone */
     float    percentDone;
 
-    /** How much has been uploaded to satisfy the seed ratio.
-        This is 1 if the ratio is reached or the torrent is set to seed forever.
+    /** The percentage of the actual ratio to the seed ratio.  This will be
+        equal to 1 if the ratio is reached or the torrent is set to seed forever.
         Range is [0..1] */
-    float    seedRatioPercentDone;
+    float    percentRatio;
 
     /** Speed all data being sent for this torrent. (KiB/s)
         This includes piece data, protocol messages, and TCP overhead */
@@ -1822,10 +1799,6 @@ typedef struct tr_stat
 
     /** The last time we uploaded or downloaded piece data on this torrent. */
     time_t    activityDate;
-    
-    /** A torrent is considered finished if it has met its seed ratio.
-        As a result, only paused torrents can be finished. */
-    tr_bool   finished;
 }
 tr_stat;
 

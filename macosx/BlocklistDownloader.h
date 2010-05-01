@@ -39,7 +39,6 @@ typedef enum
     
     BlocklistDownloaderViewController * fViewController;
     
-    NSString * fDestination;
     NSUInteger fCurrentSize;
     long long fExpectedSize;
     

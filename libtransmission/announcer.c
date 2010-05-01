@@ -24,7 +24,6 @@
 #include "publish.h"
 #include "session.h"
 #include "tr-dht.h"
-#include "tr-lds.h"
 #include "torrent.h"
 #include "utils.h"
 #include "web.h"
@@ -66,10 +65,7 @@ enum
     /* how long to put slow (nonresponsive) trackers in the penalty box */
     SLOW_HOST_PENALTY_SECS = ( 60 * 10 ),
 
-    UPKEEP_INTERVAL_SECS = 1,
-
-    /* this is an upper limit for the frequency of LDS announces */
-    LDS_HOUSEKEEPING_INTERVAL_SECS = 30
+    UPKEEP_INTERVAL_SECS = 1
 
 };
 
@@ -206,7 +202,6 @@ typedef struct tr_announcer
     tr_session * session;
     struct event * upkeepTimer;
     int slotsAvailable;
-    time_t ldsHouseKeepingAt;
 }
 tr_announcer;
 
@@ -236,25 +231,10 @@ getHost( tr_announcer * announcer, const char * url )
 static void
 onUpkeepTimer( int foo UNUSED, short bar UNUSED, void * vannouncer );
 
-static inline time_t
-calcRescheduleWithJitter( const int minPeriod )
-{
-    const double jitterFac = 0.1;
-
-    assert( minPeriod > 0 );
-
-    return tr_time()
-        + minPeriod
-        + tr_cryptoWeakRandInt( (int) ( minPeriod * jitterFac ) + 1 );
-}
-
 void
 tr_announcerInit( tr_session * session )
 {
     tr_announcer * a;
-
-    const time_t relaxUntil =
-        calcRescheduleWithJitter( LDS_HOUSEKEEPING_INTERVAL_SECS / 3 );
 
     assert( tr_isSession( session ) );
 
@@ -263,7 +243,6 @@ tr_announcerInit( tr_session * session )
     a->stops = TR_PTR_ARRAY_INIT;
     a->session = session;
     a->slotsAvailable = MAX_CONCURRENT_TASKS;
-    a->ldsHouseKeepingAt = relaxUntil;
     a->upkeepTimer = tr_new0( struct event, 1 );
     evtimer_set( a->upkeepTimer, onUpkeepTimer, a );
     tr_timerAdd( a->upkeepTimer, UPKEEP_INTERVAL_SECS, 0 );
@@ -617,23 +596,24 @@ publishWarning( tr_tier * tier, const char * msg )
 }
 
 static int
-publishNewPeers( tr_tier * tier, int seeds, int leechers,
+publishNewPeers( tr_tier * tier, tr_bool allAreSeeds,
                  const void * compact, int compactLen )
 {
     tr_tracker_event e = emptyEvent;
 
     e.messageType = TR_TRACKER_PEERS;
-    e.seedProbability = seeds+leechers ? (int)((100.0*seeds)/(seeds+leechers)) : -1;
+    e.allAreSeeds = allAreSeeds;
     e.compact = compact;
     e.compactLen = compactLen;
 
-    tr_publisherPublish( &tier->tor->tiers->publisher, tier, &e );
+    if( compactLen )
+        tr_publisherPublish( &tier->tor->tiers->publisher, tier, &e );
 
     return compactLen / 6;
 }
 
 static int
-publishNewPeersCompact( tr_tier * tier, int seeds, int leechers,
+publishNewPeersCompact( tr_tier * tier, tr_bool allAreSeeds,
                         const void * compact, int compactLen )
 {
     int i;
@@ -659,7 +639,7 @@ publishNewPeersCompact( tr_tier * tier, int seeds, int leechers,
         compactWalk += 6;
     }
 
-    publishNewPeers( tier, seeds, leechers, array, arrayLen );
+    publishNewPeers( tier, allAreSeeds, array, arrayLen );
 
     tr_free( array );
 
@@ -667,7 +647,7 @@ publishNewPeersCompact( tr_tier * tier, int seeds, int leechers,
 }
 
 static int
-publishNewPeersCompact6( tr_tier * tier, int seeds, int leechers,
+publishNewPeersCompact6( tr_tier * tier, tr_bool allAreSeeds,
                          const void * compact, int compactLen )
 {
     int i;
@@ -691,8 +671,7 @@ publishNewPeersCompact6( tr_tier * tier, int seeds, int leechers,
         memcpy( walk + sizeof( addr ), &port, 2 );
         walk += sizeof( tr_address ) + 2;
     }
-
-    publishNewPeers( tier, seeds, leechers, array, arrayLen );
+    publishNewPeers( tier, allAreSeeds, array, arrayLen );
     tr_free( array );
 
     return peerCount;
@@ -908,7 +887,7 @@ tr_announcerResetTorrent( tr_announcer * announcer, tr_torrent * tor )
         tr_tier ** tiers = (tr_tier**) tr_ptrArrayPeek( &tor->tiers->tiers, &n );
         for( i=0; i<n; ++i ) {
             tr_tier * tier = tiers[i];
-            if( !tier->wasCopied )
+            if( !tier->wasCopied )    
                 tierAddAnnounce( tier, STARTED, now );
         }
     }
@@ -1288,19 +1267,17 @@ parseAnnounceResponse( tr_tier     * tier,
         if( tr_bencDictFindRaw( &benc, "peers", &raw, &rawlen ) )
         {
             /* "compact" extension */
-            const int seeders = tier->currentTracker->seederCount;
-            const int leechers = tier->currentTracker->leecherCount;
-            peerCount += publishNewPeersCompact( tier, seeders, leechers, raw, rawlen );
+            const tr_bool allAreSeeds = !tier->currentTracker->leecherCount;
+            peerCount += publishNewPeersCompact( tier, allAreSeeds, raw, rawlen );
             gotPeers = TRUE;
         }
         else if( tr_bencDictFindList( &benc, "peers", &tmp ) )
         {
             /* original version of peers */
-            const int seeders = tier->currentTracker->seederCount;
-            const int leechers = tier->currentTracker->leecherCount;
+            const tr_bool allAreSeeds = !tier->currentTracker->leecherCount;
             size_t byteCount = 0;
             uint8_t * array = parseOldPeers( tmp, &byteCount );
-            peerCount += publishNewPeers( tier, seeders, leechers, array, byteCount );
+            peerCount += publishNewPeers( tier, allAreSeeds, array, byteCount );
             gotPeers = TRUE;
             tr_free( array );
         }
@@ -1308,9 +1285,8 @@ parseAnnounceResponse( tr_tier     * tier,
         if( tr_bencDictFindRaw( &benc, "peers6", &raw, &rawlen ) )
         {
             /* "compact" extension */
-            const int seeders = tier->currentTracker->seederCount;
-            const int leechers = tier->currentTracker->leecherCount;
-            peerCount += publishNewPeersCompact6( tier, seeders, leechers, raw, rawlen );
+            const tr_bool allAreSeeds = !tier->currentTracker->leecherCount;
+            peerCount += publishNewPeersCompact6( tier, allAreSeeds, raw, rawlen );
             gotPeers = TRUE;
         }
 
@@ -1904,16 +1880,6 @@ fprintf( stderr, "[%s] announce.c has %d requests ready to send (announce: %d, s
                         now + 25 * 60 + tr_cryptoWeakRandInt( 3 * 60 );
             }
         }
-    }
-
-    /* Local Peer Discovery */
-    if( announcer->ldsHouseKeepingAt <= now )
-    {
-        tr_ldsAnnounceMore( now, LDS_HOUSEKEEPING_INTERVAL_SECS );
-
-        /* reschedule more LDS announces for ( the future + jitter ) */
-        announcer->ldsHouseKeepingAt =
-            calcRescheduleWithJitter( LDS_HOUSEKEEPING_INTERVAL_SECS );
     }
 }
 

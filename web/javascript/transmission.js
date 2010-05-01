@@ -90,7 +90,6 @@ Transmission.prototype =
 		var ti = '#torrent_inspector_';
 		this._inspector = { };
 		this._inspector._info_tab = { };
-		this._inspector._info_tab.availability = $(ti+'availability')[0];
 		this._inspector._info_tab.comment = $(ti+'comment')[0];
 		this._inspector._info_tab.creator_date = $(ti+'creator_date')[0];
 		this._inspector._info_tab.creator = $(ti+'creator')[0];
@@ -306,10 +305,8 @@ Transmission.prototype =
 			boundingRightPad:  20,
 			boundingBottomPad: 5,
 			onContextMenu:     function(e) {
-                var closestRow = $(e.target).closest('.torrent')[0]._torrent; 
-                if(!closestRow.isSelected()) 
-                    tr.setSelectedTorrent( closestRow, true );
-                return true;
+				tr.setSelectedTorrent( $(e.target).closest('.torrent')[0]._torrent, true );
+				return true;
 			}
 		});
 	},
@@ -631,6 +628,7 @@ Transmission.prototype =
 	{
 		// handle the clutch prefs locally
 		var tr = this;
+		tr.setPref( Prefs._AutoStart, $('#prefs_form #auto_start')[0].checked );
 		var rate = parseInt( $('#prefs_form #refresh_rate')[0].value );
 		if( rate != tr[Prefs._RefreshRate] ) {
 			tr.setPref( Prefs._RefreshRate, rate );
@@ -640,7 +638,6 @@ Transmission.prototype =
 		
 		// pass the new prefs upstream to the RPC server
 		var o = { };
-		o[RPC._StartAddedTorrent]    = $('#prefs_form #auto_start')[0].checked;
 		o[RPC._PeerPort]             = parseInt( $('#prefs_form #port')[0].value );
 		o[RPC._UpSpeedLimit]         = parseInt( $('#prefs_form #upload_rate')[0].value );
 		o[RPC._DownSpeedLimit]       = parseInt( $('#prefs_form #download_rate')[0].value );
@@ -926,7 +923,7 @@ Transmission.prototype =
 
 		$('div.download_location input')[0].value = prefs[RPC._DownloadDir];
 		$('div.port input')[0].value              = prefs[RPC._PeerPort];
-		$('div.auto_start input')[0].checked      = prefs[RPC._StartAddedTorrent];
+		$('div.auto_start input')[0].checked      = prefs[Prefs._AutoStart];
 		$('input#limit_download')[0].checked      = down_limited;
 		$('input#download_rate')[0].value         = down_limit;
 		$('input#limit_upload')[0].checked        = up_limited;
@@ -943,12 +940,12 @@ Transmission.prototype =
 
 		if (!iPhone)
 		{
-			setInnerHTML( $('#limited_download_rate')[0], 'Limit (' + down_limit + ' KiB/s)' );
+			setInnerHTML( $('#limited_download_rate')[0], 'Limit (' + down_limit + ' KB/s)' );
 			var key = down_limited ? '#limited_download_rate'
 			                       : '#unlimited_download_rate';
 			$(key).deselectMenuSiblings().selectMenuItem();
 		
-			setInnerHTML( $('#limited_upload_rate')[0], 'Limit (' + up_limit + ' KiB/s)' );
+			setInnerHTML( $('#limited_upload_rate')[0], 'Limit (' + up_limit + ' KB/s)' );
 			key = up_limited ? '#limited_upload_rate'
 			                 : '#unlimited_upload_rate';
 			$(key).deselectMenuSiblings().selectMenuItem();
@@ -1053,7 +1050,7 @@ Transmission.prototype =
 					$element.deselectMenuSiblings().selectMenuItem();
 					args[RPC._DownSpeedLimited] = false;
 				} else {
-					setInnerHTML( $('#limited_download_rate')[0], 'Limit (' + rate + ' KiB/s)' );
+					setInnerHTML( $('#limited_download_rate')[0], 'Limit (' + rate + ' KB/s)' );
 					$('#limited_download_rate').deselectMenuSiblings().selectMenuItem();
 					$('div.preference input#download_rate')[0].value = rate;
 					args[RPC._DownSpeedLimit] = parseInt( rate );
@@ -1071,7 +1068,7 @@ Transmission.prototype =
 					$element.deselectMenuSiblings().selectMenuItem();
 					args[RPC._UpSpeedLimited] = false;
 				} else {
-					setInnerHTML( $('#limited_upload_rate')[0], 'Limit (' + rate + ' KiB/s)' );
+					setInnerHTML( $('#limited_upload_rate')[0], 'Limit (' + rate + ' KB/s)' );
 					$('#limited_upload_rate').deselectMenuSiblings().selectMenuItem();
 					$('div.preference input#upload_rate')[0].value = rate;
 					args[RPC._UpSpeedLimit] = parseInt( rate );
@@ -1086,7 +1083,7 @@ Transmission.prototype =
 
 				// The 'reverse sort' option state can be toggled independently of the other options
 				if ($element.is('#reverse_sort_order')) {
-                                        if(!$element.is('#reverse_sort_order.active')) break;
+					if(!$element.is('#reverse_sort_order.active')) break;
 					var dir;
 					if ($element.menuItemIsSelected()) {
 						$element.deselectMenuItem();
@@ -1148,7 +1145,6 @@ Transmission.prototype =
 		var total_download = 0;
 		var total_download_peers = 0;
 		var total_download_speed = 0;
-		var total_availability = 0;
 		var total_have = 0;
 		var total_size = 0;
 		var total_state = null;
@@ -1173,7 +1169,6 @@ Transmission.prototype =
 			setInnerHTML( tab.upload_speed, na );
 			setInnerHTML( tab.uploaded, na );
 			setInnerHTML( tab.downloaded, na );
-			setInnerHTML( tab.availability, na );
 			setInnerHTML( tab.ratio, na );
 			setInnerHTML( tab.have, na );
 			setInnerHTML( tab.upload_to, na );
@@ -1225,7 +1220,6 @@ Transmission.prototype =
 			total_download_speed += t.downloadSpeed();
 			total_upload_peers   += t.peersGettingFromUs();
 			total_download_peers += t.peersSendingToUs();
-			total_availability   += t._sizeWhenDone - t._leftUntilDone + t._desiredAvailable;
 			if( total_state == null )
 				total_state = t.stateStr();
 			else if ( total_state.search ( t.stateStr() ) == -1 )
@@ -1250,7 +1244,6 @@ Transmission.prototype =
 		setInnerHTML( tab.upload_speed, torrents.length ? Math.formatBytes( total_upload_speed ) + '/s' : na );
 		setInnerHTML( tab.uploaded, torrents.length ? Math.formatBytes( total_upload ) : na );
 		setInnerHTML( tab.downloaded, torrents.length ? Math.formatBytes( total_download ) : na );
-		setInnerHTML( tab.availability, torrents.length ? Math.ratio( total_availability*100, sizeWhenDone ) + '%' : na );
 		setInnerHTML( tab.ratio, torrents.length ? Math.ratio( total_upload, total_download ) : na );
 		setInnerHTML( tab.have, torrents.length ? Math.formatBytes(total_completed) + ' (' + Math.formatBytes(total_verified) + ' verified)' : na );
 		setInnerHTML( tab.upload_to, torrents.length ? total_upload_peers : na );
@@ -1637,7 +1630,7 @@ Transmission.prototype =
 		if (! confirmed) {
 				$('input#torrent_upload_file').attr('value', '');
 				$('input#torrent_upload_url').attr('value', '');
-				$('input#torrent_auto_start').attr('checked', $('#prefs_form #auto_start')[0].checked);
+				$('input#torrent_auto_start').attr('checked', this[Prefs._AutoStart]);
 				$('#upload_container').show();
 			if (!iPhone && Safari3) {
 				setTimeout("$('div#upload_container div.dialog_window').css('top', '0px');",10);

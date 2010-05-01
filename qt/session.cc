@@ -147,8 +147,6 @@ Session :: updatePref( int key )
         case Prefs :: USPEED:
         case Prefs :: DSPEED_ENABLED:
         case Prefs :: DSPEED:
-        case Prefs :: START:
-        case Prefs :: TRASH_ORIGINAL:
         case Prefs :: PEX_ENABLED:
         case Prefs :: PORT_FORWARDING:
         case Prefs :: PEER_PORT:
@@ -858,17 +856,6 @@ Session :: addTorrent( QString filename )
     addTorrent( filename, myPrefs.getString( Prefs::DOWNLOAD_DIR ) );
 }
 
-namespace
-{
-    bool isLink( const QString& str )
-    {
-        return str.startsWith( "magnet:?" )
-            || str.startsWith( "http://" )
-            || str.startsWith( "https://" )
-            || str.startsWith( "ftp://" );
-    }
-}
-
 void
 Session :: addTorrent( QString key, QString localPath )
 {
@@ -879,29 +866,23 @@ Session :: addTorrent( QString key, QString localPath )
     tr_bencDictAddStr( args, "download-dir", qPrintable(localPath) );
     tr_bencDictAddBool( args, "paused", !myPrefs.getBool( Prefs::START ) );
 
-    // figure out what to do with "key"....
-    bool keyHandled = false;
-    if( !keyHandled && isLink( key  )) {
+    // if "key" is a readable local file, add it as metadata...
+    // otherwise it's probably a URL or magnet link, so pass it along
+    // for the daemon to handle
+    QFile file( key );
+    file.open( QIODevice::ReadOnly );
+    const QByteArray raw( file.readAll( ) );
+    file.close( );
+    if( !raw.isEmpty( ) )
+    {
+        int b64len = 0;
+        char * b64 = tr_base64_encode( raw.constData(), raw.size(), &b64len );
+        tr_bencDictAddRaw( args, "metainfo", b64, b64len  );
+        tr_free( b64 );
+    }
+    else
+    {
         tr_bencDictAddStr( args, "filename", key.toUtf8().constData() );
-        keyHandled = true; // it's a URL or magnet link...
-    }
-    if( !keyHandled ) {
-        QFile file( key );
-        file.open( QIODevice::ReadOnly );
-        const QByteArray raw( file.readAll( ) );
-        file.close( );
-        if( !raw.isEmpty( ) ) {
-            int b64len = 0;
-            char * b64 = tr_base64_encode( raw.constData(), raw.size(), &b64len );
-            tr_bencDictAddRaw( args, "metainfo", b64, b64len  );
-            tr_free( b64 );
-            keyHandled = true; // it's a local file...
-        }
-    }
-    if( !keyHandled ) {
-        const QByteArray tmp = key.toUtf8();
-        tr_bencDictAddRaw( args, "metainfo", tmp.constData(), tmp.length() );
-        keyHandled = true; // treat it as base64
     }
 
     exec( &top );

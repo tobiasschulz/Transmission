@@ -60,7 +60,4 @@
 
 - (void) addRemoveTracker: (id) sender;
 
-- (void) copy: (id) sender;
-- (void) paste: (id) sender;
-
 @end

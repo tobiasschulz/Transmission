@@ -94,7 +94,7 @@ toggle_pref_cb( GtkToggleAction *  action,
 static GtkToggleActionEntry  pref_toggle_entries[] =
 {
     { "alt-speed-enabled", NULL, N_( "Enable Temporary Speed _Limits" ), NULL, NULL, G_CALLBACK( toggle_pref_cb ), FALSE },
-    { "compact-view",      NULL, N_( "_Compact View" ), "<alt>C", NULL, G_CALLBACK( toggle_pref_cb ), FALSE },
+    { "minimal-view",      NULL, N_( "_Minimal View" ), "<alt>M", NULL, G_CALLBACK( toggle_pref_cb ), FALSE },
     { "sort-reversed",     NULL, N_( "Re_verse Sort Order" ), NULL, NULL, G_CALLBACK( toggle_pref_cb ), FALSE },
     { "show-filterbar",    NULL, N_( "_Filterbar" ), NULL, NULL, G_CALLBACK( toggle_pref_cb ), FALSE },
     { "show-statusbar",    NULL, N_( "_Statusbar" ), NULL, NULL, G_CALLBACK( toggle_pref_cb ), FALSE },
@@ -133,6 +133,7 @@ static GtkActionEntry entries[] =
     { "show-about-dialog", GTK_STOCK_ABOUT, NULL, NULL, NULL, G_CALLBACK( action_cb ) },
     { "help", GTK_STOCK_HELP, N_( "_Contents" ), "F1", NULL, G_CALLBACK( action_cb ) },
     { "update-tracker", GTK_STOCK_NETWORK, N_( "Ask Tracker for _More Peers" ), NULL, NULL, G_CALLBACK( action_cb ) },
+    { "present-main-window", NULL, NULL, NULL, NULL, G_CALLBACK( action_cb ) },
 };
 
 typedef struct
@@ -144,14 +145,14 @@ BuiltinIconInfo;
 
 static const BuiltinIconInfo my_fallback_icons[] =
 {
-    { tr_icon_logo_48,  WINDOW_ICON          },
-    { tr_icon_logo_24,  TRAY_ICON            },
-    { tr_icon_logo_48,  NOTIFICATION_ICON    },
-    { tr_icon_lock,     "transmission-lock"  },
-    { options_icon,     "options"            },
-    { blue_turtle,      "alt-speed-on"       },
-    { grey_turtle,      "alt-speed-off"      },
-    { ratio_icon,       "ratio"              }
+    { tr_icon_logo_48, WINDOW_ICON         },
+    { tr_icon_logo_24, TRAY_ICON           },
+    { tr_icon_logo_48, NOTIFICATION_ICON   },
+    { tr_icon_lock,   "transmission-lock" },
+    { options_icon,   "options"           },
+    { blue_turtle,    "alt-speed-on"      },
+    { grey_turtle,    "alt-speed-off"     },
+    { ratio_icon,     "ratio"             }
 };
 
 static void

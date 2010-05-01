@@ -168,16 +168,9 @@
                         
             [fTableView reloadData];
             
-            if ([fTableView numberOfRows] > 0)
-            {
-                if (row == [fTableView numberOfRows])
-                {
-                    --row;
-                    [fTableView selectRowIndexes: [NSIndexSet indexSetWithIndex: row] byExtendingSelection: NO];
-                }
-                
-                [fTableView scrollRowToVisible: row];
-            }
+            NSInteger selectedRow = [fTableView selectedRow];
+            if (selectedRow != -1)
+                [fTableView scrollRowToVisible: selectedRow];
             
             break;
     }

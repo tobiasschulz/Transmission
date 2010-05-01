@@ -286,7 +286,7 @@ mimetype_guess( const char * path )
         const char *    suffix;
         const char *    mime_type;
     } types[] = {
-        /* these are the ones we need for serving the web client's files... */
+        /* these are just the ones we need for serving clutch... */
         { "css",  "text/css"                  },
         { "gif",  "image/gif"                 },
         { "html", "text/html"                 },
@@ -439,14 +439,14 @@ serve_file( struct evhttp_request * req,
 }
 
 static void
-handle_web_client( struct evhttp_request * req,
-                   struct tr_rpc_server *  server )
+handle_clutch( struct evhttp_request * req,
+               struct tr_rpc_server *  server )
 {
-    const char * webClientDir = tr_getWebClientDir( server->session );
+    const char * clutchDir = tr_getClutchDir( server->session );
 
     assert( !strncmp( req->uri, "/transmission/web/", 18 ) );
 
-    if( !webClientDir || !*webClientDir )
+    if( !clutchDir || !*clutchDir )
     {
         send_simple_response( req, HTTP_NOTFOUND,
             "<p>Couldn't find Transmission's web interface files!</p>"
@@ -474,7 +474,7 @@ handle_web_client( struct evhttp_request * req,
         else
         {
             char * filename = tr_strdup_printf( "%s%s%s",
-                                 webClientDir,
+                                 clutchDir,
                                  TR_PATH_DELIMITER_STR,
                                  subpath && *subpath ? subpath : "index.html" );
             serve_file( req, server, filename );
@@ -618,7 +618,7 @@ handle_request( struct evhttp_request * req, void * arg )
         }
         else if( !strncmp( req->uri, "/transmission/web/", 18 ) )
         {
-            handle_web_client( req, server );
+            handle_clutch( req, server );
         }
         else if( !strncmp( req->uri, "/transmission/upload", 20 ) )
         {
