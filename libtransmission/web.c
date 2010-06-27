@@ -10,11 +10,7 @@
  * $Id$
  */
 
-#ifdef WIN32
-  #include <ws2tcpip.h>
-#else
-  #include <sys/select.h>
-#endif
+#include <sys/select.h>
 
 #include <curl/curl.h>
 #include <event.h>
@@ -308,17 +304,7 @@ tr_webThreadFunc( void * vsession )
             t.tv_sec =  usec / 1000000;
             t.tv_usec = usec % 1000000;
 
-#ifdef WIN32
-            /* see ticket #3311, comments 16-18 */
-            if( !r_fd_set.fd_count && !w_fd_set.fd_count && !c_fd_set.fd_count )
-                tr_wait_msec( msec );
-            else
-                select( 0, r_fd_set.fd_count ? &r_fd_set : NULL,
-                           w_fd_set.fd_count ? &w_fd_set : NULL,
-                           c_fd_set.fd_count ? &c_fd_set : NULL, &t );
-#else
             select( max_fd+1, &r_fd_set, &w_fd_set, &c_fd_set, &t );
-#endif
         }
 
         /* call curl_multi_perform() */

@@ -30,12 +30,10 @@
 
 typedef GtkWindow TrWindow;
 
-GtkTreeSelection * tr_window_get_selection( TrWindow * );
+GtkTreeSelection * tr_window_get_selection( TrWindow* wind );
 
 GtkWidget        * tr_window_new( GtkUIManager * uim, TrCore * core );
 
-void               tr_window_update( TrWindow * );
-
-void               tr_window_set_busy( TrWindow *, gboolean isBusy );
+void               tr_window_update( TrWindow * wind );
 
 #endif

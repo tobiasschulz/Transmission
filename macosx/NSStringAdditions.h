@@ -35,8 +35,6 @@
 + (NSString *) stringForSpeedAbbrev: (CGFloat) speed;
 + (NSString *) stringForRatio: (CGFloat) ratio;
 
-+ (NSString *) percentString: (CGFloat) progress longDecimals: (BOOL) longDecimals;
-
 + (NSString *) timeString: (uint64_t) seconds showSeconds: (BOOL) showSeconds;
 + (NSString *) timeString: (uint64_t) seconds showSeconds: (BOOL) showSeconds maxFields: (NSUInteger) max;
 

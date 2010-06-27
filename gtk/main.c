@@ -532,8 +532,6 @@ main( int argc, char ** argv )
     bind_textdomain_codeset( domain, "UTF-8" );
     textdomain( domain );
     g_set_application_name( _( "Transmission" ) );
-    tr_formatter_size_init( 1024, _("B"), _("KiB"), _("MiB"), _("GiB") );
-    tr_formatter_speed_init( 1024, _("B/s"), _("KiB/s"), _("MiB/s"), _("GiB/s") );
 
     /* initialize gtk */
     if( !g_thread_supported( ) )
@@ -676,12 +674,6 @@ main( int argc, char ** argv )
 }
 
 static void
-onCoreBusy( TrCore * core UNUSED, gboolean busy, struct cbdata * c )
-{
-    tr_window_set_busy( c->wind, busy );
-}
-
-static void
 appsetup( TrWindow *      wind,
           GSList *        torrentFiles,
           struct cbdata * cbdata,
@@ -709,11 +701,13 @@ appsetup( TrWindow *      wind,
     actions_set_core( cbdata->core );
 
     /* set up core handlers */
-    g_signal_connect( cbdata->core, "busy", G_CALLBACK( onCoreBusy ), cbdata );
-    g_signal_connect( cbdata->core, "add-error", G_CALLBACK( coreerr ), cbdata );
-    g_signal_connect( cbdata->core, "add-prompt", G_CALLBACK( onAddTorrent ), cbdata );
-    g_signal_connect( cbdata->core, "prefs-changed", G_CALLBACK( prefschanged ), cbdata );
-    g_signal_connect_swapped( cbdata->core, "quit", G_CALLBACK( wannaquit ), cbdata );
+    g_signal_connect( cbdata->core, "error", G_CALLBACK( coreerr ), cbdata );
+    g_signal_connect( cbdata->core, "add-torrent-prompt",
+                      G_CALLBACK( onAddTorrent ), cbdata );
+    g_signal_connect_swapped( cbdata->core, "quit",
+                              G_CALLBACK( wannaquit ), cbdata );
+    g_signal_connect( cbdata->core, "prefs-changed",
+                      G_CALLBACK( prefschanged ), cbdata );
 
     /* add torrents from command-line and saved state */
     tr_core_load( cbdata->core, forcepause );
@@ -1017,6 +1011,8 @@ gotdrag( GtkWidget         * widget UNUSED,
                 while( g_str_has_prefix( filename, "//" ) )
                     ++filename;
             }
+
+            g_debug( "got from drag: [%s]", filename );
 
             if( g_file_test( filename, G_FILE_TEST_EXISTS ) )
                 paths = g_slist_prepend( paths, g_strdup( filename ) );
@@ -1503,12 +1499,13 @@ accumulateSelectedTorrents( GtkTreeModel * model,
 static void
 removeSelected( struct cbdata * data, gboolean delete_files )
 {
-    GSList * l = NULL;
+    GSList *           l = NULL;
     GtkTreeSelection * s = tr_window_get_selection( data->wind );
 
     gtk_tree_selection_selected_foreach( s, accumulateSelectedTorrents, &l );
-
-    if( l != NULL ) {
+    gtk_tree_selection_unselect_all( s );
+    if( l )
+    {
         l = g_slist_reverse( l );
         confirmRemove( data->wind, data->core, l, delete_files );
     }

@@ -33,7 +33,6 @@
 
 #include <libtransmission/transmission.h> /* TR_RATIO_NA, TR_RATIO_INF */
 #include <libtransmission/utils.h> /* tr_inf */
-#include <libtransmission/web.h> /* tr_webResponseStr() */
 #include <libtransmission/version.h> /* tr_inf */
 
 #include "conf.h"
@@ -106,32 +105,39 @@ tr_strlratio( char * buf, double ratio, size_t buflen )
     return tr_strratio( buf, buflen, ratio, gtr_get_unicode_string( GTR_UNICODE_INF ) );
 }
 
-char*
-tr_strlpercent( char * buf, double x, size_t buflen )
-{
-    return tr_strpercent( buf, x, buflen );
-}
+static double KiB = 1024.0;
+static double MiB = ( 1024.0 * 1024.0 );
+static double GiB = ( 1024.0 * 1024.0 * 1024.0 );
 
 char*
 tr_strlsize( char * buf, guint64 bytes, size_t buflen )
 {
     if( !bytes )
         g_strlcpy( buf, _( "None" ), buflen );
+    else if( bytes < KiB )
+        g_snprintf( buf, buflen, ngettext( "%'u byte", "%'u bytes", (guint)bytes ), (guint)bytes );
+    else if( bytes < MiB )
+        g_snprintf( buf, buflen, _( "%'.1f KiB" ), bytes / KiB );
+    else if( bytes < GiB )
+        g_snprintf( buf, buflen, _( "%'.1f MiB" ), bytes / MiB );
     else
-        tr_formatter_size( buf, bytes, buflen );
-
+        g_snprintf( buf, buflen, _( "%'.1f GiB" ), bytes / GiB );
     return buf;
 }
 
 char*
 tr_strlspeed( char * buf, double kb_sec, size_t buflen )
 {
-    const int64_t bytes_per_second = kb_sec * 1024.0;
+    const double speed = kb_sec;
 
-    if( bytes_per_second < 1 )
-        g_strlcpy( buf, _( "None" ), buflen );
-    else
-        tr_formatter_speed( buf, bytes_per_second, buflen );
+    if( speed < 1000.0 )  /* 0.0 KiB to 999.9 KiB */
+        g_snprintf( buf, buflen, _( "%'.1f KiB/s" ), speed );
+    else if( speed < 102400.0 ) /* 0.98 MiB to 99.99 MiB */
+        g_snprintf( buf, buflen, _( "%'.2f MiB/s" ), ( speed / KiB ) );
+    else if( speed < 1024000.0 ) /* 100.0 MiB to 999.9 MiB */
+        g_snprintf( buf, buflen, _( "%'.1f MiB/s" ), ( speed / MiB ) );
+    else /* insane speeds */
+        g_snprintf( buf, buflen, _( "%'.2f GiB/s" ), ( speed / GiB ) );
 
     return buf;
 }
@@ -716,16 +722,6 @@ gtr_widget_set_tooltip_text( GtkWidget * w, const char * tip )
 #endif
 }
 
-gboolean
-gtr_widget_get_realized( GtkWidget * w )
-{
-#if GTK_CHECK_VERSION( 2,20,0 )
-    return gtk_widget_get_realized( w );
-#else
-    return GTK_WIDGET_REALIZED( w ) != 0;
-#endif
-}
-
 void
 gtr_toolbar_set_orientation( GtkToolbar      * toolbar,
                              GtkOrientation    orientation )
@@ -736,7 +732,6 @@ gtr_toolbar_set_orientation( GtkToolbar      * toolbar,
     gtk_toolbar_set_orientation( toolbar, orientation );
 #endif
 }
-
 
 /***
 ****
@@ -813,25 +808,6 @@ gtr_timeout_add_seconds( guint seconds, GSourceFunc function, gpointer data )
                                gtr_func_data_new( function, data ),
                                gtr_func_data_free );
 #endif
-}
-
-void
-gtr_http_failure_dialog( GtkWidget * parent, const char * url, long response_code )
-{
-    GtkWindow * window = getWindow( parent );
-
-    GtkWidget * w = gtk_message_dialog_new( window, 0,
-                                            GTK_MESSAGE_ERROR,
-                                            GTK_BUTTONS_CLOSE,
-                                            _( "Error opening \"%s\"" ), url );
-
-    gtk_message_dialog_format_secondary_text( GTK_MESSAGE_DIALOG( w ),
-                                              _( "Server returned \"%1$ld %2$s\"" ),
-                                              response_code,
-                                              tr_webGetResponseStr( response_code ) );
-
-    g_signal_connect_swapped( w, "response", G_CALLBACK( gtk_widget_destroy ), w );
-    gtk_widget_show( w );
 }
 
 void

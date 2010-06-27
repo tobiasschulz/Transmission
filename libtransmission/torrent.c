@@ -29,7 +29,6 @@
 #include "announcer.h"
 #include "bandwidth.h"
 #include "bencode.h"
-#include "cache.h"
 #include "completion.h"
 #include "crypto.h" /* for tr_sha1 */
 #include "resume.h"
@@ -363,8 +362,13 @@ tr_torrentClearError( tr_torrent * tor )
 }
 
 static void
-onTrackerResponse( tr_torrent * tor, const tr_tracker_event * event, void * unused UNUSED )
+onTrackerResponse( void * tracker UNUSED,
+                   void * vevent,
+                   void * user_data )
 {
+    tr_torrent * tor = user_data;
+    tr_tracker_event * event = vevent;
+
     switch( event->messageType )
     {
         case TR_TRACKER_PEERS:
@@ -725,7 +729,8 @@ torrentInit( tr_torrent * tor, const tr_ctor * ctor )
         }
     }
 
-    tor->tiers = tr_announcerAddTorrent( tor->session->announcer, tor, onTrackerResponse, NULL );
+    tor->tiers = tr_announcerAddTorrent( tor->session->announcer, tor );
+    tor->tiersSubscription = tr_announcerSubscribe( tor->tiers, onTrackerResponse, tor );
 
     if( doStart )
         torrentStart( tor );
@@ -1311,6 +1316,7 @@ freeTorrent( tr_torrent * tor )
 
     tr_cpDestruct( &tor->completion );
 
+    tr_announcerUnsubscribe( tor->tiers, tor->tiersSubscription );
     tr_announcerRemoveTorrent( session->announcer, tor );
 
     tr_bitfieldDestruct( &tor->checkedPieces );
@@ -1511,7 +1517,6 @@ stopTorrent( void * vtor )
     tr_verifyRemove( tor );
     tr_peerMgrStopTorrent( tor );
     tr_announcerTorrentStopped( tor );
-    tr_cacheFlushTorrent( tor->session->cache, tor );
 
     tr_fdTorrentClose( tor->session, tor->uniqueId );
 
@@ -1662,15 +1667,6 @@ tr_torrentClearRatioLimitHitCallback( tr_torrent * torrent )
     tr_torrentSetRatioLimitHitCallback( torrent, NULL, NULL );
 }
 
-static void
-tr_setenv( const char * name, const char * value, tr_bool override )
-{
-#ifdef WIN32
-    putenv( tr_strdup_printf( "%s=%s", name, value ) ); /* leaks memory... */
-#else
-    setenv( name, value, override );
-#endif
-}
 
 static void
 torrentCallScript( tr_torrent * tor, const char * script )
@@ -1686,16 +1682,16 @@ torrentCallScript( tr_torrent * tor, const char * script )
         clearenv( );
 #endif
 
-        tr_setenv( "TR_APP_VERSION", SHORT_VERSION_STRING, 1 );
+        setenv( "TR_APP_VERSION", SHORT_VERSION_STRING, 1 );
 
         tr_snprintf( buf, sizeof( buf ), "%d", tr_torrentId( tor ) );
-        tr_setenv( "TR_TORRENT_ID", buf, 1 );
-        tr_setenv( "TR_TORRENT_NAME", tr_torrentName( tor ), 1 );
-        tr_setenv( "TR_TORRENT_DIR", tor->currentDir, 1 );
-        tr_setenv( "TR_TORRENT_HASH", tor->info.hashString, 1 );
+        setenv( "TR_TORRENT_ID", buf, 1 );
+        setenv( "TR_TORRENT_NAME", tr_torrentName( tor ), 1 );
+        setenv( "TR_TORRENT_DIR", tor->currentDir, 1 );
+        setenv( "TR_TORRENT_HASH", tor->info.hashString, 1 );
         tr_strlcpy( buf, ctime( &now ), sizeof( buf ) );
         *strchr( buf,'\n' ) = '\0';
-        tr_setenv( "TR_TIME_LOCALTIME", buf, 1 );
+        setenv( "TR_TIME_LOCALTIME", buf, 1 );
         tr_torinf( tor, "Calling script \"%s\"", script );
         system( script );
     }
@@ -2151,37 +2147,17 @@ tr_torrentGetMTimes( const tr_torrent * tor, size_t * setme_n )
 ****
 ***/
 
-static int
-compareTrackerByTier( const void * va, const void * vb )
-{
-    const tr_tracker_info * a = va;
-    const tr_tracker_info * b = vb;
-
-    /* sort by tier */
-    if( a->tier != b->tier )
-        return a->tier - b->tier;
-
-    /* get the effects of a stable sort by comparing the two elements' addresses */
-    return a - b;
-}
-
 tr_bool
 tr_torrentSetAnnounceList( tr_torrent             * tor,
-                           const tr_tracker_info  * trackers_in,
+                           const tr_tracker_info  * trackers,
                            int                      trackerCount )
 {
     int i;
     tr_benc metainfo;
     tr_bool ok = TRUE;
-    tr_tracker_info * trackers;
-
     tr_torrentLock( tor );
 
     assert( tr_isTorrent( tor ) );
-
-    /* ensure the trackers' tiers are in ascending order */
-    trackers = tr_memdup( trackers_in, sizeof( tr_tracker_info ) * trackerCount );
-    qsort( trackers, trackerCount, sizeof( tr_tracker_info ), compareTrackerByTier );
 
     /* look for bad URLs */
     for( i=0; ok && i<trackerCount; ++i )
@@ -2262,8 +2238,6 @@ tr_torrentSetAnnounceList( tr_torrent             * tor,
     }
 
     tr_torrentUnlock( tor );
-
-    tr_free( trackers );
     return ok;
 }
 

@@ -31,8 +31,8 @@ struct tr_webseed
 
     char              * url;
 
-    tr_peer_callback  * callback;
-    void              * callback_data;
+    tr_delivery_func  * callback;
+    void *              callback_userdata;
 
     tr_piece_index_t    pieceIndex;
     uint32_t            pieceOffset;
@@ -52,10 +52,11 @@ struct tr_webseed
 static const tr_peer_event blankEvent = { 0, 0, 0, 0, 0.0f, 0, 0, 0 };
 
 static void
-publish( tr_webseed * w, tr_peer_event * e )
+publish( tr_webseed *    w,
+         tr_peer_event * e )
 {
-    if( w->callback != NULL )
-        w->callback( NULL, e, w->callback_data );
+    if( w->callback )
+        w->callback( NULL, e, w->callback_userdata );
 }
 
 static void
@@ -235,9 +236,9 @@ tr_webseedGetSpeed( const tr_webseed * w, uint64_t now, float * setme_KiBs )
 
 tr_webseed*
 tr_webseedNew( struct tr_torrent * torrent,
-               const char        * url,
-               tr_peer_callback  * callback,
-               void              * callback_data )
+               const char *        url,
+               tr_delivery_func    callback,
+               void *              callback_userdata )
 {
     tr_webseed * w = tr_new0( tr_webseed, 1 );
 
@@ -246,8 +247,9 @@ tr_webseedNew( struct tr_torrent * torrent,
     w->content = evbuffer_new( );
     w->url = tr_strdup( url );
     w->callback = callback;
-    w->callback_data = callback_data;
+    w->callback_userdata = callback_userdata;
     tr_rcConstruct( &w->rateDown );
+/*fprintf( stderr, "w->callback_userdata is %p\n", w->callback_userdata );*/
     return w;
 }
 

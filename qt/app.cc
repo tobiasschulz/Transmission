@@ -26,7 +26,6 @@
 
 #include <libtransmission/transmission.h>
 #include <libtransmission/tr-getopt.h>
-#include <libtransmission/utils.h>
 #include <libtransmission/version.h>
 
 #include "app.h"
@@ -97,18 +96,6 @@ MyApp :: MyApp( int& argc, char ** argv ):
     t = new QTranslator( );
     t->load( QString(MY_NAME) + "_" + QLocale::system().name() );
     installTranslator( t );
-
-    // initialize the units formatter
-
-    tr_formatter_size_init ( 1024, qPrintable(tr("B")),
-                                   qPrintable(tr("KiB")),
-                                   qPrintable(tr("MiB")),
-                                   qPrintable(tr("GiB")) );
-
-    tr_formatter_speed_init( 1024, qPrintable(tr("B/s")),
-                                   qPrintable(tr("KiB/s")),
-                                   qPrintable(tr("MiB/s")),
-                                   qPrintable(tr("GiB/s")) );
 
     // set the default icon
     QIcon icon;

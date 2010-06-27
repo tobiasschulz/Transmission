@@ -11,8 +11,6 @@
  */
 
 #ifdef WIN32
- #include <w32api.h>
- #define WINVER  WindowsXP
  #include <windows.h>
  #include <shlobj.h> /* for CSIDL_APPDATA, CSIDL_MYDOCUMENTS */
 #else
@@ -438,7 +436,7 @@ tr_getDefaultConfigDir( const char * appname )
             s = tr_buildPath( getHomeDir( ), "Library", "Application Support",
                               appname, NULL );
 #elif defined( WIN32 )
-            char appdata[TR_PATH_MAX]; /* SHGetFolderPath() requires MAX_PATH */
+            char appdata[TR_MAX_PATH]; /* SHGetFolderPath() requires MAX_PATH */
             SHGetFolderPath( NULL, CSIDL_APPDATA, NULL, 0, appdata );
             s = tr_buildPath( appdata, appname, NULL );
 #elif defined( __HAIKU__ )

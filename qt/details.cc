@@ -26,6 +26,7 @@
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QLabel>
+#include <QLocale>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QResizeEvent>
@@ -232,6 +233,7 @@ Details :: onTorrentChanged( )
 void
 Details :: refresh( )
 {
+    QLocale locale;
     const int n = myIds.size( );
     const bool single = n == 1;
     const QString blank;
@@ -308,7 +310,7 @@ Details :: refresh( )
             string = none;
         else {
             const double d = 100.0 * ( sizeWhenDone ? ( sizeWhenDone - leftUntilDone ) / sizeWhenDone : 1 );
-            QString pct = Utils::percentToString( d );
+            QString pct = locale.toString( d, 'f', 2 );
             if( !haveUnverified )
                 string = tr( "%1 (%2%)" )
                              .arg( Utils :: sizeToString( haveVerified + haveUnverified ) )
@@ -323,14 +325,10 @@ Details :: refresh( )
     myHaveLabel->setText( string );
 
     // myAvailabilityLabel
-    if( torrents.empty( ) )
+    if( sizeWhenDone < 1 )
         string = none;
-    else {
-        if( sizeWhenDone == 0 )
-            string = none;
-        else
-            string = QString( "%1%" ).arg( Utils::percentToString( ( 100.0 * available ) / sizeWhenDone ) );
-    }
+    else
+        string.sprintf( "%'.1f%%", ( 100.0 * available ) / sizeWhenDone );
     myAvailabilityLabel->setText( string );
 
     // myDownloadedLabel
@@ -854,7 +852,7 @@ Details :: refresh( )
 
             item->setText( COL_UP, peer.rateToPeer.isZero() ? "" : Utils::speedToString( peer.rateToPeer ) );
             item->setText( COL_DOWN, peer.rateToClient.isZero() ? "" : Utils::speedToString( peer.rateToClient ) );
-            item->setText( COL_PERCENT, peer.progress > 0 ? QString( "%1%" ).arg( (int)( peer.progress * 100.0 ) ) : "" );
+            item->setText( COL_PERCENT, peer.progress > 0 ? QString( "%1%" ).arg( locale.toString((int)(peer.progress*100.0))) : "" );
             item->setText( COL_STATUS, code );
             item->setToolTip( COL_STATUS, codeTip );
 
@@ -1159,7 +1157,6 @@ Details :: createPeersTab( )
     myPeerTree->setHeaderLabels( headers );
     myPeerTree->setColumnWidth( 0, 20 );
     myPeerTree->setSortingEnabled( true );
-    myPeerTree->sortByColumn( COL_ADDRESS, Qt::AscendingOrder );
     myPeerTree->setRootIsDecorated( false );
     myPeerTree->setTextElideMode( Qt::ElideRight );
     v->addWidget( myPeerTree, 1 );

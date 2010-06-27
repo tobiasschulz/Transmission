@@ -3,8 +3,8 @@ dnl STATUS: "X" for prerelease beta builds,
 dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
-m4_define([user_agent_prefix],[2.00+])
-m4_define([peer_id_prefix],[-TR200Z-])
+m4_define([user_agent_prefix],[2.01])
+m4_define([peer_id_prefix],[-TR2010-])
 
 AC_INIT([transmission],
         [user_agent_prefix],
@@ -407,7 +407,7 @@ case $host_os in
      have_msw="yes"
      CXXFLAGS="$CXXFLAGS -mms-bitfields -mwin32 -mwindows"
      CPPFLAGS="$CPPFLAGS -DWIN32 -D_WIN32 -DWIN32_LEAN_AND_MEAN"
-     LIBS="$LIBS -liphlpapi -lshell32 -lws2_32"
+     LIBS="$LIBS -lshell32 -lws2_32"
      transmissionlocaledir="locale"
      if test -z "$host_alias"; then
        hostaliaswindres=
@@ -476,7 +476,6 @@ AC_CONFIG_FILES([Makefile
                  daemon/Makefile
                  doc/Makefile
                  libtransmission/Makefile
-                 utils/Makefile
                  third-party/Makefile
                  third-party/miniupnp/Makefile
                  third-party/libnatpmp/Makefile
