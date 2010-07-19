@@ -21,8 +21,8 @@
 
 #include "conf.h"
 #include "hig.h"
-#include "tr-core.h"
 #include "msgwin.h"
+#include "tr-core.h"
 #include "tr-prefs.h"
 #include "util.h"
 
@@ -37,12 +37,12 @@ enum
 
 struct MsgData
 {
-    TrCore        * core;
-    GtkTreeView   * view;
-    GtkListStore  * store;
-    GtkTreeModel  * filter;
-    GtkTreeModel  * sort;
-    tr_msg_level    maxLevel;
+    TrCore *        core;
+    GtkTreeView *   view;
+    GtkListStore *  store;
+    GtkTreeModel *  filter;
+    GtkTreeModel *  sort;
+    int             maxLevel;
     gboolean        isPaused;
     guint           refresh_tag;
 };

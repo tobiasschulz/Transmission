@@ -24,7 +24,6 @@
 
 #import "PeerProgressIndicatorCell.h"
 #import "NSApplicationAdditions.h"
-#import "NSStringAdditions.h"
 
 #import "transmission.h" // required by utils.h
 #import "utils.h"
@@ -64,7 +63,8 @@
             [paragraphStyle release];
         }
         
-        [[NSString percentString: [self floatValue] longDecimals: NO] drawInRect: cellFrame withAttributes: fAttributes];
+        [[NSString localizedStringWithFormat: @"%.1f%%", tr_truncd([self floatValue] * 100.0, 1)] drawInRect: cellFrame
+            withAttributes: fAttributes];
     }
     else
     {

@@ -26,12 +26,10 @@
 
 #include <libtransmission/transmission.h>
 #include <libtransmission/tr-getopt.h>
-#include <libtransmission/utils.h>
 #include <libtransmission/version.h>
 
 #include "app.h"
 #include "dbus-adaptor.h"
-#include "formatter.h"
 #include "mainwin.h"
 #include "options.h"
 #include "prefs.h"
@@ -98,7 +96,6 @@ MyApp :: MyApp( int& argc, char ** argv ):
     t = new QTranslator( );
     t->load( QString(MY_NAME) + "_" + QLocale::system().name() );
     installTranslator( t );
-    Formatter::initUnits( );
 
     // set the default icon
     QIcon icon;

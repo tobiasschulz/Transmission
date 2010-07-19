@@ -29,7 +29,7 @@ BUILDING
 
    This currently is a little awkward.  We're working on it...
 
-   1. Prerequisites: Qt >= 4.4 and its development packages
+   1. Prerequisites: Qt >= 4.x and its development packages
    2. Build Transmission as normal
    3. If you built Transmission without DHT, edit qtr.pro:
       - LIBS += $${TRANSMISSION_TOP}/third-party/dht/libdht.a

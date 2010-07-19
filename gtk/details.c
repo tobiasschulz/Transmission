@@ -11,6 +11,7 @@
  */
 
 #include <assert.h>
+#include <math.h> /* ceil() */
 #include <stddef.h>
 #include <stdio.h> /* sscanf */
 #include <stdlib.h>
@@ -218,10 +219,10 @@ refreshOptions( struct DetailsImpl * di, tr_torrent ** torrents, int n )
 
     /* downLimitSpin */
     if( n ) {
-        const int baseline = tr_torrentGetSpeedLimit_KBps( torrents[0], TR_DOWN );
+        const int baseline = tr_torrentGetSpeedLimit( torrents[0], TR_DOWN );
         int i;
         for( i=1; i<n; ++i )
-            if( baseline != ( tr_torrentGetSpeedLimit_KBps( torrents[i], TR_DOWN ) ) )
+            if( baseline != tr_torrentGetSpeedLimit( torrents[i], TR_DOWN ) )
                 break;
         if( i == n )
             set_int_spin_if_different( di->downLimitSpin,
@@ -242,10 +243,10 @@ refreshOptions( struct DetailsImpl * di, tr_torrent ** torrents, int n )
 
     /* upLimitSpin */
     if( n ) {
-        const int baseline = tr_torrentGetSpeedLimit_KBps( torrents[0], TR_UP );
+        const int baseline = tr_torrentGetSpeedLimit( torrents[0], TR_UP );
         int i;
         for( i=1; i<n; ++i )
-            if( baseline != ( tr_torrentGetSpeedLimit_KBps( torrents[i], TR_UP ) ) )
+            if( baseline != tr_torrentGetSpeedLimit( torrents[i], TR_UP ) )
                 break;
         if( i == n )
             set_int_spin_if_different( di->upLimitSpin,
@@ -438,7 +439,6 @@ options_page_new( struct DetailsImpl * d )
 {
     guint tag;
     int row;
-    char buf[128];
     const char *s;
     GtkWidget *t, *w, *tb, *h;
 
@@ -451,8 +451,7 @@ options_page_new( struct DetailsImpl * d )
     tag = g_signal_connect( tb, "toggled", G_CALLBACK( global_speed_toggled_cb ), d );
     d->honorLimitsCheckTag = tag;
 
-    g_snprintf( buf, sizeof( buf ), _( "Limit _download speed (%s):" ), _(speed_K_str) );
-    tb = gtk_check_button_new_with_mnemonic( buf );
+    tb = gtk_check_button_new_with_mnemonic( _( "Limit _download speed (KiB/s):" ) );
     gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( tb ), FALSE );
     d->downLimitedCheck = tb;
     tag = g_signal_connect( tb, "toggled", G_CALLBACK( down_speed_toggled_cb ), d );
@@ -464,8 +463,7 @@ options_page_new( struct DetailsImpl * d )
     hig_workarea_add_row_w( t, &row, tb, w, NULL );
     d->downLimitSpin = w;
 
-    g_snprintf( buf, sizeof( buf ), _( "Limit _upload speed (%s):" ), _(speed_K_str) );
-    tb = gtk_check_button_new_with_mnemonic( buf );
+    tb = gtk_check_button_new_with_mnemonic( _( "Limit _upload speed (KiB/s):" ) );
     d->upLimitedCheck = tb;
     tag = g_signal_connect( tb, "toggled", G_CALLBACK( up_speed_toggled_cb ), d );
     d->upLimitedCheckTag = tag;
@@ -599,8 +597,8 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
     const char * mixed = _( "Mixed" );
     const char * stateString;
     char buf[512];
-    uint64_t available = 0;
-    uint64_t sizeWhenDone = 0;
+    double available = 0;
+    double sizeWhenDone = 0;
     const tr_stat ** stats = g_new( const tr_stat*, n );
     const tr_info ** infos = g_new( const tr_info*, n );
     for( i=0; i<n; ++i ) {
@@ -760,7 +758,7 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
             str = none;
         else if( pieceSize >= 0 ) {
             char piecebuf[128];
-            tr_formatter_mem_B( piecebuf, pieceSize, sizeof( piecebuf ) );
+            tr_strlsize( piecebuf, (uint64_t)pieceSize, sizeof( piecebuf ) );
             g_snprintf( buf, sizeof( buf ),
                         ngettext( "%1$s (%2$'d piece @ %3$s)",
                                   "%1$s (%2$'d pieces @ %3$s)", pieces ),
@@ -781,15 +779,16 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
     if( n <= 0 )
         str = none;
     else {
-        uint64_t leftUntilDone = 0;
-        uint64_t haveUnchecked = 0;
-        uint64_t haveValid = 0;
-        uint32_t verifiedPieces = 0;
+        double leftUntilDone = 0;
+        double haveUnchecked = 0;
+        double haveValid = 0;
+        double verifiedPieces = 0;
         for( i=0; i<n; ++i ) {
             const tr_stat * st = stats[i];
             const tr_info * inf = infos[i];
+            const double v = st->haveValid;
             haveUnchecked += st->haveUnchecked;
-            haveValid += st->haveValid;
+            haveValid += v;
             verifiedPieces += inf->pieceSize ? st->haveValid / inf->pieceSize : 0;
             sizeWhenDone += st->sizeWhenDone;
             leftUntilDone += st->leftUntilDone;
@@ -798,15 +797,14 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
         if( !haveValid && !haveUnchecked )
             str = none;
         else {
-            char buf2[32], unver[64], total[64];
-            const double ratio = 100.0 * ( leftUntilDone ? ( haveValid + haveUnchecked ) / (double)sizeWhenDone : 1 );
-            tr_strlpercent( buf2, ratio, sizeof( buf2 ) );
+            char unver[64], total[64];
+            const double ratio = 100.0 * ( leftUntilDone ? ( haveValid + haveUnchecked ) / sizeWhenDone : 1 );
             tr_strlsize( total, haveUnchecked + haveValid, sizeof( total ) );
             tr_strlsize( unver, haveUnchecked,             sizeof( unver ) );
             if( haveUnchecked )
-                g_snprintf( buf, sizeof( buf ), _( "%1$s (%2$s%%); %3$s Unverified" ), total, buf2, unver );
+                g_snprintf( buf, sizeof( buf ), _( "%1$s (%2$.1f%%); %3$s Unverified" ), total, tr_truncd( ratio, 1 ), unver );
             else
-                g_snprintf( buf, sizeof( buf ), _( "%1$s (%2$s%%)" ), total, buf2 );
+                g_snprintf( buf, sizeof( buf ), _( "%1$s (%2$.1f%%)" ), total, tr_truncd( ratio, 1 ) );
             str = buf;
         }
     }
@@ -816,10 +814,8 @@ refreshInfo( struct DetailsImpl * di, tr_torrent ** torrents, int n )
     if( !sizeWhenDone  )
         str = none;
     else {
-        char buf2[32];
         const double d = ( 100.0 * available ) / sizeWhenDone;
-        tr_strlpercent( buf2, d, sizeof( buf2 ) );
-        g_snprintf( buf, sizeof( buf ), _( "%1$s%%" ), buf2 );
+        g_snprintf( buf, sizeof( buf ), _( "%1$.1f%%" ),  d );
         str = buf;
     }
     gtr_label_set_text( GTK_LABEL( di->availability_lb ), str );
@@ -1067,7 +1063,7 @@ webseed_model_new( void )
                                G_TYPE_STRING,   /* key */
                                G_TYPE_BOOLEAN,  /* was-updated */
                                G_TYPE_STRING,   /* url */
-                               G_TYPE_INT,      /* download rate int */
+                               G_TYPE_DOUBLE,   /* download rate double */
                                G_TYPE_STRING ); /* download rate string */
 }
 
@@ -1137,9 +1133,9 @@ peer_store_new( void )
                                G_TYPE_BOOLEAN,  /* was-updated */
                                G_TYPE_STRING,   /* address */
                                G_TYPE_STRING,   /* collated address */
-                               G_TYPE_DOUBLE,   /* download speed int */
+                               G_TYPE_FLOAT,    /* download speed float */
                                G_TYPE_STRING,   /* download speed string */
-                               G_TYPE_DOUBLE,   /* upload speed int */
+                               G_TYPE_FLOAT,    /* upload speed float */
                                G_TYPE_STRING,   /* upload speed string  */
                                G_TYPE_STRING,   /* client */
                                G_TYPE_INT,      /* progress [0..100] */
@@ -1192,38 +1188,54 @@ refreshPeerRow( GtkListStore        * store,
                 GtkTreeIter         * iter,
                 const tr_peer_stat  * peer )
 {
-    char up_speed[64] = { '\0' };
-    char down_speed[64] = { '\0' };
-    char up_count[64] = { '\0' };
-    char down_count[64] = { '\0' };
-    char blocks_to_peer[64] = { '\0' };
-    char blocks_to_client[64] = { '\0' };
-    char cancelled_by_peer[64] = { '\0' };
-    char cancelled_by_client[64] = { '\0' };
+    char up_speed[64];
+    char down_speed[64];
+    char up_count[64];
+    char down_count[64];
+    char blocks_to_peer[64];
+    char blocks_to_client[64];
+    char cancelled_by_peer[64];
+    char cancelled_by_client[64];
 
-    if( peer->rateToPeer_KBps > 0.01 )
-        tr_formatter_speed_KBps( up_speed, peer->rateToPeer_KBps, sizeof( up_speed ) );
+    if( peer->rateToPeer > 0.01 )
+        tr_strlspeed( up_speed, peer->rateToPeer, sizeof( up_speed ) );
+    else
+        *up_speed = '\0';
 
-    if( peer->rateToClient_KBps > 0 )
-        tr_formatter_speed_KBps( down_speed, peer->rateToClient_KBps, sizeof( down_speed ) );
+    if( peer->rateToClient > 0.01 )
+        tr_strlspeed( down_speed, peer->rateToClient, sizeof( down_speed ) );
+    else
+        *down_speed = '\0';
 
     if( peer->pendingReqsToPeer > 0 )
         g_snprintf( down_count, sizeof( down_count ), "%d", peer->pendingReqsToPeer );
+    else
+        *down_count = '\0';
 
     if( peer->pendingReqsToClient > 0 )
         g_snprintf( up_count, sizeof( down_count ), "%d", peer->pendingReqsToClient );
+    else
+        *up_count = '\0';
 
     if( peer->blocksToPeer > 0 )
         g_snprintf( blocks_to_peer, sizeof( blocks_to_peer ), "%"PRIu32, peer->blocksToPeer );
+    else
+        *blocks_to_peer = '\0';
 
     if( peer->blocksToClient > 0 )
         g_snprintf( blocks_to_client, sizeof( blocks_to_client ), "%"PRIu32, peer->blocksToClient );
+    else
+        *blocks_to_client = '\0';
 
     if( peer->cancelsToPeer > 0 )
         g_snprintf( cancelled_by_client, sizeof( cancelled_by_client ), "%"PRIu32, peer->cancelsToPeer );
+    else
+        *cancelled_by_client = '\0';
 
     if( peer->cancelsToClient > 0 )
         g_snprintf( cancelled_by_peer, sizeof( cancelled_by_peer ), "%"PRIu32, peer->cancelsToClient );
+    else
+        *cancelled_by_peer = '\0';
 
     gtk_list_store_set( store, iter,
                         PEER_COL_PROGRESS, (int)( 100.0 * peer->progress ),
@@ -1231,9 +1243,9 @@ refreshPeerRow( GtkListStore        * store,
                         PEER_COL_UPLOAD_REQUEST_COUNT_STRING, up_count,
                         PEER_COL_DOWNLOAD_REQUEST_COUNT_INT, peer->pendingReqsToPeer,
                         PEER_COL_DOWNLOAD_REQUEST_COUNT_STRING, down_count,
-                        PEER_COL_DOWNLOAD_RATE_DOUBLE, peer->rateToClient_KBps,
+                        PEER_COL_DOWNLOAD_RATE_DOUBLE, peer->rateToClient,
                         PEER_COL_DOWNLOAD_RATE_STRING, down_speed,
-                        PEER_COL_UPLOAD_RATE_DOUBLE, peer->rateToPeer_KBps,
+                        PEER_COL_UPLOAD_RATE_DOUBLE, peer->rateToPeer,
                         PEER_COL_UPLOAD_RATE_STRING, up_speed,
                         PEER_COL_STATUS, peer->flagStr,
                         PEER_COL_WAS_UPDATED, TRUE,
@@ -1379,7 +1391,7 @@ refreshWebseedList( struct DetailsImpl * di, tr_torrent ** torrents, int n )
         int j;
         const tr_torrent * tor = torrents[i];
         const tr_info * inf = tr_torrentInfo( tor );
-        double * speeds_KBps = tr_torrentWebSpeeds_KBps( tor );
+        float * speeds = tr_torrentWebSpeeds( tor );
         for( j=0; j<inf->webseedCount; ++j ) {
             char buf[128];
             char key[256];
@@ -1390,17 +1402,17 @@ refreshWebseedList( struct DetailsImpl * di, tr_torrent ** torrents, int n )
             ref = g_hash_table_lookup( hash, key );
             p = gtk_tree_row_reference_get_path( ref );
             gtk_tree_model_get_iter( model, &iter, p );
-            if( speeds_KBps[j] > 0 )
-                tr_formatter_speed_KBps( buf, speeds_KBps[j], sizeof( buf ) );
+            if( speeds[j] > 0.01 )
+                tr_strlspeed( buf, speeds[j], sizeof( buf ) );
             else
                 *buf = '\0';
-            gtk_list_store_set( store, &iter, WEBSEED_COL_DOWNLOAD_RATE_DOUBLE, speeds_KBps[j],
+            gtk_list_store_set( store, &iter, WEBSEED_COL_DOWNLOAD_RATE_DOUBLE, (double)speeds[j],
                                               WEBSEED_COL_DOWNLOAD_RATE_STRING, buf,
                                               WEBSEED_COL_WAS_UPDATED, TRUE,
                                               -1 );
             gtk_tree_path_free( p );
         }
-        tr_free( speeds_KBps );
+        tr_free( speeds );
     }
 
     /* step 4: remove webseeds that have disappeared */

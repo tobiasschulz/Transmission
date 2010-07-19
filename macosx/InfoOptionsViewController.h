@@ -31,10 +31,11 @@
     
     BOOL fSet;
     
-    IBOutlet NSPopUpButton * fPriorityPopUp, * fRatioPopUp, * fInactivePopUp;
+    IBOutlet NSPopUpButton * fPriorityPopUp, * fRatioPopUp;
     IBOutlet NSButton * fUploadLimitCheck, * fDownloadLimitCheck, * fGlobalLimitCheck;
-    IBOutlet NSTextField * fUploadLimitField, * fDownloadLimitField, * fRatioLimitField, * fInactiveLimitField,
-                        * fUploadLimitLabel, * fDownloadLimitLabel, * fInactiveLimitLabel, * fPeersConnectLabel, * fPeersConnectField;
+    IBOutlet NSTextField * fUploadLimitField, * fDownloadLimitField, * fRatioLimitField,
+                        * fUploadLimitLabel, * fDownloadLimitLabel, * fPeersConnectLabel,
+                        * fPeersConnectField;
     
     NSString * fInitialString;
 }
@@ -49,9 +50,6 @@
 
 - (void) setRatioSetting: (id) sender;
 - (void) setRatioLimit: (id) sender;
-
-- (void) setInactiveSetting: (id) sender;
-- (void) setInactiveLimit: (id) sender;
 
 - (void) setPriority: (id) sender;
 

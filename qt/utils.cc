@@ -23,14 +23,10 @@
 #include <QStyle>
 
 #include <libtransmission/transmission.h>
-#include <libtransmission/utils.h> // tr_formatter
+#include <libtransmission/utils.h>
 
 #include "qticonloader.h"
 #include "utils.h"
-
-/***
-****
-***/
 
 QString
 Utils :: remoteFileChooser( QWidget * parent, const QString& title, const QString& myPath, bool dir, bool local )
@@ -48,6 +44,143 @@ Utils :: remoteFileChooser( QWidget * parent, const QString& title, const QStrin
         path = QInputDialog::getText( parent, title, tr( "Enter a location:" ), QLineEdit::Normal, myPath, NULL );
 
     return path;
+}
+
+#define KILOBYTE_FACTOR 1024.0
+#define MEGABYTE_FACTOR ( 1024.0 * 1024.0 )
+#define GIGABYTE_FACTOR ( 1024.0 * 1024.0 * 1024.0 )
+
+QString
+Utils :: sizeToString( double size )
+{
+    QString str;
+
+    if( !size )
+    {
+        str = tr( "None" );
+    }
+    else if( size < KILOBYTE_FACTOR )
+    {
+        const int i = (int)size;
+        str = tr( "%Ln byte(s)", 0, i );
+    }
+    else
+    {
+        double displayed_size;
+
+        if( size < (int64_t)MEGABYTE_FACTOR )
+        {
+            displayed_size = (double)size / KILOBYTE_FACTOR;
+            str = tr( "%L1 KiB" ).arg( displayed_size,  0, 'f', 1 );
+        }
+        else if( size < (int64_t)GIGABYTE_FACTOR )
+        {
+            displayed_size = (double)size / MEGABYTE_FACTOR;
+            str = tr( "%L1 MiB" ).arg( displayed_size,  0, 'f', 1 );
+        }
+        else
+        {
+            displayed_size = (double) size / GIGABYTE_FACTOR;
+            str = tr( "%L1 GiB" ).arg( displayed_size,  0, 'f', 1 );
+        }
+    }
+
+    return str;
+}
+
+QString
+Utils :: ratioToString( double ratio )
+{
+    QString buf;
+
+    if( (int)ratio == TR_RATIO_NA )
+        buf = tr( "None" );
+    else if( (int)ratio == TR_RATIO_INF )
+        buf = QString::fromUtf8( "\xE2\x88\x9E" );
+    else
+    {
+        QStringList temp;
+
+        temp = QString().sprintf( "%f", ratio ).split( "." );
+        if( ratio < 100.0 )
+        {
+            if( ratio < 10.0 )
+                temp[1].truncate( 2 );
+            else
+                temp[1].truncate( 1 );
+            buf = temp.join( "." );
+        }
+        else
+            buf = QString( temp[0] );
+    }
+
+    return buf;
+
+}
+
+QString
+Utils :: timeToString( int seconds )
+{
+    int days, hours, minutes;
+    QString d, h, m, s;
+    QString str;
+
+    if( seconds < 0 )
+        seconds = 0;
+
+    days = seconds / 86400;
+    hours = ( seconds % 86400 ) / 3600;
+    minutes = ( seconds % 3600 ) / 60;
+    seconds %= 60;
+
+    d = tr( "%Ln day(s)", 0, days );
+    h = tr( "%Ln hour(s)", 0, hours );
+    m = tr( "%Ln minute(s)", 0, minutes );
+    s = tr( "%Ln second(s)", 0, seconds );
+
+    if( days )
+    {
+        if( days >= 4 || !hours )
+            str = d;
+        else
+            str = tr( "%1, %2" ).arg( d ).arg( h );
+    }
+    else if( hours )
+    {
+        if( hours >= 4 || !minutes )
+            str = h;
+        else
+            str = tr( "%1, %2" ).arg( h ).arg( m );
+    }
+    else if( minutes )
+    {
+        if( minutes >= 4 || !seconds )
+            str = m;
+        else
+            str = tr( "%1, %2" ).arg( m ).arg( s );
+    }
+    else
+    {
+        str = s;
+    }
+
+    return str;
+}
+
+QString
+Utils :: speedToString( const Speed& speed )
+{
+    const double kbps( speed.kbps( ) );
+    QString str;
+
+    if( kbps < 1000.0 )  /* 0.0 KiB to 999.9 KiB */
+        str = tr( "%L1 KiB/s" ).arg( kbps, 0, 'f', 1 );
+    else if( kbps < 102400.0 ) /* 0.98 MiB to 99.99 MiB */
+        str = tr( "%L1 MiB/s" ).arg( kbps / KILOBYTE_FACTOR, 0, 'f', 2 );
+    else // insane speeds
+        str = tr( "%L1 GiB/s" ).arg( kbps / MEGABYTE_FACTOR, 0, 'f', 1 );
+
+    return str;
 }
 
 void

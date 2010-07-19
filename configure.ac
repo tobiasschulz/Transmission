@@ -3,8 +3,8 @@ dnl STATUS: "X" for prerelease beta builds,
 dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
-m4_define([user_agent_prefix],[2.01+])
-m4_define([peer_id_prefix],[-TR201Z-])
+m4_define([user_agent_prefix],[2.02])
+m4_define([peer_id_prefix],[-TR2020-])
 
 AC_INIT([transmission],
         [user_agent_prefix],
@@ -50,9 +50,9 @@ AC_SUBST(OPENSSL_MINIMUM)
 ##   MANDATORY for the GTK+ client
 ##
 ##
-GLIB_MINIMUM=2.8.0
+GLIB_MINIMUM=2.6.0
 AC_SUBST(GLIB_MINIMUM)
-GTK_MINIMUM=2.8.0
+GTK_MINIMUM=2.6.0
 AC_SUBST(GTK_MINIMUM)
 
 ##
@@ -85,7 +85,7 @@ AC_PROG_CXX
 AC_C_INLINE
 if test "x$GCC" = "xyes" ; then
 
-    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -W -Wpointer-arith -Wformat-security -Wcast-align -Wundef -Wcast-align -Wstrict-prototypes -Wmissing-declarations -Wmissing-format-attribute -Wredundant-decls -Wnested-externs -Wunused-parameter -Wwrite-strings -Wvariadic-macros -Waggregate-return -Winline -Wfloat-equal"
+    CFLAGS="$CFLAGS -std=gnu99 -ggdb3 -Wall -W -Wpointer-arith -Wformat-security -Wcast-align -Wundef -Wcast-align -Wstrict-prototypes -Wmissing-declarations -Wmissing-format-attribute -Wredundant-decls -Wnested-externs -Wunused-parameter -Wwrite-strings"
 
     dnl figure out gcc version
     AC_MSG_CHECKING([gcc version])
@@ -407,7 +407,7 @@ case $host_os in
      have_msw="yes"
      CXXFLAGS="$CXXFLAGS -mms-bitfields -mwin32 -mwindows"
      CPPFLAGS="$CPPFLAGS -DWIN32 -D_WIN32 -DWIN32_LEAN_AND_MEAN"
-     LIBS="$LIBS -liphlpapi -lshell32 -lws2_32"
+     LIBS="$LIBS -lshell32 -lws2_32"
      transmissionlocaledir="locale"
      if test -z "$host_alias"; then
        hostaliaswindres=
@@ -476,7 +476,6 @@ AC_CONFIG_FILES([Makefile
                  daemon/Makefile
                  doc/Makefile
                  libtransmission/Makefile
-                 utils/Makefile
                  third-party/Makefile
                  third-party/miniupnp/Makefile
                  third-party/libnatpmp/Makefile

@@ -103,28 +103,6 @@ test_bitfields( void )
 }
 
 static int
-test_strip_positional_args( void )
-{
-    const char * in;
-    const char * out;
-    const char * expected;
-
-    in = "Hello %1$s foo %2$.*f";
-    expected = "Hello %s foo %.*f";
-    out = tr_strip_positional_args( in );
-    check( out != NULL )
-    check( !strcmp( out, expected ) )
-
-    in = "Hello %1$'d foo %2$'f";
-    expected = "Hello %d foo %f";
-    out = tr_strip_positional_args( in );
-    check( out != NULL )
-    check( !strcmp( out, expected ) )
-
-    return 0;
-}
-
-static int
 test_strstrip( void )
 {
     char *in, *out;
@@ -322,11 +300,11 @@ test_array( void )
     int array[10] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     int n = sizeof( array ) / sizeof( array[0] );
 
-    tr_removeElementFromArray( array, 5u, sizeof( int ), n-- );
+    tr_removeElementFromArray( array, 5, sizeof( int ), n-- );
     for( i=0; i<n; ++i )
         check( array[i] == ( i<5 ? i : i+1 ) );
 
-    tr_removeElementFromArray( array, 0u, sizeof( int ), n-- );
+    tr_removeElementFromArray( array, 0, sizeof( int ), n-- );
     for( i=0; i<n; ++i )
         check( array[i] == ( i<4 ? i+1 : i+2 ) );
 
@@ -408,8 +386,6 @@ main( void )
     if( ( i = test_hex( ) ) )
         return i;
     if( ( i = test_lowerbound( ) ) )
-        return i;
-    if( ( i = test_strip_positional_args( ) ) )
         return i;
     if( ( i = test_strstrip( ) ) )
         return i;

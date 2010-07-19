@@ -542,9 +542,6 @@ main( int argc, char ** argv )
     bind_textdomain_codeset( domain, "UTF-8" );
     textdomain( domain );
     g_set_application_name( _( "Transmission" ) );
-    tr_formatter_mem_init( mem_K, _(mem_K_str), _(mem_M_str), _(mem_G_str), _(mem_T_str) );
-    tr_formatter_size_init( disk_K, _(disk_K_str), _(disk_M_str), _(disk_G_str), _(disk_T_str) );
-    tr_formatter_speed_init( speed_K, _(speed_K_str), _(speed_M_str), _(speed_G_str), _(speed_T_str) );
 
     /* initialize gtk */
     if( !g_thread_supported( ) )
@@ -687,12 +684,6 @@ main( int argc, char ** argv )
 }
 
 static void
-onCoreBusy( TrCore * core UNUSED, gboolean busy, struct cbdata * c )
-{
-    tr_window_set_busy( c->wind, busy );
-}
-
-static void
 appsetup( TrWindow *      wind,
           GSList *        torrentFiles,
           struct cbdata * cbdata,
@@ -720,11 +711,13 @@ appsetup( TrWindow *      wind,
     actions_set_core( cbdata->core );
 
     /* set up core handlers */
-    g_signal_connect( cbdata->core, "busy", G_CALLBACK( onCoreBusy ), cbdata );
-    g_signal_connect( cbdata->core, "add-error", G_CALLBACK( coreerr ), cbdata );
-    g_signal_connect( cbdata->core, "add-prompt", G_CALLBACK( onAddTorrent ), cbdata );
-    g_signal_connect( cbdata->core, "prefs-changed", G_CALLBACK( prefschanged ), cbdata );
-    g_signal_connect_swapped( cbdata->core, "quit", G_CALLBACK( wannaquit ), cbdata );
+    g_signal_connect( cbdata->core, "error", G_CALLBACK( coreerr ), cbdata );
+    g_signal_connect( cbdata->core, "add-torrent-prompt",
+                      G_CALLBACK( onAddTorrent ), cbdata );
+    g_signal_connect_swapped( cbdata->core, "quit",
+                              G_CALLBACK( wannaquit ), cbdata );
+    g_signal_connect( cbdata->core, "prefs-changed",
+                      G_CALLBACK( prefschanged ), cbdata );
 
     /* add torrents from command-line and saved state */
     tr_core_load( cbdata->core, forcepause );
@@ -1053,6 +1046,8 @@ gotdrag( GtkWidget         * widget UNUSED,
                     ++filename;
             }
 
+            g_debug( "got from drag: [%s]", filename );
+
             if( g_file_test( filename, G_FILE_TEST_EXISTS ) )
                 paths = g_slist_prepend( paths, g_strdup( filename ) );
             else
@@ -1237,17 +1232,17 @@ prefschanged( TrCore * core UNUSED, const char * key, gpointer data )
     {
         tr_sessionLimitSpeed( tr, TR_DOWN, pref_flag_get( key ) );
     }
-    else if( !strcmp( key, TR_PREFS_KEY_DSPEED_KBps ) )
+    else if( !strcmp( key, TR_PREFS_KEY_DSPEED ) )
     {
-        tr_sessionSetSpeedLimit_KBps( tr, TR_DOWN, pref_int_get( key ) );
+        tr_sessionSetSpeedLimit( tr, TR_DOWN, pref_int_get( key ) );
     }
     else if( !strcmp( key, TR_PREFS_KEY_USPEED_ENABLED ) )
     {
         tr_sessionLimitSpeed( tr, TR_UP, pref_flag_get( key ) );
     }
-    else if( !strcmp( key, TR_PREFS_KEY_USPEED_KBps ) )
+    else if( !strcmp( key, TR_PREFS_KEY_USPEED ) )
     {
-        tr_sessionSetSpeedLimit_KBps( tr, TR_UP, pref_int_get( key ) );
+        tr_sessionSetSpeedLimit( tr, TR_UP, pref_int_get( key ) );
     }
     else if( !strcmp( key, TR_PREFS_KEY_RATIO_ENABLED ) )
     {
@@ -1333,13 +1328,13 @@ prefschanged( TrCore * core UNUSED, const char * key, gpointer data )
     {
         tr_sessionSetProxyPort( tr, pref_int_get( key ) );
     }
-    else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_UP_KBps ) )
+    else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_UP ) )
     {
-        tr_sessionSetAltSpeed_KBps( tr, TR_UP, pref_int_get( key ) );
+        tr_sessionSetAltSpeed( tr, TR_UP, pref_int_get( key ) );
     }
-    else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_DOWN_KBps ) )
+    else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_DOWN ) )
     {
-        tr_sessionSetAltSpeed_KBps( tr, TR_DOWN, pref_int_get( key ) );
+        tr_sessionSetAltSpeed( tr, TR_DOWN, pref_int_get( key ) );
     }
     else if( !strcmp( key, TR_PREFS_KEY_ALT_SPEED_ENABLED ) )
     {
@@ -1543,7 +1538,8 @@ removeSelected( struct cbdata * data, gboolean delete_files )
 
     gtk_tree_selection_selected_foreach( s, accumulateSelectedTorrents, &l );
 
-    if( l != NULL ) {
+    if( l != NULL )
+    {
         l = g_slist_reverse( l );
         confirmRemove( data->wind, data->core, l, delete_files );
     }
