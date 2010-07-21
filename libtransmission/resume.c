@@ -44,11 +44,9 @@
 #define KEY_SPEEDLIMIT_UP       "speed-limit-up"
 #define KEY_SPEEDLIMIT_DOWN     "speed-limit-down"
 #define KEY_RATIOLIMIT          "ratio-limit"
-#define KEY_INACTIVELIMIT       "inactivity-limit"
 #define KEY_UPLOADED            "uploaded"
 
-#define KEY_SPEED_KiBps            "speed"
-#define KEY_SPEED_Bps              "speed-Bps"
+#define KEY_SPEED                  "speed"
 #define KEY_USE_GLOBAL_SPEED_LIMIT "use-global-speed-limit"
 #define KEY_USE_SPEED_LIMIT        "use-speed-limit"
 #define KEY_SPEEDLIMIT_DOWN_SPEED  "down-speed"
@@ -57,8 +55,6 @@
 #define KEY_SPEEDLIMIT_UP_MODE     "up-mode"
 #define KEY_RATIOLIMIT_RATIO       "ratio-limit"
 #define KEY_RATIOLIMIT_MODE        "ratio-mode"
-#define KEY_INACTIVELIMIT_MINS     "inactivity-limit"
-#define KEY_INACTIVELIMIT_MODE     "inactivity-mode"
 
 #define KEY_PROGRESS_MTIMES    "mtimes"
 #define KEY_PROGRESS_BITFIELD  "bitfield"
@@ -273,7 +269,7 @@ static void
 saveSingleSpeedLimit( tr_benc * d, const tr_torrent * tor, tr_direction dir )
 {
     tr_bencDictReserve( d, 3 );
-    tr_bencDictAddInt( d, KEY_SPEED_Bps, tr_torrentGetSpeedLimit_Bps( tor, dir ) );
+    tr_bencDictAddInt( d, KEY_SPEED, tr_torrentGetSpeedLimit( tor, dir ) );
     tr_bencDictAddBool( d, KEY_USE_GLOBAL_SPEED_LIMIT, tr_torrentUsesSessionLimits( tor ) );
     tr_bencDictAddBool( d, KEY_USE_SPEED_LIMIT, tr_torrentUsesSpeedLimit( tor, dir ) );
 }
@@ -294,23 +290,13 @@ saveRatioLimits( tr_benc * dict, const tr_torrent * tor )
 }
 
 static void
-saveInactivityLimits( tr_benc * dict, const tr_torrent * tor )
-{
-    tr_benc * d = tr_bencDictAddDict( dict, KEY_INACTIVELIMIT, 2 );
-    tr_bencDictAddInt( d, KEY_INACTIVELIMIT_MINS, tr_torrentGetInactiveLimit( tor ) );
-    tr_bencDictAddInt( d, KEY_INACTIVELIMIT_MODE, tr_torrentGetInactiveMode( tor ) );
-}
-
-static void
 loadSingleSpeedLimit( tr_benc * d, tr_direction dir, tr_torrent * tor )
 {
     int64_t i;
     tr_bool boolVal;
 
-    if( tr_bencDictFindInt( d, KEY_SPEED_Bps, &i ) )
-        tr_torrentSetSpeedLimit_Bps( tor, dir, i );
-    else if( tr_bencDictFindInt( d, KEY_SPEED_KiBps, &i ) )
-        tr_torrentSetSpeedLimit_Bps( tor, dir, i*1024 );
+    if( tr_bencDictFindInt( d, KEY_SPEED, &i ) )
+        tr_torrentSetSpeedLimit( tor, dir, i );
 
     if( tr_bencDictFindBool( d, KEY_USE_SPEED_LIMIT, &boolVal ) )
         tr_torrentUseSpeedLimit( tor, dir, boolVal );
@@ -348,13 +334,13 @@ loadSpeedLimits( tr_benc * dict, tr_torrent * tor )
 
         int64_t i;
         if( tr_bencDictFindInt( d, KEY_SPEEDLIMIT_DOWN_SPEED, &i ) )
-            tr_torrentSetSpeedLimit_Bps( tor, TR_DOWN, i*1024 );
+            tr_torrentSetSpeedLimit( tor, TR_DOWN, i );
         if( tr_bencDictFindInt( d, KEY_SPEEDLIMIT_DOWN_MODE, &i ) ) {
             tr_torrentUseSpeedLimit( tor, TR_DOWN, i==TR_SPEEDLIMIT_SINGLE );
             tr_torrentUseSessionLimits( tor, i==TR_SPEEDLIMIT_GLOBAL );
          }
         if( tr_bencDictFindInt( d, KEY_SPEEDLIMIT_UP_SPEED, &i ) )
-            tr_torrentSetSpeedLimit_Bps( tor, TR_UP, i*1024 );
+            tr_torrentSetSpeedLimit( tor, TR_UP, i );
         if( tr_bencDictFindInt( d, KEY_SPEEDLIMIT_UP_MODE, &i ) ) {
             tr_torrentUseSpeedLimit( tor, TR_UP, i==TR_SPEEDLIMIT_SINGLE );
             tr_torrentUseSessionLimits( tor, i==TR_SPEEDLIMIT_GLOBAL );
@@ -381,27 +367,6 @@ loadRatioLimits( tr_benc *    dict,
         if( tr_bencDictFindInt( d, KEY_RATIOLIMIT_MODE, &i ) )
             tr_torrentSetRatioMode( tor, i );
       ret = TR_FR_RATIOLIMIT;
-    }
-
-    return ret;
-}
-
-static uint64_t
-loadInactivityLimits( tr_benc *    dict,
-                      tr_torrent * tor )
-{
-    uint64_t  ret = 0;
-    tr_benc * d;
-
-    if( tr_bencDictFindDict( dict, KEY_INACTIVELIMIT, &d ) )
-    {
-        int64_t i;
-        int64_t imin;
-        if( tr_bencDictFindInt( d, KEY_INACTIVELIMIT_MINS, &imin ) )
-            tr_torrentSetInactiveLimit( tor, imin );
-        if( tr_bencDictFindInt( d, KEY_INACTIVELIMIT_MODE, &i ) )
-            tr_torrentSetInactiveMode( tor, i );
-      ret = TR_FR_INACTIVELIMIT;
     }
 
     return ret;
@@ -570,7 +535,6 @@ tr_torrentSaveResume( tr_torrent * tor )
     }
     saveSpeedLimits( &top, tor );
     saveRatioLimits( &top, tor );
-    saveInactivityLimits( &top, tor );
 
     filename = getResumeFilename( tor );
     if(( err = tr_bencToFile( &top, TR_FMT_BENC, filename )))
@@ -705,9 +669,6 @@ loadFromFile( tr_torrent * tor,
 
     if( fieldsToLoad & TR_FR_RATIOLIMIT )
         fieldsLoaded |= loadRatioLimits( &top, tor );
-
-    if( fieldsToLoad & TR_FR_INACTIVELIMIT )
-        fieldsLoaded |= loadInactivityLimits( &top, tor );
 
     /* loading the resume file triggers of a lot of changes,
      * but none of them needs to trigger a re-saving of the

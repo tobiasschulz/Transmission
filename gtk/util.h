@@ -17,26 +17,6 @@
 #include <glib.h>
 #include <gtk/gtk.h>
 
-#include <libtransmission/transmission.h>
-
-extern const int mem_K;
-extern const char * mem_K_str;
-extern const char * mem_M_str;
-extern const char * mem_G_str;
-extern const char * mem_T_str;
-
-extern const int disk_K;
-extern const char * disk_K_str;
-extern const char * disk_M_str;
-extern const char * disk_G_str;
-extern const char * disk_T_str;
-
-extern const int speed_K;
-extern const char * speed_K_str;
-extern const char * speed_M_str;
-extern const char * speed_G_str;
-extern const char * speed_T_str;
-
 /* portability wrapper around g_warn_if_fail() for older versions of glib */
 #ifdef g_warn_if_fail
  #define gtr_warn_if_fail(expr) g_warn_if_fail(expr)
@@ -59,11 +39,12 @@ enum
 };
 const char * gtr_get_unicode_string( int );
 
-/* return a percent formatted string of either x.xx, xx.x or xxx */
-char* tr_strlpercent( char * buf, double x, size_t buflen );
 
 /* return a human-readable string for the size given in bytes. */
 char* tr_strlsize( char * buf, guint64  size, size_t buflen );
+
+/* return a human-readable string for the transfer rate given in bytes. */
+char* tr_strlspeed( char * buf, double KiBps, size_t buflen );
 
 /* return a human-readable string for the given ratio. */
 char* tr_strlratio( char * buf, double ratio, size_t buflen );
@@ -73,10 +54,6 @@ char* tr_strltime( char * buf, int secs, size_t buflen );
 
 /* similar to asctime, but is utf8-clean */
 char* gtr_localtime( time_t time );
-
-
-int gtr_compare_double( const double a, const double b, int decimal_places );
-
 
 /***
 ****
@@ -149,9 +126,6 @@ void gtr_toolbar_set_orientation( GtkToolbar * tb, GtkOrientation orientation );
 /* backwards-compatible wrapper around gtk_widget_set_tooltip_text() */
 void gtr_widget_set_tooltip_text( GtkWidget * w, const char * tip );
 
-/* backwards-compatible wrapper around gtk_widget_get_realized() */
-gboolean gtr_widget_get_realized( GtkWidget * w );
-
 /* backwards-compatible wrapper around g_object_ref_sink() */
 gpointer gtr_object_ref_sink( gpointer object );
 
@@ -180,7 +154,6 @@ GtkWidget * gtr_priority_combo_new( void );
 
 void gtr_unrecognized_url_dialog( GtkWidget * parent, const char * url );
 
-void gtr_http_failure_dialog( GtkWidget * parent, const char * url, long response_code );
 
 void addTorrentErrorDialog( GtkWidget  * window_or_child,
                             int          err,

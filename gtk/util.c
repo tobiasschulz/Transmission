@@ -12,7 +12,6 @@
 
 #include <ctype.h> /* isxdigit() */
 #include <errno.h>
-#include <math.h> /* pow() */
 #include <stdlib.h> /* free() */
 #include <string.h> /* strcmp() */
 
@@ -34,39 +33,12 @@
 
 #include <libtransmission/transmission.h> /* TR_RATIO_NA, TR_RATIO_INF */
 #include <libtransmission/utils.h> /* tr_inf */
-#include <libtransmission/web.h> /* tr_webResponseStr() */
 #include <libtransmission/version.h> /* tr_inf */
 
 #include "conf.h"
 #include "hig.h"
 #include "tr-prefs.h"
 #include "util.h"
-
-/***
-****  UNITS
-***/
-
-const int mem_K = 1024;
-const char * mem_K_str = N_("KiB");
-const char * mem_M_str = N_("MiB");
-const char * mem_G_str = N_("GiB");
-const char * mem_T_str = N_("TiB");
-
-const int disk_K = 1024;
-const char * disk_K_str = N_("KiB");
-const char * disk_M_str = N_("MiB");
-const char * disk_G_str = N_("GiB");
-const char * disk_T_str = N_("TiB");
-
-const int speed_K = 1000;
-const char * speed_K_str = N_("kB/s");
-const char * speed_M_str = N_("MB/s");
-const char * speed_G_str = N_("GB/s");
-const char * speed_T_str = N_("TB/s");
-
-/***
-****
-***/
 
 gtr_lockfile_state_t
 gtr_lockfile( const char * filename )
@@ -116,20 +88,6 @@ gtr_lockfile( const char * filename )
 ****
 ***/
 
-int
-gtr_compare_double( const double a, const double b, int decimal_places )
-{
-    const int64_t ia = (int64_t)(a * pow( 10, decimal_places ) );
-    const int64_t ib = (int64_t)(b * pow( 10, decimal_places ) );
-    if( ia < ib ) return -1;
-    if( ia > ib ) return  1; 
-    return 0;
-}
-
-/***
-****
-***/
-
 const char*
 gtr_get_unicode_string( int i )
 {
@@ -147,19 +105,39 @@ tr_strlratio( char * buf, double ratio, size_t buflen )
     return tr_strratio( buf, buflen, ratio, gtr_get_unicode_string( GTR_UNICODE_INF ) );
 }
 
-char*
-tr_strlpercent( char * buf, double x, size_t buflen )
-{
-    return tr_strpercent( buf, x, buflen );
-}
+static double KiB = 1024.0;
+static double MiB = ( 1024.0 * 1024.0 );
+static double GiB = ( 1024.0 * 1024.0 * 1024.0 );
 
 char*
 tr_strlsize( char * buf, guint64 bytes, size_t buflen )
 {
     if( !bytes )
         g_strlcpy( buf, _( "None" ), buflen );
+    else if( bytes < KiB )
+        g_snprintf( buf, buflen, ngettext( "%'u byte", "%'u bytes", (guint)bytes ), (guint)bytes );
+    else if( bytes < MiB )
+        g_snprintf( buf, buflen, _( "%'.1f KiB" ), bytes / KiB );
+    else if( bytes < GiB )
+        g_snprintf( buf, buflen, _( "%'.1f MiB" ), bytes / MiB );
     else
-        tr_formatter_size_B( buf, bytes, buflen );
+        g_snprintf( buf, buflen, _( "%'.1f GiB" ), bytes / GiB );
+    return buf;
+}
+
+char*
+tr_strlspeed( char * buf, double kb_sec, size_t buflen )
+{
+    const double speed = kb_sec;
+
+    if( speed < 1000.0 )  /* 0.0 KiB to 999.9 KiB */
+        g_snprintf( buf, buflen, _( "%'.1f KiB/s" ), speed );
+    else if( speed < 102400.0 ) /* 0.98 MiB to 99.99 MiB */
+        g_snprintf( buf, buflen, _( "%'.2f MiB/s" ), ( speed / KiB ) );
+    else if( speed < 1024000.0 ) /* 100.0 MiB to 999.9 MiB */
+        g_snprintf( buf, buflen, _( "%'.1f MiB/s" ), ( speed / MiB ) );
+    else /* insane speeds */
+        g_snprintf( buf, buflen, _( "%'.2f GiB/s" ), ( speed / GiB ) );
 
     return buf;
 }
@@ -744,16 +722,6 @@ gtr_widget_set_tooltip_text( GtkWidget * w, const char * tip )
 #endif
 }
 
-gboolean
-gtr_widget_get_realized( GtkWidget * w )
-{
-#if GTK_CHECK_VERSION( 2,20,0 )
-    return gtk_widget_get_realized( w );
-#else
-    return GTK_WIDGET_REALIZED( w ) != 0;
-#endif
-}
-
 void
 gtr_toolbar_set_orientation( GtkToolbar      * toolbar,
                              GtkOrientation    orientation )
@@ -764,7 +732,6 @@ gtr_toolbar_set_orientation( GtkToolbar      * toolbar,
     gtk_toolbar_set_orientation( toolbar, orientation );
 #endif
 }
-
 
 /***
 ****
@@ -841,25 +808,6 @@ gtr_timeout_add_seconds( guint seconds, GSourceFunc function, gpointer data )
                                gtr_func_data_new( function, data ),
                                gtr_func_data_free );
 #endif
-}
-
-void
-gtr_http_failure_dialog( GtkWidget * parent, const char * url, long response_code )
-{
-    GtkWindow * window = getWindow( parent );
-
-    GtkWidget * w = gtk_message_dialog_new( window, 0,
-                                            GTK_MESSAGE_ERROR,
-                                            GTK_BUTTONS_CLOSE,
-                                            _( "Error opening \"%s\"" ), url );
-
-    gtk_message_dialog_format_secondary_text( GTK_MESSAGE_DIALOG( w ),
-                                              _( "Server returned \"%1$ld %2$s\"" ),
-                                              response_code,
-                                              tr_webGetResponseStr( response_code ) );
-
-    g_signal_connect_swapped( w, "response", G_CALLBACK( gtk_widget_destroy ), w );
-    gtk_widget_show( w );
 }
 
 void

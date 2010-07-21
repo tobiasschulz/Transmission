@@ -10,7 +10,6 @@
  * $Id$
  */
 
-#include <ctype.h> /* isspace() */
 #include <stdio.h>
 #include <stdlib.h> /* exit() */
 #include <string.h>
@@ -38,52 +37,21 @@ getArgName( const tr_option * opt )
     return arg;
 }
 
-static int
-get_next_line_len( const char * description, int maxlen )
-{
-    int end;
-    int len = strlen( description );
-
-    if( len < maxlen )
-        return len;
-
-    end = maxlen < len ? maxlen : len;
-    while( ( end > 0 ) && !isspace( description[end] ) )
-        --end;
-
-    return end ? end : len;
-}
-
 static void
 getopts_usage_line( const tr_option * opt,
                     int               longWidth,
                     int               shortWidth,
                     int               argWidth )
 {
-    int len; 
     const char * longName   = opt->longName ? opt->longName : "";
     const char * shortName  = opt->shortName ? opt->shortName : "";
     const char * arg        = getArgName( opt );
 
-    const int d_indent = shortWidth + longWidth + argWidth + 7;
-    const int d_width = 80 - d_indent;
-    const char * d = opt->description;
-
-    printf( " %s%-*s %s%-*s %-*s ",
+    printf( "  %s%-*s %s%-*s %-*s  %s\n",
             (shortName && *shortName ? "-" : " "), shortWidth, shortName,
             (longName && *longName ? "--" : "  "), longWidth, longName,
-            argWidth, arg );
-    len = get_next_line_len( d, d_width );
-    printf( "%*.*s\n", len, len, d );
-
-    d += len;
-    while( isspace( *d ) ) ++d;
-
-    while(( len = get_next_line_len( d, d_width ))) {
-        printf( "%*.*s%*.*s\n", d_indent, d_indent, "", len, len, d );
-        d += len;
-        while( isspace( *d ) ) ++d;
-    }
+            argWidth, arg,
+            opt->description );
 }
 
 static void

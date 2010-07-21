@@ -124,15 +124,13 @@
         
         [fStateField setStringValue: [torrent stateString]];
         
-        NSString * progressString = [NSString percentString: [torrent progress] longDecimals: YES];
+        #warning simplify
         if ([torrent isFolder])
-        {
-            NSString * progressSelectedString = [NSString stringWithFormat:
-                                                    NSLocalizedString(@"%@ selected", "Inspector -> Activity tab -> progress"),
-                                                    [NSString percentString: [torrent progressDone] longDecimals: YES]];
-            progressString = [progressString stringByAppendingFormat: @" (%@)", progressSelectedString];
-        }
-        [fProgressField setStringValue: progressString];
+            [fProgressField setStringValue: [NSString localizedStringWithFormat: NSLocalizedString(@"%.2f%% (%.2f%% selected)",
+                "Inspector -> Activity tab -> progress"), tr_truncd(100.0 * [torrent progress], 2),
+                tr_truncd(100.0 * [torrent progressDone], 2)]];
+        else
+            [fProgressField setStringValue: [NSString localizedStringWithFormat: @"%.2f%%", tr_truncd(100.0 * [torrent progress], 2)]];
             
         [fRatioField setStringValue: [NSString stringForRatio: [torrent ratio]]];
         

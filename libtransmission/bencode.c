@@ -18,12 +18,6 @@
 #include <stdlib.h> /* realpath() */
 #include <string.h>
 
-#ifdef WIN32 /* tr_mkstemp() */
- #include <fcntl.h>
- #define _S_IREAD 256
- #define _S_IWRITE 128
-#endif
-
 #include <sys/types.h> /* stat() */
 #include <sys/stat.h> /* stat() */
 #include <locale.h>
@@ -65,7 +59,8 @@ isSomething( const tr_benc * val )
 }
 
 static void
-tr_bencInit( tr_benc * val, char type )
+tr_bencInit( tr_benc * val,
+             int       type )
 {
     memset( val, 0, sizeof( *val ) );
     val->type = type;
@@ -428,19 +423,6 @@ tr_bencListChild( tr_benc * val,
     return ret;
 }
 
-int
-tr_bencListRemove( tr_benc * list, size_t i )
-{
-    if( tr_bencIsList( list ) && ( i < list->val.l.count ) )
-    {
-        tr_bencFree( &list->val.l.vals[i] );
-        tr_removeElementFromArray( list->val.l.vals, i, sizeof( tr_benc ), list->val.l.count-- );
-        return 1;
-    }
-
-    return 0;
-}
-
 static void
 tr_benc_warning( const char * err )
 {
@@ -467,9 +449,10 @@ tr_bencGetInt( const tr_benc * val,
 }
 
 tr_bool
-tr_bencGetStr( const tr_benc * val, const char ** setme )
+tr_bencGetStr( const tr_benc * val,
+               const char **   setme )
 {
-    const tr_bool success = tr_bencIsString( val );
+    const int success = tr_bencIsString( val );
 
     if( success )
         *setme = getStr( val );
@@ -1632,31 +1615,6 @@ tr_bencToStr( const tr_benc * top, tr_fmt_mode mode, int * len )
     return ret;
 }
 
-/* portability wrapper for mkstemp(). */
-static int
-tr_mkstemp( char * template )
-{
-#ifdef WIN32
-    const int flags = O_RDWR | O_BINARY | O_CREAT | O_EXCL | _O_SHORT_LIVED;
-    const mode_t mode = _S_IREAD | _S_IWRITE;
-    mktemp( template );
-    return open( template, flags, mode );
-#else
-    return mkstemp( template );
-#endif
-}
-
-/* portability wrapper for fsync(). */
-static void
-tr_fsync( int fd )
-{
-#ifdef WIN32
-    _commit( fd );
-#else
-    fsync( fd );
-#endif
-}
-
 int
 tr_bencToFile( const tr_benc * top, tr_fmt_mode mode, const char * filename )
 {
@@ -1666,13 +1624,13 @@ tr_bencToFile( const tr_benc * top, tr_fmt_mode mode, const char * filename )
     char buf[TR_PATH_MAX];
 
     /* follow symlinks to find the "real" file, to make sure the temporary
-     * we build with tr_mkstemp() is created on the right partition */
-    if( tr_realpath( filename, buf ) != NULL )
+     * we build with mkstemp() is created on the right partition */
+    if( realpath( filename, buf ) != NULL )
         filename = buf;
 
     /* if the file already exists, try to move it out of the way & keep it as a backup */
     tmp = tr_strdup_printf( "%s.tmp.XXXXXX", filename );
-    fd = tr_mkstemp( tmp );
+    fd = mkstemp( tmp );
     if( fd >= 0 )
     {
         int len;
@@ -1681,7 +1639,7 @@ tr_bencToFile( const tr_benc * top, tr_fmt_mode mode, const char * filename )
 
         if( write( fd, str, len ) == (ssize_t)len )
         {
-            tr_fsync( fd );
+            fsync( fd );
             close( fd );
 
             if( !unlink( filename ) || ( errno == ENOENT ) )
@@ -1752,4 +1710,3 @@ tr_bencLoadFile( tr_benc * setme, tr_fmt_mode mode, const char * filename )
     tr_free( content );
     return err;
 }
-
