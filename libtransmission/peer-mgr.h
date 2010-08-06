@@ -28,6 +28,7 @@
 #include "history.h"
 #include "net.h"
 #include "peer-common.h" /* struct peer_request */
+#include "publish.h" /* tr_publisher_tag */
 
 /**
  * @addtogroup peers Peers
@@ -123,6 +124,7 @@ typedef struct tr_peer
     tr_recentHistory       * cancelsSentToPeer;
 
     struct tr_peermsgs     * msgs;
+    tr_publisher_tag         msgsTag;
 }
 tr_peer;
 
@@ -225,14 +227,14 @@ void tr_peerMgrTorrentStats( tr_torrent * tor,
 struct tr_peer_stat* tr_peerMgrPeerStats( const tr_torrent * tor,
                                           int              * setmeCount );
 
-int tr_peerMgrGetWebseedSpeed_Bps( const tr_torrent * tor, uint64_t now );
+float tr_peerMgrGetWebseedSpeed( const tr_torrent * tor, uint64_t now );
 
-double* tr_peerMgrWebSpeeds_KBps( const tr_torrent * tor );
+float* tr_peerMgrWebSpeeds( const tr_torrent * tor );
 
 
-int tr_peerGetPieceSpeed_Bps( const tr_peer    * peer,
-                              uint64_t           now,
-                              tr_direction       direction );
+double tr_peerGetPieceSpeed( const tr_peer    * peer,
+                             uint64_t           now,
+                             tr_direction       direction );
 
 /* @} */
 

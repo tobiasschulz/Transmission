@@ -20,11 +20,12 @@
 typedef struct tr_webseed tr_webseed;
 
 #include "peer-common.h"
+#include "publish.h"
 
 tr_webseed* tr_webseedNew( struct tr_torrent * torrent,
-                           const char        * url,
-                           tr_peer_callback  * callback,
-                           void              * callback_data );
+                           const char *        url,
+                           tr_delivery_func    delivery_func,
+                           void *              delivery_userdata );
 
 void        tr_webseedFree( tr_webseed * );
 
@@ -34,9 +35,9 @@ tr_addreq_t tr_webseedAddRequest( tr_webseed *     w,
                                   uint32_t         length );
 
 /** @return true if a request is being processed, or false if idle */
-int         tr_webseedGetSpeed_Bps( const tr_webseed * w,
-                                    uint64_t           now,
-                                    int              * setme_Bps );
+int         tr_webseedGetSpeed( const tr_webseed * w,
+                                uint64_t           now,
+                                float *            setme_KiBs );
 
 /** @return true if a request is being processed, or false if idle */
 int         tr_webseedIsActive( const tr_webseed * w );

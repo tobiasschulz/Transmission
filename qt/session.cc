@@ -1,11 +1,11 @@
 /*
- * This file Copyright (C) Mnemosyne LLC
+ * This file Copyright (C) 2009-2010 Mnemosyne LLC
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2
- * as published by the Free Software Foundation.
- *
- * http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+ * This file is licensed by the GPL version 2.  Works owned by the
+ * Transmission project are granted a special exemption to clause 2(b)
+ * so that the bulk of its code can remain under the MIT license.
+ * This exemption does not extend to derived works not owned by
+ * the Transmission project.
  *
  * $Id$
  */
@@ -22,7 +22,6 @@
 #include <QNetworkReply>
 #include <QNetworkRequest>
 #include <QSet>
-#include <QStringList>
 #include <QStyle>
 #include <QTextStream>
 
@@ -33,8 +32,8 @@
 #include <libtransmission/utils.h> /* tr_free */
 #include <libtransmission/version.h> /* LONG_VERSION */
 
-#include "add-data.h"
 #include "prefs.h"
+#include "qticonloader.h"
 #include "session.h"
 #include "session-dialog.h"
 #include "torrent.h"
@@ -145,8 +144,6 @@ Session :: updatePref( int key )
         case Prefs :: DOWNLOAD_DIR:
         case Prefs :: DSPEED:
         case Prefs :: DSPEED_ENABLED:
-        case Prefs :: IDLE_LIMIT:
-        case Prefs :: IDLE_LIMIT_ENABLED:
         case Prefs :: INCOMPLETE_DIR:
         case Prefs :: INCOMPLETE_DIR_ENABLED:
         case Prefs :: LPD_ENABLED:
@@ -417,21 +414,6 @@ Session :: torrentSet( const QSet<int>& ids, const QString& key, bool value )
     tr_benc * args = tr_bencDictAddDict( &top, "arguments", 2 );
     tr_bencDictAddBool( args, key.toUtf8().constData(), value );
     addOptionalIds( args, ids );
-    exec( &top );
-    tr_bencFree( &top );
-}
-
-void
-Session :: torrentSet( const QSet<int>& ids, const QString& key, const QStringList& value )
-{
-    tr_benc top;
-    tr_bencInitDict( &top, 2 );
-    tr_bencDictAddStr( &top, "method", "torrent-set" );
-    tr_benc * args = tr_bencDictAddDict( &top, "arguments", 2 );
-    addOptionalIds( args, ids );
-    tr_benc * list( tr_bencDictAddList( args, key.toUtf8().constData(), value.size( ) ) );
-    foreach( const QString str, value )
-        tr_bencListAddStr( list, str.toUtf8().constData() );
     exec( &top );
     tr_bencFree( &top );
 }
@@ -770,6 +752,12 @@ Session :: parseResponse( const char * json, size_t jsonLength )
                                                            QString::fromUtf8(str),
                                                            QMessageBox::Close,
                                                            QApplication::activeWindow());
+                        QPixmap pixmap;
+                        QIcon icon = QtIconLoader :: icon( "dialog-information" );
+                        if( !icon.isNull( ) ) {
+                            const int size = QApplication::style()->pixelMetric( QStyle::PM_LargeIconSize );
+                            d->setIconPixmap( icon.pixmap( size, size ) );
+                        }
                         connect( d, SIGNAL(rejected()), d, SLOT(deleteLater()) );
                         d->show( );
                     }
@@ -919,38 +907,54 @@ Session :: setBlocklistSize( int64_t i )
 }
 
 void
-Session :: addTorrent( const AddData& addMe )
+Session :: addTorrent( QString filename )
 {
-    const QByteArray b64 = addMe.toBase64();
+    addTorrent( filename, myPrefs.getString( Prefs::DOWNLOAD_DIR ) );
+}
 
-    tr_benc top, *args;
-    tr_bencInitDict( &top, 2 );
-    tr_bencDictAddStr( &top, "method", "torrent-add" );
-    args = tr_bencDictAddDict( &top, "arguments", 2 );
-    tr_bencDictAddBool( args, "paused", !myPrefs.getBool( Prefs::START ) );
-    switch( addMe.type ) {
-        case AddData::MAGNET:   tr_bencDictAddStr( args, "filename", addMe.magnet.toUtf8().constData() ); break;
-        case AddData::URL:      tr_bencDictAddStr( args, "filename", addMe.url.toString().toUtf8().constData() ); break;
-        case AddData::FILENAME: /* fall-through */
-        case AddData::METAINFO: tr_bencDictAddRaw( args, "metainfo", b64.constData(), b64.size() ); break;
-        default: std::cerr << "Unhandled AddData type: " << addMe.type << std::endl;
+namespace
+{
+    bool isLink( const QString& str )
+    {
+        return Utils::isMagnetLink(str) || Utils::isURL(str);
     }
-    exec( &top );
-    tr_bencFree( &top );
 }
 
 void
-Session :: addNewlyCreatedTorrent( const QString& filename, const QString& localPath )
+Session :: addTorrent( QString key, QString localPath )
 {
-    const QByteArray b64 = AddData(filename).toBase64();
-
     tr_benc top, *args;
     tr_bencInitDict( &top, 2 );
     tr_bencDictAddStr( &top, "method", "torrent-add" );
     args = tr_bencDictAddDict( &top, "arguments", 3 );
     tr_bencDictAddStr( args, "download-dir", qPrintable(localPath) );
     tr_bencDictAddBool( args, "paused", !myPrefs.getBool( Prefs::START ) );
-    tr_bencDictAddRaw( args, "metainfo", b64.constData(), b64.size() );
+
+    // figure out what to do with "key"....
+    bool keyHandled = false;
+    if( !keyHandled && isLink( key  )) {
+        tr_bencDictAddStr( args, "filename", key.toUtf8().constData() );
+        keyHandled = true; // it's a URL or magnet link...
+    }
+    if( !keyHandled ) {
+        QFile file( key );
+        file.open( QIODevice::ReadOnly );
+        const QByteArray raw( file.readAll( ) );
+        file.close( );
+        if( !raw.isEmpty( ) ) {
+            int b64len = 0;
+            char * b64 = tr_base64_encode( raw.constData(), raw.size(), &b64len );
+            tr_bencDictAddRaw( args, "metainfo", b64, b64len  );
+            tr_free( b64 );
+            keyHandled = true; // it's a local file...
+        }
+    }
+    if( !keyHandled ) {
+        const QByteArray tmp = key.toUtf8();
+        tr_bencDictAddRaw( args, "metainfo", tmp.constData(), tmp.length() );
+        keyHandled = true; // treat it as base64
+    }
+
     exec( &top );
     tr_bencFree( &top );
 }
