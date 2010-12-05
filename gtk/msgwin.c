@@ -21,8 +21,8 @@
 
 #include "conf.h"
 #include "hig.h"
-#include "tr-core.h"
 #include "msgwin.h"
+#include "tr-core.h"
 #include "tr-prefs.h"
 #include "util.h"
 
@@ -37,12 +37,12 @@ enum
 
 struct MsgData
 {
-    TrCore        * core;
-    GtkTreeView   * view;
-    GtkListStore  * store;
-    GtkTreeModel  * filter;
-    GtkTreeModel  * sort;
-    tr_msg_level    maxLevel;
+    TrCore *        core;
+    GtkTreeView *   view;
+    GtkListStore *  store;
+    GtkTreeModel *  filter;
+    GtkTreeModel *  sort;
+    int             maxLevel;
     gboolean        isPaused;
     guint           refresh_tag;
 };
@@ -55,15 +55,23 @@ static struct tr_msg_list * myHead = NULL;
 ***/
 
 static void
-level_combo_changed_cb( GtkComboBox * combo_box, gpointer gdata )
+level_combo_changed_cb( GtkWidget * w,
+                        gpointer    gdata )
 {
     struct MsgData * data = gdata;
-    const int level = gtr_combo_box_get_active_enum( combo_box );
+    GtkTreeIter      iter;
 
-    tr_setMessageLevel( level );
-    tr_core_set_pref_int( data->core, TR_PREFS_KEY_MSGLEVEL, level );
-    data->maxLevel = level;
-    gtk_tree_model_filter_refilter( GTK_TREE_MODEL_FILTER( data->filter ) );
+    if( gtk_combo_box_get_active_iter( GTK_COMBO_BOX( w ), &iter ) )
+    {
+        int            level = 0;
+        GtkTreeModel * m = gtk_combo_box_get_model( GTK_COMBO_BOX( w ) );
+        gtk_tree_model_get( m, &iter, 1, &level, -1 );
+
+        tr_setMessageLevel( level );
+        tr_core_set_pref_int( data->core, TR_PREFS_KEY_MSGLEVEL, level );
+        data->maxLevel = level;
+        gtk_tree_model_filter_refilter( GTK_TREE_MODEL_FILTER( data->filter ) );
+    }
 }
 
 static void
@@ -142,7 +150,8 @@ onSaveRequest( GtkWidget * w,
 }
 
 static void
-onClearRequest( GtkWidget * w UNUSED, gpointer gdata )
+onClearRequest( GtkWidget * w UNUSED,
+                gpointer      gdata )
 {
     struct MsgData * data = gdata;
 
@@ -152,12 +161,24 @@ onClearRequest( GtkWidget * w UNUSED, gpointer gdata )
 }
 
 static void
-onPauseToggled( GtkToggleToolButton * w, gpointer gdata )
+onPauseToggled( GtkToggleToolButton * w,
+                gpointer              gdata )
 {
     struct MsgData * data = gdata;
 
     data->isPaused = gtk_toggle_tool_button_get_active( w );
 }
+
+static struct
+{
+    const char *  label;
+    const char *  pref;
+    int           id;
+} trLevels[] = {
+    { N_( "Error" ),       "error",       TR_MSG_ERR          },
+    { N_( "Information" ), "info",        TR_MSG_INF          },
+    { N_( "Debug" ),       "debug",       TR_MSG_DBG          },
+};
 
 static const char*
 getForegroundColor( int msgLevel )
@@ -361,12 +382,38 @@ onRefresh( gpointer gdata )
 static GtkWidget*
 debug_level_combo_new( void )
 {
-    GtkWidget * w = gtr_combo_box_new_enum( _( "Error" ),       TR_MSG_ERR,
-                                            _( "Information" ), TR_MSG_INF,
-                                            _( "Debug" ),       TR_MSG_DBG,
-                                            NULL );
-    gtr_combo_box_set_active_enum( GTK_COMBO_BOX( w ), pref_int_get( TR_PREFS_KEY_MSGLEVEL ) );
-    return w;
+    unsigned int      i;
+    int               ii;
+    int               curlevel;
+    GtkWidget *       levels;
+    GtkListStore *    store;
+    GtkCellRenderer * renderer;
+
+    store = gtk_list_store_new ( 2, G_TYPE_STRING, G_TYPE_INT );
+
+    curlevel = pref_int_get( TR_PREFS_KEY_MSGLEVEL );
+    for( i = ii = 0; i < G_N_ELEMENTS( trLevels ); ++i )
+    {
+        GtkTreeIter iter;
+        gtk_list_store_append ( store, &iter );
+        gtk_list_store_set ( store, &iter, 0, _( trLevels[i].label ),
+                             1, trLevels[i].id,
+                             -1 );
+        if( trLevels[i].id == curlevel )
+            ii = i;
+    }
+    levels = gtk_combo_box_new_with_model ( GTK_TREE_MODEL( store ) );
+    g_object_unref( G_OBJECT( store ) );
+    store = NULL;
+
+    renderer = gtk_cell_renderer_text_new ( );
+    gtk_cell_layout_pack_start( GTK_CELL_LAYOUT( levels ), renderer, TRUE );
+    gtk_cell_layout_set_attributes( GTK_CELL_LAYOUT( levels ), renderer,
+                                    "text", 0,
+                                    NULL );
+    gtk_combo_box_set_active( GTK_COMBO_BOX( levels ), ii );
+
+    return levels;
 }
 
 /**
@@ -374,7 +421,7 @@ debug_level_combo_new( void )
 **/
 
 GtkWidget *
-msgwin_new( TrCore * core, GtkWindow * parent )
+msgwin_new( TrCore * core )
 {
     GtkWidget *      win;
     GtkWidget *      vbox;
@@ -388,7 +435,6 @@ msgwin_new( TrCore * core, GtkWindow * parent )
     data->core = core;
 
     win = gtk_window_new( GTK_WINDOW_TOPLEVEL );
-    gtk_window_set_transient_for( GTK_WINDOW( win ), parent );
     gtk_window_set_title( GTK_WINDOW( win ), _( "Message Log" ) );
     gtk_window_set_default_size( GTK_WINDOW( win ), 560, 350 );
     gtk_window_set_role( GTK_WINDOW( win ), "message-log" );
@@ -430,7 +476,8 @@ msgwin_new( TrCore * core, GtkWindow * parent )
     gtk_toolbar_insert( GTK_TOOLBAR( toolbar ), item, -1 );
 
     w = debug_level_combo_new( );
-    g_signal_connect( w, "changed", G_CALLBACK( level_combo_changed_cb ), data );
+    g_signal_connect( w, "changed", G_CALLBACK(
+                          level_combo_changed_cb ), data );
     item = gtk_tool_item_new( );
     gtk_container_add( GTK_CONTAINER( item ), w );
     gtk_toolbar_insert( GTK_TOOLBAR( toolbar ), item, -1 );

@@ -39,9 +39,11 @@ response_cb( GtkDialog *     dialog,
 {
     if( response == GTK_RESPONSE_HELP )
     {
-        char * uri = g_strconcat( gtr_get_help_uri(), "/html/preferences.html", NULL );
-        gtr_open_uri( uri );
-        g_free( uri );
+        char * base = gtr_get_help_url( );
+        char * url = g_strdup_printf( "%s/html/preferences.html", base );
+        gtr_open_file( url );
+        g_free( url );
+        g_free( base );
     }
 
     if( response == GTK_RESPONSE_CLOSE )
@@ -94,8 +96,8 @@ spin_idle_data_free( gpointer gdata )
 static gboolean
 spun_cb_idle( gpointer spin )
 {
-    gboolean keep_waiting = TRUE;
-    GObject * o = G_OBJECT( spin );
+    gboolean                keep_waiting = TRUE;
+    GObject *               o = G_OBJECT( spin );
     struct spin_idle_data * data = g_object_get_data( o, IDLE_DATA );
 
     /* has the user stopped making changes? */
@@ -103,7 +105,6 @@ spun_cb_idle( gpointer spin )
     {
         /* update the core */
         const char * key = g_object_get_data( o, PREF_KEY );
-
         if (data->isDouble)
         {
             const double value = gtk_spin_button_get_value( GTK_SPIN_BUTTON( spin ) );
@@ -111,7 +112,8 @@ spun_cb_idle( gpointer spin )
         }
         else
         {
-            const int value = gtk_spin_button_get_value_as_int( GTK_SPIN_BUTTON( spin ) );
+            const int    value = gtk_spin_button_get_value_as_int(
+                                 GTK_SPIN_BUTTON( spin ) );
             tr_core_set_pref_int( TR_CORE( data->core ), key, value );
         }
 
@@ -125,11 +127,13 @@ spun_cb_idle( gpointer spin )
 }
 
 static void
-spun_cb( GtkSpinButton * w, gpointer core, gboolean isDouble )
+spun_cb( GtkSpinButton * w,
+         gpointer        core,
+         gboolean        isDouble )
 {
     /* user may be spinning through many values, so let's hold off
        for a moment to keep from flooding the core with changes */
-    GObject * o = G_OBJECT( w );
+    GObject *               o = G_OBJECT( w );
     struct spin_idle_data * data = g_object_get_data( o, IDLE_DATA );
 
     if( data == NULL )
@@ -146,13 +150,15 @@ spun_cb( GtkSpinButton * w, gpointer core, gboolean isDouble )
 }
 
 static void
-spun_cb_int( GtkSpinButton * w, gpointer core )
+spun_cb_int( GtkSpinButton * w,
+             gpointer        core )
 {
     spun_cb( w, core, FALSE );
 }
 
 static void
-spun_cb_double( GtkSpinButton * w, gpointer core )
+spun_cb_double( GtkSpinButton * w,
+                gpointer        core )
 {
     spun_cb( w, core, TRUE );
 }
@@ -165,7 +171,9 @@ new_spin_button( const char * key,
                  int          step )
 {
     GtkWidget * w = gtk_spin_button_new_with_range( low, high, step );
-    g_object_set_data_full( G_OBJECT( w ), PREF_KEY, g_strdup( key ), g_free );
+
+    g_object_set_data_full( G_OBJECT( w ), PREF_KEY, g_strdup(
+                                key ), g_free );
     gtk_spin_button_set_digits( GTK_SPIN_BUTTON( w ), 0 );
     gtk_spin_button_set_value( GTK_SPIN_BUTTON( w ), pref_int_get( key ) );
     g_signal_connect( w, "value-changed", G_CALLBACK( spun_cb_int ), core );
@@ -180,7 +188,9 @@ new_spin_button_double( const char * key,
                        double        step )
 {
     GtkWidget * w = gtk_spin_button_new_with_range( low, high, step );
-    g_object_set_data_full( G_OBJECT( w ), PREF_KEY, g_strdup( key ), g_free );
+
+    g_object_set_data_full( G_OBJECT( w ), PREF_KEY, g_strdup(
+                                key ), g_free );
     gtk_spin_button_set_digits( GTK_SPIN_BUTTON( w ), 2 );
     gtk_spin_button_set_value( GTK_SPIN_BUTTON( w ), pref_double_get( key ) );
     g_signal_connect( w, "value-changed", G_CALLBACK( spun_cb_double ), core );
@@ -188,7 +198,8 @@ new_spin_button_double( const char * key,
 }
 
 static void
-entry_changed_cb( GtkEntry * w, gpointer   core )
+entry_changed_cb( GtkEntry * w,
+                  gpointer   core )
 {
     const char * key = g_object_get_data( G_OBJECT( w ), PREF_KEY );
     const char * value = gtk_entry_get_text( w );
@@ -245,7 +256,8 @@ new_file_chooser_button( const char * key, gpointer core )
 }
 
 static void
-target_cb( GtkWidget * tb, gpointer target )
+target_cb( GtkWidget * tb,
+           gpointer    target )
 {
     const gboolean b = gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( tb ) );
 
@@ -316,19 +328,12 @@ torrentPage( GObject * core )
     hig_workarea_add_row_w( t, &row, l, w, NULL );
 
     hig_workarea_add_section_divider( t, &row );
-    hig_workarea_add_section_title( t, &row, _( "Seeding Limits" ) );
+    hig_workarea_add_section_title( t, &row, _( "Seeding" ) );
 
-    s = _( "Stop seeding at _ratio:" );
+    s = _( "_Seed torrent until its ratio reaches:" );
     w = new_check_button( s, TR_PREFS_KEY_RATIO_ENABLED, core );
-    w2 = new_spin_button_double( TR_PREFS_KEY_RATIO, core, 0, 1000, .05 );
+    w2 = new_spin_button_double( TR_PREFS_KEY_RATIO, core, 0, INT_MAX, .05 );
     gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_RATIO_ENABLED ) );
-    g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
-    hig_workarea_add_row_w( t, &row, w, w2, NULL );
-
-    s = _( "Stop seeding if idle for _N minutes:" );
-    w = new_check_button( s, TR_PREFS_KEY_IDLE_LIMIT_ENABLED, core );
-    w2 = new_spin_button( TR_PREFS_KEY_IDLE_LIMIT, core, 1, 9999, 5 );
-    gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_IDLE_LIMIT_ENABLED ) );
     g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
     hig_workarea_add_row_w( t, &row, w, w2, NULL );
 
@@ -382,7 +387,6 @@ struct blocklist_data
     gulong      updateBlocklistTag;
     GtkWidget * updateBlocklistButton;
     GtkWidget * updateBlocklistDialog;
-    GtkWidget * label;
     GtkWidget * check;
     TrCore    * core;
 };
@@ -390,14 +394,12 @@ struct blocklist_data
 static void
 updateBlocklistText( GtkWidget * w, TrCore * core )
 {
-    char buf1[512];
-    char buf2[512];
     const int n = tr_blocklistGetRuleCount( tr_core_session( core ) );
-    g_snprintf( buf1, sizeof( buf1 ),
-                gtr_ngettext( "Blocklist contains %'d rule",
-                              "Blocklist contains %'d rules", n ), n );
-    g_snprintf( buf2, sizeof( buf2 ), "<i>%s</i>", buf1 );
-    gtk_label_set_markup( GTK_LABEL( w ), buf2 );
+    char      buf[512];
+    g_snprintf( buf, sizeof( buf ),
+                ngettext( "Enable _blocklist (contains %'d rule)",
+                          "Enable _blocklist (contains %'d rules)", n ), n );
+    gtk_button_set_label( GTK_BUTTON( w ), buf );
 }
 
 /* prefs dialog is being destroyed, so stop listening to blocklist updates */
@@ -425,15 +427,13 @@ onBlocklistUpdateResponse( GtkDialog * dialog, gint response UNUSED, gpointer gd
 static void
 onBlocklistUpdated( TrCore * core, int n, gpointer gdata )
 {
-    const tr_bool success = n >= 0;
-    const int count = n >=0 ? n : tr_blocklistGetRuleCount( tr_core_session( core ) );
-    const char * s = gtr_ngettext( "Blocklist has %'d rule.", "Blocklist has %'d rules.", count );
+    const char * s = ngettext( "Blocklist now has %'d rule.", "Blocklist now has %'d rules.", n );
     struct blocklist_data * data = gdata;
     GtkMessageDialog * d = GTK_MESSAGE_DIALOG( data->updateBlocklistDialog );
     gtk_widget_set_sensitive( data->updateBlocklistButton, TRUE );
-    gtk_message_dialog_set_markup( d, success ? _( "<b>Update succeeded!</b>" ) : _( "<b>Unable to update.</b>" ) );
-    gtk_message_dialog_format_secondary_text( d, s, count );
-    updateBlocklistText( data->label, core );
+    gtk_message_dialog_set_markup( d, _( "<b>Update succeeded!</b>" ) );
+    gtk_message_dialog_format_secondary_text( d, s, n );
+    updateBlocklistText( data->check, core );
 }
 
 /* user pushed a button to update the blocklist */
@@ -457,36 +457,72 @@ onBlocklistUpdate( GtkButton * w, gpointer gdata )
 }
 
 static void
-onIntComboChanged( GtkComboBox * combo_box, gpointer core )
+onIntComboChanged( GtkComboBox * w, gpointer core )
 {
-    const int val = gtr_combo_box_get_active_enum( combo_box );
-    const char * key = g_object_get_data( G_OBJECT( combo_box ), PREF_KEY );
-    tr_core_set_pref_int( TR_CORE( core ), key, val );
+    GtkTreeIter iter;
+
+    if( gtk_combo_box_get_active_iter( w, &iter ) )
+    {
+        int val = 0;
+        const char * key = g_object_get_data( G_OBJECT( w ), PREF_KEY );
+        gtk_tree_model_get( gtk_combo_box_get_model( w ), &iter, 0, &val, -1 );
+        tr_core_set_pref_int( TR_CORE( core ), key, val );
+    }
 }
 
 static GtkWidget*
 new_encryption_combo( GObject * core, const char * key )
 {
-    GtkWidget * w = gtr_combo_box_new_enum( _( "Allow encryption" ),   TR_CLEAR_PREFERRED,
-                                            _( "Prefer encryption" ),  TR_ENCRYPTION_PREFERRED,
-                                            _( "Require encryption" ), TR_ENCRYPTION_REQUIRED,
-                                            NULL );
-    gtr_combo_box_set_active_enum( GTK_COMBO_BOX( w ), pref_int_get( key ) );
+    int i;
+    int selIndex;
+    GtkWidget * w;
+    GtkCellRenderer * r;
+    GtkListStore * store;
+    const int currentValue = pref_int_get( key );
+    const struct {
+        int value;
+        const char * text;
+    } items[] = {
+        { TR_CLEAR_PREFERRED,      N_( "Allow encryption" )  },
+        { TR_ENCRYPTION_PREFERRED, N_( "Prefer encryption" ) },
+        { TR_ENCRYPTION_REQUIRED,  N_( "Require encryption" )  }
+    };
+
+    /* build a store for encryption */
+    selIndex = -1;
+    store = gtk_list_store_new( 2, G_TYPE_INT, G_TYPE_STRING );
+    for( i=0; i<(int)G_N_ELEMENTS(items); ++i ) {
+        GtkTreeIter iter;
+        gtk_list_store_append( store, &iter );
+        gtk_list_store_set( store, &iter, 0, items[i].value, 1, _( items[i].text ), -1 );
+        if( items[i].value == currentValue )
+            selIndex = i;
+    }
+
+    /* build the widget */
+    w = gtk_combo_box_new_with_model( GTK_TREE_MODEL( store ) );
+    r = gtk_cell_renderer_text_new( );
+    gtk_cell_layout_pack_start( GTK_CELL_LAYOUT( w ), r, TRUE );
+    gtk_cell_layout_set_attributes( GTK_CELL_LAYOUT( w ), r, "text", 1, NULL );
     g_object_set_data_full( G_OBJECT( w ), PREF_KEY, tr_strdup( key ), g_free );
+    if( selIndex >= 0 )
+        gtk_combo_box_set_active( GTK_COMBO_BOX( w ), selIndex );
     g_signal_connect( w, "changed", G_CALLBACK( onIntComboChanged ), core );
+
+    /* cleanup */
+    g_object_unref( G_OBJECT( store ) );
     return w;
 }
 
 static GtkWidget*
 privacyPage( GObject * core )
 {
-    int row = 0;
-    const char * s;
-    GtkWidget * t;
-    GtkWidget * w;
-    GtkWidget * b;
-    GtkWidget * h;
-    GtkWidget * e;
+    int                     row = 0;
+    const char *            s;
+    GtkWidget *             t;
+    GtkWidget *             w;
+    GtkWidget *             b;
+    GtkWidget *             h;
     struct blocklist_data * data;
 
     data = g_new0( struct blocklist_data, 1 );
@@ -495,32 +531,25 @@ privacyPage( GObject * core )
     t = hig_workarea_create( );
     hig_workarea_add_section_title( t, &row, _( "Blocklist" ) );
 
-    b = new_check_button( _( "Enable _blocklist:" ), TR_PREFS_KEY_BLOCKLIST_ENABLED, core );
-    e = new_entry( TR_PREFS_KEY_BLOCKLIST_URL, core );
-    gtk_widget_set_size_request( e, 300, -1 );
-    hig_workarea_add_row_w( t, &row, b, e, NULL );
-    data->check = b;
-    g_signal_connect( b, "toggled", G_CALLBACK( target_cb ), e );
-    target_cb( b, e );
-
-    w = gtk_label_new( "" );
-    gtk_misc_set_alignment( GTK_MISC( w ), 0.0f, 0.5f );
+    w = new_check_button( "", TR_PREFS_KEY_BLOCKLIST_ENABLED, core );
     updateBlocklistText( w, TR_CORE( core ) );
-    data->label = w;
     h = gtk_hbox_new( FALSE, GUI_PAD_BIG );
     gtk_box_pack_start( GTK_BOX( h ), w, TRUE, TRUE, 0 );
-    b = data->updateBlocklistButton = gtk_button_new_with_mnemonic( _( "_Update" ) );
-    g_object_set_data( G_OBJECT( b ), "session", tr_core_session( TR_CORE( core ) ) );
+    b = data->updateBlocklistButton = gtr_button_new_from_stock( GTK_STOCK_REFRESH, _( "_Update" ) );
+    data->check = w;
+    g_object_set_data( G_OBJECT( b ), "session",
+                      tr_core_session( TR_CORE( core ) ) );
     g_signal_connect( b, "clicked", G_CALLBACK( onBlocklistUpdate ), data );
-    g_signal_connect( data->check, "toggled", G_CALLBACK( target_cb ), b ); target_cb( data->check, b );
     gtk_box_pack_start( GTK_BOX( h ), b, FALSE, FALSE, 0 );
-    g_signal_connect( data->check, "toggled", G_CALLBACK( target_cb ), w ); target_cb( data->check, w );
+    g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), b );
+    target_cb( w, b );
     hig_workarea_add_wide_control( t, &row, h );
 
     s = _( "Enable _automatic updates" );
     w = new_check_button( s, PREF_KEY_BLOCKLIST_UPDATES_ENABLED, core );
     hig_workarea_add_wide_control( t, &row, w );
-    g_signal_connect( data->check, "toggled", G_CALLBACK( target_cb ), w ); target_cb( data->check, w );
+    g_signal_connect( data->check, "toggled", G_CALLBACK( target_cb ), w );
+    target_cb( data->check, w );
 
     hig_workarea_add_section_divider( t, &row );
     hig_workarea_add_section_title ( t, &row, _( "Privacy" ) );
@@ -541,7 +570,7 @@ privacyPage( GObject * core )
     gtr_widget_set_tooltip_text( w, s );
     hig_workarea_add_wide_control( t, &row, w );
 
-    s = _( "Use _Local Peer Discovery to find more peers" );
+    s = _( "Use Local Peer Discovery to find more peers" );
     w = new_check_button( s, TR_PREFS_KEY_LPD_ENABLED, core );
     s = _( "LPD is a tool for finding peers on your local network." );
     gtr_widget_set_tooltip_text( w, s );
@@ -727,13 +756,15 @@ onWhitelistSelectionChanged( GtkTreeSelection * sel UNUSED,
 }
 
 static void
-onLaunchClutchCB( GtkButton * w UNUSED, gpointer data UNUSED )
+onLaunchClutchCB( GtkButton * w UNUSED,
+                  gpointer data UNUSED )
 {
-    const int port = pref_int_get( TR_PREFS_KEY_RPC_PORT );
-    char * uri = g_strdup_printf( "http://localhost:%d/transmission/web", port );
+    int    port = pref_int_get( TR_PREFS_KEY_RPC_PORT );
+    char * url = g_strdup_printf( "http://localhost:%d/transmission/web",
+                                  port );
 
-    gtr_open_uri( uri );
-    g_free( uri );
+    gtr_open_file( url );
+    g_free( url );
 }
 
 static void
@@ -771,7 +802,7 @@ webPage( GObject * core )
     g_signal_connect( w, "clicked", G_CALLBACK( onRPCToggled ), page );
     h = gtk_hbox_new( FALSE, GUI_PAD_BIG );
     gtk_box_pack_start( GTK_BOX( h ), w, TRUE, TRUE, 0 );
-    w = gtk_button_new_with_mnemonic( _( "_Open web client" ) );
+    w = gtr_button_new_from_stock( GTK_STOCK_OPEN, _( "_Open web client" ) );
     page->widgets = g_slist_append( page->widgets, w );
     g_signal_connect( w, "clicked", G_CALLBACK( onLaunchClutchCB ), NULL );
     gtk_box_pack_start( GTK_BOX( h ), w, FALSE, FALSE, 0 );
@@ -884,6 +915,150 @@ webPage( GObject * core )
 }
 
 /****
+*****  Proxy Tab
+****/
+
+struct ProxyPage
+{
+    TrCore *  core;
+    GSList *  proxy_widgets;
+    GSList *  proxy_auth_widgets;
+};
+
+static void
+refreshProxySensitivity( struct ProxyPage * p )
+{
+    GSList *       l;
+    const gboolean proxy_enabled = pref_flag_get( TR_PREFS_KEY_PROXY_ENABLED );
+    const gboolean proxy_auth_enabled = pref_flag_get( TR_PREFS_KEY_PROXY_AUTH_ENABLED );
+
+    for( l = p->proxy_widgets; l != NULL; l = l->next )
+        gtk_widget_set_sensitive( GTK_WIDGET( l->data ), proxy_enabled );
+
+    for( l = p->proxy_auth_widgets; l != NULL; l = l->next )
+        gtk_widget_set_sensitive( GTK_WIDGET( l->data ),
+                                  proxy_enabled && proxy_auth_enabled );
+}
+
+static void
+onProxyToggled( GtkToggleButton * tb UNUSED,
+                gpointer             user_data )
+{
+    refreshProxySensitivity( user_data );
+}
+
+static void
+proxyPageFree( gpointer gpage )
+{
+    struct ProxyPage * page = gpage;
+
+    g_slist_free( page->proxy_widgets );
+    g_slist_free( page->proxy_auth_widgets );
+    g_free( page );
+}
+
+static GtkTreeModel*
+proxyTypeModelNew( void )
+{
+    GtkTreeIter    iter;
+    GtkListStore * store = gtk_list_store_new( 2, G_TYPE_STRING, G_TYPE_INT );
+
+    gtk_list_store_append( store, &iter );
+    gtk_list_store_set( store, &iter, 0, "HTTP", 1, TR_PROXY_HTTP, -1 );
+    gtk_list_store_append( store, &iter );
+    gtk_list_store_set( store, &iter, 0, "SOCKS4", 1, TR_PROXY_SOCKS4, -1 );
+    gtk_list_store_append( store, &iter );
+    gtk_list_store_set( store, &iter, 0, "SOCKS5", 1, TR_PROXY_SOCKS5, -1 );
+    return GTK_TREE_MODEL( store );
+}
+
+static void
+onProxyTypeChanged( GtkComboBox * w,
+                    gpointer      gpage )
+{
+    GtkTreeIter iter;
+
+    if( gtk_combo_box_get_active_iter( w, &iter ) )
+    {
+        struct ProxyPage * page = gpage;
+        int type = TR_PROXY_HTTP;
+        gtk_tree_model_get( gtk_combo_box_get_model( w ), &iter, 1, &type, -1 );
+        tr_core_set_pref_int( TR_CORE( page->core ), TR_PREFS_KEY_PROXY_TYPE, type );
+    }
+}
+
+static GtkWidget*
+trackerPage( GObject * core )
+{
+    int                row = 0;
+    const char *       s;
+    GtkWidget *        t;
+    GtkWidget *        w;
+    GtkTreeModel *     m;
+    GtkCellRenderer *  r;
+    struct ProxyPage * page = tr_new0( struct ProxyPage, 1 );
+
+    page->core = TR_CORE( core );
+
+    t = hig_workarea_create( );
+    hig_workarea_add_section_title ( t, &row, _( "Tracker" ) );
+
+    s = _( "Connect to tracker via a pro_xy" );
+    w = new_check_button( s, TR_PREFS_KEY_PROXY_ENABLED, core );
+    g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
+    hig_workarea_add_wide_control( t, &row, w );
+
+    s = _( "Proxy _server:" );
+    w = new_entry( TR_PREFS_KEY_PROXY, core );
+    page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
+    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
+
+    w = new_spin_button( TR_PREFS_KEY_PROXY_PORT, core, 0, USHRT_MAX, 1 );
+    page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
+    w = hig_workarea_add_row( t, &row, _( "Proxy _port:" ), w, NULL );
+    page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
+
+    s = _( "Proxy _type:" );
+    m = proxyTypeModelNew( );
+    w = gtk_combo_box_new_with_model( m );
+    r = gtk_cell_renderer_text_new( );
+    gtk_cell_layout_pack_start( GTK_CELL_LAYOUT( w ), r, TRUE );
+    gtk_cell_layout_set_attributes( GTK_CELL_LAYOUT( w ), r, "text", 0, NULL );
+    gtk_combo_box_set_active( GTK_COMBO_BOX( w ), pref_int_get( TR_PREFS_KEY_PROXY_TYPE ) );
+    g_signal_connect( w, "changed", G_CALLBACK( onProxyTypeChanged ), page );
+    g_object_unref( G_OBJECT( m ) );
+    page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
+    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
+
+    s = _( "Use _authentication" );
+    w = new_check_button( s, TR_PREFS_KEY_PROXY_AUTH_ENABLED, core );
+    g_signal_connect( w, "toggled", G_CALLBACK( onProxyToggled ), page );
+    hig_workarea_add_wide_control( t, &row, w );
+    page->proxy_widgets = g_slist_append( page->proxy_widgets, w );
+
+    s = _( "_Username:" );
+    w = new_entry( TR_PREFS_KEY_PROXY_USERNAME, core );
+    page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
+    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
+
+    s = _( "Pass_word:" );
+    w = new_entry( TR_PREFS_KEY_PROXY_PASSWORD, core );
+    gtk_entry_set_visibility( GTK_ENTRY( w ), FALSE );
+    page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
+    w = hig_workarea_add_row( t, &row, s, w, NULL );
+    page->proxy_auth_widgets = g_slist_append( page->proxy_auth_widgets, w );
+
+    hig_workarea_finish( t, &row );
+    g_object_set_data_full( G_OBJECT( t ), "page", page, proxyPageFree );
+
+    refreshProxySensitivity( page );
+    return t;
+}
+
+/****
 *****  Bandwidth Tab
 ****/
 
@@ -972,20 +1147,51 @@ new_time_combo( GObject *    core,
 static GtkWidget*
 new_week_combo( GObject * core, const char * key )
 {
-    GtkWidget * w = gtr_combo_box_new_enum( _( "Every Day" ), TR_SCHED_ALL,
-                                            _( "Weekdays" ),  TR_SCHED_WEEKDAY,
-                                            _( "Weekends" ),  TR_SCHED_WEEKEND,
-                                            _( "Sunday" ),    TR_SCHED_SUN,
-                                            _( "Monday" ),    TR_SCHED_MON,
-                                            _( "Tuesday" ),   TR_SCHED_TUES,
-                                            _( "Wednesday" ), TR_SCHED_WED,
-                                            _( "Thursday" ),  TR_SCHED_THURS,
-                                            _( "Friday" ),    TR_SCHED_FRI,
-                                            _( "Saturday" ),  TR_SCHED_SAT,
-                                            NULL );
-    gtr_combo_box_set_active_enum( GTK_COMBO_BOX( w ), pref_int_get( key ) );
+    int i;
+    int selIndex;
+    GtkWidget * w;
+    GtkCellRenderer * r;
+    GtkListStore * store;
+    const int currentValue = pref_int_get( key );
+    const struct {
+        int value;
+        const char * text;
+    } items[] = {
+        { TR_SCHED_ALL,     N_( "Every Day" ) },
+        { TR_SCHED_WEEKDAY, N_( "Weekdays" ) },
+        { TR_SCHED_WEEKEND, N_( "Weekends" ) },
+        { TR_SCHED_SUN,     N_( "Sunday" ) },
+        { TR_SCHED_MON,     N_( "Monday" ) },
+        { TR_SCHED_TUES,    N_( "Tuesday" ) },
+        { TR_SCHED_WED,     N_( "Wednesday" ) },
+        { TR_SCHED_THURS,   N_( "Thursday" ) },
+        { TR_SCHED_FRI,     N_( "Friday" ) },
+        { TR_SCHED_SAT,     N_( "Saturday" ) }
+    };
+
+    /* build a store for the days of the week */
+    selIndex = -1;
+    store = gtk_list_store_new( 2, G_TYPE_INT, G_TYPE_STRING );
+    for( i=0; i<(int)G_N_ELEMENTS(items); ++i ) {
+        GtkTreeIter iter;
+        gtk_list_store_append( store, &iter );
+        gtk_list_store_set( store, &iter, 0, items[i].value, 1, _( items[i].text ), -1 );
+        if( items[i].value == currentValue )
+            selIndex = i;
+    }
+
+    /* build the widget */
+    w = gtk_combo_box_new_with_model( GTK_TREE_MODEL( store ) );
+    r = gtk_cell_renderer_text_new( );
+    gtk_cell_layout_pack_start( GTK_CELL_LAYOUT( w ), r, TRUE );
+    gtk_cell_layout_set_attributes( GTK_CELL_LAYOUT( w ), r, "text", 1, NULL );
     g_object_set_data_full( G_OBJECT( w ), PREF_KEY, tr_strdup( key ), g_free );
+    if( selIndex >= 0 )
+        gtk_combo_box_set_active( GTK_COMBO_BOX( w ), selIndex );
     g_signal_connect( w, "changed", G_CALLBACK( onIntComboChanged ), core );
+
+    /* cleanup */
+    g_object_unref( G_OBJECT( store ) );
     return w;
 }
 
@@ -1014,16 +1220,16 @@ bandwidthPage( GObject * core )
     t = hig_workarea_create( );
     hig_workarea_add_section_title( t, &row, _( "Speed Limits" ) );
 
-        g_snprintf( buf, sizeof( buf ), _( "Limit _download speed (%s):" ), _(speed_K_str) );
-        w = new_check_button( buf, TR_PREFS_KEY_DSPEED_ENABLED, core );
-        w2 = new_spin_button( TR_PREFS_KEY_DSPEED_KBps, core, 0, INT_MAX, 5 );
+        s = _( "Limit _download speed (KiB/s):" );
+        w = new_check_button( s, TR_PREFS_KEY_DSPEED_ENABLED, core );
+        w2 = new_spin_button( TR_PREFS_KEY_DSPEED, core, 0, INT_MAX, 5 );
         gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_DSPEED_ENABLED ) );
         g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
         hig_workarea_add_row_w( t, &row, w, w2, NULL );
 
-        g_snprintf( buf, sizeof( buf ), _( "Limit _upload speed (%s):" ), _(speed_K_str) );
-        w = new_check_button( buf, TR_PREFS_KEY_USPEED_ENABLED, core );
-        w2 = new_spin_button( TR_PREFS_KEY_USPEED_KBps, core, 0, INT_MAX, 5 );
+        s = _( "Limit _upload speed (KiB/s):" );
+        w = new_check_button( s, TR_PREFS_KEY_USPEED_ENABLED, core );
+        w2 = new_spin_button( TR_PREFS_KEY_USPEED, core, 0, INT_MAX, 5 );
         gtk_widget_set_sensitive( GTK_WIDGET( w2 ), pref_flag_get( TR_PREFS_KEY_USPEED_ENABLED ) );
         g_signal_connect( w, "toggled", G_CALLBACK( target_cb ), w2 );
         hig_workarea_add_row_w( t, &row, w, w2, NULL );
@@ -1046,13 +1252,13 @@ bandwidthPage( GObject * core )
         gtk_misc_set_alignment( GTK_MISC( w ), 0.5f, 0.5f );
         hig_workarea_add_wide_control( t, &row, w );
 
-        g_snprintf( buf, sizeof( buf ), _( "Limit do_wnload speed (%s):" ), _(speed_K_str) );
-        w = new_spin_button( TR_PREFS_KEY_ALT_SPEED_DOWN_KBps, core, 0, INT_MAX, 5 );
-        hig_workarea_add_row( t, &row, buf, w, NULL );
+        s = _( "Limit do_wnload speed (KiB/s):" );
+        w = new_spin_button( TR_PREFS_KEY_ALT_SPEED_DOWN, core, 0, INT_MAX, 5 );
+        hig_workarea_add_row( t, &row, s, w, NULL );
 
-        g_snprintf( buf, sizeof( buf ), _( "Limit u_pload speed (%s):" ), _(speed_K_str) );
-        w = new_spin_button( TR_PREFS_KEY_ALT_SPEED_UP_KBps, core, 0, INT_MAX, 5 );
-        hig_workarea_add_row( t, &row, buf, w, NULL );
+        s = _( "Limit u_pload speed (KiB/s):" );
+        w = new_spin_button( TR_PREFS_KEY_ALT_SPEED_UP, core, 0, INT_MAX, 5 );
+        hig_workarea_add_row( t, &row, s, w, NULL );
 
         s = _( "_Scheduled times:" );
         h = gtk_hbox_new( FALSE, 0 );
@@ -1180,7 +1386,7 @@ peerPage( GObject * core )
     data->prefsTag = g_signal_connect( TR_CORE( core ), "prefs-changed", G_CALLBACK( onCorePrefsChanged ), data );
     g_object_weak_ref( G_OBJECT( t ), peerPageDestroyed, data );
 
-    s = _( "Pick a _random port every time Transmission is started" );
+    s = _( "Pick a _random port on startup" );
     w = new_check_button( s, TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, core );
     hig_workarea_add_wide_control( t, &row, w );
 
@@ -1219,6 +1425,7 @@ tr_prefs_dialog_new( GObject *   core,
                                      GTK_STOCK_CLOSE, GTK_RESPONSE_CLOSE,
                                      NULL );
     gtk_window_set_role( GTK_WINDOW( d ), "transmission-preferences-dialog" );
+    gtk_dialog_set_has_separator( GTK_DIALOG( d ), FALSE );
     gtk_container_set_border_width( GTK_CONTAINER( d ), GUI_PAD );
 
     n = gtk_notebook_new( );
@@ -1242,6 +1449,9 @@ tr_prefs_dialog_new( GObject *   core,
     gtk_notebook_append_page( GTK_NOTEBOOK( n ),
                               webPage( core ),
                               gtk_label_new ( _( "Web" ) ) );
+    gtk_notebook_append_page( GTK_NOTEBOOK( n ),
+                              trackerPage( core ),
+                              gtk_label_new ( _( "Proxy" ) ) );
 
     g_signal_connect( d, "response", G_CALLBACK( response_cb ), core );
     gtk_box_pack_start( GTK_BOX( GTK_DIALOG( d )->vbox ), n, TRUE, TRUE, 0 );

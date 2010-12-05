@@ -74,7 +74,7 @@ struct tr_openfile
     tr_file_index_t  fileNum;
     char             filename[TR_PATH_MAX];
     int              fd;
-    time_t           date;
+    uint64_t         date;
 };
 
 struct tr_fdInfo
@@ -125,7 +125,7 @@ preallocateFileFull( const char * filename, uint64_t length )
 
 #ifdef WIN32
 
-    HANDLE hFile = CreateFile( filename, GENERIC_WRITE, 0, 0, CREATE_NEW, FILE_FLAG_RANDOM_ACCESS, 0 );
+    HANDLE hFile = CreateFile( filename, GENERIC_WRITE, 0, 0, CREATE_NEW, 0, 0 );
     if( hFile != INVALID_HANDLE_VALUE )
     {
         LARGE_INTEGER li;
@@ -231,7 +231,7 @@ tr_pwrite( int fd, const void *buf, size_t count, off_t offset )
 }
 
 int
-tr_prefetch( int fd UNUSED, off_t offset UNUSED, size_t count UNUSED )
+tr_prefetch( int fd, off_t offset, size_t count )
 {
 #ifdef HAVE_POSIX_FADVISE
     return posix_fadvise( fd, offset, count, POSIX_FADV_WILLNEED );
@@ -305,11 +305,6 @@ tr_close_file( int fd )
     const int err = errno;
     posix_fadvise( fd, 0, 0, POSIX_FADV_DONTNEED );
     errno = err;
-#endif
-#ifdef SYS_DARWIN
-    /* it's unclear to me from the man pages if this actually flushes out the cache,
-     * but it couldn't hurt... */
-    fcntl( fd, F_NOCACHE, 1 );
 #endif
     close( fd );
 }
@@ -399,21 +394,18 @@ TrOpenFile( tr_session             * session,
     }
 #endif
 
-#if defined( SYS_DARWIN )
-    /**
-     * 1. Enable readahead for reasons described above w/POSIX_FADV_SEQUENTIAL.
-     *
-     * 2. Disable OS-level caching due to user reports of adverse effects of
-     *    excessive inactive memory.  However this is experimental because
-     *    previous attempts at this have *also* had adverse effects (see r8198)
-     *
-     * It's okay for this to fail silently, so don't let it affect errno
-     */
+#if defined( SYS_DARWIN )  
+    /** 
+     * 1. Enable readahead for reasons described above w/POSIX_FADV_SEQUENTIAL. 
+     * 2. Disable OS-level caching due to user reports of adverse effects of 
+     *    excessive inactive memory.
+     * It's okay for this to fail silently, so don't let it affect errno 
+     */ 
     {
-        const int err = errno;
-        fcntl( file->fd, F_NOCACHE, 1 );
-        fcntl( file->fd, F_RDAHEAD, 1 );
-        errno = err;
+        const int err = errno; 
+        fcntl( file->fd, F_NOCACHE, 1 );  
+        fcntl( file->fd, F_RDAHEAD, 1 );  
+        errno = err; 
     }
 #endif
 
@@ -474,7 +466,7 @@ tr_fdFileGetCached( tr_session       * session,
 
     if( ( match != NULL ) && ( !doWrite || match->isWritable ) )
     {
-        match->date = tr_time( );
+        match->date = tr_date( );
         return match->fd;
     }
 
@@ -532,7 +524,7 @@ tr_fdFileCheckout( tr_session             * session,
     dbgmsg( "it's not already open.  looking for an open slot or an old file." );
     while( winner < 0 )
     {
-        time_t date = tr_time( ) + 1;
+        uint64_t date = tr_date( ) + 1;
 
         /* look for the file that's been open longest */
         for( i=0; i<gFd->openFileLimit; ++i )
@@ -582,7 +574,7 @@ tr_fdFileCheckout( tr_session             * session,
     dbgmsg( "checking out '%s' in slot %d", filename, winner );
     o->torrentId = torrentId;
     o->fileNum = fileNum;
-    o->date = tr_time( );
+    o->date = tr_date( );
     return o->fd;
 }
 

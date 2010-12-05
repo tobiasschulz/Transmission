@@ -1,4 +1,3 @@
-#include <math.h>
 #include <stdio.h> /* fprintf */
 #include <string.h> /* strcmp */
 
@@ -100,28 +99,6 @@ test_bitfields( void )
         check( tr_bitfieldHas( field, i ) == ( ( 4 <= i ) && ( i < 5 ) ) );
 
     tr_bitfieldFree( field );
-    return 0;
-}
-
-static int
-test_strip_positional_args( void )
-{
-    const char * in;
-    const char * out;
-    const char * expected;
-
-    in = "Hello %1$s foo %2$.*f";
-    expected = "Hello %s foo %.*f";
-    out = tr_strip_positional_args( in );
-    check( out != NULL )
-    check( !strcmp( out, expected ) )
-
-    in = "Hello %1$'d foo %2$'f";
-    expected = "Hello %d foo %f";
-    out = tr_strip_positional_args( in );
-    check( out != NULL )
-    check( !strcmp( out, expected ) )
-
     return 0;
 }
 
@@ -323,11 +300,11 @@ test_array( void )
     int array[10] = { 0, 1, 2, 3, 4, 5, 6, 7, 8, 9 };
     int n = sizeof( array ) / sizeof( array[0] );
 
-    tr_removeElementFromArray( array, 5u, sizeof( int ), n-- );
+    tr_removeElementFromArray( array, 5, sizeof( int ), n-- );
     for( i=0; i<n; ++i )
         check( array[i] == ( i<5 ? i : i+1 ) );
 
-    tr_removeElementFromArray( array, 0u, sizeof( int ), n-- );
+    tr_removeElementFromArray( array, 0, sizeof( int ), n-- );
     for( i=0; i<n; ++i )
         check( array[i] == ( i<4 ? i+1 : i+2 ) );
 
@@ -380,7 +357,6 @@ static int
 test_truncd( void )
 {
     char buf[32];
-    const double nan = sqrt( -1 );
 
     tr_snprintf( buf, sizeof( buf ), "%.2f%%", 99.999 );
     check( !strcmp( buf, "100.00%" ) );
@@ -390,21 +366,6 @@ test_truncd( void )
 
     tr_snprintf( buf, sizeof( buf ), "%.4f", tr_truncd( 403650.656250, 4 ) );
     check( !strcmp( buf, "403650.6562" ) );
-
-    tr_snprintf( buf, sizeof( buf ), "%.2f", tr_truncd( 2.15, 2 ) );
-    check( !strcmp( buf, "2.15" ) );
-
-    tr_snprintf( buf, sizeof( buf ), "%.2f", tr_truncd( 2.05, 2 ) );
-    check( !strcmp( buf, "2.05" ) );
-
-    tr_snprintf( buf, sizeof( buf ), "%.2f", tr_truncd( 3.3333, 2 ) );
-    check( !strcmp( buf, "3.33" ) );
-
-    tr_snprintf( buf, sizeof( buf ), "%.0f", tr_truncd( 3.3333, 0 ) );
-    check( !strcmp( buf, "3" ) );
-
-    tr_snprintf( buf, sizeof( buf ), "%.2f", tr_truncd( nan, 2 ) );
-    check( !strcmp( buf, "nan" ) );
 
     return 0;
 }
@@ -435,8 +396,6 @@ main( void )
     if( ( i = test_hex( ) ) )
         return i;
     if( ( i = test_lowerbound( ) ) )
-        return i;
-    if( ( i = test_strip_positional_args( ) ) )
         return i;
     if( ( i = test_strstrip( ) ) )
         return i;

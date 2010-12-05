@@ -17,12 +17,17 @@
 #ifndef TR_PLATFORM_H
 #define TR_PLATFORM_H
 
-#define TR_PATH_DELIMITER '/'
-#define TR_PATH_DELIMITER_STR "/"
+#if defined( WIN32 )
+ #define TR_PATH_DELIMITER '\\'
+ #define TR_PATH_DELIMITER_STR "\\"
+#else
+ #define TR_PATH_DELIMITER '/'
+ #define TR_PATH_DELIMITER_STR "/"
+#endif
 
 #ifdef WIN32
- #include <windef.h> /* MAX_PATH */
- #define TR_PATH_MAX (MAX_PATH + 1)
+ #include <windows.h> /* MAX_PATH */
+ #define TR_PATH_MAX MAX_PATH
 #else
  #include <limits.h> /* PATH_MAX */
  #ifdef PATH_MAX
@@ -69,7 +74,7 @@ tr_thread* tr_threadNew( void ( *func )(void *), void * arg );
 
 /** @brief Return nonzero if this function is being called from `thread'
     @param thread the thread being tested */
-tr_bool tr_amInThread( const tr_thread * );
+int tr_amInThread( const tr_thread * );
 
 /***
 ****

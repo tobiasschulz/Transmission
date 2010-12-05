@@ -1,11 +1,11 @@
 /*
- * This file Copyright (C) Mnemosyne LLC
+ * This file Copyright (C) 2009-2010 Mnemosyne LLC
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2
- * as published by the Free Software Foundation.
- *
- * http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+ * This file is licensed by the GPL version 2.  Works owned by the
+ * Transmission project are granted a special exemption to clause 2(b)
+ * so that the bulk of its code can remain under the MIT license.
+ * This exemption does not extend to derived works not owned by
+ * the Transmission project.
  *
  * $Id$
  */
@@ -36,16 +36,10 @@ class QTreeWidgetItem;
 class Session;
 class Torrent;
 class TorrentModel;
-class TrackerDelegate;
-class TrackerModel;
-class TrackerModelFilter;
 
 class Details: public QDialog
 {
         Q_OBJECT
-
-    private:
-        void getNewData( );
 
     private slots:
         void onTorrentChanged( );
@@ -64,12 +58,12 @@ class Details: public QDialog
         QWidget * createOptionsTab( );
 
     private:
-        QIcon getStockIcon( const QString& freedesktop_name, int fallback );
         QString timeToStringRounded( int seconds );
         QString trimToDesiredWidth( const QString& str );
         void enableWhenChecked( QCheckBox *, QWidget * );
 
     private:
+
         Session& mySession;
         Prefs& myPrefs;
         TorrentModel& myModel;
@@ -83,6 +77,7 @@ class Details: public QDialog
         QLabel * myAvailabilityLabel;
         QLabel * myDownloadedLabel;
         QLabel * myUploadedLabel;
+        QLabel * myRatioLabel;
         QLabel * myErrorLabel;
         QLabel * myRunTimeLabel;
         QLabel * myETALabel;
@@ -93,15 +88,12 @@ class Details: public QDialog
         QCheckBox * mySingleUpCheck;
         QCheckBox * myShowTrackerScrapesCheck;
         QCheckBox * myShowBackupTrackersCheck;
-        QPushButton * myAddTrackerButton;
-        QPushButton * myEditTrackerButton;
-        QPushButton * myRemoveTrackerButton;
         QSpinBox * mySingleDownSpin;
         QSpinBox * mySingleUpSpin;
-        QComboBox * myRatioCombo;
-        QDoubleSpinBox * myRatioSpin;
-        QComboBox * myIdleCombo;
-        QSpinBox * myIdleSpin;
+        QRadioButton * mySeedGlobalRadio;
+        QRadioButton * mySeedForeverRadio;
+        QRadioButton * mySeedCustomRadio;
+        QDoubleSpinBox * mySeedCustomSpin;
         QSpinBox * myPeerLimitSpin;
         QComboBox * myBandwidthPriorityCombo;
 
@@ -121,37 +113,28 @@ class Details: public QDialog
         QLabel * myAnnounceResponseLabel;
         QLabel * myAnnounceManualLabel;
 
-        TrackerModel * myTrackerModel;
-        TrackerModelFilter * myTrackerFilter;
-        TrackerDelegate * myTrackerDelegate;
-        QTreeView * myTrackerView;
-        //QMap<QString,QTreeWidgetItem*> myTrackerTiers;
-        //QMap<QString,QTreeWidgetItem*> myTrackerItems;
-
+        QTreeWidget * myTrackerTree;
         QTreeWidget * myPeerTree;
+        QMap<QString,QTreeWidgetItem*> myTrackerStats;
         QMap<QString,QTreeWidgetItem*> myPeers;
-
         QWidgetList myWidgets;
 
         FileTreeView * myFileTreeView;
 
     private slots:
-        void refreshPref( int key );
         void onBandwidthPriorityChanged( int );
         void onFilePriorityChanged( const QSet<int>& fileIndices, int );
         void onFileWantedChanged( const QSet<int>& fileIndices, bool );
         void onHonorsSessionLimitsToggled( bool );
         void onDownloadLimitedToggled( bool );
-        void onSpinBoxEditingFinished( );
+        void onDownloadLimitChanged( int );
         void onUploadLimitedToggled( bool );
-        void onRatioModeChanged( int );
-        void onIdleModeChanged( int );
-        void onShowTrackerScrapesToggled( bool );
+        void onUploadLimitChanged( int );
+        void onSeedUntilChanged( bool );
+        void onSeedRatioLimitChanged( double );
         void onShowBackupTrackersToggled( bool );
-        void onTrackerSelectionChanged( );
-        void onAddTrackerClicked( );
-        void onEditTrackerClicked( );
-        void onRemoveTrackerClicked( );
+        void onShowTrackerScrapesToggled( bool );
+        void onMaxPeersChanged( int );
         void refresh( );
 };
 

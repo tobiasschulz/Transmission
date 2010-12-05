@@ -347,7 +347,7 @@ tr_cryptoWeakRandInt( int upperBound )
 
     if( !init )
     {
-        srand( tr_time_msec( ) );
+        srand( tr_date( ) );
         init = TRUE;
     }
 
@@ -368,21 +368,20 @@ tr_cryptoRandBuf( void * buf, size_t len )
 char*
 tr_ssha1( const void * plaintext )
 {
-    enum { saltval_len = 8,
-           salter_len  = 64 };
     static const char * salter = "0123456789"
                                  "abcdefghijklmnopqrstuvwxyz"
                                  "ABCDEFGHIJKLMNOPQRSTUVWXYZ"
                                  "./";
+    const size_t salter_len = 64;
+    const size_t saltval_len = 8;
 
     size_t i;
-    unsigned char salt[saltval_len];
+    char salt[saltval_len];
     uint8_t sha[SHA_DIGEST_LENGTH];
     char buf[2*SHA_DIGEST_LENGTH + saltval_len + 2];
 
-    tr_cryptoRandBuf( salt, saltval_len );
     for( i=0; i<saltval_len; ++i )
-        salt[i] = salter[ salt[i] % salter_len ];
+        salt[i] = salter[ tr_cryptoRandInt( salter_len ) ];
 
     tr_sha1( sha, plaintext, strlen( plaintext ), salt, saltval_len, NULL );
     tr_sha1_to_hex( &buf[1], sha );

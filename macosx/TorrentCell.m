@@ -610,8 +610,8 @@
     //fill an all-white bar for magnet links
     if ([torrent isMagnet])
     {
-        [[NSColor colorWithCalibratedWhite: 1.0 alpha: [fDefaults boolForKey: @"SmallView"] ? 0.25 : 1.0] set];
-        NSRectFillUsingOperation(barRect, NSCompositeSourceOver);
+        [[NSColor whiteColor] set];
+        NSRectFill(barRect);
         return;
     }
     

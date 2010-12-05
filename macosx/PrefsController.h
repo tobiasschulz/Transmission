@@ -36,19 +36,15 @@
     
     NSString * fInitialString;
     
-    IBOutlet NSTextField * fCheckForUpdatesLabel;
-    IBOutlet NSButton * fCheckForUpdatesButton, * fCheckForUpdatesBetaButton;
-    
-    IBOutlet NSPopUpButton * fFolderPopUp, * fIncompleteFolderPopUp, * fImportFolderPopUp, * fDoneScriptPopUp;
-    IBOutlet NSTextField * fRatioStopField, * fIdleStopField, * fQueueDownloadField, * fQueueSeedField, * fStalledField;
+    IBOutlet NSPopUpButton * fFolderPopUp, * fIncompleteFolderPopUp, * fImportFolderPopUp;
+    IBOutlet NSTextField * fRatioStopField, * fQueueDownloadField, * fQueueSeedField, * fStalledField;
 
     IBOutlet NSTextField * fUploadField, * fDownloadField,
                         * fSpeedLimitUploadField, * fSpeedLimitDownloadField;
     IBOutlet NSPopUpButton * fAutoSpeedDayTypePopUp;
     
-    IBOutlet NSTextField * fPeersGlobalField, * fPeersTorrentField,
-                        * fBlocklistURLField, * fBlocklistMessageField, * fBlocklistDateField;
-    IBOutlet NSButton * fBlocklistButton;
+    IBOutlet NSTextField * fPeersGlobalField, * fPeersTorrentField, * fBlocklistMessageField, * fBlocklistDateField;
+    IBOutlet NSButton * fBlocklistEnableCheck;
     
     PortChecker * fPortChecker;
     IBOutlet NSTextField * fPortField, * fPortStatusField;
@@ -57,6 +53,9 @@
     IBOutlet NSProgressIndicator * fPortStatusProgress;
     NSTimer * fPortStatusTimer;
     int fPeerPort, fNatStatus;
+    
+    IBOutlet NSTextField * fProxyAddressField, * fProxyPortField, * fProxyPasswordField;
+    IBOutlet NSPopUpButton * fProxyTypePopUp;
     
     IBOutlet NSTextField * fRPCPortField, * fRPCPasswordField;
     IBOutlet NSTableView * fRPCWhitelistTable;
@@ -93,8 +92,6 @@
 - (void) updateBlocklist: (id) sender;
 - (void) setBlocklistAutoUpdate: (id) sender;
 - (void) updateBlocklistFields;
-- (void) updateBlocklistURLField;
-- (void) updateBlocklistButton;
 
 - (void) setAutoStartDownloads: (id) sender;
 
@@ -117,15 +114,9 @@
 
 - (void) setRenamePartialFiles: (id) sender;
 
-- (void) setDoneScriptEnabled: (id) sender;
-- (void) doneScriptSheetShow: (id) sender;
-
 - (void) applyRatioSetting: (id) sender;
-- (void) setRatioStop: (id) sender;
 - (void) updateRatioStopField;
-
-- (void) applyIdleStopSetting: (id) sender;
-- (void) setIdleStop: (id) sender;
+- (void) setRatioStop: (id) sender;
 
 - (void) applySpeedSettings: (id) sender;
 - (void) applyAltSpeedSettings;
@@ -144,6 +135,16 @@
 - (void) importFolderSheetShow: (id) sender;
 
 - (void) setAutoSize: (id) sender;
+
+- (void) setProxyEnabled: (id) sender;
+- (void) setProxyAddress: (id) sender;
+- (void) setProxyPort: (id) sender;
+- (void) setProxyType: (id) sender;
+- (void) updateProxyType;
+- (void) setProxyAuthorize: (id) sender;
+- (void) setProxyUsername: (id) sender;
+- (void) setProxyPassword: (id) sender;
+- (void) updateProxyPassword;
 
 - (void) setRPCEnabled: (id) sender;
 - (void) linkWebUI: (id) sender;

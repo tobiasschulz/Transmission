@@ -50,6 +50,6 @@
 - (uint64_t) size;
 - (NSImage *) icon;
 
-- (NSMutableArray *) children;
+- (NSArray *) children;
 
 @end

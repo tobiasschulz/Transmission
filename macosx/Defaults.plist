@@ -16,7 +16,7 @@
 	<true/>
 	<key>BindPort</key>
 	<integer>51413</integer>
-	<key>BlocklistNew</key>
+	<key>Blocklist</key>
 	<false/>
 	<key>BlocklistAutoUpdate</key>
 	<false/>
@@ -50,8 +50,6 @@
 	<true/>
 	<key>DisplayStatusProgressSelected</key>
 	<false/>
-	<key>DoneScriptEnabled</key>
-	<false/>
 	<key>DownloadAsk</key>
 	<true/>
 	<key>DownloadAskManual</key>
@@ -78,10 +76,6 @@
 	<integer>-2</integer>
 	<key>FilterSearchType</key>
 	<string>Name</string>
-	<key>IdleLimitCheck</key>
-	<false/>
-	<key>IdleLimitMinutes</key>
-	<integer>30</integer>
 	<key>IncompleteDownloadFolder</key>
 	<string>~/Downloads</string>
 	<key>InfoVisible</key>
@@ -112,6 +106,18 @@
 	<true/>
 	<key>PlaySeedingSound</key>
 	<false/>
+	<key>Proxy</key>
+	<false/>
+	<key>ProxyAddress</key>
+	<string></string>
+	<key>ProxyAuthorize</key>
+	<false/>
+	<key>ProxyPort</key>
+	<integer>80</integer>
+	<key>ProxyType</key>
+	<string>HTTP</string>
+	<key>ProxyUsername</key>
+	<string></string>
 	<key>Queue</key>
 	<false/>
 	<key>QueueDownloadNumber</key>

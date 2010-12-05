@@ -39,17 +39,10 @@ THE SOFTWARE.
 #include <unistd.h>
 #include <fcntl.h>
 #include <sys/time.h>
-
-#ifndef WIN32
 #include <arpa/inet.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#else
-#include <w32api.h>
-#define WINVER WindowsXP
-#include <ws2tcpip.h>
-#endif
 
 #include "dht.h"
 
@@ -61,48 +54,6 @@ THE SOFTWARE.
 
 #ifndef MSG_CONFIRM
 #define MSG_CONFIRM 0
-#endif
-
-#ifdef WIN32
-
-#define EAFNOSUPPORT WSAEAFNOSUPPORT
-#define EAGAIN WSAEWOULDBLOCK
-static int
-set_nonblocking(int fd, int nonblocking)
-{
-    int rc;
-
-    unsigned long mode = !!nonblocking;
-    rc = ioctlsocket(fd, FIONBIO, &mode);
-    if(rc != 0)
-        errno = WSAGetLastError();
-    return (rc == 0 ? 0 : -1);
-}
-
-static int
-random(void)
-{
-    return rand();
-}
-extern const char *inet_ntop(int, const void *, char *, socklen_t);
-
-#else
-
-static int
-set_nonblocking(int fd, int nonblocking)
-{
-    int rc;
-    rc = fcntl(fd, F_GETFL, 0);
-    if(rc < 0)
-        return -1;
-
-    rc = fcntl(fd, F_SETFL, nonblocking?(rc | O_NONBLOCK):(rc & ~O_NONBLOCK));
-    if(rc < 0)
-        return -1;
-
-    return 0;
-}
-
 #endif
 
 /* We set sin_family to 0 to mark unused slots. */
@@ -380,7 +331,7 @@ is_martian(struct sockaddr *sa)
 /* Forget about the ``XOR-metric''.  An id is just a path from the
    root of the tree, so bits are numbered from the start. */
 
-static int
+static inline int
 id_cmp(const unsigned char *restrict id1, const unsigned char *restrict id2)
 {
     /* Memcmp is guaranteed to perform an unsigned comparison. */
@@ -790,7 +741,7 @@ new_node(const unsigned char *id, struct sockaddr *sa, int salen, int confirm)
 
         if(split) {
             debugf("Splitting.\n");
-            split_bucket(b);
+            b = split_bucket(b);
             return new_node(id, sa, salen, confirm);
         }
 
@@ -1224,23 +1175,9 @@ static int
 storage_store(const unsigned char *id, struct sockaddr *sa)
 {
     int i, len;
-    struct storage *st;
+    struct storage *st = storage;
     unsigned char *ip;
     unsigned short port;
-
-    if(sa->sa_family == AF_INET) {
-        struct sockaddr_in *sin = (struct sockaddr_in*)sa;
-        ip = (unsigned char*)&sin->sin_addr;
-        len = 4;
-        port = ntohs(sin->sin_port);
-    } else if(sa->sa_family == AF_INET6) {
-        struct sockaddr_in6 *sin6 = (struct sockaddr_in6*)sa;
-        ip = (unsigned char*)&sin6->sin6_addr;
-        len = 16;
-        port = ntohs(sin6->sin6_port);
-    } else {
-        return -1;
-    }
 
     st = find_storage(id);
 
@@ -1253,6 +1190,18 @@ storage_store(const unsigned char *id, struct sockaddr *sa)
         st->next = storage;
         storage = st;
         numstorage++;
+    }
+
+    if(sa->sa_family == AF_INET) {
+        struct sockaddr_in *sin = (struct sockaddr_in*)sa;
+        ip = (unsigned char*)&sin->sin_addr;
+        len = 4;
+        port = ntohs(sin->sin_port);
+    } else if(sa->sa_family == AF_INET6) {
+        struct sockaddr_in6 *sin6 = (struct sockaddr_in6*)sa;
+        ip = (unsigned char*)&sin6->sin6_addr;
+        len = 16;
+        port = ntohs(sin6->sin6_port);
     }
 
     for(i = 0; i < st->numpeers; i++) {
@@ -1599,7 +1548,11 @@ dht_init(int s, int s6, const unsigned char *id, const unsigned char *v)
             return -1;
         buckets->af = AF_INET;
 
-        rc = set_nonblocking(s, 1);
+        rc = fcntl(s, F_GETFL, 0);
+        if(rc < 0)
+            goto fail;
+
+        rc = fcntl(s, F_SETFL, (rc | O_NONBLOCK));
         if(rc < 0)
             goto fail;
     }
@@ -1610,7 +1563,11 @@ dht_init(int s, int s6, const unsigned char *id, const unsigned char *v)
             return -1;
         buckets6->af = AF_INET6;
 
-        rc = set_nonblocking(s6, 1);
+        rc = fcntl(s6, F_GETFL, 0);
+        if(rc < 0)
+            goto fail;
+
+        rc = fcntl(s6, F_SETFL, (rc | O_NONBLOCK));
         if(rc < 0)
             goto fail;
     }
@@ -1847,7 +1804,7 @@ dht_periodic(int available, time_t *tosleep,
         unsigned short port;
         unsigned char values[2048], values6[2048];
         int values_len = 2048, values6_len = 2048;
-        int want;
+        int want, want4, want6;
         struct sockaddr_storage source_storage;
         struct sockaddr *source = (struct sockaddr*)&source_storage;
         socklen_t sourcelen = sizeof(source_storage);
@@ -1916,6 +1873,14 @@ dht_periodic(int available, time_t *tosleep,
                 debugf("Dropping request due to rate limiting.\n");
                 goto dontread;
             }
+        }
+
+        if(want > 0) {
+            want4 = (want & WANT4);
+            want6 = (want & WANT6);
+        } else {
+            want4 = source->sa_family == AF_INET;
+            want6 = source->sa_family == AF_INET6;
         }
 
         switch(message) {
@@ -2862,10 +2827,8 @@ parse_message(const unsigned char *buf, int buflen,
             if(values6_len)
                 *values6_len = j6;
         } else {
-            if(values_len)
-                *values_len = 0;
-            if(values6_len)
-                *values6_len = 0;
+            *values_len = 0;
+            *values6_len = 0;
         }
     }
 

@@ -125,7 +125,7 @@ addResponseCB( GtkDialog * dialog,
         {
             tr_torrent * tor = tr_torrent_handle( data->gtor );
 
-            tr_torrentSetPriority( tor, gtr_priority_combo_get_value( GTK_COMBO_BOX( data->priority_combo ) ) );
+            tr_torrentSetPriority( tor, gtr_priority_combo_get_value( data->priority_combo ) );
 
             if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( data->run_check ) ) )
                 tr_torrentStart( tor );
@@ -297,8 +297,8 @@ addSingleTorrentDialog( GtkWindow * parent, TrCore * core, tr_ctor * ctor )
     str = _( "_Start when added" );
     data->run_check = gtk_check_button_new_with_mnemonic( str );
 
-    w = data->priority_combo = gtr_priority_combo_new( );
-    gtr_priority_combo_set_value( GTK_COMBO_BOX( w ), TR_PRI_NORMAL );
+    data->priority_combo = gtr_priority_combo_new( );
+    gtr_priority_combo_set_value( data->priority_combo, TR_PRI_NORMAL );
 
     g_signal_connect( G_OBJECT( d ), "response",
                       G_CALLBACK( addResponseCB ), data );
@@ -372,6 +372,10 @@ addSingleTorrentDialog( GtkWindow * parent, TrCore * core, tr_ctor * ctor )
         g_assert_not_reached( );
     gtk_toggle_button_set_active( GTK_TOGGLE_BUTTON( w ), flag );
     gtk_table_attach( GTK_TABLE( t ), w, col, col + 2, row, row + 1, GTK_FILL, 0, 0, 0 );
+
+    ++row;
+    col = 0;
+    w = data->priority_combo;
 
     /* trigger sourceChanged, either directly or indirectly,
      * so that it creates the tor/gtor objects */

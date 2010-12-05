@@ -23,13 +23,11 @@
 
 #include <event.h>
 
-//#define TR_SHOW_DEPRECATED
 #include "transmission.h"
 #include "announcer.h"
 #include "bandwidth.h"
 #include "bencode.h"
 #include "blocklist.h"
-#include "cache.h"
 #include "crypto.h"
 #include "fdlimit.h"
 #include "list.h"
@@ -53,9 +51,7 @@
 
 enum
 {
-    SAVE_INTERVAL_SECS = 120,
-
-    DEFAULT_CACHE_SIZE_MB = 2
+    SAVE_INTERVAL_SECS = 120
 };
 
 
@@ -87,9 +83,9 @@ tr_peerIdNew( void )
 
     memcpy( buf, PEERID_PREFIX, 8 );
 
-    tr_cryptoRandBuf( buf+8, 11 );
-    for( i=8; i<19; ++i ) {
-        val = buf[i] % base;
+    for( i = 8; i < 19; ++i )
+    {
+        val = tr_cryptoRandInt( base );
         total += val;
         buf[i] = pool[val];
     }
@@ -199,16 +195,16 @@ open_incoming_peer_port( tr_session * session )
 
     /* bind an ipv4 port to listen for incoming peers... */
     b = session->public_ipv4;
-    b->socket = tr_netBindTCP( &b->addr, session->private_peer_port, FALSE );
+    b->socket = tr_netBindTCP( &b->addr, session->peerPort, FALSE );
     if( b->socket >= 0 ) {
         event_set( &b->ev, b->socket, EV_READ | EV_PERSIST, accept_incoming_peer, session );
         event_add( &b->ev, NULL );
     }
 
     /* and do the exact same thing for ipv6, if it's supported... */
-    if( tr_net_hasIPv6( session->private_peer_port ) ) {
+    if( tr_net_hasIPv6( session->peerPort ) ) {
         b = session->public_ipv6;
-        b->socket = tr_netBindTCP( &b->addr, session->private_peer_port, FALSE );
+        b->socket = tr_netBindTCP( &b->addr, session->peerPort, FALSE );
         if( b->socket >= 0 ) {
             event_set( &b->ev, b->socket, EV_READ | EV_PERSIST, accept_incoming_peer, session );
             event_add( &b->ev, NULL );
@@ -246,18 +242,14 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
 {
     assert( tr_bencIsDict( d ) );
 
-    tr_bencDictReserve( d, 60 );
+    tr_bencDictReserve( d, 35 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_BLOCKLIST_ENABLED,        FALSE );
-    tr_bencDictAddStr ( d, TR_PREFS_KEY_BLOCKLIST_URL,            "http://www.example.com/blocklist" );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_MAX_CACHE_SIZE_MB,        DEFAULT_CACHE_SIZE_MB );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DHT_ENABLED,              TRUE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_LPD_ENABLED,              FALSE );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_DOWNLOAD_DIR,             tr_getDefaultDownloadDir( ) );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_DSPEED_KBps,              100 );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_DSPEED,                   100 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DSPEED_ENABLED,           FALSE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ENCRYPTION,               TR_DEFAULT_ENCRYPTION );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_IDLE_LIMIT,               30 );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_IDLE_LIMIT_ENABLED,       FALSE );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_INCOMPLETE_DIR,           tr_getDefaultDownloadDir( ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED,   FALSE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_LAZY_BITFIELD,            TRUE );
@@ -273,6 +265,13 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEX_ENABLED,              TRUE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PORT_FORWARDING,          TRUE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PREALLOCATION,            TR_PREALLOCATE_SPARSE );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY,                    "" );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_PROXY_AUTH_ENABLED,       FALSE );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_PROXY_ENABLED,            FALSE );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY_PASSWORD,           "" );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_PORT,               80 );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_TYPE,               TR_PROXY_HTTP );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY_USERNAME,           "" );
     tr_bencDictAddReal( d, TR_PREFS_KEY_RATIO,                    2.0 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RATIO_ENABLED,            FALSE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RENAME_PARTIAL_FILES,     TRUE );
@@ -287,13 +286,13 @@ tr_sessionGetDefaultSettings( const char * configDir UNUSED, tr_benc * d )
     tr_bencDictAddStr ( d, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_FILENAME, "" );
     tr_bencDictAddBool( d, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_ENABLED, FALSE );
     tr_bencDictAddBool( d, TR_PREFS_KEY_ALT_SPEED_ENABLED,        FALSE );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_UP_KBps,        50 ); /* half the regular */
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_DOWN_KBps,      50 ); /* half the regular */
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_UP,             50 ); /* half the regular */
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_DOWN,           50 ); /* half the regular */
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_TIME_BEGIN,     540 ); /* 9am */
     tr_bencDictAddBool( d, TR_PREFS_KEY_ALT_SPEED_TIME_ENABLED,   FALSE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_TIME_END,       1020 ); /* 5pm */
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_TIME_DAY,       TR_SCHED_ALL );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_USPEED_KBps,              100 );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_USPEED,                   100 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_USPEED_ENABLED,           FALSE );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_UMASK,                    022 );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, 14 );
@@ -308,18 +307,14 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
 {
     assert( tr_bencIsDict( d ) );
 
-    tr_bencDictReserve( d, 60 );
+    tr_bencDictReserve( d, 30 );
     tr_bencDictAddBool( d, TR_PREFS_KEY_BLOCKLIST_ENABLED,        tr_blocklistIsEnabled( s ) );
-    tr_bencDictAddStr ( d, TR_PREFS_KEY_BLOCKLIST_URL,            tr_blocklistGetURL( s ) );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_MAX_CACHE_SIZE_MB,        tr_sessionGetCacheLimit_MB( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DHT_ENABLED,              s->isDHTEnabled );
     tr_bencDictAddBool( d, TR_PREFS_KEY_LPD_ENABLED,              s->isLPDEnabled );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_DOWNLOAD_DIR,             s->downloadDir );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_DSPEED_KBps,              tr_sessionGetSpeedLimit_KBps( s, TR_DOWN ) );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_DSPEED,                   tr_sessionGetSpeedLimit( s, TR_DOWN ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DSPEED_ENABLED,           tr_sessionIsSpeedLimited( s, TR_DOWN ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ENCRYPTION,               s->encryptionMode );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_IDLE_LIMIT,               tr_sessionGetIdleLimit( s ) );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_IDLE_LIMIT_ENABLED,       tr_sessionIsIdleLimited( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_INCOMPLETE_DIR,           tr_sessionGetIncompleteDir( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED,   tr_sessionIsIncompleteDirEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_LAZY_BITFIELD,            s->useLazyBitfield );
@@ -337,6 +332,13 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEX_ENABLED,              s->isPexEnabled );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PORT_FORWARDING,          tr_sessionIsPortForwardingEnabled( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PREALLOCATION,            s->preallocationMode );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY,                    s->proxy );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_PROXY_AUTH_ENABLED,       s->isProxyAuthEnabled );
+    tr_bencDictAddBool( d, TR_PREFS_KEY_PROXY_ENABLED,            s->isProxyEnabled );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY_PASSWORD,           s->proxyPassword );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_PORT,               s->proxyPort );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_PROXY_TYPE,               s->proxyType );
+    tr_bencDictAddStr ( d, TR_PREFS_KEY_PROXY_USERNAME,           s->proxyUsername );
     tr_bencDictAddReal( d, TR_PREFS_KEY_RATIO,                    s->desiredRatio );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RATIO_ENABLED,            s->isRatioLimited );
     tr_bencDictAddBool( d, TR_PREFS_KEY_RENAME_PARTIAL_FILES,     tr_sessionIsIncompleteFileNamingEnabled( s ) );
@@ -351,13 +353,13 @@ tr_sessionGetSettings( tr_session * s, struct tr_benc * d )
     tr_bencDictAddBool( d, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_ENABLED, tr_sessionIsTorrentDoneScriptEnabled( s ) );
     tr_bencDictAddStr ( d, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_FILENAME, tr_sessionGetTorrentDoneScript( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_ALT_SPEED_ENABLED,        tr_sessionUsesAltSpeed( s ) );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_UP_KBps,        tr_sessionGetAltSpeed_KBps( s, TR_UP ) );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_DOWN_KBps,      tr_sessionGetAltSpeed_KBps( s, TR_DOWN ) );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_UP,             tr_sessionGetAltSpeed( s, TR_UP ) );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_DOWN,           tr_sessionGetAltSpeed( s, TR_DOWN ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_TIME_BEGIN,     tr_sessionGetAltSpeedBegin( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_ALT_SPEED_TIME_ENABLED,   tr_sessionUsesAltSpeedTime( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_TIME_END,       tr_sessionGetAltSpeedEnd( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_ALT_SPEED_TIME_DAY,       tr_sessionGetAltSpeedDay( s ) );
-    tr_bencDictAddInt ( d, TR_PREFS_KEY_USPEED_KBps,              tr_sessionGetSpeedLimit_KBps( s, TR_UP ) );
+    tr_bencDictAddInt ( d, TR_PREFS_KEY_USPEED,                   tr_sessionGetSpeedLimit( s, TR_UP ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_USPEED_ENABLED,           tr_sessionIsSpeedLimited( s, TR_UP ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_UMASK,                    s->umask );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, s->uploadSlotsPerTorrent );
@@ -463,9 +465,6 @@ onSaveTimer( int foo UNUSED, short bar UNUSED, void * vsession )
     tr_torrent * tor = NULL;
     tr_session * session = vsession;
 
-    if( tr_cacheFlushDone( session->cache ) )
-        tr_err( "Error while flushing completed pieces from cache" );
-
     while(( tor = tr_torrentNext( session, tor )))
         tr_torrentSave( tor );
 
@@ -499,6 +498,8 @@ tr_sessionInit( const char  * tag,
     tr_session * session;
     struct init_data data;
 
+    tr_msgInit( );
+
     assert( tr_bencIsDict( clientSettings ) );
 
     tr_timeUpdate( time( NULL ) );
@@ -507,7 +508,6 @@ tr_sessionInit( const char  * tag,
     session = tr_new0( tr_session, 1 );
     session->bandwidth = tr_bandwidthNew( session, NULL );
     session->lock = tr_lockNew( );
-    session->cache = tr_cacheNew( 1024*1024*2 );
     session->tag = tr_strdup( tag );
     session->magicNumber = SESSION_MAGIC_NUMBER;
     session->buffer = tr_valloc( SESSION_BUFFER_SIZE );
@@ -669,8 +669,6 @@ sessionSetImpl( void * vdata )
     }
 
     /* misc features */
-    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_MAX_CACHE_SIZE_MB, &i ) )
-        tr_sessionSetCacheLimit_MB( session, i );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_LAZY_BITFIELD, &boolVal ) )
         tr_sessionSetLazyBitfieldEnabled( session, boolVal );
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PEER_LIMIT_TORRENT, &i ) )
@@ -689,8 +687,6 @@ sessionSetImpl( void * vdata )
         session->peer_congestion_algorithm = tr_strdup(str);
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_BLOCKLIST_ENABLED, &boolVal ) )
         tr_blocklistSetEnabled( session, boolVal );
-    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_BLOCKLIST_URL, &str ) )
-        tr_blocklistSetURL( session, str );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_START, &boolVal ) )
         tr_sessionSetPaused( session, !boolVal );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_TRASH_ORIGINAL, &boolVal) )
@@ -707,6 +703,22 @@ sessionSetImpl( void * vdata )
         tr_sessionSetIncompleteDirEnabled( session, boolVal );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_RENAME_PARTIAL_FILES, &boolVal ) )
         tr_sessionSetIncompleteFileNamingEnabled( session, boolVal );
+
+    /* proxies */
+    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_PROXY_ENABLED, &boolVal ) )
+        tr_sessionSetProxyEnabled( session, boolVal );
+    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PROXY, &str ) )
+        tr_sessionSetProxy( session, str );
+    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PROXY_PORT, &i ) )
+        tr_sessionSetProxyPort( session, i );
+    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_PROXY_TYPE, &i ) )
+        tr_sessionSetProxyType( session, i );
+    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_PROXY_AUTH_ENABLED, &boolVal ) )
+        tr_sessionSetProxyAuthEnabled( session, boolVal );
+    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PROXY_USERNAME, &str ) )
+        tr_sessionSetProxyUsername( session, str );
+    if( tr_bencDictFindStr( settings, TR_PREFS_KEY_PROXY_PASSWORD, &str ) )
+        tr_sessionSetProxyPassword( session, str );
 
     /* rpc server */
     if( session->rpcServer != NULL ) /* close the old one */
@@ -739,7 +751,7 @@ sessionSetImpl( void * vdata )
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, &boolVal ) )
         tr_sessionSetPeerPortRandomOnStart( session, boolVal );
     if( !tr_bencDictFindInt( settings, TR_PREFS_KEY_PEER_PORT, &i ) )
-        i = session->private_peer_port;
+        i = session->peerPort;
     setPeerPort( session, boolVal ? getRandomPort( session ) : i );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_PORT_FORWARDING, &boolVal ) )
         tr_sessionSetPortForwardingEnabled( session, boolVal );
@@ -756,13 +768,13 @@ sessionSetImpl( void * vdata )
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_UPLOAD_SLOTS_PER_TORRENT, &i ) )
         session->uploadSlotsPerTorrent = i;
 
-    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_USPEED_KBps, &i ) )
-        tr_sessionSetSpeedLimit_KBps( session, TR_UP, i );
+    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_USPEED, &i ) )
+        tr_sessionSetSpeedLimit( session, TR_UP, i );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_USPEED_ENABLED, &boolVal ) )
         tr_sessionLimitSpeed( session, TR_UP, boolVal );
 
-    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_DSPEED_KBps, &i ) )
-        tr_sessionSetSpeedLimit_KBps( session, TR_DOWN, i );
+    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_DSPEED, &i ) )
+        tr_sessionSetSpeedLimit( session, TR_DOWN, i );
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_DSPEED_ENABLED, &boolVal ) )
         tr_sessionLimitSpeed( session, TR_DOWN, boolVal );
 
@@ -771,20 +783,15 @@ sessionSetImpl( void * vdata )
     if( tr_bencDictFindBool( settings, TR_PREFS_KEY_RATIO_ENABLED, &boolVal ) )
         tr_sessionSetRatioLimited( session, boolVal );
 
-    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_IDLE_LIMIT, &i ) )
-        tr_sessionSetIdleLimit( session, i );
-    if( tr_bencDictFindBool( settings, TR_PREFS_KEY_IDLE_LIMIT_ENABLED, &boolVal ) )
-        tr_sessionSetIdleLimited( session, boolVal );
-
     /**
     ***  Turtle Mode
     **/
 
     /* update the turtle mode's fields */
-    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_ALT_SPEED_UP_KBps, &i ) )
-        turtle->speedLimit_Bps[TR_UP] = toSpeedBytes( i );
-    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_ALT_SPEED_DOWN_KBps, &i ) )
-        turtle->speedLimit_Bps[TR_DOWN] = toSpeedBytes( i );
+    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_ALT_SPEED_UP, &i ) )
+        turtle->speedLimit[TR_UP] = i;
+    if( tr_bencDictFindInt( settings, TR_PREFS_KEY_ALT_SPEED_DOWN, &i ) )
+        turtle->speedLimit[TR_DOWN] = i;
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_ALT_SPEED_TIME_BEGIN, &i ) )
         turtle->beginMinute = i;
     if( tr_bencDictFindInt( settings, TR_PREFS_KEY_ALT_SPEED_TIME_END, &i ) )
@@ -982,8 +989,7 @@ peerPortChanged( void * session )
 static void
 setPeerPort( tr_session * session, tr_port port )
 {
-    session->private_peer_port = port;
-    session->public_peer_port = port;
+    session->peerPort = port;
 
     tr_runInEventThread( session, peerPortChanged, session );
 }
@@ -991,7 +997,7 @@ setPeerPort( tr_session * session, tr_port port )
 void
 tr_sessionSetPeerPort( tr_session * session, tr_port port )
 {
-    if( tr_isSession( session ) && ( session->private_peer_port != port ) )
+    if( tr_isSession( session ) && ( session->peerPort != port ) )
     {
         setPeerPort( session, port );
     }
@@ -1000,7 +1006,7 @@ tr_sessionSetPeerPort( tr_session * session, tr_port port )
 tr_port
 tr_sessionGetPeerPort( const tr_session * session )
 {
-    return tr_isSession( session ) ? session->private_peer_port : 0;
+    return tr_isSession( session ) ? session->peerPort : 0;
 }
 
 tr_port
@@ -1009,7 +1015,7 @@ tr_sessionSetPeerPortRandom( tr_session * session )
     assert( tr_isSession( session ) );
 
     tr_sessionSetPeerPort( session, getRandomPort( session ) );
-    return session->private_peer_port;
+    return session->peerPort;
 }
 
 void
@@ -1075,48 +1081,12 @@ tr_sessionGetRatioLimit( const tr_session * session )
 
 /***
 ****
-***/
-
-void
-tr_sessionSetIdleLimited( tr_session * session, tr_bool isLimited )
-{
-    assert( tr_isSession( session ) );
-
-    session->isIdleLimited = isLimited;
-}
-
-void
-tr_sessionSetIdleLimit( tr_session * session, uint16_t idleMinutes )
-{
-    assert( tr_isSession( session ) );
-
-    session->idleLimitMinutes = idleMinutes;
-}
-
-tr_bool
-tr_sessionIsIdleLimited( const tr_session  * session )
-{
-    assert( tr_isSession( session ) );
-
-    return session->isIdleLimited;
-}
-
-uint16_t
-tr_sessionGetIdleLimit( const tr_session * session )
-{
-    assert( tr_isSession( session ) );
-
-    return session->idleLimitMinutes;
-}
-
-/***
-****
 ****  SPEED LIMITS
 ****
 ***/
 
 tr_bool
-tr_sessionGetActiveSpeedLimit_Bps( const tr_session * session, tr_direction dir, int * setme_Bps )
+tr_sessionGetActiveSpeedLimit( const tr_session * session, tr_direction dir, int * setme )
 {
     int isLimited = TRUE;
 
@@ -1124,35 +1094,25 @@ tr_sessionGetActiveSpeedLimit_Bps( const tr_session * session, tr_direction dir,
         return FALSE;
 
     if( tr_sessionUsesAltSpeed( session ) )
-        *setme_Bps = tr_sessionGetAltSpeed_Bps( session, dir );
+        *setme = tr_sessionGetAltSpeed( session, dir );
     else if( tr_sessionIsSpeedLimited( session, dir ) )
-        *setme_Bps = tr_sessionGetSpeedLimit_Bps( session, dir );
+        *setme = tr_sessionGetSpeedLimit( session, dir );
     else
         isLimited = FALSE;
 
     return isLimited;
 }
-tr_bool
-tr_sessionGetActiveSpeedLimit_KBps( const tr_session  * session,
-                                    tr_direction        dir,
-                                    double            * setme_KBps )
-{
-    int Bps = 0;
-    const tr_bool is_active = tr_sessionGetActiveSpeedLimit_Bps( session, dir, &Bps );
-    *setme_KBps = toSpeedKBps( Bps );
-    return is_active;
-}
 
 static void
 updateBandwidth( tr_session * session, tr_direction dir )
 {
-    int limit_Bps = 0;
-    const tr_bool isLimited = tr_sessionGetActiveSpeedLimit_Bps( session, dir, &limit_Bps );
-    const tr_bool zeroCase = isLimited && !limit_Bps;
+    int limit = 0;
+    const tr_bool isLimited = tr_sessionGetActiveSpeedLimit( session, dir, &limit );
+    const tr_bool zeroCase = isLimited && !limit;
 
     tr_bandwidthSetLimited( session->bandwidth, dir, isLimited && !zeroCase );
 
-    tr_bandwidthSetDesiredSpeed_Bps( session->bandwidth, dir, limit_Bps );
+    tr_bandwidthSetDesiredSpeed( session->bandwidth, dir, limit );
 }
 
 enum
@@ -1293,34 +1253,24 @@ turtleBootstrap( tr_session * session, struct tr_turtle_info * turtle )
 ***/
 
 void
-tr_sessionSetSpeedLimit_Bps( tr_session * s, tr_direction d, int Bps )
+tr_sessionSetSpeedLimit( tr_session * s, tr_direction d, int KB_s )
 {
     assert( tr_isSession( s ) );
     assert( tr_isDirection( d ) );
-    assert( Bps >= 0 );
+    assert( KB_s >= 0 );
 
-    s->speedLimit_Bps[d] = Bps;
+    s->speedLimit[d] = KB_s;
 
     updateBandwidth( s, d );
 }
-void
-tr_sessionSetSpeedLimit_KBps( tr_session * s, tr_direction d, int KBps )
-{
-    tr_sessionSetSpeedLimit_Bps( s, d, toSpeedBytes( KBps ) );
-}
 
 int
-tr_sessionGetSpeedLimit_Bps( const tr_session * s, tr_direction d )
+tr_sessionGetSpeedLimit( const tr_session * s, tr_direction d )
 {
     assert( tr_isSession( s ) );
     assert( tr_isDirection( d ) );
 
-    return s->speedLimit_Bps[d];
-}
-int
-tr_sessionGetSpeedLimit_KBps( const tr_session * s, tr_direction d )
-{
-    return toSpeedKBps( tr_sessionGetSpeedLimit_Bps( s, d ) );
+    return s->speedLimit[d];
 }
 
 void
@@ -1349,35 +1299,24 @@ tr_sessionIsSpeedLimited( const tr_session * s, tr_direction d )
 ***/
 
 void
-tr_sessionSetAltSpeed_Bps( tr_session * s, tr_direction d, int Bps )
+tr_sessionSetAltSpeed( tr_session * s, tr_direction d, int KB_s )
 {
     assert( tr_isSession( s ) );
     assert( tr_isDirection( d ) );
-    assert( Bps >= 0 );
+    assert( KB_s >= 0 );
 
-    s->turtle.speedLimit_Bps[d] = Bps;
+    s->turtle.speedLimit[d] = KB_s;
 
     updateBandwidth( s, d );
 }
 
-void
-tr_sessionSetAltSpeed_KBps( tr_session * s, tr_direction d, int KBps )
-{
-    tr_sessionSetAltSpeed_Bps( s, d, toSpeedBytes( KBps ) );
-}
-
 int
-tr_sessionGetAltSpeed_Bps( const tr_session * s, tr_direction d )
+tr_sessionGetAltSpeed( const tr_session * s, tr_direction d )
 {
     assert( tr_isSession( s ) );
     assert( tr_isDirection( d ) );
 
-    return s->turtle.speedLimit_Bps[d];
-}
-int
-tr_sessionGetAltSpeed_KBps( const tr_session * s, tr_direction d )
-{
-    return toSpeedKBps( tr_sessionGetAltSpeed_Bps( s, d ) );
+    return s->turtle.speedLimit[d];
 }
 
 static void
@@ -1583,28 +1522,17 @@ tr_sessionGetDeleteSource( const tr_session * session )
 ****
 ***/
 
-int
-tr_sessionGetPieceSpeed_Bps( const tr_session * session, tr_direction dir )
-{
-    return tr_isSession( session ) ? tr_bandwidthGetPieceSpeed_Bps( session->bandwidth, 0, dir ) : 0;
-}
 double
-tr_sessionGetPieceSpeed_KBps( const tr_session * session, tr_direction dir )
+tr_sessionGetPieceSpeed( const tr_session * session, tr_direction dir )
 {
-    return toSpeedKBps( tr_sessionGetPieceSpeed_Bps( session, dir ) );
+    return tr_isSession( session ) ? tr_bandwidthGetPieceSpeed( session->bandwidth, 0, dir ) : 0.0;
 }
 
-int
-tr_sessionGetRawSpeed_Bps( const tr_session * session, tr_direction dir )
-{
-    return tr_isSession( session ) ? tr_bandwidthGetRawSpeed_Bps( session->bandwidth, 0, dir ) : 0;
-}
 double
-tr_sessionGetRawSpeed_KBps( const tr_session * session, tr_direction dir )
+tr_sessionGetRawSpeed( const tr_session * session, tr_direction dir )
 {
-    return toSpeedKBps( tr_sessionGetRawSpeed_Bps( session, dir ) );
+    return tr_isSession( session ) ? tr_bandwidthGetRawSpeed( session->bandwidth, 0, dir ) : 0.0;
 }
-
 
 int
 tr_sessionCountTorrents( const tr_session * session )
@@ -1671,8 +1599,6 @@ sessionCloseImpl( void * vsession )
         tr_torrentFree( torrents[i] );
     tr_free( torrents );
 
-    tr_cacheFree( session->cache );
-    session->cache = NULL;
     tr_announcerClose( session );
     tr_statsClose( session );
     tr_peerMgrFree( session->peerMgr );
@@ -1761,7 +1687,9 @@ tr_sessionClose( tr_session * session )
     tr_free( session->torrentDir );
     tr_free( session->downloadDir );
     tr_free( session->incompleteDir );
-    tr_free( session->blocklist_url );
+    tr_free( session->proxy );
+    tr_free( session->proxyUsername );
+    tr_free( session->proxyPassword );
     tr_free( session->peer_congestion_algorithm );
     tr_free( session );
 }
@@ -1917,26 +1845,6 @@ tr_bool
 tr_sessionAllowsLPD( const tr_session * session )
 {
     return tr_sessionIsLPDEnabled( session );
-}
-
-/***
-****
-***/
-
-void
-tr_sessionSetCacheLimit_MB( tr_session * session, int max_bytes )
-{
-    assert( tr_isSession( session ) );
-
-    tr_cacheSetLimit( session->cache, toMemBytes( max_bytes ) );
-}
-
-int
-tr_sessionGetCacheLimit_MB( const tr_session * session )
-{
-    assert( tr_isSession( session ) );
-
-    return toMemMB( tr_cacheGetLimit( session->cache ) );
 }
 
 /***
@@ -2142,12 +2050,13 @@ tr_blocklistExists( const tr_session * session )
 }
 
 int
-tr_blocklistSetContent( tr_session * session, const char * contentFilename )
+tr_blocklistSetContent( tr_session * session,
+                        const char * contentFilename )
 {
     tr_list * l;
     int ruleCount;
     tr_blocklist * b;
-    const char * defaultName = DEFAULT_BLOCKLIST_FILENAME;
+    const char * defaultName = "level1.bin";
     tr_sessionLock( session );
 
     for( b = NULL, l = session->blocklists; !b && l; l = l->next )
@@ -2181,23 +2090,6 @@ tr_sessionIsAddressBlocked( const tr_session * session,
             return TRUE;
     return FALSE;
 }
-
-void
-tr_blocklistSetURL( tr_session * session, const char * url )
-{
-    if( session->blocklist_url != url )
-    {
-        tr_free( session->blocklist_url );
-        session->blocklist_url = tr_strdup( url );
-    }
-}
-
-const char *
-tr_blocklistGetURL ( const tr_session * session )
-{
-    return session->blocklist_url;
-}
-
 
 /***
 ****
@@ -2429,6 +2321,143 @@ tr_sessionGetRPCBindAddress( const tr_session * session )
     assert( tr_isSession( session ) );
 
     return tr_rpcGetBindAddress( session->rpcServer );
+}
+
+/***
+****
+***/
+
+tr_bool
+tr_sessionIsProxyEnabled( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->isProxyEnabled;
+}
+
+void
+tr_sessionSetProxyEnabled( tr_session * session,
+                           tr_bool      isEnabled )
+{
+    assert( tr_isSession( session ) );
+    assert( tr_isBool( isEnabled ) );
+
+    session->isProxyEnabled = isEnabled != 0;
+}
+
+tr_proxy_type
+tr_sessionGetProxyType( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->proxyType;
+}
+
+void
+tr_sessionSetProxyType( tr_session *  session,
+                        tr_proxy_type type )
+{
+    assert( tr_isSession( session ) );
+
+    session->proxyType = type;
+}
+
+const char*
+tr_sessionGetProxy( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->proxy;
+}
+
+tr_port
+tr_sessionGetProxyPort( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->proxyPort;
+}
+
+void
+tr_sessionSetProxy( tr_session * session,
+                    const char * proxy )
+{
+    assert( tr_isSession( session ) );
+
+    if( proxy != session->proxy )
+    {
+        tr_free( session->proxy );
+        session->proxy = tr_strdup( proxy );
+    }
+}
+
+void
+tr_sessionSetProxyPort( tr_session * session,
+                        tr_port      port )
+{
+    assert( tr_isSession( session ) );
+
+    session->proxyPort = port;
+}
+
+tr_bool
+tr_sessionIsProxyAuthEnabled( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->isProxyAuthEnabled;
+}
+
+void
+tr_sessionSetProxyAuthEnabled( tr_session * session,
+                               tr_bool      isEnabled )
+{
+    assert( tr_isSession( session ) );
+    assert( tr_isBool( isEnabled ) );
+
+    session->isProxyAuthEnabled = isEnabled != 0;
+}
+
+const char*
+tr_sessionGetProxyUsername( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->proxyUsername;
+}
+
+void
+tr_sessionSetProxyUsername( tr_session * session,
+                            const char * username )
+{
+    assert( tr_isSession( session ) );
+
+    if( username != session->proxyUsername )
+    {
+        tr_free( session->proxyUsername );
+        session->proxyUsername = tr_strdup( username );
+    }
+}
+
+const char*
+tr_sessionGetProxyPassword( const tr_session * session )
+{
+    assert( tr_isSession( session ) );
+
+    return session->proxyPassword;
+}
+
+void
+tr_sessionSetProxyPassword( tr_session * session,
+                            const char * password )
+{
+    assert( tr_isSession( session ) );
+
+    if( password != session->proxyPassword )
+    {
+        tr_free( session->proxyPassword );
+        session->proxyPassword = tr_strdup( password );
+    }
 }
 
 /****

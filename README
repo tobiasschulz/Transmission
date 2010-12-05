@@ -20,8 +20,8 @@ BUILDING
 
   Building a Transmission release from the command line:
 
-    $ xz -d -c transmission-2.11.tar.xz | tar xf -
-    $ cd transmission-2.11
+    $ xz -d -c transmission-2.05.tar.xz | tar xf -
+    $ cd transmission-2.05
     $ ./configure
     $ make
     $ sudo make install

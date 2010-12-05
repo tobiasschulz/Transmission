@@ -129,12 +129,8 @@ tr_notify_send( TrTorrent *tor )
         NotifyNotification * n;
 
         n = notify_notification_new( _( "Torrent Complete" ),
-                                     info->name, NULL
-/* the fourth argument was removed in libnotify 0.7.0 */
-#if !defined(NOTIFY_VERSION_MINOR) || (NOTIFY_VERSION_MAJOR == 0 && NOTIFY_VERSION_MINOR < 7)
-                                                     , NULL
-#endif
-                                                            );
+                                     info->name,
+                                     NULL, NULL );
         addIcon( n );
 
         if( can_support_actions( ) )

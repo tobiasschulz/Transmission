@@ -10,11 +10,7 @@
  * $Id$
  */
 
-#ifdef WIN32
-  #include <ws2tcpip.h>
-#else
-  #include <sys/select.h>
-#endif
+#include <sys/select.h>
 
 #include <curl/curl.h>
 #include <event.h>
@@ -124,18 +120,20 @@ sockoptfunction( void * vtask, curl_socket_t fd, curlsocktype purpose UNUSED )
 }
 #endif
 
-static long
-getTimeoutFromURL( const struct tr_web_task * task )
+static int
+getCurlProxyType( tr_proxy_type t )
 {
-    long timeout;
-    const tr_session * session = task->session;
+    if( t == TR_PROXY_SOCKS4 ) return CURLPROXY_SOCKS4;
+    if( t == TR_PROXY_SOCKS5 ) return CURLPROXY_SOCKS5;
+    return CURLPROXY_HTTP;
+}
 
-    if( !session || session->isClosed ) timeout = 20L;
-    else if( strstr( task->url, "scrape" ) != NULL ) timeout = 30L;
-    else if( strstr( task->url, "announce" ) != NULL ) timeout = 90L;
-    else timeout = 240L;
-
-    return timeout;
+static long
+getTimeoutFromURL( const char * url )
+{
+    if( strstr( url, "scrape" ) != NULL ) return 30L;
+    if( strstr( url, "announce" ) != NULL ) return 90L;
+    return 240L;
 }
 
 static CURL *
@@ -144,10 +142,23 @@ createEasy( tr_session * s, struct tr_web_task * task )
     const tr_address * addr;
     CURL * e = curl_easy_init( );
     const long verbose = getenv( "TR_CURL_VERBOSE" ) != NULL;
-    char * cookie_filename = tr_buildPath( s->configDir, "cookies.txt", NULL );
+
+    if( !task->range && s->isProxyEnabled ) {
+        const long proxyType = getCurlProxyType( s->proxyType );
+        curl_easy_setopt( e, CURLOPT_PROXY, s->proxy );
+        curl_easy_setopt( e, CURLOPT_PROXYAUTH, CURLAUTH_ANY );
+        curl_easy_setopt( e, CURLOPT_PROXYPORT, s->proxyPort );
+        curl_easy_setopt( e, CURLOPT_PROXYTYPE, proxyType );
+    }
+
+    if( !task->range && s->isProxyAuthEnabled ) {
+        char * str = tr_strdup_printf( "%s:%s", s->proxyUsername,
+                                                s->proxyPassword );
+        curl_easy_setopt( e, CURLOPT_PROXYUSERPWD, str );
+        tr_free( str );
+    }
 
     curl_easy_setopt( e, CURLOPT_AUTOREFERER, 1L );
-    curl_easy_setopt( e, CURLOPT_COOKIEFILE, cookie_filename );
     curl_easy_setopt( e, CURLOPT_ENCODING, "gzip;q=1.0, deflate, identity" );
     curl_easy_setopt( e, CURLOPT_FOLLOWLOCATION, 1L );
     curl_easy_setopt( e, CURLOPT_MAXREDIRS, -1L );
@@ -159,7 +170,7 @@ createEasy( tr_session * s, struct tr_web_task * task )
 #endif
     curl_easy_setopt( e, CURLOPT_SSL_VERIFYHOST, 0L );
     curl_easy_setopt( e, CURLOPT_SSL_VERIFYPEER, 0L );
-    curl_easy_setopt( e, CURLOPT_TIMEOUT, getTimeoutFromURL( task ) );
+    curl_easy_setopt( e, CURLOPT_TIMEOUT, getTimeoutFromURL( task->url ) );
     curl_easy_setopt( e, CURLOPT_URL, task->url );
     curl_easy_setopt( e, CURLOPT_USERAGENT, TR_NAME "/" SHORT_VERSION_STRING );
     curl_easy_setopt( e, CURLOPT_VERBOSE, verbose );
@@ -172,7 +183,6 @@ createEasy( tr_session * s, struct tr_web_task * task )
     if( task->range )
         curl_easy_setopt( e, CURLOPT_RANGE, task->range );
 
-    tr_free( cookie_filename );
     return e;
 }
 
@@ -226,39 +236,6 @@ tr_webRun( tr_session         * session,
     }
 }
 
-/**
- * Portability wrapper for select().
- *
- * http://msdn.microsoft.com/en-us/library/ms740141%28VS.85%29.aspx
- * On win32, any two of the parameters, readfds, writefds, or exceptfds,
- * can be given as null. At least one must be non-null, and any non-null
- * descriptor set must contain at least one handle to a socket.
- */
-static void
-tr_select( int nfds,
-           fd_set * r_fd_set, fd_set * w_fd_set, fd_set * c_fd_set,
-           struct timeval  * t )
-{
-#ifdef WIN32
-    if( !r_fd_set->fd_count && !w_fd_set->fd_count && !c_fd_set->fd_count )
-    {
-        const long int msec = t->tv_sec*1000 + t->tv_usec/1000;
-        tr_wait_msec( msec );
-    }
-    else if( select( 0, r_fd_set->fd_count ? r_fd_set : NULL,
-                        w_fd_set->fd_count ? w_fd_set : NULL,
-                        c_fd_set->fd_count ? c_fd_set : NULL, t ) < 0 )
-    {
-        char errstr[512];
-        const int e = EVUTIL_SOCKET_ERROR( );
-        tr_net_strerror( errstr, sizeof( errstr ), e );
-        dbgmsg( "Error: select (%d) %s", e, errstr );
-    }
-#else
-    select( nfds, r_fd_set, w_fd_set, c_fd_set, t );
-#endif
-}
-
 static void
 tr_webThreadFunc( void * vsession )
 {
@@ -296,7 +273,6 @@ tr_webThreadFunc( void * vsession )
         tr_lockLock( web->taskLock );
         while(( task = tr_list_pop_front( &web->tasks )))
         {
-            dbgmsg( "adding task to curl: [%s]\n", task->url );
             curl_multi_add_handle( multi, createEasy( session, task ));
             /*fprintf( stderr, "adding a task.. taskCount is now %d\n", taskCount );*/
             ++taskCount;
@@ -328,7 +304,7 @@ tr_webThreadFunc( void * vsession )
             t.tv_sec =  usec / 1000000;
             t.tv_usec = usec % 1000000;
 
-            tr_select( max_fd+1, &r_fd_set, &w_fd_set, &c_fd_set, &t );
+            select( max_fd+1, &r_fd_set, &w_fd_set, &c_fd_set, &t );
         }
 
         /* call curl_multi_perform() */
@@ -444,7 +420,7 @@ tr_http_escape( struct evbuffer  * out,
     if( ( len < 0 ) && ( str != NULL ) )
         len = strlen( str );
 
-    for( end=str+len; str && str!=end; ++str ) {
+    for( end=str+len; str!=end; ++str ) {
         if(    ( *str == ',' )
             || ( *str == '-' )
             || ( *str == '.' )

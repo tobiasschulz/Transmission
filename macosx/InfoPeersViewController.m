@@ -273,7 +273,7 @@
         if ([ident isEqualToString: @"DL From"])
         {
             NSNumber * rate;
-            return (rate = [webSeed objectForKey: @"DL From Rate"]) ? [NSString stringForSpeedAbbrev: [rate doubleValue]] : @"";
+            return (rate = [webSeed objectForKey: @"DL From Rate"]) ? [NSString stringForSpeedAbbrev: [rate floatValue]] : @"";
         }
         else
             return [webSeed objectForKey: @"Address"];
@@ -292,12 +292,12 @@
         else if ([ident isEqualToString: @"UL To"])
         {
             NSNumber * rate;
-            return (rate = [peer objectForKey: @"UL To Rate"]) ? [NSString stringForSpeedAbbrev: [rate doubleValue]] : @"";
+            return (rate = [peer objectForKey: @"UL To Rate"]) ? [NSString stringForSpeedAbbrev: [rate floatValue]] : @"";
         }
         else if ([ident isEqualToString: @"DL From"])
         {
             NSNumber * rate;
-            return (rate = [peer objectForKey: @"DL From Rate"]) ? [NSString stringForSpeedAbbrev: [rate doubleValue]] : @"";
+            return (rate = [peer objectForKey: @"DL From Rate"]) ? [NSString stringForSpeedAbbrev: [rate floatValue]] : @"";
         }
         else
             return [peer objectForKey: @"IP"];
@@ -358,9 +358,8 @@
             [components addObject: [peer objectForKey: @"Name"]];
         
         const CGFloat progress = [[peer objectForKey: @"Progress"] floatValue];
-        NSString * progressString = [NSString stringWithFormat: NSLocalizedString(@"Progress: %@",
-                                        "Inspector -> Peers tab -> table row tooltip"),
-                                        [NSString percentString: progress longDecimals: NO]];
+        NSString * progressString = [NSString localizedStringWithFormat: NSLocalizedString(@"Progress: %.1f%%",
+                                        "Inspector -> Peers tab -> table row tooltip"), tr_truncd(progress * 100.0, 1)];
         if (progress < 1.0 && [[peer objectForKey: @"Seed"] boolValue])
             progressString = [progressString stringByAppendingFormat: @" (%@)", NSLocalizedString(@"Partial Seed",
                                 "Inspector -> Peers tab -> table row tooltip")];

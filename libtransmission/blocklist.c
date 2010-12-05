@@ -15,11 +15,7 @@
 #include <string.h>
 
 #ifdef WIN32
- #include <w32api.h>
- #define WINVER  WindowsXP
  #include <windows.h>
- #define PROT_READ      PAGE_READONLY
- #define MAP_PRIVATE    FILE_MAP_COPY
 #endif
 
 #ifndef WIN32
@@ -36,10 +32,6 @@
 #include "blocklist.h"
 #include "net.h"
 #include "utils.h"
-
-#ifndef O_BINARY
- #define O_BINARY 0
-#endif
 
 
 /***
@@ -79,9 +71,8 @@ blocklistClose( tr_blocklist * b )
 static void
 blocklistLoad( tr_blocklist * b )
 {
-    int fd;
-    size_t byteCount;
-    struct stat st;
+    int          fd;
+    struct stat  st;
     const char * err_fmt = _( "Couldn't read \"%1$s\": %2$s" );
 
     blocklistClose( b );
@@ -89,15 +80,18 @@ blocklistLoad( tr_blocklist * b )
     if( stat( b->filename, &st ) == -1 )
         return;
 
-    fd = open( b->filename, O_RDONLY | O_BINARY );
+    fd = open( b->filename, O_RDONLY );
     if( fd == -1 )
     {
         tr_err( err_fmt, b->filename, tr_strerror( errno ) );
         return;
     }
 
-    byteCount = (size_t) st.st_size;
-    b->rules = mmap( NULL, byteCount, PROT_READ, MAP_PRIVATE, fd, 0 );
+#ifndef WIN32
+    b->rules = mmap( NULL, st.st_size, PROT_READ, MAP_PRIVATE, fd, 0 );
+#else
+    b->rules = mmap( NULL, st.st_size, 0, 0, fd, 0 );
+#endif
     if( !b->rules )
     {
         tr_err( err_fmt, b->filename, tr_strerror( errno ) );
@@ -105,13 +99,13 @@ blocklistLoad( tr_blocklist * b )
         return;
     }
 
+    b->byteCount = st.st_size;
+    b->ruleCount = st.st_size / sizeof( struct tr_ip_range );
     b->fd = fd;
-    b->byteCount = byteCount;
-    b->ruleCount = byteCount / sizeof( struct tr_ip_range );
 
     {
         char * base = tr_basename( b->filename );
-        tr_inf( _( "Blocklist \"%s\" contains %zu entries" ), base, b->ruleCount );
+        tr_inf( _( "Blocklist \"%s\" contains %'zu entries" ), base, b->ruleCount );
         tr_free( base );
     }
 }
@@ -147,7 +141,8 @@ blocklistDelete( tr_blocklist * b )
 ***/
 
 tr_blocklist *
-_tr_blocklistNew( const char * filename, tr_bool isEnabled )
+_tr_blocklistNew( const char * filename,
+                  int          isEnabled )
 {
     tr_blocklist * b;
 
@@ -231,9 +226,7 @@ _tr_blocklistHasAddress( tr_blocklist     * b,
 }
 
 /*
- * P2P plaintext format: "comment:x.x.x.x-y.y.y.y"
- * http://wiki.phoenixlabs.org/wiki/P2P_Format
- * http://en.wikipedia.org/wiki/PeerGuardian#P2P_plaintext_format
+ * level1 format: "comment:x.x.x.x-y.y.y.y"
  */
 static tr_bool
 parseLine1( const char * line, struct tr_ip_range * range )
@@ -268,8 +261,7 @@ parseLine1( const char * line, struct tr_ip_range * range )
 }
 
 /*
- * DAT format: "000.000.000.000 - 000.255.255.255 , 000 , invalid ip"
- * http://wiki.phoenixlabs.org/wiki/DAT_Format
+ * "000.000.000.000 - 000.255.255.255 , 000 , invalid ip"
  */
 static tr_bool
 parseLine2( const char * line, struct tr_ip_range * range )
@@ -323,7 +315,7 @@ _tr_blocklistSetContent( tr_blocklist * b,
         return 0;
     }
 
-    in = fopen( filename, "rb" );
+    in = fopen( filename, "r" );
     if( !in )
     {
         tr_err( err_fmt, filename, tr_strerror( errno ) );
@@ -348,8 +340,8 @@ _tr_blocklistSetContent( tr_blocklist * b,
         ++inCount;
 
         /* zap the linefeed */
-        if(( walk = strchr( line, '\r' ))) *walk = '\0';
-        if(( walk = strchr( line, '\n' ))) *walk = '\0';
+        if(( walk = strchr( line, '\r' ))) *walk = '\0'; 
+        if(( walk = strchr( line, '\n' ))) *walk = '\0'; 
 
         if( !parseLine( line, &range ) )
         {
@@ -370,7 +362,7 @@ _tr_blocklistSetContent( tr_blocklist * b,
 
     {
         char * base = tr_basename( b->filename );
-        tr_inf( _( "Blocklist \"%s\" updated with %d entries" ), base, outCount );
+        tr_inf( _( "Blocklist \"%1$s\" updated with %2$'d entries" ), base, outCount );
         tr_free( base );
     }
 

@@ -30,11 +30,11 @@
 ****
 ***/
 
-static unsigned int
-getSpeed_Bps( const struct bratecontrol * r, unsigned int interval_msec, uint64_t now )
+static float
+getSpeed( const struct bratecontrol * r, int interval_msec, uint64_t now )
 {
     uint64_t       bytes = 0;
-    const uint64_t cutoff = (now?now:tr_time_msec()) - interval_msec;
+    const uint64_t cutoff = (now?now:tr_date()) - interval_msec;
     int            i = r->newest;
 
     for( ;; )
@@ -48,7 +48,7 @@ getSpeed_Bps( const struct bratecontrol * r, unsigned int interval_msec, uint64_
         if( i == r->newest ) break; /* we've come all the way around */
     }
 
-    return (unsigned int)(( bytes * 1000u ) / interval_msec);
+    return ( bytes / 1024.0 ) * ( 1000.0 / interval_msec );
 }
 
 static void
@@ -153,7 +153,7 @@ static void
 allocateBandwidth( tr_bandwidth  * b,
                    tr_priority_t   parent_priority,
                    tr_direction    dir,
-                   unsigned int    period_msec,
+                   int             period_msec,
                    tr_ptrArray   * peer_pool )
 {
     tr_priority_t priority;
@@ -164,14 +164,15 @@ allocateBandwidth( tr_bandwidth  * b,
     /* set the available bandwidth */
     if( b->band[dir].isLimited )
     {
-        const unsigned int nextPulseSpeed = b->band[dir].desiredSpeed_Bps;
-        b->band[dir].bytesLeft = ( nextPulseSpeed * period_msec ) / 1000u;
+        const double desiredSpeed = b->band[dir].desiredSpeed;
+        const double nextPulseSpeed = desiredSpeed;
+        b->band[dir].bytesLeft = MAX( 0.0, nextPulseSpeed * 1024.0 * period_msec / 1000.0 );
 
 #ifdef DEBUG_DIRECTION
         if( dir == DEBUG_DIRECTION )
-                fprintf( stderr, "bandwidth %p currentPieceSpeed(%5.2f of %5.2f) desiredSpeed(%5.2f), allocating %d\n",
+                fprintf( stderr, "bandwidth %p currentPieceSpeed(%5.2f of %5.2f) desiredSpeed(%5.2f), allocating %5.2f\n",
                          b, currentSpeed, tr_bandwidthGetRawSpeed( b, dir ), desiredSpeed,
-                         b->band[dir].bytesLeft );
+                         b->band[dir].bytesLeft/1024.0 );
 #endif
     }
 
@@ -237,7 +238,7 @@ phaseOne( tr_ptrArray * peerArray, tr_direction dir )
 void
 tr_bandwidthAllocate( tr_bandwidth  * b,
                       tr_direction    dir,
-                      unsigned int    period_msec )
+                      int             period_msec )
 {
     int i, peerCount;
     tr_ptrArray tmp = TR_PTR_ARRAY_INIT;
@@ -305,10 +306,10 @@ tr_bandwidthSetPeer( tr_bandwidth * b, tr_peerIo * peer )
 ****
 ***/
 
-unsigned int
+size_t
 tr_bandwidthClamp( const tr_bandwidth  * b,
                    tr_direction          dir,
-                   unsigned int          byteCount )
+                   size_t                byteCount )
 {
     assert( tr_isBandwidth( b ) );
     assert( tr_isDirection( dir ) );
@@ -325,30 +326,30 @@ tr_bandwidthClamp( const tr_bandwidth  * b,
     return byteCount;
 }
 
-unsigned int
-tr_bandwidthGetRawSpeed_Bps( const tr_bandwidth * b, const uint64_t now, const tr_direction dir )
+double
+tr_bandwidthGetRawSpeed( const tr_bandwidth * b, const uint64_t now, const tr_direction dir )
 {
     assert( tr_isBandwidth( b ) );
     assert( tr_isDirection( dir ) );
 
-    return getSpeed_Bps( &b->band[dir].raw, HISTORY_MSEC, now );
+    return getSpeed( &b->band[dir].raw, HISTORY_MSEC, now );
 }
 
-unsigned int
-tr_bandwidthGetPieceSpeed_Bps( const tr_bandwidth * b, const uint64_t now, const tr_direction dir )
+double
+tr_bandwidthGetPieceSpeed( const tr_bandwidth * b, const uint64_t now, const tr_direction dir )
 {
     assert( tr_isBandwidth( b ) );
     assert( tr_isDirection( dir ) );
 
-    return getSpeed_Bps( &b->band[dir].piece, HISTORY_MSEC, now );
+    return getSpeed( &b->band[dir].piece, HISTORY_MSEC, now );
 }
 
-void
-tr_bandwidthUsed( tr_bandwidth  * b,
-                  tr_direction    dir,
-                  size_t          byteCount,
-                  tr_bool         isPieceData,
-                  uint64_t        now )
+static void
+bandwidthUsedImpl( tr_bandwidth  * b,
+                   tr_direction    dir,
+                   size_t          byteCount,
+                   tr_bool         isPieceData,
+                   uint64_t        now )
 {
     struct tr_band * band;
 
@@ -372,5 +373,14 @@ fprintf( stderr, "%p consumed %5zu bytes of %5s data... was %6zu, now %6zu left\
         bytesUsed( now, &band->piece, byteCount );
 
     if( b->parent != NULL )
-        tr_bandwidthUsed( b->parent, dir, byteCount, isPieceData, now );
+        bandwidthUsedImpl( b->parent, dir, byteCount, isPieceData, now );
+}
+
+void
+tr_bandwidthUsed( tr_bandwidth  * b,
+                  tr_direction    dir,
+                  size_t          byteCount,
+                  tr_bool         isPieceData )
+{
+    bandwidthUsedImpl( b, dir, byteCount, isPieceData, tr_date( ) );
 }

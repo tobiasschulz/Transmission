@@ -25,21 +25,13 @@ THE SOFTWARE.
 #include <stdio.h>
 
 /* posix */
+#include <netinet/in.h> /* sockaddr_in */
 #include <signal.h> /* sig_atomic_t */
 #include <sys/time.h>
+#include <sys/types.h>
+#include <sys/socket.h> /* socket(), bind() */
 #include <unistd.h> /* close() */
 #include <ctype.h> /* toupper() */
-#ifdef WIN32
-  #include <w32api.h>
-  #define WINDOWS  WindowsXP  /* freeaddrinfo(),getaddrinfo(),getnameinfo() */
-  #include <inttypes.h>
-  #include <ws2tcpip.h>
-  typedef uint16_t in_port_t;			/* all missing */
-#else
-  #include <sys/types.h>
-  #include <sys/socket.h> /* socket(), bind() */
-  #include <netinet/in.h> /* sockaddr_in */
-#endif
 
 /* third party */
 #include <event.h>
@@ -249,6 +241,7 @@ static int lpd_extractParam( const char* const str, const char* const name, int 
 /**
 * @} */
 
+
 /**
 * @brief Initializes Local Peer Discovery for this node
 *
@@ -281,7 +274,8 @@ int tr_lpdInit( tr_session* ss, tr_address* tr_addr UNUSED )
         if( lpd_socket < 0 )
             goto fail;
 
-        if( evutil_make_socket_nonblocking( lpd_socket ) < 0 )
+        /* enable non-blocking operation */
+        if( evutil_make_socket_nonblocking( lpd_socket ) < 0 ) 
             goto fail;
 
         if( setsockopt( lpd_socket, SOL_SOCKET, SO_REUSEADDR,
@@ -320,7 +314,8 @@ int tr_lpdInit( tr_session* ss, tr_address* tr_addr UNUSED )
         if( lpd_socket2 < 0 )
             goto fail;
 
-        if( evutil_make_socket_nonblocking( lpd_socket2 ) < 0 )
+        /* enable non-blocking operation */
+        if( evutil_make_socket_nonblocking( lpd_socket2 ) < 0 ) 
             goto fail;
 
         /* configure outbound multicast TTL */
@@ -500,7 +495,7 @@ static int tr_lpdConsiderAnnounce( tr_pex* peer, const char* const msg )
             return 0;
 
         /* determine announced peer port, refuse if value too large */
-        if( sscanf( value, "%d", &peerPort ) != 1 || peerPort > (in_port_t)-1 )
+        if( sscanf( value, "%u", &peerPort ) != 1 || peerPort > (in_port_t)-1 )
             return 0;
 
         peer->port = htons( peerPort );

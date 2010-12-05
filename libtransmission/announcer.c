@@ -7,7 +7,7 @@
  * This exemption does not extend to derived works not owned by
  * the Transmission project.
  *
- * $Id$
+ * $Id:$
  */
 
 #include <assert.h>
@@ -21,6 +21,7 @@
 #include "crypto.h"
 #include "net.h"
 #include "ptrarray.h"
+#include "publish.h"
 #include "session.h"
 #include "tr-dht.h"
 #include "tr-lpd.h"
@@ -77,8 +78,8 @@ enum
 ***/
 
 static int
-compareTransfer( uint64_t a_uploaded, uint64_t a_downloaded,
-                 uint64_t b_uploaded, uint64_t b_downloaded )
+compareTransfer( int a_uploaded, int a_downloaded,
+                 int b_uploaded, int b_downloaded )
 {
     /* higher upload count goes first */
     if( a_uploaded != b_uploaded )
@@ -136,7 +137,7 @@ getHostName( const char * url )
     int port = 0;
     char * host = NULL;
     char * ret;
-    tr_urlParse( url, -1, NULL, &host, &port, NULL );
+    tr_urlParse( url, strlen( url ), NULL, &host, &port, NULL );
     ret = tr_strdup_printf( "%s:%d", ( host ? host : "invalid" ), port );
     tr_free( host );
     return ret;
@@ -172,8 +173,8 @@ struct stop_message
 {
     tr_host * host;
     char * url;
-    uint64_t up;
-    uint64_t down;
+    int up;
+    int down;
 };
 
 static void
@@ -315,7 +316,7 @@ typedef struct
      * to verify us if our IP address changes.
      * This is immutable for the life of the tracker object.
      * The +1 is for '\0' */
-    unsigned char key_param[KEYLEN + 1];
+    char key_param[KEYLEN + 1];
 }
 tr_tracker_item;
 
@@ -334,16 +335,15 @@ trackerItemCopyAttributes( tr_tracker_item * t, const tr_tracker_item * o )
 }
 
 static void
-generateKeyParam( unsigned char * msg, size_t msglen )
+generateKeyParam( char * msg, size_t msglen )
 {
     size_t i;
     const char * pool = "abcdefghijklmnopqrstuvwxyz0123456789";
-    const int poolSize = 36;
+    const int poolSize = strlen( pool );
 
-    tr_cryptoRandBuf( msg, msglen );
     for( i=0; i<msglen; ++i )
-        msg[i] = pool[ msg[i] % poolSize ];
-    msg[msglen] = '\0';
+        *msg++ = pool[tr_cryptoRandInt( poolSize )];
+    *msg = '\0';
 }
 
 static tr_tracker_item*
@@ -530,8 +530,7 @@ tierAddTracker( tr_announcer * announcer,
 typedef struct tr_torrent_tiers
 {
     tr_ptrArray tiers;
-    tr_tracker_callback * callback;
-    void * callbackData;
+    tr_publisher publisher;
 }
 tr_torrent_tiers;
 
@@ -540,12 +539,14 @@ tiersNew( void )
 {
     tr_torrent_tiers * tiers = tr_new0( tr_torrent_tiers, 1 );
     tiers->tiers = TR_PTR_ARRAY_INIT;
+    tiers->publisher = TR_PUBLISHER_INIT;
     return tiers;
 }
 
 static void
 tiersFree( tr_torrent_tiers * tiers )
 {
+    tr_publisherDestruct( &tiers->publisher );
     tr_ptrArrayDestruct( &tiers->tiers, tierFree );
     tr_free( tiers );
 }
@@ -592,9 +593,7 @@ publishMessage( tr_tier * tier, const char * msg, int type )
         event.messageType = type;
         event.text = msg;
         event.tracker = tier->currentTracker ? tier->currentTracker->announce : NULL;
-
-        if( tiers->callback != NULL )
-            tiers->callback( tier->tor, &event, tiers->callbackData );
+        tr_publisherPublish( &tiers->publisher, tier, &event );
     }
 }
 
@@ -618,14 +617,14 @@ publishWarning( tr_tier * tier, const char * msg )
     publishMessage( tier, msg, TR_TRACKER_WARNING );
 }
 
-static int8_t
+static int
 getSeedProbability( int seeds, int leechers )
 {
     if( !seeds )
         return 0;
 
     if( seeds>=0 && leechers>=0 )
-        return (int8_t)((100.0*seeds)/(seeds+leechers));
+        return (int)((100.0*seeds)/(seeds+leechers));
 
     return -1; /* unknown */
 }
@@ -641,8 +640,7 @@ publishNewPeers( tr_tier * tier, int seeds, int leechers,
     e.compact = compact;
     e.compactLen = compactLen;
 
-    if( tier->tor->tiers->callback != NULL )
-        tier->tor->tiers->callback( tier->tor, &e, NULL );
+    tr_publisherPublish( &tier->tor->tiers->publisher, tier, &e );
 
     return compactLen / 6;
 }
@@ -746,7 +744,7 @@ createAnnounceURL( const tr_announcer     * announcer,
                               strchr( ann, '?' ) ? '&' : '?',
                               torrent->info.hashEscaped,
                               torrent->peer_id,
-                              (int)tr_sessionGetPublicPeerPort( announcer->session ),
+                              (int)tr_sessionGetPeerPort( announcer->session ),
                               tier->byteCounts[TR_ANN_UP],
                               tier->byteCounts[TR_ANN_DOWN],
                               tr_cpLeftUntilComplete( &torrent->completion ),
@@ -781,7 +779,7 @@ createAnnounceURL( const tr_announcer     * announcer,
         char ipv6_readable[INET6_ADDRSTRLEN];
         inet_ntop( AF_INET6, ipv6, ipv6_readable, INET6_ADDRSTRLEN );
         evbuffer_add_printf( buf, "&ipv6=");
-        tr_http_escape( buf, ipv6_readable, -1, TRUE );
+        tr_http_escape( buf, ipv6_readable, strlen(ipv6_readable), TRUE );
     }
 
     ret = tr_strndup( EVBUFFER_DATA( buf ), EVBUFFER_LENGTH( buf ) );
@@ -795,6 +793,14 @@ createAnnounceURL( const tr_announcer     * announcer,
 ****
 ***/
 
+static tr_bool
+announceURLIsSupported( const char * announce )
+{
+    return ( announce != NULL )
+        && ( ( strstr( announce, "http://" ) == announce ) ||
+             ( strstr( announce, "https://" ) == announce ) );
+}
+
 static void
 addTorrentToTier( tr_announcer * announcer, tr_torrent_tiers * tiers, tr_torrent * tor )
 {
@@ -806,7 +812,7 @@ addTorrentToTier( tr_announcer * announcer, tr_torrent_tiers * tiers, tr_torrent
     /* get the trackers that we support... */
     infos = tr_new0( const tr_tracker_info*, trackerCount );
     for( i=n=0; i<trackerCount; ++i )
-        if( tr_urlIsValidTracker( trackers[i].announce ) )
+        if( announceURLIsSupported( trackers[i].announce ) )
             infos[n++] = &trackers[i];
 
     /* build our private table of tiers... */
@@ -838,8 +844,7 @@ addTorrentToTier( tr_announcer * announcer, tr_torrent_tiers * tiers, tr_torrent
 }
 
 tr_torrent_tiers *
-tr_announcerAddTorrent( tr_announcer * announcer, tr_torrent * tor,
-                        tr_tracker_callback * callback, void * callbackData )
+tr_announcerAddTorrent( tr_announcer * announcer, tr_torrent * tor )
 {
     tr_torrent_tiers * tiers;
 
@@ -847,8 +852,6 @@ tr_announcerAddTorrent( tr_announcer * announcer, tr_torrent * tor,
     assert( tr_isTorrent( tor ) );
 
     tiers = tiersNew( );
-    tiers->callback = callback;
-    tiers->callbackData = callbackData;
 
     addTorrentToTier( announcer, tiers, tor );
 
@@ -924,6 +927,22 @@ tr_announcerResetTorrent( tr_announcer * announcer, tr_torrent * tor )
 
     /* cleanup */
     tr_ptrArrayDestruct( &oldTiers, tierFree );
+}
+
+tr_publisher_tag
+tr_announcerSubscribe( struct tr_torrent_tiers   * tiers,
+                       tr_delivery_func            func,
+                       void                      * userData )
+{
+    return tr_publisherSubscribe( &tiers->publisher, func, userData );
+}
+
+void
+tr_announcerUnsubscribe( struct tr_torrent_tiers  * tiers,
+                         tr_publisher_tag           tag )
+{
+    if( tiers )
+        tr_publisherUnsubscribe( &tiers->publisher, tag );
 }
 
 static tr_bool
@@ -1162,7 +1181,7 @@ compareTiers( const void * va, const void * vb )
 }
 
 static uint8_t *
-parseOldPeers( tr_benc * bePeers, size_t * byteCount )
+parseOldPeers( tr_benc * bePeers, size_t *  byteCount )
 {
     int       i;
     uint8_t * array, *walk;
@@ -1190,7 +1209,7 @@ parseOldPeers( tr_benc * bePeers, size_t * byteCount )
             continue;
 
         memcpy( walk, &addr, sizeof( tr_address ) );
-        port = htons( (uint16_t)itmp );
+        port = htons( itmp );
         memcpy( walk + sizeof( tr_address ), &port, 2 );
         walk += sizeof( tr_address ) + 2;
     }
@@ -1989,10 +2008,6 @@ tr_announcerStats( const tr_torrent * torrent,
             st->tier = i;
             st->isBackup = tracker != tier->currentTracker;
             st->lastScrapeStartTime = tier->lastScrapeStartTime;
-            if( tracker->scrape )
-                tr_strlcpy( st->scrape, tracker->scrape, sizeof( st->scrape ) );
-            else
-                st->scrape[0] = '\0';
 
             st->seederCount = tracker->seederCount;
             st->leecherCount = tracker->leecherCount;

@@ -1,11 +1,11 @@
 /*
- * This file Copyright (C) Mnemosyne LLC
+ * This file Copyright (C) 2009-2010 Mnemosyne LLC
  *
- * This program is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License version 2
- * as published by the Free Software Foundation.
- *
- * http://www.gnu.org/licenses/old-licenses/gpl-2.0.html
+ * This file is licensed by the GPL version 2.  Works owned by the
+ * Transmission project are granted a special exemption to clause 2(b)
+ * so that the bulk of its code can remain under the MIT license.
+ * This exemption does not extend to derived works not owned by
+ * the Transmission project.
  *
  * $Id$
  */
@@ -36,10 +36,10 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-#include "formatter.h"
 #include "hig.h"
 #include "prefs.h"
 #include "prefs-dialog.h"
+#include "qticonloader.h"
 #include "session.h"
 #include "utils.h"
 
@@ -56,7 +56,7 @@ void
 PrefsDialog :: checkBoxToggled( bool checked )
 {
     const int key( sender( )->property( PREF_KEY ).toInt( ) );
-    setPref( key, checked );
+    myPrefs.set( key, checked );
 }
 
 QCheckBox *
@@ -78,15 +78,38 @@ PrefsDialog :: enableBuddyWhenChecked( QCheckBox * box, QWidget * buddy )
 }
 
 void
-PrefsDialog :: spinBoxEditingFinished()
+PrefsDialog :: spinBoxChangedIdle( )
 {
-    const QObject * spin = sender();
-    const int key = spin->property( PREF_KEY ).toInt( );
+    const QObject * spin( sender()->property( "SPIN" ).value<QObject*>( ) );
+    const int key( spin->property( PREF_KEY ).toInt( ) );
+
     const QDoubleSpinBox * d = qobject_cast<const QDoubleSpinBox*>( spin );
-    if( d )
-        setPref( key, d->value( ) );
+    if( d != 0 )
+        myPrefs.set( key, d->value( ) );
     else
-        setPref( key, qobject_cast<const QSpinBox*>(spin)->value( ) );
+        myPrefs.set( key, qobject_cast<const QSpinBox*>(spin)->value( ) );
+}
+
+void
+PrefsDialog :: spinBoxChanged( int value )
+{
+    Q_UNUSED( value );
+
+    static const QString timerName( "TIMER_CHILD" );
+    QObject * o( sender( ) );
+
+    // user may be spinning through many values, so let's hold off
+    // for a moment to kekep from flooding a bunch of prefs changes
+    QTimer * timer( o->findChild<QTimer*>( timerName ) );
+    if( timer == 0 )
+    {
+        timer = new QTimer( o );
+        timer->setObjectName( timerName );
+        timer->setSingleShot( true );
+        timer->setProperty( "SPIN", qVariantFromValue( o ) );
+        connect( timer, SIGNAL(timeout()), this, SLOT(spinBoxChangedIdle()));
+    }
+    timer->start( 200 );
 }
 
 QSpinBox *
@@ -97,9 +120,17 @@ PrefsDialog :: spinBoxNew( int key, int low, int high, int step )
     spin->setSingleStep( step );
     spin->setValue( myPrefs.getInt( key ) );
     spin->setProperty( PREF_KEY, key );
-    connect( spin, SIGNAL(editingFinished()), this, SLOT(spinBoxEditingFinished()));
+    connect( spin, SIGNAL(valueChanged(int)), this, SLOT(spinBoxChanged(int)));
     myWidgets.insert( key, spin );
     return spin;
+}
+
+void
+PrefsDialog :: doubleSpinBoxChanged( double value )
+{
+    Q_UNUSED( value );
+
+    spinBoxChanged( 0 );
 }
 
 QDoubleSpinBox *
@@ -111,24 +142,19 @@ PrefsDialog :: doubleSpinBoxNew( int key, double low, double high, double step, 
     spin->setDecimals( decimals );
     spin->setValue( myPrefs.getDouble( key ) );
     spin->setProperty( PREF_KEY, key );
-    connect( spin, SIGNAL(editingFinished()), this, SLOT(spinBoxEditingFinished()));
+    connect( spin, SIGNAL(valueChanged(double)), this, SLOT(doubleSpinBoxChanged(double)));
     myWidgets.insert( key, spin );
     return spin;
 }
 
 void
-PrefsDialog :: timeEditingFinished( )
+PrefsDialog :: timeChanged( const QTime& time )
 {
-    QTimeEdit * e = qobject_cast<QTimeEdit*>(sender());
-    if( e )
-    {
-        const int key( e->property( PREF_KEY ).toInt( ) );
-        const QTime time( e->time( ) );
-        const int seconds( QTime().secsTo( time ) );
-std::cerr << "setPref to " << (seconds/60) << " minutes" << std::endl;
-        setPref( key, seconds / 60 );
-    }
+    const int key( sender()->property( PREF_KEY ).toInt( ) );
+    const int seconds( QTime().secsTo( time ) );
+    myPrefs.set( key, seconds / 60 );
 }
+
 QTimeEdit*
 PrefsDialog :: timeEditNew( int key )
 {
@@ -138,21 +164,17 @@ PrefsDialog :: timeEditNew( int key )
     e->setProperty( PREF_KEY, key );
     e->setTime( QTime().addSecs( minutes * 60 ) );
     myWidgets.insert( key, e );
-    connect( e, SIGNAL(editingFinished()), this, SLOT(timeEditingFinished()) );
+    connect( e, SIGNAL(timeChanged(const QTime&)), this, SLOT(timeChanged(const QTime&)) );
     return e;
 }
 
 void
-PrefsDialog :: lineEditingFinished( )
+PrefsDialog :: textChanged( const QString& text )
 {
-    QLineEdit * e = qobject_cast<QLineEdit*>(sender());
-    if( e && e->isModified( ) )
-    {
-        const int key( e->property( PREF_KEY ).toInt( ) );
-        const QString text( e->text() );
-        setPref( key, text );
-    }
+    const int key( sender()->property( PREF_KEY ).toInt( ) );
+    myPrefs.set( key, text );
 }
+
 QLineEdit*
 PrefsDialog :: lineEditNew( int key, int echoMode )
 {
@@ -160,8 +182,35 @@ PrefsDialog :: lineEditNew( int key, int echoMode )
     e->setProperty( PREF_KEY, key );
     e->setEchoMode( QLineEdit::EchoMode( echoMode ) );
     myWidgets.insert( key, e );
-    connect( e, SIGNAL(editingFinished()), this, SLOT(lineEditingFinished()) );
+    connect( e, SIGNAL(textChanged(const QString&)), this, SLOT(textChanged(const QString&)) );
     return e;
+}
+
+/***
+****
+***/
+
+QWidget *
+PrefsDialog :: createTrackerTab( )
+{
+    QWidget *l, *r;
+    HIG * hig = new HIG( );
+    hig->addSectionTitle( tr( "Tracker Proxy" ) );
+    hig->addWideControl( l = checkBoxNew( tr( "Connect to tracker via a pro&xy" ), Prefs::PROXY_ENABLED ) );
+    myUnsupportedWhenRemote << l;
+    l = hig->addRow( tr( "Proxy &server:" ), r = lineEditNew( Prefs::PROXY ) );
+    myProxyWidgets << l << r;
+    l = hig->addRow( tr( "Proxy &port:" ), r = spinBoxNew( Prefs::PROXY_PORT, 1, 65535, 1 ) );
+    myProxyWidgets << l << r;
+    hig->addWideControl( l = checkBoxNew( tr( "Use &authentication" ), Prefs::PROXY_AUTH_ENABLED ) );
+    myProxyWidgets << l;
+    l = hig->addRow( tr( "&Username:" ), r = lineEditNew( Prefs::PROXY_USERNAME ) );
+    myProxyAuthWidgets << l << r;
+    l = hig->addRow( tr( "Pass&word:" ), r = lineEditNew( Prefs::PROXY_PASSWORD, QLineEdit::Password ) );
+    myProxyAuthWidgets << l << r;
+    myUnsupportedWhenRemote << myProxyAuthWidgets;
+    hig->finish( );
+    return hig;
 }
 
 /***
@@ -175,7 +224,8 @@ PrefsDialog :: createWebTab( Session& session )
     hig->addSectionTitle( tr( "Web Client" ) );
     QWidget * w;
     QHBoxLayout * h = new QHBoxLayout( );
-    QPushButton * b = new QPushButton( tr( "&Open web client" ) );
+    QIcon i( style()->standardIcon( QStyle::StandardPixmap( QStyle::SP_DirOpenIcon ) ) );
+    QPushButton * b = new QPushButton( i, tr( "&Open web client" ) );
     connect( b, SIGNAL(clicked()), &session, SLOT(launchWebInterface()) );
     h->addWidget( b, 0, Qt::AlignRight );
     QWidget * l = checkBoxNew( tr( "&Enable web client" ), Prefs::RPC_ENABLED );
@@ -206,7 +256,7 @@ void
 PrefsDialog :: altSpeedDaysEdited( int i )
 {
     const int value = qobject_cast<QComboBox*>(sender())->itemData(i).toInt();
-    setPref( Prefs::ALT_SPEED_LIMIT_TIME_DAY, value );
+    myPrefs.set( Prefs::ALT_SPEED_LIMIT_TIME_DAY, value );
 }
 
 
@@ -216,14 +266,13 @@ PrefsDialog :: createSpeedTab( )
     QWidget *l, *r;
     HIG * hig = new HIG( this );
     hig->addSectionTitle( tr( "Speed Limits" ) );
-    const QString speed_K_str = Formatter::unitStr( Formatter::SPEED, Formatter::KB );
 
-        l = checkBoxNew( tr( "Limit &download speed (%1):" ).arg( speed_K_str ), Prefs::DSPEED_ENABLED );
+        l = checkBoxNew( tr( "Limit &download speed (KiB/s):" ), Prefs::DSPEED_ENABLED );
         r = spinBoxNew( Prefs::DSPEED, 0, INT_MAX, 5 );
         hig->addRow( l, r );
         enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), r );
 
-        l = checkBoxNew( tr( "Limit &upload speed (%1):" ).arg( speed_K_str ), Prefs::USPEED_ENABLED );
+        l = checkBoxNew( tr( "Limit &upload speed (KiB/s):" ), Prefs::USPEED_ENABLED );
         r = spinBoxNew( Prefs::USPEED, 0, INT_MAX, 5 );
         hig->addRow( l, r );
         enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), r );
@@ -244,11 +293,11 @@ PrefsDialog :: createSpeedTab( )
         QString s = tr( "<small>Override normal speed limits manually or at scheduled times</small>" );
         hig->addWideControl( new QLabel( s ) );
 
-        s = tr( "Limit do&wnload speed (%1):" ).arg( speed_K_str );
+        s = tr( "Limit d&ownload speed (KiB/s):" );
         r = spinBoxNew( Prefs :: ALT_SPEED_LIMIT_DOWN, 0, INT_MAX, 5 );
         hig->addRow( s, r );
 
-        s = tr( "Limit u&pload speed (%1):" ).arg( speed_K_str );
+        s = tr( "Limit u&pload speed (KiB/s):" );
         r = spinBoxNew( Prefs :: ALT_SPEED_LIMIT_UP, 0, INT_MAX, 5 );
         hig->addRow( s, r );
 
@@ -258,7 +307,7 @@ PrefsDialog :: createSpeedTab( )
         QWidget * w = timeEditNew( Prefs :: ALT_SPEED_LIMIT_TIME_BEGIN );
         h->addWidget( w, 1 );
         mySchedWidgets << w;
-        QLabel * nd = new QLabel( tr("&to") );
+        QLabel * nd = new QLabel( "&to" );
         h->addWidget( nd );
         mySchedWidgets << nd;
         w = timeEditNew( Prefs :: ALT_SPEED_LIMIT_TIME_END );
@@ -284,23 +333,6 @@ PrefsDialog :: createSpeedTab( )
         connect( box, SIGNAL(activated(int)), this, SLOT(altSpeedDaysEdited(int)) );
         w = hig->addRow( s, box );
         mySchedWidgets << w << box;
-
-    hig->finish( );
-    return hig;
-}
-
-/***
-****
-***/
-
-QWidget *
-PrefsDialog :: createDesktopTab( )
-{
-    HIG * hig = new HIG( this );
-    hig->addSectionTitle( tr( "Desktop" ) );
-
-    hig->addWideControl( checkBoxNew( tr( "Show Transmission icon in the &notification area" ), Prefs::SHOW_TRAY_ICON ) );
-    hig->addWideControl( checkBoxNew( tr( "Show &popup notifications" ), Prefs::SHOW_DESKTOP_NOTIFICATION ) );
 
     hig->finish( );
     return hig;
@@ -336,7 +368,7 @@ PrefsDialog :: createNetworkTab( )
 
     QSpinBox * s = spinBoxNew( Prefs::PEER_PORT, 1, 65535, 1 );
     QHBoxLayout * h = new QHBoxLayout( );
-    QPushButton * b = myPortButton = new QPushButton( tr( "Te&st Port" ) );
+    QPushButton * b = myPortButton = new QPushButton( tr( "&Test Port" ) );
     QLabel * l = myPortLabel = new QLabel( tr( "Status unknown" ) );
     h->addWidget( l );
     h->addSpacing( HIG :: PAD_BIG );
@@ -347,8 +379,8 @@ PrefsDialog :: createNetworkTab( )
 
     hig->addRow( tr( "&Port for incoming connections:" ), s );
     hig->addRow( "", h, 0 );
-    hig->addWideControl( checkBoxNew( tr( "Pick a &random port every time Transmission is started" ), Prefs :: PEER_PORT_RANDOM_ON_START ) );
     hig->addWideControl( checkBoxNew( tr( "Use UPnP or NAT-PMP port &forwarding from my router" ), Prefs::PORT_FORWARDING ) );
+    hig->addWideControl( checkBoxNew( tr( "Pick a &random port every time Transmission is started" ), Prefs :: PEER_PORT_RANDOM_ON_START ) );
 
     hig->addSectionDivider( );
     hig->addSectionTitle( tr( "Limits" ) );
@@ -393,6 +425,12 @@ PrefsDialog :: onUpdateBlocklistClicked( )
                                          tr( "<b>Update Blocklist</b><p>Getting new blocklist..." ),
                                          QMessageBox::Close,
                                          this );
+    QPixmap pixmap;
+    QIcon icon = QtIconLoader :: icon( "dialog-information" );
+    if( !icon.isNull( ) ) {
+        const int size = style()->pixelMetric( QStyle::PM_LargeIconSize );
+        myBlocklistDialog->setIconPixmap( icon.pixmap( size, size ) );
+    }
     connect( myBlocklistDialog, SIGNAL(rejected()), this, SLOT(onUpdateBlocklistCancelled()) );
     connect( &mySession, SIGNAL(blocklistUpdated(int)), this, SLOT(onBlocklistUpdated(int))) ;
     myBlocklistDialog->show( );
@@ -403,39 +441,27 @@ void
 PrefsDialog :: encryptionEdited( int i )
 {
     const int value( qobject_cast<QComboBox*>(sender())->itemData(i).toInt( ) );
-    setPref( Prefs::ENCRYPTION, value );
+    myPrefs.set( Prefs::ENCRYPTION, value );
 }
 
 QWidget *
 PrefsDialog :: createPrivacyTab( )
 {
-    QWidget * w;
     HIG * hig = new HIG( this );
-
     hig->addSectionTitle( tr( "Blocklist" ) );
-
-    QWidget * l = checkBoxNew( tr("Enable &blocklist:"), Prefs::BLOCKLIST_ENABLED );
-    QWidget * e = lineEditNew( Prefs::BLOCKLIST_URL );
-    myBlockWidgets << e;
-    hig->addRow( l, e );
-
-    l = myBlocklistLabel = new QLabel( "" );
-    myBlockWidgets << l;
-    w = new QPushButton( tr( "&Update" ) );
+    QHBoxLayout * h = new QHBoxLayout( );
+    QIcon i( style()->standardIcon( QStyle::StandardPixmap( QStyle::SP_BrowserReload ) ) );
+    QWidget * w = new QPushButton( i, tr( "&Update blocklist" ) );
     connect( w, SIGNAL(clicked(bool)), this, SLOT(onUpdateBlocklistClicked()));
     myBlockWidgets << w;
-    QHBoxLayout * h = new QHBoxLayout( );
+    QWidget * l = checkBoxNew( "", Prefs::BLOCKLIST_ENABLED );
     h->addWidget( l );
     h->addStretch( 1 );
     h->addWidget( w );
     hig->addWideControl( h );
-
     l = checkBoxNew( tr( "Enable &automatic updates" ), Prefs::BLOCKLIST_UPDATES_ENABLED );
     myBlockWidgets << l;
     hig->addWideControl( l );
-
-    hig->addSectionDivider( );
-    hig->addSectionTitle( tr( "Privacy" ) );
 
     QComboBox * box = new QComboBox( );
     box->addItem( tr( "Allow encryption" ), 0 );
@@ -444,6 +470,8 @@ PrefsDialog :: createPrivacyTab( )
     myWidgets.insert( Prefs :: ENCRYPTION, box );
     connect( box, SIGNAL(activated(int)), this, SLOT(encryptionEdited(int)));
 
+    hig->addSectionDivider( );
+    hig->addSectionTitle( tr( "Privacy" ) );
     hig->addRow( tr( "&Encryption mode:" ), box );
     hig->addWideControl( w = checkBoxNew( tr( "Use PE&X to find more peers" ), Prefs::PEX_ENABLED ) );
     w->setToolTip( tr( "PEX is a tool for exchanging peer lists with the peers you're connected to." ) );
@@ -453,7 +481,7 @@ PrefsDialog :: createPrivacyTab( )
     w->setToolTip( tr( "LPD is a tool for finding peers on your local network." ) );
 
     hig->finish( );
-    updateBlocklistLabel( );
+    updateBlocklistCheckBox( );
     return hig;
 }
 
@@ -508,7 +536,8 @@ PrefsDialog :: onDestinationClicked( void )
 void
 PrefsDialog :: onLocationSelected( const QString& path, int key )
 {
-    setPref( key, path );
+    myPrefs.set( key, path );
+    updatePref( key );
 }
 
 QWidget *
@@ -523,7 +552,7 @@ PrefsDialog :: createTorrentsTab( )
 
     QWidget *l, *r;
     HIG * hig = new HIG( this );
-    hig->addSectionTitle( tr( "Adding" ) );
+    hig->addSectionTitle( tr( "Adding Torrents" ) );
 
         l = checkBoxNew( tr( "Automatically &add torrents from:" ), Prefs::DIR_WATCH_ENABLED );
         QPushButton * b = myWatchButton = new QPushButton;
@@ -536,17 +565,7 @@ PrefsDialog :: createTorrentsTab( )
         hig->addWideControl( checkBoxNew( tr( "Show &options dialog" ), Prefs::OPTIONS_PROMPT ) );
         hig->addWideControl( checkBoxNew( tr( "&Start when added" ), Prefs::START ) );
         hig->addWideControl( checkBoxNew( tr( "Mo&ve .torrent file to the trash" ), Prefs::TRASH_ORIGINAL ) );
-
-    hig->addSectionDivider( );
-    hig->addSectionTitle( tr( "Downloading" ) );
-
         hig->addWideControl( checkBoxNew( tr( "Append \".&part\" to incomplete files' names" ), Prefs::RENAME_PARTIAL_FILES ) );
-
-        b = myDestinationButton = new QPushButton;
-        b->setIcon( folderPixmap );
-        b->setStyleSheet( "text-align: left; padding-left: 5; padding-right: 5" );
-        connect( b, SIGNAL(clicked(bool)), this, SLOT(onDestinationClicked(void)) );
-        hig->addRow( tr( "Save to &Location:" ), b );
 
         l = myIncompleteCheckbox = checkBoxNew( tr( "Keep &incomplete files in:" ), Prefs::INCOMPLETE_DIR_ENABLED );
         b = myIncompleteButton = new QPushButton;
@@ -556,7 +575,7 @@ PrefsDialog :: createTorrentsTab( )
         hig->addRow( myIncompleteCheckbox, b );
         enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), b );
 
-        l = myTorrentDoneScriptCheckbox = checkBoxNew( tr( "Call scrip&t when torrent is completed:" ), Prefs::SCRIPT_TORRENT_DONE_ENABLED );
+        l = myTorrentDoneScriptCheckbox = checkBoxNew( tr( "Call scrip&t when torrent is completed" ), Prefs::SCRIPT_TORRENT_DONE_ENABLED );
         b = myTorrentDoneScriptButton = new QPushButton;
         b->setIcon( filePixmap );
         b->setStyleSheet( "text-align: left; padding-left: 5; padding-right: 5" );
@@ -564,16 +583,17 @@ PrefsDialog :: createTorrentsTab( )
         hig->addRow( myTorrentDoneScriptCheckbox, b );
         enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), b );
 
+        b = myDestinationButton = new QPushButton;
+        b->setIcon( folderPixmap );
+        b->setStyleSheet( "text-align: left; padding-left: 5; padding-right: 5" );
+        connect( b, SIGNAL(clicked(bool)), this, SLOT(onDestinationClicked(void)) );
+        hig->addRow( tr( "Save to &Location:" ), b );
+
     hig->addSectionDivider( );
-    hig->addSectionTitle( tr( "Seeding Limits" ) );
+    hig->addSectionTitle( tr( "Limits" ) );
 
-        l = checkBoxNew( tr( "Stop seeding at &ratio:" ), Prefs::RATIO_ENABLED );
+        l = checkBoxNew( tr( "&Seed torrent until its ratio reaches:" ), Prefs::RATIO_ENABLED );
         r = doubleSpinBoxNew( Prefs::RATIO, 0, INT_MAX, 0.5, 2 );
-        hig->addRow( l, r );
-        enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), r );
-
-        l = checkBoxNew( tr( "Stop seeding if idle for &N minutes:" ), Prefs::IDLE_LIMIT_ENABLED );
-        r = spinBoxNew( Prefs::IDLE_LIMIT, 1, INT_MAX, 5 );
         hig->addRow( l, r );
         enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), r );
 
@@ -599,8 +619,8 @@ PrefsDialog :: PrefsDialog( Session& session, Prefs& prefs, QWidget * parent ):
     t->addTab( createSpeedTab( ),        tr( "Speed" ) );
     t->addTab( createPrivacyTab( ),      tr( "Privacy" ) );
     t->addTab( createNetworkTab( ),      tr( "Network" ) );
-    t->addTab( createDesktopTab( ),      tr( "Desktop" ) );
     t->addTab( createWebTab( session ),  tr( "Web" ) );
+    //t->addTab( createTrackerTab( ),    tr( "Trackers" ) );
     myLayout->addWidget( t );
 
     QDialogButtonBox * buttons = new QDialogButtonBox( QDialogButtonBox::Close, Qt::Horizontal, this );
@@ -612,6 +632,7 @@ PrefsDialog :: PrefsDialog( Session& session, Prefs& prefs, QWidget * parent ):
 
     QList<int> keys;
     keys << Prefs :: RPC_ENABLED
+         << Prefs :: PROXY_ENABLED
          << Prefs :: ALT_SPEED_LIMIT_ENABLED
          << Prefs :: ALT_SPEED_LIMIT_TIME_ENABLED
          << Prefs :: ENCRYPTION
@@ -621,7 +642,7 @@ PrefsDialog :: PrefsDialog( Session& session, Prefs& prefs, QWidget * parent ):
          << Prefs :: INCOMPLETE_DIR
          << Prefs :: INCOMPLETE_DIR_ENABLED;
     foreach( int key, keys )
-        refreshPref( key );
+        updatePref( key );
 
     // if it's a remote session, disable the preferences
     // that don't work in remote sessions
@@ -637,13 +658,6 @@ PrefsDialog :: ~PrefsDialog( )
 {
 }
 
-void
-PrefsDialog :: setPref( int key, const QVariant& v )
-{
-    myPrefs.set( key, v );
-    refreshPref( key );
-}
-
 /***
 ****
 ***/
@@ -651,18 +665,22 @@ PrefsDialog :: setPref( int key, const QVariant& v )
 void
 PrefsDialog :: sessionUpdated( )
 {
-    updateBlocklistLabel( );
+    updateBlocklistCheckBox( );
 }
 
 void
-PrefsDialog :: updateBlocklistLabel( )
+PrefsDialog :: updateBlocklistCheckBox( )
 {
+    QCheckBox * box = qobject_cast<QCheckBox*>( myWidgets[Prefs::BLOCKLIST_ENABLED] );
     const int n = mySession.blocklistSize( );
-    myBlocklistLabel->setText( tr( "<i>Blocklist contains %Ln rules)", 0, n ) );
+    if( n < 0 ) // unknown
+        box->setText( tr( "Enable &blocklist" ) );
+    else
+        box->setText( tr( "Enable &blocklist (%Ln rules)", 0, n ) );
 }
 
 void
-PrefsDialog :: refreshPref( int key )
+PrefsDialog :: updatePref( int key )
 {
     switch( key )
     {
@@ -675,6 +693,15 @@ PrefsDialog :: refreshPref( int key )
             foreach( QWidget * w, myWebWhitelistWidgets ) w->setEnabled( enabled && whitelist );
             foreach( QWidget * w, myWebAuthWidgets ) w->setEnabled( enabled && auth );
             foreach( QWidget * w, myWebWidgets ) w->setEnabled( enabled );
+            break;
+        }
+
+        case Prefs :: PROXY_ENABLED:
+        case Prefs :: PROXY_AUTH_ENABLED: {
+            const bool enabled( myPrefs.getBool( Prefs::PROXY_ENABLED ) );
+            const bool auth( myPrefs.getBool( Prefs::PROXY_AUTH_ENABLED ) );
+            foreach( QWidget * w, myProxyAuthWidgets ) w->setEnabled( enabled && auth );
+            foreach( QWidget * w, myProxyWidgets ) w->setEnabled( enabled );
             break;
         }
 

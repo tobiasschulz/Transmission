@@ -121,7 +121,7 @@
     return fIcon;
 }
 
-- (NSMutableArray *) children
+- (NSArray *) children
 {
     NSAssert(fIsFolder, @"method can only be invoked on folders");
     
