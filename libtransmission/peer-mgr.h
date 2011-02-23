@@ -34,7 +34,6 @@
  * @{
  */
 
-struct UTPSocket;
 struct tr_peer_stat;
 struct tr_torrent;
 typedef struct tr_peerMgr tr_peerMgr;
@@ -149,13 +148,6 @@ void tr_peerMgrFree( tr_peerMgr * manager );
 tr_bool tr_peerMgrPeerIsSeed( const tr_torrent * tor,
                               const tr_address * addr );
 
-void tr_peerMgrSetUtpSupported( tr_torrent       * tor,
-                                const tr_address * addr );
-
-void tr_peerMgrSetUtpFailed( tr_torrent *tor,
-                             const tr_address *addr,
-                             tr_bool failed );
-
 void tr_peerMgrGetNextRequests( tr_torrent          * torrent,
                                 tr_peer             * peer,
                                 int                   numwant,
@@ -171,8 +163,7 @@ void tr_peerMgrRebuildRequests( tr_torrent * torrent );
 void tr_peerMgrAddIncoming( tr_peerMgr  * manager,
                             tr_address  * addr,
                             tr_port       port,
-                            int           socket,
-                            struct UTPSocket *utp_socket );
+                            int           socket );
 
 tr_pex * tr_peerMgrCompactToPex( const void    * compact,
                                  size_t          compactLen,

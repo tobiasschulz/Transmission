@@ -23,7 +23,6 @@ LDADD = \
     $(top_builddir)/third-party/miniupnp/libminiupnp.a \
     $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
     @DHT_LIBS@ \
-    @LIBUTP_LIBS@ \
     @LIBEVENT_LIBS@ \
     @LIBCURL_LIBS@ \
     @OPENSSL_LIBS@ \

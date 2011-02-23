@@ -105,7 +105,6 @@ class Prefs: public QObject
             TRASH_ORIGINAL,
             PEX_ENABLED,
             DHT_ENABLED,
-            UTP_ENABLED,
             LPD_ENABLED,
             PORT_FORWARDING,
             PREALLOCATION,

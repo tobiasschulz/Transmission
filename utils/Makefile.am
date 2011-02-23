@@ -30,7 +30,6 @@ transmission_create_LDADD = \
     $(top_builddir)/third-party/libnatpmp/libnatpmp.a \
     @INTLLIBS@ \
     @DHT_LIBS@ \
-    @LIBUTP_LIBS@ \
     @LIBEVENT_LIBS@ \
     @LIBCURL_LIBS@ \
     @OPENSSL_LIBS@ \

@@ -298,8 +298,6 @@ static tr_option opts[] =
     { 985, "no-honor-session",       "Make the current torrent(s) not honor the session limits", "HL",  0, NULL },
     { 'u', "uplimit",                "Set the max upload speed in "SPEED_K_STR" for the current torrent(s) or globally", "u", 1, "<speed>" },
     { 'U', "no-uplimit",             "Disable max upload speed for the current torrent(s) or globally", "U", 0, NULL },
-    { 830, "utp",                    "Enable uTP for peer connections", NULL, 0, NULL },
-    { 831, "no-utp",                 "Disable uTP for peer connections", NULL, 0, NULL },
     { 'v', "verify",                 "Verify the current torrent(s)", "v",  0, NULL },
     { 'V', "version",                "Show version number and exit", "V", 0, NULL },
     { 'w', "download-dir",           "When adding a new torrent, set its download folder. Otherwise, set the default download folder", "w",  1, "<path>" },
@@ -382,8 +380,6 @@ getOptMode( int val )
         case 'Y': /* no-lpd */
         case 800: /* torrent-done-script */
         case 801: /* no-torrent-done-script */
-        case 830: /* utp */
-        case 831: /* no-utp */
         case 970: /* alt-speed */
         case 971: /* no-alt-speed */
         case 972: /* alt-speed-downlimit */
@@ -493,18 +489,13 @@ static char * sessionId = NULL;
 static char*
 tr_getcwd( void )
 {
-    char * result;
     char buf[2048];
+    *buf = '\0';
 #ifdef WIN32
-    result = _getcwd( buf, sizeof( buf ) );
+    _getcwd( buf, sizeof( buf ) );
 #else
-    result = getcwd( buf, sizeof( buf ) );
+    getcwd( buf, sizeof( buf ) );
 #endif
-    if( result == NULL )
-    {
-        fprintf( stderr, "getcwd error: \"%s\"", tr_strerror( errno ) );
-        *buf = '\0';
-    }
     return tr_strdup( buf );
 }
 
@@ -1995,10 +1986,6 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
                           break;
                 case 'O': tr_bencDictAddBool( args, TR_PREFS_KEY_DHT_ENABLED, FALSE );
                           break;
-                case 830: tr_bencDictAddBool( args, TR_PREFS_KEY_UTP_ENABLED, TRUE );
-                          break;
-                case 831: tr_bencDictAddBool( args, TR_PREFS_KEY_UTP_ENABLED, FALSE );
-                          break;
                 case 'p': tr_bencDictAddInt( args, TR_PREFS_KEY_PEER_PORT, numarg( optarg ) );
                           break;
                 case 'P': tr_bencDictAddBool( args, TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, TRUE);
@@ -2285,7 +2272,7 @@ processArgs( const char * rpcurl, int argc, const char ** argv )
             }
             default:
             {
-                fprintf( stderr, "got opt [%d]\n", c );
+                fprintf( stderr, "got opt [%d]\n", (int)c );
                 showUsage( );
                 break;
             }

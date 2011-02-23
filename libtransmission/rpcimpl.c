@@ -36,7 +36,7 @@
 #include "version.h"
 #include "web.h"
 
-#define RPC_VERSION     13
+#define RPC_VERSION     11
 #define RPC_VERSION_MIN 1
 
 #define RECENTLY_ACTIVE_SECONDS 60
@@ -446,7 +446,6 @@ addPeers( const tr_torrent * tor,
         tr_bencDictAddBool( d, "isEncrypted", peer->isEncrypted );
         tr_bencDictAddBool( d, "isIncoming", peer->isIncoming );
         tr_bencDictAddBool( d, "isUploadingTo", peer->isUploadingTo );
-        tr_bencDictAddBool( d, "isUTP", peer->isUTP );
         tr_bencDictAddBool( d, "peerIsChoked", peer->peerIsChoked );
         tr_bencDictAddBool( d, "peerIsInterested", peer->peerIsInterested );
         tr_bencDictAddInt ( d, "port", peer->port );
@@ -534,7 +533,7 @@ addField( const tr_torrent * tor, tr_benc * d, const char * key )
     else if( tr_streq( key, keylen, "metadataPercentComplete" ) )
         tr_bencDictAddReal( d, key, st->metadataPercentComplete );
     else if( tr_streq( key, keylen, "name" ) )
-        tr_bencDictAddStr( d, key, tr_torrentName( tor ) );
+        tr_bencDictAddStr( d, key, inf->name );
     else if( tr_streq( key, keylen, "percentDone" ) )
         tr_bencDictAddReal( d, key, st->percentDone );
     else if( tr_streq( key, keylen, "peer-limit" ) )
@@ -1067,8 +1066,6 @@ torrentSetLocation( tr_session               * session,
 
 static void
 portTested( tr_session       * session UNUSED,
-            tr_bool            did_connect UNUSED,
-            tr_bool            did_timeout UNUSED,
             long               response_code,
             const void       * response,
             size_t             response_byte_count,
@@ -1111,8 +1108,6 @@ portTest( tr_session               * session,
 
 static void
 gotNewBlocklist( tr_session       * session,
-                 tr_bool            did_connect UNUSED,
-                 tr_bool            did_timeout UNUSED,
                  long               response_code,
                  const void       * response,
                  size_t             response_byte_count,
@@ -1257,8 +1252,6 @@ struct add_torrent_idle_data
 
 static void
 gotMetadataFromURL( tr_session       * session UNUSED,
-                    tr_bool            did_connect UNUSED,
-                    tr_bool            did_timeout UNUSED,
                     long               response_code,
                     const void       * response,
                     size_t             response_byte_count,
@@ -1473,8 +1466,6 @@ sessionSet( tr_session               * session,
         tr_sessionSetPexEnabled( session, boolVal );
     if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_DHT_ENABLED, &boolVal ) )
         tr_sessionSetDHTEnabled( session, boolVal );
-    if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_UTP_ENABLED, &boolVal ) )
-        tr_sessionSetUTPEnabled( session, boolVal );
     if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_LPD_ENABLED, &boolVal ) )
         tr_sessionSetLPDEnabled( session, boolVal );
     if( tr_bencDictFindBool( args_in, TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START, &boolVal ) )
@@ -1599,7 +1590,6 @@ sessionGet( tr_session               * s,
     tr_bencDictAddStr ( d, TR_PREFS_KEY_INCOMPLETE_DIR, tr_sessionGetIncompleteDir( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED, tr_sessionIsIncompleteDirEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_PEX_ENABLED, tr_sessionIsPexEnabled( s ) );
-    tr_bencDictAddBool( d, TR_PREFS_KEY_UTP_ENABLED, tr_sessionIsUTPEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_DHT_ENABLED, tr_sessionIsDHTEnabled( s ) );
     tr_bencDictAddBool( d, TR_PREFS_KEY_LPD_ENABLED, tr_sessionIsLPDEnabled( s ) );
     tr_bencDictAddInt ( d, TR_PREFS_KEY_PEER_PORT, tr_sessionGetPeerPort( s ) );

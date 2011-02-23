@@ -48,7 +48,7 @@
     InfoOptionsViewController * fOptionsViewController;
 
     IBOutlet NSImageView * fImageView;
-    IBOutlet NSTextField * fNameField, * fBasicInfoField, * fNoneSelectedField;
+    IBOutlet NSTextField * fNameField, * fBasicInfoField;
 }
 
 - (void) setInfoForTorrents: (NSArray *) torrents;

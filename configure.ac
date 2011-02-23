@@ -3,8 +3,8 @@ dnl STATUS: "X" for prerelease beta builds,
 dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
-m4_define([user_agent_prefix],[2.21+])
-m4_define([peer_id_prefix],[-TR221Z-])
+m4_define([user_agent_prefix],[2.21])
+m4_define([peer_id_prefix],[-TR2210-])
 
 AC_INIT([transmission],
         [user_agent_prefix],
@@ -213,24 +213,6 @@ DHT_CFLAGS="-I\$(top_srcdir)/third-party/dht"
 DHT_LIBS="\$(top_builddir)/third-party/dht/libdht.a"
 AC_SUBST(DHT_CFLAGS)
 AC_SUBST(DHT_LIBS)
-
-
-dnl ----------------------------------------------------------------------------
-dnl
-dnl  utp
-
-AC_ARG_ENABLE([utp],
-              AS_HELP_STRING([--enable-utp],[build µTP support]),
-              [build_utp=${enableval}],
-              [build_utp=no])
-if test "x$build_utp" = "xyes" ; then
-    LIBUTP_CFLAGS="-I\$(top_srcdir)/third-party/"
-    LIBUTP_LIBS="\$(top_builddir)/third-party/libutp/libutp.a -lrt"
-    AC_DEFINE([WITH_UTP],[1])
-fi
-AC_SUBST(LIBUTP_CFLAGS)
-AC_SUBST(LIBUTP_LIBS)
-AM_CONDITIONAL([BUILD_UTP],[test "x$build_utp" = "xyes"])
 
 
 dnl ----------------------------------------------------------------------------
@@ -488,7 +470,6 @@ AC_CONFIG_FILES([Makefile
                  third-party/Makefile
                  third-party/miniupnp/Makefile
                  third-party/libnatpmp/Makefile
-                 third-party/libutp/Makefile
                  third-party/dht/Makefile
                  macosx/Makefile
                  gtk/Makefile
@@ -515,7 +496,6 @@ Configuration:
    Build libtransmission:                             yes
 
       * optimized for low-resource systems:           ${enable_lightweight}
-      * µTP enabled:                                  ${build_utp}
 
    Build Command-Line client:                         ${build_cli}
 

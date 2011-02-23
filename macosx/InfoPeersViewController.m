@@ -366,13 +366,8 @@
                                 "Inspector -> Peers tab -> table row tooltip")];
         [components addObject: progressString];
         
-        NSString * protocolString = [[peer objectForKey: @"uTP"] boolValue] ? @"\u00b5TP" : @"TCP";
         if ([[peer objectForKey: @"Encryption"] boolValue])
-            protocolString = [protocolString stringByAppendingFormat: @" (%@)",
-                                NSLocalizedString(@"encrypted", "Inspector -> Peers tab -> table row tooltip")];
-        [components addObject: [NSString stringWithFormat:
-                                NSLocalizedString(@"Protocol: %@", "Inspector -> Peers tab -> table row tooltip"),
-                                protocolString]];
+            [components addObject: NSLocalizedString(@"Encrypted Connection", "Inspector -> Peers tab -> table row tooltip")];
         
         NSString * portString;
         NSInteger port;
