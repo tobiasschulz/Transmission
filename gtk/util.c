@@ -183,20 +183,43 @@ tr_strltime( char * buf, int seconds, size_t buflen )
     g_snprintf( m, sizeof( m ), gtr_ngettext( "%'d minute", "%'d minutes", minutes ), minutes );
     g_snprintf( s, sizeof( s ), gtr_ngettext( "%'d second", "%'d seconds", seconds ), seconds );
 
-    if( days >= 4 || !hours )
-        g_strlcpy( buf, d, buflen );
-    else if( days )
-        g_snprintf( buf, buflen, "%s, %s", d, h );
-    else if( hours >= 4 || !minutes )
-        g_strlcpy( buf, h, buflen );
+    if( days )
+    {
+        if( days >= 4 || !hours )
+        {
+            g_strlcpy( buf, d, buflen );
+        }
+        else
+        {
+            g_snprintf( buf, buflen, "%s, %s", d, h );
+        }
+    }
     else if( hours )
-        g_snprintf( buf, buflen, "%s, %s", h, m );
-    else if( minutes >= 4 || !seconds )
-        g_strlcpy( buf, m, buflen );
+    {
+        if( hours >= 4 || !minutes )
+        {
+            g_strlcpy( buf, h, buflen );
+        }
+        else
+        {
+            g_snprintf( buf, buflen, "%s, %s", h, m );
+        }
+    }
     else if( minutes )
-        g_snprintf( buf, buflen, "%s, %s", m, s );
+    {
+        if( minutes >= 4 || !seconds )
+        {
+            g_strlcpy( buf, m, buflen );
+        }
+        else
+        {
+            g_snprintf( buf, buflen, "%s, %s", m, s );
+        }
+    }
     else
+    {
         g_strlcpy( buf, s, buflen );
+    }
 
     return buf;
 }
@@ -204,8 +227,8 @@ tr_strltime( char * buf, int seconds, size_t buflen )
 char *
 gtr_localtime( time_t time )
 {
-    char buf[256], *eoln;
     const struct tm tm = *localtime( &time );
+    char            buf[256], *eoln;
 
     g_strlcpy( buf, asctime( &tm ), sizeof( buf ) );
     if( ( eoln = strchr( buf, '\n' ) ) )
@@ -228,8 +251,8 @@ gtr_mkdir_with_parents( const char * path, int mode )
 char*
 gtr_get_host_from_url( const char * url )
 {
-    char * name;
     char * h = NULL;
+    char * name;
 
     tr_urlParse( url, -1, NULL, &h, NULL, NULL );
 

@@ -16,14 +16,12 @@ QT += network
 PKGCONFIG = fontconfig libcurl openssl libevent
 
 TRANSMISSION_TOP = ..
-INCLUDEPATH = $${EVENT_TOP}/include $${INCLUDEPATH}
 INCLUDEPATH += $${TRANSMISSION_TOP}
 LIBS += $${TRANSMISSION_TOP}/libtransmission/libtransmission.a
-LIBS += $${TRANSMISSION_TOP}/third-party/libutp/libutp.a
 LIBS += $${TRANSMISSION_TOP}/third-party/dht/libdht.a
 LIBS += $${TRANSMISSION_TOP}/third-party/miniupnp/libminiupnp.a
 LIBS += $${TRANSMISSION_TOP}/third-party/libnatpmp/libnatpmp.a
-unix: LIBS += -L$${EVENT_TOP}/lib -levent -lz -lrt
+unix: LIBS += -L$${EVENT_TOP}/lib -levent -lz
 win32:DEFINES += QT_DBUS
 win32:LIBS += -levent -lws2_32 -lintl
 win32:LIBS += -lidn -liconv -lwldap32 -liphlpapi
@@ -31,8 +29,7 @@ win32:LIBS += -lidn -liconv -lwldap32 -liphlpapi
 TRANSLATIONS += translations/transmission_en.ts \
                 translations/transmission_es.ts \
                 translations/transmission_pt_BR.ts \
-                translations/transmission_ru.ts \
-                translations/transmission_kk.ts
+                translations/transmission_ru.ts
 
 FORMS += mainwin.ui
 RESOURCES += application.qrc

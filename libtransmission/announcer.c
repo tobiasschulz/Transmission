@@ -63,7 +63,7 @@ enum
     UPKEEP_INTERVAL_SECS = 1,
 
     /* this is an upper limit for the frequency of LDS announces */
-    LPD_HOUSEKEEPING_INTERVAL_SECS = 5
+    LPD_HOUSEKEEPING_INTERVAL_SECS = 30
 
 };
 
@@ -515,7 +515,7 @@ publishPeersPex( tr_tier * tier, int seeds, int leechers,
 
 static size_t
 publishPeersCompact( tr_tier * tier, int seeds, int leechers,
-                     const void * compact, int compactLen )
+                        const void * compact, int compactLen )
 {
     size_t n = 0;
     tr_pex * pex = tr_peerMgrCompactToPex( compact, compactLen, NULL, 0, &n );
@@ -523,11 +523,11 @@ publishPeersCompact( tr_tier * tier, int seeds, int leechers,
     dbgmsg( tier, "got IPv4 list of %zu peers", n );
     tr_free( pex );
     return n;
-}
+}    
 
 static size_t
 publishPeersCompact6( tr_tier * tier, int seeds, int leechers,
-                      const void * compact, int compactLen )
+                         const void * compact, int compactLen )
 {
     size_t n = 0;
     tr_pex * pex = tr_peerMgrCompact6ToPex( compact, compactLen, NULL, 0, &n );
@@ -577,10 +577,10 @@ publishPeersDict( tr_tier * tier, int seeds, int leechers, tr_benc * peerList )
 }
 
 static char*
-createAnnounceURL( const tr_announcer  * announcer,
-                   const tr_torrent    * torrent,
-                   const tr_tier       * tier,
-                   const char          * eventName )
+createAnnounceURL( const tr_announcer     * announcer,
+                   const tr_torrent       * torrent,
+                   const tr_tier          * tier,
+                   const char             * eventName )
 {
     const int isStopping = !strcmp( eventName, "stopped" );
     const int numwant = isStopping ? 0 : NUMWANT;
@@ -1036,8 +1036,6 @@ struct announce_data
 
 static void
 onAnnounceDone( tr_session   * session,
-                tr_bool        didConnect,
-                tr_bool        didTimeout,
                 long           responseCode,
                 const void   * response,
                 size_t         responseLen,
@@ -1054,7 +1052,7 @@ onAnnounceDone( tr_session   * session,
         tr_tracker_item * tracker;
 
         tier->lastAnnounceTime = now;
-        tier->lastAnnounceTimedOut = didTimeout;
+        tier->lastAnnounceTimedOut = responseCode == 0;
         tier->lastAnnounceSucceeded = FALSE;
         tier->isAnnouncing = FALSE;
         tier->manualAnnounceAllowedAt = now + tier->announceMinIntervalSec;
@@ -1107,11 +1105,9 @@ onAnnounceDone( tr_session   * session,
         {
             int interval;
 
-            if( !didConnect )
-                tr_strlcpy( tier->lastAnnounceStr, _( "Could not connect to tracker" ),
-                            sizeof( tier->lastAnnounceStr ) );
-            else if( !responseCode )
-                tr_strlcpy( tier->lastAnnounceStr, _( "Tracker did not respond" ),
+            if( !responseCode )
+                tr_strlcpy( tier->lastAnnounceStr,
+                            _( "Tracker did not respond" ),
                             sizeof( tier->lastAnnounceStr ) );
             else {
                 /* %1$ld - http status code, such as 404
@@ -1312,8 +1308,6 @@ parseScrapeResponse( tr_tier     * tier,
 
 static void
 onScrapeDone( tr_session   * session,
-              tr_bool        didConnect,
-              tr_bool        didTimeout,
               long           responseCode,
               const void   * response,
               size_t         responseLen,
@@ -1369,10 +1363,7 @@ onScrapeDone( tr_session   * session,
 
             /* %1$ld - http status code, such as 404
              * %2$s - human-readable explanation of the http status code */
-            if( !didConnect )
-                tr_strlcpy( tier->lastScrapeStr, _( "Could not connect to tracker" ),
-                            sizeof( tier->lastScrapeStr ) );
-            else if( !responseCode )
+            if( !responseCode )
                 tr_strlcpy( tier->lastScrapeStr, _( "tracker did not respond" ),
                             sizeof( tier->lastScrapeStr ) );
             else
@@ -1382,7 +1373,7 @@ onScrapeDone( tr_session   * session,
         }
 
         tier->lastScrapeSucceeded = success;
-        tier->lastScrapeTimedOut = didTimeout;
+        tier->lastScrapeTimedOut = responseCode == 0;
     }
 
     tr_free( data );
@@ -1470,7 +1461,7 @@ compareTiers( const void * va, const void * vb )
     /* secondary key: announcements that have been waiting longer go first */
     if( !ret && ( a->announceAt != b->announceAt ) )
         ret = a->announceAt < b->announceAt ? -1 : 1;
-
+         
     return ret;
 }
 

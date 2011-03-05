@@ -452,11 +452,6 @@ tr_session * fHandle;
         [sound play];
 }
 
-- (void) setUTP: (id) sender
-{
-    tr_sessionSetUTPEnabled(fHandle, [fDefaults boolForKey: @"UTPGlobal"]);
-}
-
 - (void) setPeersGlobal: (id) sender
 {
     const int count = [sender intValue];
@@ -602,9 +597,6 @@ tr_session * fHandle;
 {
     tr_sessionSetRatioLimited(fHandle, [fDefaults boolForKey: @"RatioCheck"]);
     tr_sessionSetRatioLimit(fHandle, [fDefaults floatForKey: @"RatioLimit"]);
-    
-    //reload global settings in inspector
-    [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateGlobalOptions" object: nil];
 }
 
 - (void) setRatioStop: (id) sender
@@ -626,9 +618,6 @@ tr_session * fHandle;
 {
     tr_sessionSetIdleLimited(fHandle, [fDefaults boolForKey: @"IdleLimitCheck"]);
     tr_sessionSetIdleLimit(fHandle, [fDefaults integerForKey: @"IdleLimitMinutes"]);
-    
-    //reload global settings in inspector
-    [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateGlobalOptions" object: nil];
 }
 
 - (void) setIdleStop: (id) sender
@@ -1099,10 +1088,6 @@ tr_session * fHandle;
     const BOOL usePartialFileRanaming = tr_sessionIsIncompleteFileNamingEnabled(fHandle);
     [fDefaults setBool: usePartialFileRanaming forKey: @"RenamePartialFiles"];
     
-    //utp
-    const BOOL utp = tr_sessionIsUTPEnabled(fHandle);
-    [fDefaults setBool: utp forKey: @"UTPGlobal"];
-    
     //peers
     const uint16_t peersTotal = tr_sessionGetPeerLimit(fHandle);
     [fDefaults setInteger: peersTotal forKey: @"PeersTotal"];
@@ -1118,7 +1103,7 @@ tr_session * fHandle;
     const BOOL dht = tr_sessionIsDHTEnabled(fHandle);
     [fDefaults setBool: dht forKey: @"DHTGlobal"];
     
-    //lpd
+    //dht
     const BOOL lpd = tr_sessionIsLPDEnabled(fHandle);
     [fDefaults setBool: lpd forKey: @"LocalPeerDiscoveryGlobal"];
     
@@ -1214,8 +1199,6 @@ tr_session * fHandle;
         
         //download directory handled by bindings
         
-        //utp handled by bindings
-        
         [fPeersGlobalField setIntValue: peersTotal];
         [fPeersTorrentField setIntValue: peersTorrent];
         
@@ -1255,9 +1238,6 @@ tr_session * fHandle;
     }
     
     [[NSNotificationCenter defaultCenter] postNotificationName: @"SpeedLimitUpdate" object: nil];
-    
-    //reload global settings in inspector
-    [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateGlobalOptions" object: nil];
 }
 
 @end

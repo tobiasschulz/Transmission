@@ -476,19 +476,6 @@ tr_bencGetStr( const tr_benc * val, const char ** setme )
 }
 
 tr_bool
-tr_bencGetRaw( const tr_benc * val, const uint8_t ** setme_raw, size_t * setme_len )
-{
-    const tr_bool success = tr_bencIsString( val );
-
-    if( success ) {
-        *setme_raw = (uint8_t*) getStr(val);
-        *setme_len = val->val.s.len;
-    }
-
-    return success;
-}
-
-tr_bool
 tr_bencGetBool( const tr_benc * val, tr_bool * setme )
 {
     const char * str;
@@ -576,9 +563,20 @@ tr_bencDictFindDict( tr_benc * dict, const char * key, tr_benc ** setme )
 }
 
 tr_bool
-tr_bencDictFindRaw( tr_benc * dict, const char * key, const uint8_t  ** setme_raw, size_t * setme_len )
+tr_bencDictFindRaw( tr_benc         * dict,
+                    const char      * key,
+                    const uint8_t  ** setme_raw,
+                    size_t          * setme_len )
 {
-    return tr_bencGetRaw( tr_bencDictFind( dict, key ), setme_raw, setme_len );
+    tr_benc * child;
+    const tr_bool found = tr_bencDictFindType( dict, key, TR_TYPE_STR, &child );
+
+    if( found ) {
+        *setme_raw = (uint8_t*) getStr(child);
+        *setme_len = child->val.s.len;
+    }
+
+    return found;
 }
 
 /***
@@ -1706,7 +1704,7 @@ tr_bencToFile( const tr_benc * top, tr_fmt_mode mode, const char * filename )
         }
         else
         {
-            //tr_fsync( fd );
+            tr_fsync( fd );
             tr_close_file( fd );
 
 #ifdef WIN32

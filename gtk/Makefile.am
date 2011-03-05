@@ -56,6 +56,7 @@ noinst_HEADERS = \
     tr-core-dbus.h \
     tr-icon.h \
     tr-prefs.h \
+    tr-torrent.h \
     tr-window.h \
     ui.h \
     util.h
@@ -85,6 +86,7 @@ transmission_gtk_SOURCES = \
     tr-core.c \
     tr-icon.c \
     tr-prefs.c \
+    tr-torrent.c \
     tr-window.c \
     util.c \
     $(dbus_generated_sources)
@@ -98,7 +100,6 @@ transmission_gtk_LDADD = \
     @LIBCANBERRA_LIBS@ \
     @GCONF2_LIBS@ \
     @DHT_LIBS@ \
-    @LIBUTP_LIBS@ \
     @GTK_LIBS@ \
     @GIO_LIBS@ \
     @LIBAPPINDICATOR_LIBS@ \
@@ -134,7 +135,7 @@ CLEANFILES = $(dbus_generated_sources)
 $(srcdir)/tr-core.c: tr-core-dbus.h
 
 tr-core-dbus.h: $(srcdir)/tr-core-dbus.xml
-	$(DBUS_BINDING_TOOL) --mode=glib-server --prefix=gtr_core $< > $(@F)
+	$(DBUS_BINDING_TOOL) --mode=glib-server --prefix=tr_core $< > $(@F)
 
 if WIN32
 

@@ -73,8 +73,6 @@ typedef enum
 
 - (void) awakeFromNib
 {
-    [fNoneSelectedField setStringValue: NSLocalizedString(@"No Torrents Selected", "Inspector -> selected torrents")];
-    
     //window location and size
     NSPanel * window = (NSPanel *)[self window];
     
@@ -395,7 +393,6 @@ typedef enum
             [fNameField setStringValue: [NSString stringWithFormat: NSLocalizedString(@"%@ Torrents Selected",
                                             "Inspector -> selected torrents"),
                                             [NSString formattedUInteger: numberSelected]]];
-            [fNameField setHidden: NO];
         
             uint64_t size = 0;
             NSUInteger fileCount = 0, magnetCount = 0;
@@ -444,18 +441,14 @@ typedef enum
                 [fBasicInfoField setStringValue: fileString];
                 [fBasicInfoField setToolTip: nil];
             }
-            [fBasicInfoField setHidden: NO];
-            
-            [fNoneSelectedField setHidden: YES];
         }
         else
         {
-            #warning change to NSImageNameApplicationIcon
             [fImageView setImage: [NSImage imageNamed: @"NSApplicationIcon"]];
-            [fNoneSelectedField setHidden: NO];
             
-            [fNameField setHidden: YES];
-            [fBasicInfoField setHidden: YES];
+            [fNameField setStringValue: NSLocalizedString(@"No Torrents Selected", "Inspector -> selected torrents")];
+            [fBasicInfoField setStringValue: @""];
+            [fBasicInfoField setToolTip: @""];
         }
         
         [fNameField setToolTip: nil];
@@ -477,7 +470,6 @@ typedef enum
         NSString * name = [torrent name];
         [fNameField setStringValue: name];
         [fNameField setToolTip: name];
-        [fNameField setHidden: NO];
         
         if (![torrent isMagnet])
         {
@@ -502,9 +494,6 @@ typedef enum
             [fBasicInfoField setStringValue: NSLocalizedString(@"Magnetized transfer", "Inspector -> selected torrents")];
             [fBasicInfoField setToolTip: nil];
         }
-        [fBasicInfoField setHidden: NO];
-        
-        [fNoneSelectedField setHidden: YES];
     }
     
     [fGeneralViewController setInfoForTorrents: fTorrents];

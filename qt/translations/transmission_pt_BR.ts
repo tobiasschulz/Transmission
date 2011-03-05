@@ -208,11 +208,6 @@
         <translation>A fonte é uma conexão de entrada</translation>
     </message>
     <message>
-        <location line="+1"/>
-        <source>Peer is connected over uTP</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location line="+56"/>
         <source>Activity</source>
         <translation>Atividade</translation>
@@ -309,7 +304,7 @@
         <translation>O rastreador já existe</translation>
     </message>
     <message>
-        <location line="-582"/>
+        <location line="-581"/>
         <source>%1 (100%)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -339,7 +334,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+218"/>
+        <location line="+217"/>
         <source>Size:</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1294,7 +1289,7 @@ Adicione outra URL primária depois de uma linha em branco.</translation>
 <context>
     <name>MyApp</name>
     <message>
-        <location filename="../app.cc" line="+228"/>
+        <location filename="../app.cc" line="+223"/>
         <source>Transmission is a file-sharing program.  When you run a torrent, its data will be made available to others by means of upload.  You and you alone are fully responsible for exercising proper judgement and abiding by your local laws.</source>
         <translation>O Transmission é um programa de compartilhamento de arquivos que torna os dados de cada torrent executado disponíveis a outras pessoas por meio do upload. Você e apenas você é responsável por respeitar as leis locais do seu país.</translation>
     </message>
@@ -1541,12 +1536,12 @@ Adicione outra URL primária depois de uma linha em branco.</translation>
     </message>
     <message>
         <location line="+5"/>
-        <location line="+372"/>
+        <location line="+365"/>
         <source>Status unknown</source>
         <translation>Estado desconhecido</translation>
     </message>
     <message>
-        <location line="-364"/>
+        <location line="-357"/>
         <source>&amp;Port for incoming connections:</source>
         <translation>Porta para conexões de entrada:</translation>
     </message>
@@ -1555,23 +1550,8 @@ Adicione outra URL primária depois de uma linha em branco.</translation>
         <source>Use UPnP or NAT-PMP port &amp;forwarding from my router</source>
         <translation>Usar encaminhamento UPnP ou NAT-PMP no meu roteador</translation>
     </message>
-    <message>
-        <location line="+8"/>
-        <source>Options</source>
-        <translation type="unfinished">Opções</translation>
-    </message>
-    <message>
-        <location line="+3"/>
-        <source>Enable &amp;uTP for peer connections</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location line="+1"/>
-        <source>uTP is a tool for reducing network congestion.</source>
-        <translation type="unfinished"></translation>
-    </message>
     <message numerus="yes">
-        <location line="+306"/>
+        <location line="+311"/>
         <source>&lt;i&gt;Blocklist contains %Ln rules&lt;/i&gt;</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -1579,7 +1559,7 @@ Adicione outra URL primária depois de uma linha em branco.</translation>
         </translation>
     </message>
     <message>
-        <location line="-319"/>
+        <location line="-312"/>
         <source>Pick a &amp;random port every time Transmission is started</source>
         <translation>Usar uma porta aleatória quando iniciar</translation>
     </message>
@@ -1599,7 +1579,7 @@ Adicione outra URL primária depois de uma linha em branco.</translation>
         <translation>Máximo de fontes ao todo:</translation>
     </message>
     <message numerus="yes">
-        <location line="+35"/>
+        <location line="+28"/>
         <source>&lt;b&gt;Update succeeded!&lt;/b&gt;&lt;p&gt;Blocklist now has %Ln rules.</source>
         <translation>
             <numerusform>&lt;b&gt;Atualização concluída!&lt;/b&gt;&lt;p&gt;A lista de bloqueios tem agora %Ln regra.</numerusform>
@@ -1643,7 +1623,7 @@ Adicione outra URL primária depois de uma linha em branco.</translation>
         <translation>Privacidade</translation>
     </message>
     <message>
-        <location line="-360"/>
+        <location line="-353"/>
         <source>Limit do&amp;wnload speed (%1):</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1654,12 +1634,12 @@ Adicione outra URL primária depois de uma linha em branco.</translation>
     </message>
     <message>
         <location line="+39"/>
-        <location line="+309"/>
+        <location line="+302"/>
         <source>Desktop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="-307"/>
+        <location line="-300"/>
         <source>Show Transmission icon in the &amp;notification area</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1674,7 +1654,7 @@ Adicione outra URL primária depois de uma linha em branco.</translation>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location line="+85"/>
+        <location line="+78"/>
         <source>Enable &amp;blocklist:</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1879,7 +1859,7 @@ Adicione outra URL primária depois de uma linha em branco.</translation>
 <context>
     <name>Session</name>
     <message>
-        <location filename="../session.cc" line="+825"/>
+        <location filename="../session.cc" line="+824"/>
         <source>Add Torrent</source>
         <translation>Adicionar Torrent</translation>
     </message>

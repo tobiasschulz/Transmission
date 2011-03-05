@@ -79,10 +79,6 @@ typedef struct tr_address
 extern const tr_address tr_inaddr_any;
 extern const tr_address tr_in6addr_any;
 
-tr_bool tr_ssToAddr( tr_address * setme_addr,
-                     tr_port    * setme_port,
-                     const struct sockaddr_storage * from );
-
 const char *tr_ntop( const tr_address * src,
                      char * dst,
                      int size );
@@ -106,12 +102,6 @@ int  tr_netOpenPeerSocket( tr_session       * session,
                            tr_port            port,
                            tr_bool            clientIsSeed );
 
-struct UTPSocket *
-tr_netOpenPeerUTPSocket( tr_session        * session,
-                         const tr_address  * addr,
-                         tr_port             port,
-                         tr_bool             clientIsSeed);
-
 int  tr_netBindTCP( const tr_address * addr,
                     tr_port            port,
                     tr_bool            suppressMsgs );
@@ -131,7 +121,6 @@ void tr_netClose( tr_session * session, int s );
 void tr_netCloseSocket( int fd );
 
 void tr_netInit( void );
-
 
 /**
  * @brief get a human-representable string representing the network error.

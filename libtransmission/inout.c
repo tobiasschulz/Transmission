@@ -120,8 +120,7 @@ readOrWriteBytes( tr_session       * session,
         {
             char * filename = tr_buildPath( base, subpath, NULL );
 
-            if( ( fd = tr_fdFileCheckout( session, tor->uniqueId, fileIndex,
-                                          base, filename,
+            if( ( fd = tr_fdFileCheckout( session, tor->uniqueId, fileIndex, filename,
                                           doWrite, preallocationMode, file->length ) ) < 0 )
             {
                 err = errno;

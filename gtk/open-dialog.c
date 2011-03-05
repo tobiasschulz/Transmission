@@ -75,7 +75,7 @@ save_recent_destination( TrCore * core, const char * dir  )
         g_snprintf( key, sizeof( key ), "recent-download-dir-%d", i + 1 );
         gtr_pref_string_set( key, l->data );
     }
-    gtr_pref_save( gtr_core_session( core ) );
+    gtr_pref_save( tr_core_session( core ) );
 
     /* cleanup */
     g_slist_foreach( list, (GFunc)g_free, NULL );
@@ -95,18 +95,19 @@ struct OpenData
     GtkWidget *  priority_combo;
     char *       filename;
     char *       downloadDir;
-    tr_torrent * tor;
+    TrTorrent *  gtor;
     tr_ctor *    ctor;
 };
 
 static void
-removeOldTorrent( struct OpenData * o )
+removeOldTorrent( struct OpenData * data )
 {
-    if( o->tor )
+    if( data->gtor )
     {
-        gtr_file_list_clear( o->file_list );
-        tr_torrentRemove( o->tor, FALSE, NULL );
-        o->tor = NULL;
+        gtr_file_list_clear( data->file_list );
+        tr_torrent_set_remove_flag( data->gtor, TRUE );
+        g_object_unref( G_OBJECT( data->gtor ) );
+        data->gtor = NULL;
     }
 }
 
@@ -115,34 +116,36 @@ addResponseCB( GtkDialog * dialog,
                gint        response,
                gpointer    gdata )
 {
-    struct OpenData * o = gdata;
+    struct OpenData * data = gdata;
 
-    if( o->tor )
+    if( data->gtor )
     {
         if( response != GTK_RESPONSE_ACCEPT )
         {
-            removeOldTorrent( o );
+            removeOldTorrent( data );
         }
         else
         {
-            tr_torrentSetPriority( o->tor, gtr_priority_combo_get_value( GTK_COMBO_BOX( o->priority_combo ) ) );
+            tr_torrent * tor = tr_torrent_handle( data->gtor );
 
-            if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( o->run_check ) ) )
-                tr_torrentStart( o->tor );
+            tr_torrentSetPriority( tor, gtr_priority_combo_get_value( GTK_COMBO_BOX( data->priority_combo ) ) );
 
-            gtr_core_add_torrent( o->core, o->tor, FALSE );
+            if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( data->run_check ) ) )
+                tr_torrentStart( tor );
 
-            if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( o->trash_check ) ) )
-                gtr_file_trash_or_remove( o->filename );
+            tr_core_add_torrent( data->core, data->gtor, FALSE );
 
-            save_recent_destination( o->core, o->downloadDir );
+            if( gtk_toggle_button_get_active( GTK_TOGGLE_BUTTON( data->trash_check ) ) )
+                gtr_file_trash_or_remove( data->filename );
+
+            save_recent_destination( data->core, data->downloadDir );
         }
     }
 
-    tr_ctorFree( o->ctor );
-    g_free( o->filename );
-    g_free( o->downloadDir );
-    g_free( o );
+    tr_ctorFree( data->ctor );
+    g_free( data->filename );
+    g_free( data->downloadDir );
+    g_free( data );
     gtk_widget_destroy( GTK_WIDGET( dialog ) );
 }
 
@@ -152,17 +155,18 @@ updateTorrent( struct OpenData * o )
     const gboolean isLocalFile = tr_ctorGetSourceFile( o->ctor ) != NULL;
     gtk_widget_set_sensitive( o->trash_check, isLocalFile );
 
-    if( !o->tor )
+    if( !o->gtor )
     {
         gtr_file_list_clear( o->file_list );
         gtk_widget_set_sensitive( o->file_list, FALSE );
     }
     else
     {
-        tr_torrentSetDownloadDir( o->tor, o->downloadDir );
-        gtk_widget_set_sensitive( o->file_list, tr_torrentHasMetadata( o->tor ) );
-        gtr_file_list_set_torrent( o->file_list, tr_torrentId( o->tor ) );
-        tr_torrentVerify( o->tor );
+        tr_torrent * tor = tr_torrent_handle( o->gtor );
+        tr_torrentSetDownloadDir( tor, o->downloadDir );
+        gtk_widget_set_sensitive( o->file_list, tr_torrentHasMetadata( tor ) );
+        gtr_file_list_set_torrent( o->file_list, tr_torrentId( tor ) );
+        tr_torrentVerify( tor );
     }
 }
 
@@ -176,39 +180,39 @@ updateTorrent( struct OpenData * o )
 static void
 sourceChanged( GtkFileChooserButton * b, gpointer gdata )
 {
-    struct OpenData * o = gdata;
+    struct OpenData * data = gdata;
     char * filename = gtk_file_chooser_get_filename( GTK_FILE_CHOOSER( b ) );
 
     /* maybe instantiate a torrent */
-    if( filename || !o->tor )
+    if( filename || !data->gtor )
     {
         int err = 0;
         int new_file = 0;
         tr_torrent * torrent;
 
-        if( filename && ( !o->filename || !tr_is_same_file( filename, o->filename ) ) )
+        if( filename && ( !data->filename || !tr_is_same_file( filename, data->filename ) ) )
         {
-            g_free( o->filename );
-            o->filename = g_strdup( filename );
-            tr_ctorSetMetainfoFromFile( o->ctor, o->filename );
+            g_free( data->filename );
+            data->filename = g_strdup( filename );
+            tr_ctorSetMetainfoFromFile( data->ctor, data->filename );
             new_file = 1;
         }
 
-        tr_ctorSetDownloadDir( o->ctor, TR_FORCE, o->downloadDir );
-        tr_ctorSetPaused( o->ctor, TR_FORCE, TRUE );
-        tr_ctorSetDeleteSource( o->ctor, FALSE );
+        tr_ctorSetDownloadDir( data->ctor, TR_FORCE, data->downloadDir );
+        tr_ctorSetPaused( data->ctor, TR_FORCE, TRUE );
+        tr_ctorSetDeleteSource( data->ctor, FALSE );
 
-        if(( torrent = tr_torrentNew( o->ctor, &err ) ) )
+        if( ( torrent = tr_torrentNew( data->ctor, &err ) ) )
         {
-            removeOldTorrent( o );
-            o->tor = torrent;
+            removeOldTorrent( data );
+            data->gtor = tr_torrent_new_preexisting( torrent );
         }
         else if( new_file )
         {
-            gtr_add_torrent_error_dialog( GTK_WIDGET( b ), err, o->filename );
+            gtr_add_torrent_error_dialog( GTK_WIDGET( b ), err, data->filename );
         }
 
-        updateTorrent( o );
+        updateTorrent( data );
     }
 
     g_free( filename );
@@ -408,7 +412,7 @@ onOpenDialogResponse( GtkDialog * dialog, int response, gpointer core )
         const gboolean    doNotify = FALSE;
         GSList * l = gtk_file_chooser_get_filenames( chooser );
 
-        gtr_core_add_list( core, l, doStart, doPrompt, doNotify );
+        tr_core_add_list( core, l, doStart, doPrompt, doNotify );
     }
 
     gtk_widget_destroy( GTK_WIDGET( dialog ) );
@@ -468,7 +472,7 @@ onOpenURLResponse( GtkDialog * dialog, int response, gpointer user_data )
             if( gtr_is_supported_url( url ) || gtr_is_magnet_link( url )
                                             || gtr_is_hex_hashcode( url ) )
             {
-                gtr_core_add_from_url( core, url );
+                tr_core_add_from_url( core, url );
             }
             else
             {

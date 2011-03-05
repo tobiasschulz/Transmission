@@ -24,33 +24,18 @@
  * For example, it could count how many are bytes transferred
  * to estimate the speed over the last N seconds.
  */
-
-struct tr_history_slice
-{
-    unsigned int n;
-    time_t date;
-};
-typedef struct tr_recentHistory
-{
-    /* these are PRIVATE IMPLEMENTATION details included for composition only.
-     * Don't access these directly! */
-    int newest;
-    int sliceCount;
-    unsigned int precision;
-    struct tr_history_slice * slices;
-}
-tr_recentHistory;
+typedef struct tr_recentHistory tr_recentHistory;
 
 /**
- * @brief construct a new tr_recentHistory object
+ * @brief create a new tr_recentHistory object.
  * @param seconds how many seconds of history this object should remember
  * @param precision how precise the history should be, in seconds
  *        For a precision of 10 seconds and a history of 2 minutes, makes 12 bins.
  */
-void tr_historyConstruct( tr_recentHistory *, unsigned int seconds, unsigned int precision );
+tr_recentHistory * tr_historyNew( unsigned int seconds, unsigned int precision );
 
-/** @brief destruct an existing tr_recentHistory object. */
-void tr_historyDestruct( tr_recentHistory * );
+/** @brief destroy an existing tr_recentHistory object. */
+void tr_historyFree( tr_recentHistory * );
 
 /**
  * @brief add a counter to the recent history object.

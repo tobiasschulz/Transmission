@@ -10,7 +10,6 @@
  * $Id$
  */
 
-#include <signal.h> /* signal() */
 #include <sys/types.h> /* stat */
 #include <sys/stat.h> /* stat */
 #ifndef WIN32
@@ -68,14 +67,6 @@
 /***
 ****
 ***/
-
-const char *
-tr_torrentName( const tr_torrent * tor )
-{
-    assert( tr_isTorrent( tor ) );
-
-    return tor->info.name;
-}
 
 int
 tr_torrentId( const tr_torrent * tor )
@@ -1138,6 +1129,7 @@ tr_torrentStat( tr_torrent * tor )
     tr_stat *               s;
     int                     usableSeeds;
     uint64_t                now;
+    double                  d;
     uint64_t                seedRatioBytesLeft;
     uint64_t                seedRatioBytesGoal;
     tr_bool                 seedRatioApplies;
@@ -1160,6 +1152,7 @@ tr_torrentStat( tr_torrent * tor )
     s->manualAnnounceTime = tr_announcerNextManualAnnounce( tor );
 
     tr_peerMgrTorrentStats( tor,
+                            &s->peersKnown,
                             &s->peersConnected,
                             &usableSeeds,
                             &s->webseedsSendingToUs,
@@ -1168,10 +1161,11 @@ tr_torrentStat( tr_torrent * tor )
                             s->peersFrom );
 
     now = tr_time_msec( );
+    d = tr_peerMgrGetWebseedSpeed_Bps( tor, now );
     s->rawUploadSpeed_KBps     = toSpeedKBps( tr_bandwidthGetRawSpeed_Bps  ( tor->bandwidth, now, TR_UP ) );
     s->pieceUploadSpeed_KBps   = toSpeedKBps( tr_bandwidthGetPieceSpeed_Bps( tor->bandwidth, now, TR_UP ) );
-    s->rawDownloadSpeed_KBps   = toSpeedKBps( tr_bandwidthGetRawSpeed_Bps  ( tor->bandwidth, now, TR_DOWN ) );
-    s->pieceDownloadSpeed_KBps = toSpeedKBps( tr_bandwidthGetPieceSpeed_Bps( tor->bandwidth, now, TR_DOWN ) );
+    s->rawDownloadSpeed_KBps   = toSpeedKBps( d + tr_bandwidthGetRawSpeed_Bps  ( tor->bandwidth, now, TR_DOWN ) );
+    s->pieceDownloadSpeed_KBps = toSpeedKBps( d + tr_bandwidthGetPieceSpeed_Bps( tor->bandwidth, now, TR_DOWN ) );
 
     usableSeeds += tor->info.webseedCount;
 
@@ -1308,31 +1302,61 @@ fileBytesCompleted( const tr_torrent * tor, tr_file_index_t index )
 
     if( f->length )
     {
-        tr_block_index_t first;
-        tr_block_index_t last;
-        tr_torGetFileBlockRange( tor, index, &first, &last );
+        const tr_block_index_t firstBlock = f->offset / tor->blockSize;
+        const uint64_t lastByte = f->offset + f->length - 1;
+        const tr_block_index_t lastBlock = lastByte / tor->blockSize;
 
-        if( first == last )
+        if( firstBlock == lastBlock )
         {
-            if( tr_cpBlockIsComplete( &tor->completion, first ) )
+            if( tr_cpBlockIsCompleteFast( &tor->completion, firstBlock ) )
                 total = f->length;
         }
         else
         {
+            tr_block_index_t i;
+
             /* the first block */
-            if( tr_cpBlockIsComplete( &tor->completion, first ) )
+            if( tr_cpBlockIsCompleteFast( &tor->completion, firstBlock ) )
                 total += tor->blockSize - ( f->offset % tor->blockSize );
 
             /* the middle blocks */
-            if( first + 1 < last ) {
-                uint64_t u = tr_bitsetCountRange( tr_cpBlockBitset( &tor->completion ), first+1, last );
-                u *= tor->blockSize;
-                total += u;
+            if( f->firstPiece == f->lastPiece )
+            {
+                for( i=firstBlock+1; i<lastBlock; ++i )
+                    if( tr_cpBlockIsCompleteFast( &tor->completion, i ) )
+                        total += tor->blockSize;
+            }
+            else
+            {
+                uint64_t b = 0;
+                const tr_block_index_t firstBlockOfLastPiece
+                           = tr_torPieceFirstBlock( tor, f->lastPiece );
+                const tr_block_index_t lastBlockOfFirstPiece
+                           = tr_torPieceFirstBlock( tor, f->firstPiece )
+                             + tr_torPieceCountBlocks( tor, f->firstPiece ) - 1;
+
+                /* the rest of the first piece */
+                for( i=firstBlock+1; i<lastBlock && i<=lastBlockOfFirstPiece; ++i )
+                    if( tr_cpBlockIsCompleteFast( &tor->completion, i ) )
+                        ++b;
+
+                /* the middle pieces */
+                if( f->firstPiece + 1 < f->lastPiece )
+                    for( i=f->firstPiece+1; i<f->lastPiece; ++i )
+                        b += tor->blockCountInPiece - tr_cpMissingBlocksInPiece( &tor->completion, i );
+
+                /* the rest of the last piece */
+                for( i=firstBlockOfLastPiece; i<lastBlock; ++i )
+                    if( tr_cpBlockIsCompleteFast( &tor->completion, i ) )
+                        ++b;
+
+                b *= tor->blockSize;
+                total += b;
             }
 
             /* the last block */
-            if( tr_cpBlockIsComplete( &tor->completion, last ) )
-                total += ( f->offset + f->length ) - ( (uint64_t)tor->blockSize * last );
+            if( tr_cpBlockIsCompleteFast( &tor->completion, lastBlock ) )
+                total += ( f->offset + f->length ) - ( (uint64_t)tor->blockSize * lastBlock );
         }
     }
 
@@ -1807,7 +1831,7 @@ removeTorrent( void * vdata )
 
 void
 tr_torrentRemove( tr_torrent   * tor,
-                  tr_bool        deleteFlag,
+                  tr_bool        deleteFlag, 
                   tr_fileFunc    deleteFunc )
 {
     struct remove_data * data;
@@ -1940,7 +1964,7 @@ torrentCallScript( const tr_torrent * tor, const char * script )
             tr_strdup_printf( "TR_TORRENT_NAME=%s", tr_torrentName( tor ) ),
             NULL };
 
-        tr_torinf( tor, "Calling script \"%s\"", script );
+        tr_torinf( tor, "Calling script \"%s\"", script ); 
 
 #ifdef WIN32
         _spawnvpe( _P_NOWAIT, script, (const char*)cmd, env );
@@ -2252,21 +2276,6 @@ tr_torrentGetPeerLimit( const tr_torrent * tor )
 ****
 ***/
 
-void
-tr_torrentGetBlockLocation( const tr_torrent * tor,
-                            tr_block_index_t   block,
-                            tr_piece_index_t * piece,
-                            uint32_t         * offset,
-                            uint32_t         * length )
-{
-    uint64_t pos = block;
-    pos *= tor->blockSize;
-    *piece = pos / tor->info.pieceSize;
-    *offset = pos - ( *piece * tor->info.pieceSize );
-    *length = tr_torBlockCountBytes( tor, block );
-}
-
-
 tr_block_index_t
 _tr_block( const tr_torrent * tor,
            tr_piece_index_t   index,
@@ -2328,37 +2337,6 @@ tr_pieceOffset( const tr_torrent * tor,
     ret += length;
     return ret;
 }
-
-void
-tr_torGetFileBlockRange( const tr_torrent        * tor,
-                         const tr_file_index_t     file,
-                         tr_block_index_t        * first,
-                         tr_block_index_t        * last )
-{
-    const tr_file * f = &tor->info.files[file];
-    uint64_t offset = f->offset;
-    *first = offset / tor->blockSize;
-    if( !f->length )
-        *last = *first;
-    else {
-        offset += f->length - 1;
-        *last = offset / tor->blockSize;
-    }
-}
-
-void
-tr_torGetPieceBlockRange( const tr_torrent        * tor,
-                          const tr_piece_index_t    piece,
-                          tr_block_index_t        * first,
-                          tr_block_index_t        * last )
-{
-    uint64_t offset = tor->info.pieceSize;
-    offset *= piece;
-    *first = offset / tor->blockSize;
-    offset += ( tr_torPieceCountBytes( tor, piece ) - 1 );
-    *last = offset / tor->blockSize;
-}
-
 
 /***
 ****
@@ -2824,8 +2802,8 @@ tr_torrentDeleteLocalData( tr_torrent * tor, tr_fileFunc fileFunc )
 struct LocationData
 {
     tr_bool move_from_old_location;
-    volatile int * setme_state;
-    volatile double * setme_progress;
+    int * setme_state;
+    double * setme_progress;
     char * location;
     tr_torrent * tor;
 };
@@ -2921,11 +2899,11 @@ setLocation( void * vdata )
 }
 
 void
-tr_torrentSetLocation( tr_torrent       * tor,
-                       const char       * location,
-                       tr_bool             move_from_old_location,
-                       volatile double  * setme_progress,
-                       volatile int     * setme_state )
+tr_torrentSetLocation( tr_torrent  * tor,
+                       const char  * location,
+                       tr_bool       move_from_old_location,
+                       double      * setme_progress,
+                       int         * setme_state )
 {
     struct LocationData * data;
 

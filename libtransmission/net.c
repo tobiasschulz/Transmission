@@ -45,7 +45,6 @@
 #include <unistd.h>
 
 #include <event2/util.h>
-#include <libutp/utp.h>
 
 #include "transmission.h"
 #include "fdlimit.h"
@@ -54,7 +53,6 @@
 #include "peer-io.h"
 #include "platform.h"
 #include "session.h"
-#include "tr-utp.h"
 #include "utils.h"
 
 #ifndef IN_MULTICAST
@@ -249,32 +247,6 @@ tr_netSetCongestionControl( int s UNUSED, const char *algorithm UNUSED )
 #endif
 }
 
-tr_bool
-tr_ssToAddr( tr_address * setme_addr,
-             tr_port    * setme_port,
-             const struct sockaddr_storage * from )
-{
-    if( from->ss_family == AF_INET )
-    {
-        struct sockaddr_in * sin = (struct sockaddr_in *)from;
-        setme_addr->type = TR_AF_INET;
-        setme_addr->addr.addr4.s_addr = sin->sin_addr.s_addr;
-        *setme_port = sin->sin_port;
-        return TRUE;
-    }
-
-    if( from->ss_family == AF_INET6 )
-    {
-        struct sockaddr_in6 *sin6 = (struct sockaddr_in6*) from;
-        setme_addr->type = TR_AF_INET6;
-        setme_addr->addr.addr6 = sin6->sin6_addr;
-        *setme_port = sin6->sin6_port;
-        return TRUE;
-    }
-
-    return FALSE;
-}
-
 static socklen_t
 setup_sockaddr( const tr_address        * addr,
                 tr_port                   port,
@@ -375,20 +347,6 @@ tr_netOpenPeerSocket( tr_session        * session,
                s, tr_peerIoAddrStr( addr, port ) );
 
     return s;
-}
-
-struct UTPSocket *
-tr_netOpenPeerUTPSocket( tr_session        * session,
-                         const tr_address  * addr,
-                         tr_port             port,
-                         tr_bool             clientIsSeed UNUSED )
-{
-    struct sockaddr_storage ss;
-    socklen_t sslen;
-    sslen = setup_sockaddr( addr, port, &ss );
-
-    return UTP_Create( tr_utpSendTo, (void*)session,
-                       (struct sockaddr*)&ss, sslen );
 }
 
 static int

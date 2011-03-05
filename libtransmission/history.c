@@ -16,6 +16,20 @@
 #include "history.h"
 #include "utils.h"
 
+struct history_slice
+{
+    unsigned int n;
+    time_t date;
+};
+
+struct tr_recentHistory
+{
+    int newest;
+    int sliceCount;
+    unsigned int precision;
+    struct history_slice * slices;
+};
+
 void
 tr_historyAdd( tr_recentHistory * h, time_t now, unsigned int n )
 {
@@ -49,20 +63,24 @@ tr_historyGet( const tr_recentHistory * h, time_t now, unsigned int sec )
     return n;
 }
 
-void
-tr_historyConstruct( tr_recentHistory * h, unsigned int seconds, unsigned int precision )
+tr_recentHistory *
+tr_historyNew( unsigned int seconds, unsigned int precision )
 {
-    memset( h, 0, sizeof( tr_recentHistory ) );
+    tr_recentHistory * h;
 
     assert( precision <= seconds );
 
+    h = tr_new0( tr_recentHistory, 1 );
     h->precision = precision;
     h->sliceCount = seconds / precision;
-    h->slices = tr_new0( struct tr_history_slice, h->sliceCount );
+    h->slices = tr_new0( struct history_slice, h->sliceCount );
+
+    return h;
 }
 
 void
-tr_historyDestruct( tr_recentHistory * h )
+tr_historyFree( tr_recentHistory * h )
 {
     tr_free( h->slices );
+    tr_free( h );
 }

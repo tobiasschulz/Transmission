@@ -161,7 +161,6 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_BLOCKLIST_URL                 "blocklist-url"
 #define TR_PREFS_KEY_MAX_CACHE_SIZE_MB             "cache-size-mb"
 #define TR_PREFS_KEY_DHT_ENABLED                   "dht-enabled"
-#define TR_PREFS_KEY_UTP_ENABLED                   "utp-enabled"
 #define TR_PREFS_KEY_LPD_ENABLED                   "lpd-enabled"
 #define TR_PREFS_KEY_PREFETCH_ENABLED              "prefetch-enabled"
 #define TR_PREFS_KEY_DOWNLOAD_DIR                  "download-dir"
@@ -170,6 +169,7 @@ const char* tr_getDefaultDownloadDir( void );
 #define TR_PREFS_KEY_IDLE_LIMIT_ENABLED            "idle-seeding-limit-enabled"
 #define TR_PREFS_KEY_INCOMPLETE_DIR                "incomplete-dir"
 #define TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED        "incomplete-dir-enabled"
+#define TR_PREFS_KEY_LAZY_BITFIELD                 "lazy-bitfield-enabled"
 #define TR_PREFS_KEY_MSGLEVEL                      "message-level"
 #define TR_PREFS_KEY_OPEN_FILE_LIMIT               "open-file-limit"
 #define TR_PREFS_KEY_PEER_LIMIT_GLOBAL             "peer-limit-global"
@@ -571,9 +571,6 @@ tr_bool  tr_sessionIsPexEnabled( const tr_session * session );
 
 tr_bool  tr_sessionIsDHTEnabled( const tr_session * session );
 void     tr_sessionSetDHTEnabled( tr_session * session, tr_bool );
-
-tr_bool  tr_sessionIsUTPEnabled( const tr_session * session );
-void     tr_sessionSetUTPEnabled( tr_session * session, tr_bool );
 
 tr_bool  tr_sessionIsLPDEnabled( const tr_session * session );
 void     tr_sessionSetLPDEnabled( tr_session * session, tr_bool enabled );
@@ -1067,11 +1064,11 @@ enum
  * will be clobberred s.t. additional files being added will be saved
  * to the torrent's downloadDir.
  */
-void tr_torrentSetLocation( tr_torrent       * torrent,
-                            const char       * location,
-                            tr_bool            move_from_previous_location,
-                            volatile double  * setme_progress,
-                            volatile int     * setme_state );
+void tr_torrentSetLocation( tr_torrent  * torrent,
+                            const char  * location,
+                            tr_bool       move_from_previous_location,
+                            double      * setme_progress,
+                            int         * setme_state );
 
 uint64_t tr_torrentGetBytesLeftToAllocate( const tr_torrent * torrent );
 
@@ -1091,10 +1088,6 @@ tr_torrent* tr_torrentFindFromHash( tr_session * session, const uint8_t * hash )
 /** @brief Convenience function similar to tr_torrentFindFromHash() */
 tr_torrent* tr_torrentFindFromMagnetLink( tr_session * session, const char * link );
 
-/**
- * @return this torrent's name.
- */
-const char* tr_torrentName( const tr_torrent * );
 
 /**
  * @brief find the location of a torrent's file by looking with and without
@@ -1393,8 +1386,6 @@ tr_bool tr_torrentCanManualUpdate( const tr_torrent * torrent );
 
 typedef struct tr_peer_stat
 {
-    tr_bool  isUTP;
-
     tr_bool  isEncrypted;
     tr_bool  isDownloadingFrom;
     tr_bool  isUploadingTo;
@@ -1803,6 +1794,9 @@ typedef struct tr_stat
     int    eta;
     /** If seeding, number of seconds left until the idle time limit is reached. */
     int    etaIdle;
+
+    /** Number of peers that the tracker says this torrent has */
+    int    peersKnown;
 
     /** Number of peers that we're connected to */
     int    peersConnected;

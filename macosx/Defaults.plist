@@ -180,8 +180,6 @@
 	<integer>50</integer>
 	<key>UseIncompleteDownloadFolder</key>
 	<false/>
-	<key>UTPGlobal</key>
-	<true/>
 	<key>WarningCreatorBlankAddress</key>
 	<true/>
 	<key>WarningCreatorPrivateBlankAddress</key>

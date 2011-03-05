@@ -31,14 +31,14 @@
 @class AddWindowController;
 @class Badger;
 @class DragOverlayWindow;
-@class FilterBarController;
+@class FilterBarView;
+@class FilterButton;
 @class InfoWindowController;
 @class MessageWindowController;
 @class PrefsController;
-@class StatusBarController;
+@class StatusBarView;
 @class Torrent;
 @class TorrentTableView;
-@class URLSheetWindowController;
 
 typedef enum
 {
@@ -73,10 +73,16 @@ typedef enum
     IBOutlet NSButton               * fActionButton, * fSpeedLimitButton;
     IBOutlet NSTextField            * fTotalTorrentsField;
     
-    StatusBarController             * fStatusBar;
+    IBOutlet StatusBarView          * fStatusBar;
+    IBOutlet NSButton               * fStatusButton;
+    IBOutlet NSTextField            * fTotalDLField, * fTotalULField;
+    IBOutlet NSImageView            * fTotalDLImageView;
     
-    FilterBarController             * fFilterBar;
-    IBOutlet NSMenuItem             * fNextFilterItem;
+    IBOutlet FilterBarView          * fFilterBar;
+    IBOutlet FilterButton           * fNoFilterButton, * fActiveFilterButton, * fDownloadFilterButton,
+                                    * fSeedFilterButton, * fPauseFilterButton;
+    IBOutlet NSSearchField          * fSearchFilterField;
+    IBOutlet NSMenuItem             * fNextFilterItem, * fPrevFilterItem;
                                 
     IBOutlet NSMenuItem             * fNextInfoTabItem, * fPrevInfoTabItem;
     
@@ -87,7 +93,12 @@ typedef enum
     IBOutlet NSMenu                 * fRatioStopMenu;
     IBOutlet NSMenuItem             * fCheckRatioItem, * fNoCheckRatioItem;
     
-    IBOutlet NSMenu                 * fGroupsSetMenu, * fGroupsSetContextMenu;
+    IBOutlet NSMenu                 * fGroupsSetMenu, * fGroupsSetContextMenu, * fGroupFilterMenu;
+    IBOutlet NSPopUpButton          * fGroupsButton;
+    
+    IBOutlet NSWindow               * fURLSheetWindow;
+    IBOutlet NSTextField            * fURLSheetTextField;
+    IBOutlet NSButton               * fURLSheetOpenButton;
     
     #warning change to QLPreviewPanel
     id                              fPreviewPanel;
@@ -121,9 +132,10 @@ typedef enum
 - (void) duplicateOpenAlert: (NSString *) name;
 - (void) duplicateOpenMagnetAlert: (NSString *) address transferName: (NSString *) name;
 
-- (void) openURL: (NSString *) urlString;
-- (void) openURLShowSheet: (id) sender;
-- (void) urlSheetDidEnd: (URLSheetWindowController *) controller url: (NSString *) urlString returnCode: (NSInteger) returnCode;
+- (void) openURL:               (NSString *) urlString;
+- (void) openURLEndSheet:       (id) sender;
+- (void) openURLCancelEndSheet: (id) sender;
+- (void) openURLShowSheet:      (id) sender;
 
 - (void) quitSheetDidEnd: (NSWindow *) sheet returnCode: (NSInteger) returnCode contextInfo: (void *) contextInfo;
 
@@ -147,8 +159,6 @@ typedef enum
 - (void) confirmRemoveTorrents: (NSArray *) torrents deleteData: (BOOL) deleteData;
 - (void) removeNoDelete:                (id) sender;
 - (void) removeDeleteData:              (id) sender;
-
-- (void) clearCompleted: (id) sender;
 
 - (void) moveDataFilesSelected: (id) sender;
 - (void) moveDataFiles: (NSArray *) torrents;
@@ -179,7 +189,10 @@ typedef enum
 
 - (void) updateUI;
 
+- (void) resizeStatusButton;
 - (void) setBottomCountText: (BOOL) filtering;
+
+- (void) updateSpeedFieldsToolTips;
 
 - (void) updateTorrentsInQueue;
 - (NSUInteger) numToStartFromQueue: (BOOL) downloadQueue;
@@ -190,7 +203,7 @@ typedef enum
 
 - (void) updateTorrentHistory;
 
-- (void) applyFilter;
+- (void) applyFilter: (id) sender;
 
 - (void) sortTorrents;
 - (void) sortTorrentsIgnoreSelected;
@@ -198,9 +211,16 @@ typedef enum
 - (void) setSortByGroup: (id) sender;
 - (void) setSortReverse: (id) sender;
 
+- (void) setFilter: (id) sender;
+- (void) setFilterSearchType: (id) sender;
 - (void) switchFilter: (id) sender;
 
+- (void) setStatusLabel: (id) sender;
+
 - (void) setGroup: (id) sender; //used by delegate-generated menu items
+- (void) setGroupFilter: (id) sender;
+- (void) updateGroupsFilterButton;
+- (void) updateGroupsFilters: (NSNotification *) notification;
 
 - (void) toggleSpeedLimit: (id) sender;
 - (void) speedLimitChanged: (id) sender;
@@ -237,6 +257,8 @@ typedef enum
 
 - (void) setWindowSizeToFit;
 - (NSRect) sizedWindowFrame;
+
+- (void) resizeFilterBar;
 
 - (void) updateForExpandCollape;
 
