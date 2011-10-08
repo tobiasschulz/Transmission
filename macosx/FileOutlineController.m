@@ -252,8 +252,9 @@ typedef enum
 
 - (void) outlineViewSelectionDidChange: (NSNotification *) notification
 {
-    if ([QLPreviewPanel sharedPreviewPanelExists] && [[QLPreviewPanel sharedPreviewPanel] isVisible])
-        [[QLPreviewPanel sharedPreviewPanel] reloadData];
+    if ([NSApp isOnSnowLeopardOrBetter] && [QLPreviewPanelSL sharedPreviewPanelExists]
+        && [[QLPreviewPanelSL sharedPreviewPanel] isVisible])
+        [[QLPreviewPanelSL sharedPreviewPanel] reloadData];
 }
 
 - (NSInteger) outlineView: (NSOutlineView *) outlineView numberOfChildrenOfItem: (id) item
@@ -308,7 +309,7 @@ typedef enum
     if ([identifier isEqualToString: @"Check"])
     {
         NSIndexSet * indexSet;
-        if ([NSEvent modifierFlags] & NSAlternateKeyMask)
+        if (([NSApp isOnSnowLeopardOrBetter] ? [NSEvent modifierFlags] : [[NSApp currentEvent] modifierFlags]) & NSAlternateKeyMask)
             indexSet = [NSIndexSet indexSetWithIndexesInRange: NSMakeRange(0, [fTorrent fileCount])];
         else
             indexSet = [(FileListNode *)item indexes];
@@ -457,16 +458,28 @@ typedef enum
         tr_wait_msec(100);
     
     NSIndexSet * indexes = [fOutline selectedRowIndexes];
-    NSMutableArray * paths = [NSMutableArray arrayWithCapacity: [indexes count]];
-    for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
+    if ([NSApp isOnSnowLeopardOrBetter])
     {
-        NSString * path = [fTorrent fileLocation: [fOutline itemAtRow: i]];
-        if (path)
-            [paths addObject: [NSURL fileURLWithPath: path]];
+        NSMutableArray * paths = [NSMutableArray arrayWithCapacity: [indexes count]];
+        for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
+        {
+            NSString * path = [fTorrent fileLocation: [fOutline itemAtRow: i]];
+            if (path)
+                [paths addObject: [NSURL fileURLWithPath: path]];
+        }
+        
+        if ([paths count])
+            [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs: paths];
     }
-    
-    if ([paths count] > 0)
-        [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs: paths];
+    else
+    {
+        for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
+        {
+            NSString * path = [fTorrent fileLocation: [fOutline itemAtRow: i]];
+            if (path)
+                [[NSWorkspace sharedWorkspace] selectFile: path inFileViewerRootedAtPath: nil];
+        }
+    }
     
     [fLock unlock];
 }

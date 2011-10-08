@@ -34,7 +34,6 @@
 
 #define MAX_GROUP 999999
 
-//eliminate when Lion-only
 #define ACTION_MENU_GLOBAL_TAG 101
 #define ACTION_MENU_UNLIMITED_TAG 102
 #define ACTION_MENU_LIMIT_TAG 103
@@ -179,7 +178,19 @@
         if ([ident isEqualToString: @"UL Image"] || [ident isEqualToString: @"DL Image"])
         {
             //ensure arrows are white only when selected
-            [[cell image] setTemplate: [cell backgroundStyle] == NSBackgroundStyleLowered];
+            if ([NSApp isOnSnowLeopardOrBetter])
+                [[cell image] setTemplate: [cell backgroundStyle] == NSBackgroundStyleLowered];
+            else
+            {
+                NSImage * image = [cell image];
+                const BOOL template = [cell backgroundStyle] == NSBackgroundStyleLowered;
+                if ([image isTemplate] != template)
+                {
+                    [image setTemplate: template];
+                    [cell setImage: nil];
+                    [cell setImage: image];
+                }
+            }
         }
     }
 }
@@ -565,7 +576,7 @@
         [fController stopTorrents: [NSArray arrayWithObject: torrent]];
     else
     {
-        if ([NSEvent modifierFlags] & NSAlternateKeyMask)
+        if (([NSApp isOnSnowLeopardOrBetter] ? [NSEvent modifierFlags] : [[NSApp currentEvent] modifierFlags]) & NSAlternateKeyMask)
             [fController resumeTorrentsNoWait: [NSArray arrayWithObject: torrent]];
         else if ([torrent waitingToStart])
             [fController stopTorrents: [NSArray arrayWithObject: torrent]];
@@ -614,8 +625,20 @@
         NSPoint location = rect.origin;
         location.y += NSHeight(rect) + 5.0;
         
-        location = [self convertPoint: location toView: self];
-        [fActionMenu popUpMenuPositioningItem: nil atLocation: location inView: self];
+        if ([NSApp isOnSnowLeopardOrBetter])
+        {
+            location = [self convertPoint: location toView: self];
+            [fActionMenu popUpMenuPositioningItem: nil atLocation: location inView: self];
+        }
+        else
+        {
+            location = [self convertPoint: location toView: nil];
+            NSEvent * newEvent = [NSEvent mouseEventWithType: [event type] location: location
+                modifierFlags: [event modifierFlags] timestamp: [event timestamp] windowNumber: [event windowNumber]
+                context: [event context] eventNumber: [event eventNumber] clickCount: [event clickCount] pressure: [event pressure]];
+            
+            [NSMenu popUpContextMenu: fActionMenu withEvent: newEvent forView: self];
+        }
         
         [fMenuTorrent release];
         fMenuTorrent = nil;
@@ -633,7 +656,6 @@
     fActionPopoverShown = NO;
 }
 
-//eliminate when Lion-only, along with all the menu item instance variables
 - (void) menuNeedsUpdate: (NSMenu *) menu
 {
     //this method seems to be called when it shouldn't be
@@ -717,7 +739,6 @@
     }
 }
 
-//the following methods might not be needed when Lion-only
 - (void) setQuickLimitMode: (id) sender
 {
     const BOOL limit = [sender tag] == ACTION_MENU_LIMIT_TAG;
@@ -737,7 +758,7 @@
 
 - (void) setGlobalLimit: (id) sender
 {
-    [fMenuTorrent setUseGlobalSpeedLimit: [(NSButton *)sender state] != NSOnState];
+    [fMenuTorrent setUseGlobalSpeedLimit: [sender state] != NSOnState];
     
     [[NSNotificationCenter defaultCenter] postNotificationName: @"UpdateOptions" object: nil];
 }

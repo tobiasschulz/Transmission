@@ -27,6 +27,7 @@
 #import "BlocklistScheduler.h"
 #import "PortChecker.h"
 #import "BonjourController.h"
+#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 #import "UKKQueue.h"
 
@@ -540,7 +541,20 @@ tr_session * fHandle;
         NSDate * updatedDate = [fDefaults objectForKey: @"BlocklistNewLastUpdateSuccess"];
         
         if (updatedDate)
-            updatedDateString = [NSDateFormatter localizedStringFromDate: updatedDate dateStyle: NSDateFormatterFullStyle timeStyle: NSDateFormatterShortStyle];
+        {
+            if ([NSApp isOnSnowLeopardOrBetter])
+                updatedDateString = [NSDateFormatter localizedStringFromDate: updatedDate dateStyle: NSDateFormatterFullStyle
+                                        timeStyle: NSDateFormatterShortStyle];
+            else
+            {
+                NSDateFormatter * dateFormatter = [[NSDateFormatter alloc] init];
+                [dateFormatter setDateStyle: NSDateFormatterFullStyle];
+                [dateFormatter setTimeStyle: NSDateFormatterShortStyle];
+                
+                updatedDateString = [dateFormatter stringFromDate: updatedDate];
+                [dateFormatter release];
+            }
+        }
         else
             updatedDateString = NSLocalizedString(@"N/A", "Prefs -> blocklist -> message");
     }
@@ -1356,7 +1370,7 @@ tr_session * fHandle;
         return;
     
     NSRect windowRect = [window frame];
-    const CGFloat difference = (NSHeight([view frame]) - NSHeight([[window contentView] frame])) * [window userSpaceScaleFactor];
+    float difference = ([view frame].size.height - [[window contentView] frame].size.height) * [window userSpaceScaleFactor];
     windowRect.origin.y -= difference;
     windowRect.size.height += difference;
     
@@ -1387,7 +1401,7 @@ tr_session * fHandle;
     {
         [fFolderPopUp selectItemAtIndex: DOWNLOAD_FOLDER];
         
-        NSString * folder = [[[openPanel URLs] objectAtIndex: 0] path];
+        NSString * folder = [[openPanel filenames] objectAtIndex: 0];
         [fDefaults setObject: folder forKey: @"DownloadFolder"];
         [fDefaults setObject: @"Constant" forKey: @"DownloadChoice"];
         
@@ -1404,7 +1418,7 @@ tr_session * fHandle;
 {
     if (code == NSOKButton)
     {
-        NSString * folder = [[[openPanel URLs] objectAtIndex: 0] path];
+        NSString * folder = [[openPanel filenames] objectAtIndex: 0];
         [fDefaults setObject: folder forKey: @"IncompleteDownloadFolder"];
         
         tr_sessionSetIncompleteDir(fHandle, [folder UTF8String]);
@@ -1421,7 +1435,7 @@ tr_session * fHandle;
         if (path)
             [sharedQueue removePathFromQueue: [path stringByExpandingTildeInPath]];
         
-        path = [[[openPanel URLs] objectAtIndex: 0] path];
+        path = [[openPanel filenames] objectAtIndex: 0];
         [fDefaults setObject: path forKey: @"AutoImportDirectory"];
         [sharedQueue addPath: [path stringByExpandingTildeInPath]];
         
@@ -1437,7 +1451,7 @@ tr_session * fHandle;
 {
     if (code == NSOKButton)
     {
-        NSString * filePath = [[[openPanel URLs] objectAtIndex: 0] path];
+        NSString * filePath = [[openPanel filenames] objectAtIndex: 0];
         
         if ([[NSFileManager defaultManager] fileExistsAtPath: filePath])  // script file exists
         {

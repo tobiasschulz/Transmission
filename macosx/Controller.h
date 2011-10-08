@@ -49,7 +49,8 @@ typedef enum
     ADD_CREATED
 } addType;
 
-@interface Controller : NSObject <GrowlApplicationBridgeDelegate, NSPopoverDelegate, NSSoundDelegate, NSToolbarDelegate, NSWindowDelegate, QLPreviewPanelDataSource, QLPreviewPanelDelegate>
+#warning uncomment
+@interface Controller : NSObject <GrowlApplicationBridgeDelegate, NSPopoverDelegate, NSSoundDelegate, NSToolbarDelegate, NSWindowDelegate> //, QLPreviewPanelDataSource, QLPreviewPanelDelegate>
 {
     tr_session                      * fLib;
     
@@ -90,7 +91,8 @@ typedef enum
     
     IBOutlet NSMenu                 * fGroupsSetMenu, * fGroupsSetContextMenu;
     
-    QLPreviewPanel                  * fPreviewPanel;
+    #warning change to QLPreviewPanel
+    id                              fPreviewPanel;
     BOOL                            fQuitting;
     BOOL                            fQuitRequested;
     BOOL                            fPauseOnLaunch;

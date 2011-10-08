@@ -26,6 +26,7 @@
 #import "FileOutlineView.h"
 #import "Torrent.h"
 #import "FileListNode.h"
+#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 
 #import "transmission.h" // required by utils.h
@@ -115,7 +116,15 @@
 - (void) drawWithFrame: (NSRect) cellFrame inView: (NSView *) controlView
 {
     //icon
-    [[self image] drawInRect: [self imageRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0 respectFlipped: YES hints: nil];
+    if ([NSApp isOnSnowLeopardOrBetter])
+        [[self image] drawInRect: [self imageRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0
+            respectFlipped: YES hints: nil];
+    else
+    {
+        NSImage * image = [self image];
+        [image setFlipped: YES];
+        [image drawInRect: [self imageRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
+    }
     
     NSColor * titleColor, * statusColor;
     if ([self backgroundStyle] == NSBackgroundStyleDark)
