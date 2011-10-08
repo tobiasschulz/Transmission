@@ -132,7 +132,8 @@
     return NO;
 }
 
-- (NSRect) quickLookSourceFrameForPreviewItem: (id <QLPreviewItem>) item
+#warning uncomment (in header too)
+- (NSRect) quickLookSourceFrameForPreviewItem: (id /*<QLPreviewItem>*/) item
 {
     FileOutlineView * fileOutlineView = [fFileController outlineView];
     

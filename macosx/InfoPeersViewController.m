@@ -580,8 +580,11 @@
     //sort by IP after primary sort
     if (useSecond)
     {
-        NSSortDescriptor * secondDescriptor = [NSSortDescriptor sortDescriptorWithKey: @"IP" ascending: asc selector: @selector(compareNumeric:)];
+        #warning when 10.6-only, replace with sortDescriptorWithKey:ascending:selector:
+        NSSortDescriptor * secondDescriptor = [[NSSortDescriptor alloc] initWithKey: @"IP" ascending: asc
+                                                                        selector: @selector(compareNumeric:)];
         [descriptors addObject: secondDescriptor];
+        [secondDescriptor release];
     }
     
     return descriptors;

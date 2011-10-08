@@ -23,6 +23,7 @@
  *****************************************************************************/
 
 #import "CreatorWindowController.h"
+#import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
 
 #import "transmission.h" // required by utils.h
@@ -146,7 +147,7 @@
     const BOOL multifile = !fInfo->isSingleFile;
     
     NSImage * icon = [[NSWorkspace sharedWorkspace] iconForFileType: multifile
-                        ? NSFileTypeForHFSTypeCode(kGenericFolderIcon) : [fPath pathExtension]];
+                        ? NSFileTypeForHFSTypeCode('fldr') : [fPath pathExtension]];
     [icon setSize: [fIconView frame].size];
     [fIconView setImage: icon];
     
@@ -330,8 +331,16 @@
     NSString * text = [addresses componentsJoinedByString: @"\n"];
     
     NSPasteboard * pb = [NSPasteboard generalPasteboard];
-    [pb clearContents];
-    [pb writeObjects: [NSArray arrayWithObject: text]];
+    if ([NSApp isOnSnowLeopardOrBetter])
+    {
+        [pb clearContents];
+        [pb writeObjects: [NSArray arrayWithObject: text]];
+    }
+    else
+    {
+        [pb declareTypes: [NSArray arrayWithObject: NSStringPboardType] owner: nil];
+        [pb setString: text forType: NSStringPboardType];
+    }
 }
 
 - (BOOL) validateMenuItem: (NSMenuItem *) menuItem
@@ -343,7 +352,9 @@
     
     if (action == @selector(paste:))
         return [[self window] firstResponder] == fTrackerTable
-            && [[NSPasteboard generalPasteboard] canReadObjectForClasses: [NSArray arrayWithObject: [NSString class]] options: nil];
+            && ([NSApp isOnSnowLeopardOrBetter]
+                ? [[NSPasteboard generalPasteboard] canReadObjectForClasses: [NSArray arrayWithObject: [NSString class]] options: nil]
+                : [[NSPasteboard generalPasteboard] availableTypeFromArray: [NSArray arrayWithObject: NSStringPboardType]] != nil);
     
     return YES;
 }
@@ -352,11 +363,23 @@
 {
     NSMutableArray * tempTrackers = [NSMutableArray array];
     
-    NSArray * items = [[NSPasteboard generalPasteboard] readObjectsForClasses: [NSArray arrayWithObject: [NSString class]] options: nil];
-    NSAssert(items != nil, @"no string items to paste; should not be able to call this method");
-    
-    for (NSString * pbItem in items)
+    if ([NSApp isOnSnowLeopardOrBetter])
     {
+        NSArray * items = [[NSPasteboard generalPasteboard] readObjectsForClasses:
+                            [NSArray arrayWithObject: [NSString class]] options: nil];
+        NSAssert(items != nil, @"no string items to paste; should not be able to call this method");
+        
+        for (NSString * pbItem in items)
+        {
+            for (NSString * tracker in [pbItem componentsSeparatedByString: @"\n"])
+                [tempTrackers addObject: tracker];
+        }
+    }
+    else
+    {
+        NSString * pbItem =[[NSPasteboard generalPasteboard] stringForType: NSStringPboardType];
+        NSAssert(pbItem != nil, @"no string items to paste; should not be able to call this method");
+        
         for (NSString * tracker in [pbItem componentsSeparatedByString: @"\n"])
             [tempTrackers addObject: tracker];
     }
@@ -404,7 +427,7 @@
     [panel setMessage: NSLocalizedString(@"Select a file or folder for the torrent file.", "Create torrent -> select file")];
     
     BOOL success = [panel runModal] == NSOKButton;
-    return success ? [[[panel URLs] objectAtIndex: 0] path] : nil;
+    return success ? [[panel filenames] objectAtIndex: 0] : nil;
 }
 
 - (void) locationSheetClosed: (NSSavePanel *) panel returnCode: (NSInteger) code contextInfo: (void *) info
@@ -412,7 +435,7 @@
     if (code == NSOKButton)
     {
         [fLocation release];
-        fLocation = [[[panel URL] path] retain];
+        fLocation = [[panel filename] retain];
         
         [fLocationField setStringValue: [fLocation stringByAbbreviatingWithTildeInPath]];
         [fLocationField setToolTip: fLocation];

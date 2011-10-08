@@ -23,7 +23,6 @@
  *****************************************************************************/
 
 #import <Cocoa/Cocoa.h>
-#import <Quartz/Quartz.h>
 
 @protocol InfoViewController;
 @class InfoGeneralViewController;
@@ -63,6 +62,6 @@
 
 - (NSArray *) quickLookURLs;
 - (BOOL) canQuickLook;
-- (NSRect) quickLookSourceFrameForPreviewItem: (id <QLPreviewItem>) item;
+- (NSRect) quickLookSourceFrameForPreviewItem: (id /*<QLPreviewItem>*/) item;
 
 @end

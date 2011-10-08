@@ -23,6 +23,7 @@
  *****************************************************************************/
 
 #import "TrackerCell.h"
+#import "NSApplicationAdditions.h"
 #import "TrackerNode.h"
 
 #import "transmission.h" // required by utils.h
@@ -59,7 +60,8 @@
 @implementation TrackerCell
 
 //make the favicons accessible to all tracker cells
-NSCache * fTrackerIconCache;
+#warning make NSCache when 10.6-only
+NSMutableDictionary * fTrackerIconCache;
 NSMutableSet * fTrackerIconLoading;
 
 + (void) initialize
@@ -109,7 +111,15 @@ NSMutableSet * fTrackerIconLoading;
 - (void) drawWithFrame: (NSRect) cellFrame inView: (NSView *) controlView
 {
     //icon
-    [[self favIcon] drawInRect: [self imageRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0 respectFlipped: YES hints: nil];
+    if ([NSApp isOnSnowLeopardOrBetter])
+        [[self favIcon] drawInRect: [self imageRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver
+                        fraction: 1.0 respectFlipped: YES hints: nil];
+    else
+    {
+        NSImage * icon = [self favIcon];
+        [icon setFlipped: YES];
+        [icon drawInRect: [self imageRectForBounds: cellFrame] fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
+    }
 
     //set table colors
     NSColor * nameColor, * statusColor;

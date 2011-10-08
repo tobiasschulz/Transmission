@@ -22,10 +22,13 @@
  * DEALINGS IN THE SOFTWARE.
  *****************************************************************************/
 
+#define QLPreviewPanelSL NSClassFromString(@"QLPreviewPanel")
+#define NSRunningApplicationSL NSClassFromString(@"NSRunningApplication")
 #define NSPopoverLion NSClassFromString(@"NSPopover")
 
 @interface NSApplication (NSApplicationAdditions)
 
+- (BOOL) isOnSnowLeopardOrBetter;
 - (BOOL) isOnLionOrBetter;
 
 @end
