@@ -23,7 +23,6 @@
  *****************************************************************************/
 
 #import <Cocoa/Cocoa.h>
-#import <Quartz/Quartz.h>
 #import "InfoViewController.h"
 
 @class FileOutlineController;
@@ -48,6 +47,6 @@
 
 - (NSArray *) quickLookURLs;
 - (BOOL) canQuickLook;
-- (NSRect) quickLookSourceFrameForPreviewItem: (id <QLPreviewItem>) item;
+- (NSRect) quickLookSourceFrameForPreviewItem: (id /*<QLPreviewItem>*/) item;
 
 @end

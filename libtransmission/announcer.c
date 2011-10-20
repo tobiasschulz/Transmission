@@ -1072,10 +1072,7 @@ on_announce_done( const tr_announce_response  * response,
         {
             int i;
             const char * str;
-            int scrape_fields = 0;
-            int seeders = 0;
-            int leechers = 0;
-            int downloads = 0;
+            bool got_scrape_info = false;
             const bool isStopped = event == TR_ANNOUNCE_EVENT_STOPPED;
 
             publishErrorClear( tier );
@@ -1084,21 +1081,18 @@ on_announce_done( const tr_announce_response  * response,
             {
                 tracker->consecutiveFailures = 0;
 
-                if( response->seeders >= 0 )
-                {
-                    tracker->seederCount = seeders = response->seeders;
-                    ++scrape_fields;
-                }
+                /* if the tracker included scrape fields in its announce response,
+                   then a separate scrape isn't needed */
 
-                if( response->leechers >= 0 )
+                got_scrape_info = response->seeders
+                               || response->leechers
+                               || response->downloads;
+
+                if( got_scrape_info )
                 {
-                    tracker->leecherCount = leechers = response->leechers;
-                    ++scrape_fields;
-                }
-                if( response->downloads >= 0 )
-                {
-                    tracker->downloadCount = downloads = response->downloads;
-                    ++scrape_fields;
+                    tracker->seederCount = response->seeders;
+                    tracker->leecherCount = response->leechers;
+                    tracker->downloadCount = response->downloads;
                 }
 
                 if(( str = response->tracker_id_str ))
@@ -1115,11 +1109,6 @@ on_announce_done( const tr_announce_response  * response,
                 dbgmsg( tier, "tracker gave \"%s\"", str );
                 publishWarning( tier, str );
             }
-            else
-            {
-                tr_strlcpy( tier->lastAnnounceStr, _( "Success" ),
-                            sizeof( tier->lastAnnounceStr ) );
-            }
 
             if(( i = response->min_interval ))
                 tier->announceMinIntervalSec = i;
@@ -1128,18 +1117,20 @@ on_announce_done( const tr_announce_response  * response,
                 tier->announceIntervalSec = i;
 
             if( response->pex_count > 0 )
-                publishPeersPex( tier, seeders, leechers,
+                publishPeersPex( tier, response->seeders, response->leechers,
                                  response->pex, response->pex_count );
 
             if( response->pex6_count > 0 )
-                publishPeersPex( tier, seeders, leechers,
+                publishPeersPex( tier, response->seeders, response->leechers,
                                  response->pex6, response->pex6_count );
+
+            if( !*tier->lastAnnounceStr )
+                tr_strlcpy( tier->lastAnnounceStr, _( "Success" ),
+                            sizeof( tier->lastAnnounceStr ) );
 
             tier->isRunning = data->isRunningOnSuccess;
 
-            /* if the tracker included scrape fields in its announce response,
-               then a separate scrape isn't needed */
-            if( scrape_fields >= 3 )
+            if( got_scrape_info )
             {
                 tr_tordbg( tier->tor, "Announce response contained scrape info; "
                                       "rescheduling next scrape to %d seconds from now.",
@@ -1349,12 +1340,9 @@ on_scrape_done( const tr_scrape_response * response, void * vsession )
 
                     if(( tracker = tier->currentTracker ))
                     {
-                        if( row->seeders >= 0 )
-                            tracker->seederCount = row->seeders;
-                        if( row->leechers >= 0 )
-                            tracker->leecherCount = row->leechers;
-                        if( row->downloads >= 0 )
-                            tracker->downloadCount = row->downloads;
+                        tracker->seederCount = row->seeders;
+                        tracker->leecherCount = row->leechers;
+                        tracker->downloadCount = row->downloads;
                         tracker->downloaderCount = row->downloaders;
                         tracker->consecutiveFailures = 0;
                     }

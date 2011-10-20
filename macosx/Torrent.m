@@ -604,9 +604,9 @@ int trashDataFile(const char * filename)
     if ([self isMagnet])
         return [NSImage imageNamed: @"Magnet.png"];
     
-    #warning replace kGenericFolderIcon stuff with NSImageNameFolder on 10.6
+    #warning replace 'fldr' stuff with NSImageNameFolder on 10.6
     if (!fIcon)
-        fIcon = [[[NSWorkspace sharedWorkspace] iconForFileType: [self isFolder] ? NSFileTypeForHFSTypeCode(kGenericFolderIcon)
+        fIcon = [[[NSWorkspace sharedWorkspace] iconForFileType: [self isFolder] ? NSFileTypeForHFSTypeCode('fldr')
                                                                                 : [[self name] pathExtension]] retain];
     return fIcon;
 }
@@ -1786,7 +1786,8 @@ int trashDataFile(const char * filename)
 
 - (void) sortFileList: (NSMutableArray *) fileNodes
 {
-    NSSortDescriptor * descriptor = [NSSortDescriptor sortDescriptorWithKey: @"name" ascending: YES selector: @selector(localizedStandardCompare:)];
+    NSSortDescriptor * descriptor = [[[NSSortDescriptor alloc] initWithKey: @"name" ascending: YES
+                                            selector: @selector(compareFinder:)] autorelease];
     [fileNodes sortUsingDescriptors: [NSArray arrayWithObject: descriptor]];
     
     for (FileListNode * node in fileNodes)

@@ -3,8 +3,8 @@ dnl STATUS: "X" for prerelease beta builds,
 dnl         "Z" for unsupported trunk builds,
 dnl         "0" for stable, supported releases
 dnl these should be the only two lines you need to change
-m4_define([user_agent_prefix],[2.42+])
-m4_define([peer_id_prefix],[-TR242Z-])
+m4_define([user_agent_prefix],[2.42])
+m4_define([peer_id_prefix],[-TR2420-])
 
 AC_INIT([transmission],
         [user_agent_prefix],
@@ -237,78 +237,6 @@ AM_CONDITIONAL([BUILD_UTP],[test "x$build_utp" = "xyes"])
 AC_MSG_RESULT([$build_utp])
 
 
-dnl
-dnl  look for preinstalled miniupnpc...
-dnl
-
-AC_MSG_CHECKING([supported miniupnp library])
-upnp_version="none"
-ac_save_LIBS="$LIBS" 
-LIBS="-lminiupnpc" 
-# See if the OS has its miniupnp 1.5 installed
-AC_TRY_LINK([ 
-    #include <stdlib.h> 
-    #include <miniupnpc/miniupnpc.h> 
-    #include <miniupnpc/upnpcommands.h> 
-],[ 
-    struct UPNPDev * devlist; 
-    struct UPNPUrls    urls; 
-    struct IGDdatas    data; 
-    char lanaddr[16]; 
-    char portStr[8]; 
-    char intPort[8]; 
-    char intClient[16]; 
-    upnpDiscover( 2000, NULL, NULL, 0 ); 
-    UPNP_GetValidIGD( devlist, &urls, &data, lanaddr, sizeof( lanaddr ) );  
-    UPNP_GetSpecificPortMappingEntry( urls.controlURL, data.first.servicetype, 
-                        portStr, "TCP", intClient, intPort ); 
-],[ 
-AC_DEFINE(HAVE_MINIUPNP_15, 1, [Define to 1 if you have miniupnpc version 1.5]) 
-upnp_version="1.5"])
- 
-# See if the OS has its miniupnp 1.6 installed
-AC_TRY_LINK([ 
-    #include <stdlib.h> 
-    #include <errno.h> 
-    #include <miniupnpc/miniupnpc.h> 
-    #include <miniupnpc/upnpcommands.h> 
-],[ 
-    struct UPNPDev * devlist; 
-    struct UPNPUrls    urls; 
-    struct IGDdatas    data; 
-    char lanaddr[16]; 
-    char portStr[8]; 
-    char intPort[8]; 
-    char intClient[16]; 
-    upnpDiscover( 2000, NULL, NULL, 0, 0, &errno ); 
-    UPNP_GetValidIGD( devlist, &urls, &data, lanaddr, sizeof( lanaddr ) );  
-    UPNP_GetSpecificPortMappingEntry( urls.controlURL, data.first.servicetype, 
-                        portStr, "TCP", intClient, intPort, NULL, NULL, NULL ); 
-],[ 
-AC_DEFINE(HAVE_MINIUPNP_16, 1, [Define to 1 if you have miniupnpc version 1.6]) 
-upnp_version="1.6"])
-
-# ... and the results of our tests
-LIBS="$ac_save_LIBS" 
-AC_MSG_RESULT([$upnp_version])
-AM_CONDITIONAL([BUILD_MINIUPNP],[test "x$upnp_version" = "xnone"]) 
-if test "x$upnp_version" = "xnone" ; then
-    LIBUPNP_CFLAGS="-I\$(top_srcdir)/third-party/" 
-    LIBUPNP_LIBS="\$(top_builddir)/third-party/miniupnp/libminiupnp.a" 
-    LIBUPNP_LIBS_QT="\$\${TRANSMISSION_TOP}/third-party/miniupnp/libminiupnp.a" 
-    dnl because this is the version that we bundle...
-    AC_DEFINE(HAVE_MINIUPNP_16, 1, [Define to 1 if you have miniupnpc version 1.6]) 
-else
-    AC_DEFINE([SYSTEM_MINIUPNP]) 
-    LIBUPNP_CFLAGS=""  
-    LIBUPNP_LIBS="-lminiupnpc" 
-    LIBUPNP_LIBS_QT="-lminiupnpc" 
-fi
-AC_SUBST(LIBUPNP_CFLAGS) 
-AC_SUBST(LIBUPNP_LIBS) 
-AC_SUBST(LIBUPNP_LIBS_QT) 
-
-
 dnl ----------------------------------------------------------------------------
 dnl
 dnl  detection for the GTK+ client
@@ -488,23 +416,21 @@ AC_CONFIG_FILES([Makefile
                  libtransmission/Makefile
                  utils/Makefile
                  third-party/Makefile
-                 third-party/dht/Makefile
-                 third-party/libutp/Makefile
-                 third-party/libnatpmp/Makefile
                  third-party/miniupnp/Makefile
+                 third-party/libnatpmp/Makefile
+                 third-party/libutp/Makefile
+                 third-party/dht/Makefile
                  macosx/Makefile
                  gtk/Makefile
                  gtk/icons/Makefile
                  web/Makefile
                  web/images/Makefile
-                 web/style/Makefile
-                 web/style/jqueryui/Makefile
-                 web/style/jqueryui/images/Makefile
-                 web/style/transmission/Makefile
-                 web/style/transmission/images/Makefile
-                 web/style/transmission/images/buttons/Makefile
+                 web/images/buttons/Makefile
+                 web/images/graphics/Makefile
+                 web/images/progress/Makefile
                  web/javascript/Makefile
                  web/javascript/jquery/Makefile
+                 web/stylesheets/Makefile
                  po/Makefile.in])
 
 AC_OUTPUT

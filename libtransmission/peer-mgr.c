@@ -17,6 +17,7 @@
 #include <stdlib.h> /* qsort */
 
 #include <event2/event.h>
+#include <libutp/utp.h>
 
 #include "transmission.h"
 #include "announcer.h"
@@ -35,7 +36,6 @@
 #include "session.h"
 #include "stats.h" /* tr_statsAddUploaded, tr_statsAddDownloaded */
 #include "torrent.h"
-#include "tr-utp.h"
 #include "utils.h"
 #include "webseed.h"
 

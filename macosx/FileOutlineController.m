@@ -72,7 +72,7 @@ typedef enum
     
     [fOutline setMenu: [self menu]];
     
-    fLock = [[NSRecursiveLock alloc] init];
+    //fLock = [[NSRecursiveLock alloc] init];
     [fLock setName: @"File Table"];
     
     [self setTorrent: nil];
@@ -102,11 +102,11 @@ typedef enum
     [fFilterText release];
     fFilterText = nil;
     
-    while (![fLock tryLock])
-        tr_wait_msec(100);
+    /*while (![fLock tryLock])
+        tr_wait_msec(100);*/
     
     [fOutline reloadData];
-    [fOutline deselectAll: nil]; //do this after reloading the data #4575
+    [fOutline deselectAll: nil];
     
     [fLock unlock];
 }
@@ -125,12 +125,12 @@ typedef enum
     
     const BOOL onLion = [NSApp isOnLionOrBetter];
     
-    while (![fLock tryLock])
-        tr_wait_msec(100);
+    /*while (![fLock tryLock])
+        tr_wait_msec(100);*/
     
     if (onLion)
     {
-        [[NSAnimationContext currentContext] setCompletionHandler: ^{ [fLock unlock]; }];
+        [[NSAnimationContext currentContext] setCompletionHandler: nil];
         [NSAnimationContext beginGrouping];
         
         [fOutline beginUpdates];
@@ -242,8 +242,8 @@ typedef enum
 {
     [fTorrent updateFileStat];
     
-    while (![fLock tryLock])
-        tr_wait_msec(100);
+    /*while (![fLock tryLock])
+        tr_wait_msec(100);*/
     
     [fOutline reloadData];
     
@@ -252,8 +252,9 @@ typedef enum
 
 - (void) outlineViewSelectionDidChange: (NSNotification *) notification
 {
-    if ([QLPreviewPanel sharedPreviewPanelExists] && [[QLPreviewPanel sharedPreviewPanel] isVisible])
-        [[QLPreviewPanel sharedPreviewPanel] reloadData];
+    if ([NSApp isOnSnowLeopardOrBetter] && [QLPreviewPanelSL sharedPreviewPanelExists]
+        && [[QLPreviewPanelSL sharedPreviewPanel] isVisible])
+        [[QLPreviewPanelSL sharedPreviewPanel] reloadData];
 }
 
 - (NSInteger) outlineView: (NSOutlineView *) outlineView numberOfChildrenOfItem: (id) item
@@ -308,7 +309,7 @@ typedef enum
     if ([identifier isEqualToString: @"Check"])
     {
         NSIndexSet * indexSet;
-        if ([NSEvent modifierFlags] & NSAlternateKeyMask)
+        if (([NSApp isOnSnowLeopardOrBetter] ? [NSEvent modifierFlags] : [[NSApp currentEvent] modifierFlags]) & NSAlternateKeyMask)
             indexSet = [NSIndexSet indexSetWithIndexesInRange: NSMakeRange(0, [fTorrent fileCount])];
         else
             indexSet = [(FileListNode *)item indexes];
@@ -333,7 +334,7 @@ typedef enum
     {
         NSString * path = [fTorrent fileLocation: item];
         if (!path)
-            path = [[(FileListNode *)item path] stringByAppendingPathComponent: [(FileListNode *)item name]];
+            path = [[item path] stringByAppendingPathComponent: [item name]];
         return path;
     }
     else if ([ident isEqualToString: @"Check"])
@@ -385,8 +386,8 @@ typedef enum
 
 - (void) setCheck: (id) sender
 {
-    while (![fLock tryLock])
-        tr_wait_msec(100);
+    /*while (![fLock tryLock])
+        tr_wait_msec(100);*/
     
     NSInteger state = [sender tag] == FILE_UNCHECK_TAG ? NSOffState : NSOnState;
     
@@ -403,8 +404,8 @@ typedef enum
 
 - (void) setOnlySelectedCheck: (id) sender
 {
-    while (![fLock tryLock])
-        tr_wait_msec(100);
+    /*while (![fLock tryLock])
+        tr_wait_msec(100);*/
     
     NSIndexSet * indexSet = [fOutline selectedRowIndexes];
     NSMutableIndexSet * itemIndexes = [NSMutableIndexSet indexSet];
@@ -437,8 +438,8 @@ typedef enum
             priority = TR_PRI_LOW;
     }
     
-    while (![fLock tryLock])
-        tr_wait_msec(100);
+    /*while (![fLock tryLock])
+        tr_wait_msec(100);*/
     
     NSIndexSet * indexSet = [fOutline selectedRowIndexes];
     NSMutableIndexSet * itemIndexes = [NSMutableIndexSet indexSet];
@@ -453,20 +454,32 @@ typedef enum
 
 - (void) revealFile: (id) sender
 {
-    while (![fLock tryLock])
-        tr_wait_msec(100);
+    /*while (![fLock tryLock])
+        tr_wait_msec(100);*/
     
     NSIndexSet * indexes = [fOutline selectedRowIndexes];
-    NSMutableArray * paths = [NSMutableArray arrayWithCapacity: [indexes count]];
-    for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
+    if ([NSApp isOnSnowLeopardOrBetter])
     {
-        NSString * path = [fTorrent fileLocation: [fOutline itemAtRow: i]];
-        if (path)
-            [paths addObject: [NSURL fileURLWithPath: path]];
+        NSMutableArray * paths = [NSMutableArray arrayWithCapacity: [indexes count]];
+        for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
+        {
+            NSString * path = [fTorrent fileLocation: [fOutline itemAtRow: i]];
+            if (path)
+                [paths addObject: [NSURL fileURLWithPath: path]];
+        }
+        
+        if ([paths count])
+            [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs: paths];
     }
-    
-    if ([paths count] > 0)
-        [[NSWorkspace sharedWorkspace] activateFileViewerSelectingURLs: paths];
+    else
+    {
+        for (NSUInteger i = [indexes firstIndex]; i != NSNotFound; i = [indexes indexGreaterThanIndex: i])
+        {
+            NSString * path = [fTorrent fileLocation: [fOutline itemAtRow: i]];
+            if (path)
+                [[NSWorkspace sharedWorkspace] selectFile: path inFileViewerRootedAtPath: nil];
+        }
+    }
     
     [fLock unlock];
 }

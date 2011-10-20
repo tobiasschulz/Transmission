@@ -19,13 +19,11 @@ TRANSMISSION_TOP = ..
 INCLUDEPATH = $${EVENT_TOP}/include $${INCLUDEPATH}
 INCLUDEPATH += $${TRANSMISSION_TOP}
 LIBS += $${TRANSMISSION_TOP}/libtransmission/libtransmission.a
-exists( $${TRANSMISSION_TOP}/third-party/libutp/Makefile ) { 
+exists( $${TRANSMISSION_TOP}/third-party/libutp/libutp.a ) { 
     LIBS += $${TRANSMISSION_TOP}/third-party/libutp/libutp.a
 }
 LIBS += $${TRANSMISSION_TOP}/third-party/dht/libdht.a
-exists( $${TRANSMISSION_TOP}/third-party/miniupnp/Makefile ) { 
-    LIBS += $${TRANSMISSION_TOP}/third-party/miniupnp/libminiupnp.a
-}
+LIBS += $${TRANSMISSION_TOP}/third-party/miniupnp/libminiupnp.a
 LIBS += $${TRANSMISSION_TOP}/third-party/libnatpmp/libnatpmp.a
 unix: LIBS += -L$${EVENT_TOP}/lib -lz -lrt
 win32:DEFINES += QT_DBUS

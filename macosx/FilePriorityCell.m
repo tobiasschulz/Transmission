@@ -25,6 +25,7 @@
 #import "FilePriorityCell.h"
 #import "FileOutlineView.h"
 #import "FileListNode.h"
+#import "NSApplicationAdditions.h"
 #import "Torrent.h"
 
 #define IMAGE_OVERLAP 3.0
@@ -165,9 +166,17 @@
         for (NSImage * image in images)
         {
             const NSSize imageSize = [image size];
-            const NSRect imageRect = NSMakeRect(currentWidth, floor(NSMidY(cellFrame) - imageSize.height * 0.5), imageSize.width, imageSize.height);
+            NSRect imageRect = NSMakeRect(currentWidth, floor(NSMidY(cellFrame) - imageSize.height * 0.5), imageSize.width, imageSize.height);
             
-            [image drawInRect: imageRect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0 respectFlipped: YES hints: nil];
+            if ([NSApp isOnSnowLeopardOrBetter])
+                [image drawInRect: imageRect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0 respectFlipped: YES hints: nil];
+            else
+            {
+                image = [image copy];
+                [image setFlipped: YES];
+                [image drawInRect: imageRect fromRect: NSZeroRect operation: NSCompositeSourceOver fraction: 1.0];
+                [image release];
+            }
             
             currentWidth += imageSize.width - IMAGE_OVERLAP;
         }
