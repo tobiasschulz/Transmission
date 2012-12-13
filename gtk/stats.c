@@ -20,39 +20,36 @@
 
 enum
 {
-  TR_RESPONSE_RESET = 1
+    TR_RESPONSE_RESET = 1
 };
 
 struct stat_ui
 {
-  GtkLabel * one_up_lb;
-  GtkLabel * one_down_lb;
-  GtkLabel * one_ratio_lb;
-  GtkLabel * one_time_lb;
-
-  GtkLabel * all_up_lb;
-  GtkLabel * all_down_lb;
-  GtkLabel * all_ratio_lb;
-  GtkLabel * all_time_lb;
-
-  GtkLabel * all_sessions_lb;
-
-  TrCore * core;
+    GtkWidget *  one_up_lb;
+    GtkWidget *  one_down_lb;
+    GtkWidget *  one_ratio_lb;
+    GtkWidget *  one_time_lb;
+    GtkWidget *  all_up_lb;
+    GtkWidget *  all_down_lb;
+    GtkWidget *  all_ratio_lb;
+    GtkWidget *  all_time_lb;
+    GtkWidget *  all_sessions_lb;
+    TrCore *     core;
 };
 
 static void
-setLabel (GtkLabel * l, const char * str)
+setLabel (GtkWidget *  w, const char * str)
 {
-  gtr_label_set_text (l, str);
+    gtr_label_set_text (GTK_LABEL (w), str);
 }
 
 static void
-setLabelFromRatio (GtkLabel * l, double d)
+setLabelFromRatio (GtkWidget * w, double d)
 {
     char buf[128];
 
     tr_strlratio (buf, d, sizeof (buf));
-    setLabel (l, buf);
+    setLabel (w, buf);
 }
 
 static gboolean
@@ -150,43 +147,34 @@ gtr_stats_dialog_new (GtkWindow * parent, TrCore * core)
     ui->core = core;
 
     hig_workarea_add_section_title (t, &row, _("Current Session"));
-    l = gtk_label_new (NULL);
-    ui->one_up_lb = GTK_LABEL (l);
-    gtk_label_set_single_line_mode (ui->one_up_lb, TRUE);
+    l = ui->one_up_lb = gtk_label_new (NULL);
+    gtk_label_set_single_line_mode (GTK_LABEL (l), TRUE);
     hig_workarea_add_row (t, &row, _("Uploaded:"), l, NULL);
-    l = gtk_label_new (NULL);
-    ui->one_down_lb = GTK_LABEL (l);
-    gtk_label_set_single_line_mode (ui->one_down_lb, TRUE);
+    l = ui->one_down_lb = gtk_label_new (NULL);
+    gtk_label_set_single_line_mode (GTK_LABEL (l), TRUE);
     hig_workarea_add_row (t, &row, _("Downloaded:"), l, NULL);
-    l = gtk_label_new (NULL);
-    ui->one_ratio_lb = GTK_LABEL (l);
-    gtk_label_set_single_line_mode (ui->one_ratio_lb, TRUE);
+    l = ui->one_ratio_lb = gtk_label_new (NULL);
+    gtk_label_set_single_line_mode (GTK_LABEL (l), TRUE);
     hig_workarea_add_row (t, &row, _("Ratio:"), l, NULL);
-    l = gtk_label_new (NULL);
-    ui->one_time_lb = GTK_LABEL (l);
-    gtk_label_set_single_line_mode (ui->one_time_lb, TRUE);
+    l = ui->one_time_lb = gtk_label_new (NULL);
+    gtk_label_set_single_line_mode (GTK_LABEL (l), TRUE);
     hig_workarea_add_row (t, &row, _("Duration:"), l, NULL);
     hig_workarea_add_section_divider (t, &row);
     hig_workarea_add_section_title (t, &row, _("Total"));
-    l = gtk_label_new (_("Started %'d time"));
-    ui->all_sessions_lb = GTK_LABEL (l);
-    gtk_label_set_single_line_mode (ui->all_sessions_lb, TRUE);
+    l = ui->all_sessions_lb = gtk_label_new (_("Started %'d time"));
+    gtk_label_set_single_line_mode (GTK_LABEL (l), TRUE);
     hig_workarea_add_label_w (t, row++, l);
-    l = gtk_label_new (NULL);
-    ui->all_up_lb = GTK_LABEL (l);
-    gtk_label_set_single_line_mode (ui->all_up_lb, TRUE);
+    l = ui->all_up_lb = gtk_label_new (NULL);
+    gtk_label_set_single_line_mode (GTK_LABEL (l), TRUE);
     hig_workarea_add_row (t, &row, _("Uploaded:"), l, NULL);
-    l = gtk_label_new (NULL);
-    ui->all_down_lb = GTK_LABEL (l);
-    gtk_label_set_single_line_mode (ui->all_down_lb, TRUE);
+    l = ui->all_down_lb = gtk_label_new (NULL);
+    gtk_label_set_single_line_mode (GTK_LABEL (l), TRUE);
     hig_workarea_add_row (t, &row, _("Downloaded:"), l, NULL);
-    l = gtk_label_new (NULL);
-    ui->all_ratio_lb = GTK_LABEL (l);
-    gtk_label_set_single_line_mode (ui->all_ratio_lb, TRUE);
+    l = ui->all_ratio_lb = gtk_label_new (NULL);
+    gtk_label_set_single_line_mode (GTK_LABEL (l), TRUE);
     hig_workarea_add_row (t, &row, _("Ratio:"), l, NULL);
-    l = gtk_label_new (NULL);
-    ui->all_time_lb = GTK_LABEL (l);
-    gtk_label_set_single_line_mode (ui->all_time_lb, TRUE);
+    l = ui->all_time_lb = gtk_label_new (NULL);
+    gtk_label_set_single_line_mode (GTK_LABEL (l), TRUE);
     hig_workarea_add_row (t, &row, _("Duration:"), l, NULL);
     gtr_dialog_set_content (GTK_DIALOG (d), t);
 
