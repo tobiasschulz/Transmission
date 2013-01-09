@@ -28,23 +28,23 @@
 
 enum
 {
-  COL_SEQUENCE,
-  COL_NAME,
-  COL_MESSAGE,
-  COL_TR_MSG,
-  N_COLUMNS
+    COL_SEQUENCE,
+    COL_NAME,
+    COL_MESSAGE,
+    COL_TR_MSG,
+    N_COLUMNS
 };
 
 struct MsgData
 {
-  TrCore        * core;
-  GtkTreeView   * view;
-  GtkListStore  * store;
-  GtkTreeModel  * filter;
-  GtkTreeModel  * sort;
-  tr_msg_level    maxLevel;
-  gboolean        isPaused;
-  guint           refresh_tag;
+    TrCore        * core;
+    GtkTreeView   * view;
+    GtkListStore  * store;
+    GtkTreeModel  * filter;
+    GtkTreeModel  * sort;
+    tr_msg_level    maxLevel;
+    gboolean        isPaused;
+    guint           refresh_tag;
 };
 
 static struct tr_msg_list * myTail = NULL;
@@ -64,7 +64,7 @@ is_pinned_to_new (struct MsgData * data)
     {
       pinned_to_new = TRUE;
     }
-  else
+    else
     {
       GtkTreePath * last_visible;
       if (gtk_tree_view_get_visible_range (data->view, NULL, &last_visible))
@@ -112,7 +112,7 @@ level_combo_changed_cb (GtkComboBox * combo_box, gpointer gdata)
   const gboolean pinned_to_new = is_pinned_to_new (data);
 
   tr_setMessageLevel (level);
-  gtr_core_set_pref_int (data->core, TR_KEY_message_level, level);
+  gtr_core_set_pref_int (data->core, TR_PREFS_KEY_MSGLEVEL, level);
   data->maxLevel = level;
   gtk_tree_model_filter_refilter (GTK_TREE_MODEL_FILTER (data->filter));
 
@@ -430,7 +430,7 @@ onRefresh (gpointer gdata)
         scroll_to_bottom (data);
     }
 
-  return G_SOURCE_CONTINUE;
+  return TRUE;
 }
 
 static GtkWidget*
@@ -440,7 +440,7 @@ debug_level_combo_new (void)
                                           _("Information"), TR_MSG_INF,
                                           _("Debug"),       TR_MSG_DBG,
                                           NULL);
-  gtr_combo_box_set_active_enum (GTK_COMBO_BOX (w), gtr_pref_int_get (TR_KEY_message_level));
+  gtr_combo_box_set_active_enum (GTK_COMBO_BOX (w), gtr_pref_int_get (TR_PREFS_KEY_MSGLEVEL));
   return w;
 }
 
@@ -532,7 +532,7 @@ gtr_message_log_window_new (GtkWindow * parent, TrCore * core)
   gtk_tree_sortable_set_sort_column_id (GTK_TREE_SORTABLE (data->sort),
                                         COL_SEQUENCE,
                                         GTK_SORT_ASCENDING);
-  data->maxLevel = gtr_pref_int_get (TR_KEY_message_level);
+  data->maxLevel = gtr_pref_int_get (TR_PREFS_KEY_MSGLEVEL);
   gtk_tree_model_filter_set_visible_func (GTK_TREE_MODEL_FILTER (data->filter),
                                           isRowVisible, data, NULL);
 

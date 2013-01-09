@@ -158,12 +158,6 @@ MyApp :: MyApp( int& argc, char ** argv ):
         myPrefs->set( Prefs::SESSION_REMOTE_PASSWORD, password );
     if( ( host != 0 ) || ( port != 0 ) || ( username != 0 ) || ( password != 0 ) )
         myPrefs->set( Prefs::SESSION_IS_REMOTE, true );
-    if ( myPrefs->getBool( Prefs::START_MINIMIZED) )
-        minimized = true;
-
-    // start as minimized only if the system tray present
-    if ( !myPrefs->getBool( Prefs::SHOW_TRAY_ICON ) )
-      minimized = false;
 
     mySession = new Session( configDir, *myPrefs );
     myModel = new TorrentModel( *myPrefs );
@@ -171,9 +165,9 @@ MyApp :: MyApp( int& argc, char ** argv ):
     myWatchDir = new WatchDir( *myModel );
 
     // when the session gets torrent info, update the model
-    connect( mySession, SIGNAL(torrentsUpdated(tr_variant*,bool)), myModel, SLOT(updateTorrents(tr_variant*,bool)) );
-    connect( mySession, SIGNAL(torrentsUpdated(tr_variant*,bool)), myWindow, SLOT(refreshActionSensitivity()) );
-    connect( mySession, SIGNAL(torrentsRemoved(tr_variant*)), myModel, SLOT(removeTorrents(tr_variant*)) );
+    connect( mySession, SIGNAL(torrentsUpdated(tr_benc*,bool)), myModel, SLOT(updateTorrents(tr_benc*,bool)) );
+    connect( mySession, SIGNAL(torrentsUpdated(tr_benc*,bool)), myWindow, SLOT(refreshActionSensitivity()) );
+    connect( mySession, SIGNAL(torrentsRemoved(tr_benc*)), myModel, SLOT(removeTorrents(tr_benc*)) );
     // when the session source gets changed, request a full refresh
     connect( mySession, SIGNAL(sourceChanged()), this, SLOT(onSessionSourceChanged()) );
     // when the model sees a torrent for the first time, ask the session for full info on it

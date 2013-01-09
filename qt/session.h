@@ -26,12 +26,11 @@ class QStringList;
 class AddData;
 
 #include <libtransmission/transmission.h>
-#include <libtransmission/quark.h>
 
 extern "C"
 {
     struct evbuffer;
-    struct tr_variant;
+    struct tr_benc;
 }
 
 class Prefs;
@@ -73,33 +72,33 @@ class Session: public QObject
         bool isLocal( ) const;
 
     private:
-        void updateStats( struct tr_variant * args );
-        void updateInfo( struct tr_variant * args );
+        void updateStats( struct tr_benc * args );
+        void updateInfo( struct tr_benc * args );
         void parseResponse( const char * json, size_t len );
         static void localSessionCallback( tr_session *, struct evbuffer *, void * );
 
     public:
         void exec( const char * json );
-        void exec( const struct tr_variant * request );
+        void exec( const struct tr_benc * request );
 
     public:
         int64_t getUniqueTag( ) { return nextUniqueTag++; }
 
     private:
-        void sessionSet( const tr_quark key, const QVariant& variant );
+        void sessionSet( const char * key, const QVariant& variant );
         void pumpRequests( );
         void sendTorrentRequest( const char * request, const QSet<int>& torrentIds );
-        static void updateStats( struct tr_variant * d, struct tr_session_stats * stats );
+        static void updateStats( struct tr_benc * d, struct tr_session_stats * stats );
         void refreshTorrents( const QSet<int>& torrentIds );
         QNetworkAccessManager * networkAccessManager( );
 
     public:
-        void torrentSet( const QSet<int>& ids, const tr_quark key, bool val );
-        void torrentSet( const QSet<int>& ids, const tr_quark key, int val );
-        void torrentSet( const QSet<int>& ids, const tr_quark key, double val );
-        void torrentSet( const QSet<int>& ids, const tr_quark key, const QList<int>& val );
-        void torrentSet( const QSet<int>& ids, const tr_quark key, const QStringList& val );
-        void torrentSet( const QSet<int>& ids, const tr_quark key, const QPair<int,QString>& val);
+        void torrentSet( const QSet<int>& ids, const QString& key, bool val );
+        void torrentSet( const QSet<int>& ids, const QString& key, int val );
+        void torrentSet( const QSet<int>& ids, const QString& key, double val );
+        void torrentSet( const QSet<int>& ids, const QString& key, const QList<int>& val );
+        void torrentSet( const QSet<int>& ids, const QString& key, const QStringList& val );
+        void torrentSet( const QSet<int>& ids, const QString& key, const QPair<int,QString>& val);
         void torrentSetLocation( const QSet<int>& ids, const QString& path, bool doMove );
 
 
@@ -131,14 +130,14 @@ class Session: public QObject
         void onFinished( QNetworkReply * reply );
 
     signals:
-        void executed( int64_t tag, const QString& result, struct tr_variant * arguments );
+        void executed( int64_t tag, const QString& result, struct tr_benc * arguments );
         void sourceChanged( );
         void portTested( bool isOpen );
         void statsUpdated( );
         void sessionUpdated( );
         void blocklistUpdated( int );
-        void torrentsUpdated( struct tr_variant * torrentList, bool completeList );
-        void torrentsRemoved( struct tr_variant * torrentList );
+        void torrentsUpdated( struct tr_benc * torrentList, bool completeList );
+        void torrentsRemoved( struct tr_benc * torrentList );
         void dataReadProgress( );
         void dataSendProgress( );
         void httpAuthenticationRequired( );

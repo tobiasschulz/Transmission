@@ -34,6 +34,7 @@
 #include "transmission.h"
 #include "announcer.h"
 #include "bandwidth.h"
+#include "bencode.h"
 #include "cache.h"
 #include "completion.h"
 #include "crypto.h" /* for tr_sha1 */
@@ -51,7 +52,6 @@
 #include "torrent-magnet.h"
 #include "trevent.h" /* tr_runInEventThread () */
 #include "utils.h"
-#include "variant.h"
 #include "verify.h"
 #include "version.h"
 
@@ -155,22 +155,19 @@ bool
 tr_torrentIsPieceTransferAllowed (const tr_torrent  * tor,
                                   tr_direction        direction)
 {
-  bool allowed = true;
-  unsigned int limit;
+    unsigned int limit;
+    bool allowed = true;
 
-  assert (tr_isTorrent (tor));
-  assert (tr_isDirection (direction));
+    if (tr_torrentUsesSpeedLimit (tor, direction))
+        if (tr_torrentGetSpeedLimit_Bps (tor, direction) <= 0)
+            allowed = false;
 
-  if (tr_torrentUsesSpeedLimit (tor, direction))
-    if (tr_torrentGetSpeedLimit_Bps (tor, direction) <= 0)
-      allowed = false;
+    if (tr_torrentUsesSessionLimits (tor))
+        if (tr_sessionGetActiveSpeedLimit_Bps (tor->session, direction, &limit))
+            if (limit <= 0)
+                allowed = false;
 
-  if (tr_torrentUsesSessionLimits (tor))
-    if (tr_sessionGetActiveSpeedLimit_Bps (tor->session, direction, &limit))
-      if (limit <= 0)
-        allowed = false;
-
-  return allowed;
+    return allowed;
 }
 
 /***
@@ -203,50 +200,48 @@ tr_torrentGetSpeedLimit_Bps (const tr_torrent * tor, tr_direction dir)
 unsigned int
 tr_torrentGetSpeedLimit_KBps (const tr_torrent * tor, tr_direction dir)
 {
-  assert (tr_isTorrent (tor));
-  assert (tr_isDirection (dir));
-
-  return toSpeedKBps (tr_torrentGetSpeedLimit_Bps (tor, dir));
+    return toSpeedKBps (tr_torrentGetSpeedLimit_Bps (tor, dir));
 }
 
 void
 tr_torrentUseSpeedLimit (tr_torrent * tor, tr_direction dir, bool do_use)
 {
-  assert (tr_isTorrent (tor));
-  assert (tr_isDirection (dir));
+    assert (tr_isTorrent (tor));
+    assert (tr_isDirection (dir));
 
-  if (tr_bandwidthSetLimited (&tor->bandwidth, dir, do_use))
-    tr_torrentSetDirty (tor);
+    if (tr_bandwidthSetLimited (&tor->bandwidth, dir, do_use))
+        tr_torrentSetDirty (tor);
 }
 
 bool
 tr_torrentUsesSpeedLimit (const tr_torrent * tor, tr_direction dir)
 {
-  assert (tr_isTorrent (tor));
+    assert (tr_isTorrent (tor));
+    assert (tr_isDirection (dir));
 
-  return tr_bandwidthIsLimited (&tor->bandwidth, dir);
+    return tr_bandwidthIsLimited (&tor->bandwidth, dir);
 }
 
 void
 tr_torrentUseSessionLimits (tr_torrent * tor, bool doUse)
 {
-  bool changed;
+    bool changed;
 
-  assert (tr_isTorrent (tor));
+    assert (tr_isTorrent (tor));
 
-  changed = tr_bandwidthHonorParentLimits (&tor->bandwidth, TR_UP, doUse);
-  changed |= tr_bandwidthHonorParentLimits (&tor->bandwidth, TR_DOWN, doUse);
+    changed = tr_bandwidthHonorParentLimits (&tor->bandwidth, TR_UP, doUse);
+    changed |= tr_bandwidthHonorParentLimits (&tor->bandwidth, TR_DOWN, doUse);
 
-  if (changed)
-    tr_torrentSetDirty (tor);
+    if (changed)
+        tr_torrentSetDirty (tor);
 }
 
 bool
 tr_torrentUsesSessionLimits (const tr_torrent * tor)
 {
-  assert (tr_isTorrent (tor));
+    assert (tr_isTorrent (tor));
 
-  return tr_bandwidthAreParentLimitsHonored (&tor->bandwidth, TR_UP);
+    return tr_bandwidthAreParentLimitsHonored (&tor->bandwidth, TR_UP);
 }
 
 /***
@@ -256,103 +251,99 @@ tr_torrentUsesSessionLimits (const tr_torrent * tor)
 void
 tr_torrentSetRatioMode (tr_torrent *  tor, tr_ratiolimit mode)
 {
-  assert (tr_isTorrent (tor));
-  assert (mode==TR_RATIOLIMIT_GLOBAL || mode==TR_RATIOLIMIT_SINGLE || mode==TR_RATIOLIMIT_UNLIMITED);
+    assert (tr_isTorrent (tor));
+    assert (mode==TR_RATIOLIMIT_GLOBAL || mode==TR_RATIOLIMIT_SINGLE || mode==TR_RATIOLIMIT_UNLIMITED);
 
-  if (mode != tor->ratioLimitMode)
+    if (mode != tor->ratioLimitMode)
     {
-      tor->ratioLimitMode = mode;
+        tor->ratioLimitMode = mode;
 
-      tr_torrentSetDirty (tor);
+        tr_torrentSetDirty (tor);
     }
 }
 
 tr_ratiolimit
 tr_torrentGetRatioMode (const tr_torrent * tor)
 {
-  assert (tr_isTorrent (tor));
+    assert (tr_isTorrent (tor));
 
-  return tor->ratioLimitMode;
+    return tor->ratioLimitMode;
 }
 
 void
 tr_torrentSetRatioLimit (tr_torrent * tor, double desiredRatio)
 {
-  assert (tr_isTorrent (tor));
+    assert (tr_isTorrent (tor));
 
-  if ((int)(desiredRatio*100.0) != (int)(tor->desiredRatio*100.0))
+    if ((int)(desiredRatio*100.0) != (int)(tor->desiredRatio*100.0))
     {
-      tor->desiredRatio = desiredRatio;
+        tor->desiredRatio = desiredRatio;
 
-      tr_torrentSetDirty (tor);
+        tr_torrentSetDirty (tor);
     }
 }
 
 double
 tr_torrentGetRatioLimit (const tr_torrent * tor)
 {
-  assert (tr_isTorrent (tor));
+    assert (tr_isTorrent (tor));
 
-  return tor->desiredRatio;
+    return tor->desiredRatio;
 }
 
 bool
 tr_torrentGetSeedRatio (const tr_torrent * tor, double * ratio)
 {
-  bool isLimited;
+    bool isLimited;
 
-  assert (tr_isTorrent (tor));
-
-  switch (tr_torrentGetRatioMode (tor))
+    switch (tr_torrentGetRatioMode (tor))
     {
-      case TR_RATIOLIMIT_SINGLE:
-        isLimited = true;
-        if (ratio)
-          *ratio = tr_torrentGetRatioLimit (tor);
-        break;
+        case TR_RATIOLIMIT_SINGLE:
+            isLimited = true;
+            if (ratio)
+                *ratio = tr_torrentGetRatioLimit (tor);
+            break;
 
-      case TR_RATIOLIMIT_GLOBAL:
-        isLimited = tr_sessionIsRatioLimited (tor->session);
-        if (isLimited && ratio)
-          *ratio = tr_sessionGetRatioLimit (tor->session);
-        break;
+        case TR_RATIOLIMIT_GLOBAL:
+            isLimited = tr_sessionIsRatioLimited (tor->session);
+            if (isLimited && ratio)
+                *ratio = tr_sessionGetRatioLimit (tor->session);
+            break;
 
-      default: /* TR_RATIOLIMIT_UNLIMITED */
-        isLimited = false;
-        break;
+        default: /* TR_RATIOLIMIT_UNLIMITED */
+            isLimited = false;
+            break;
     }
 
-  return isLimited;
+    return isLimited;
 }
 
 /* returns true if the seed ratio applies --
  * it applies if the torrent's a seed AND it has a seed ratio set */
 static bool
-tr_torrentGetSeedRatioBytes (const tr_torrent  * tor,
-                             uint64_t          * setmeLeft,
-                             uint64_t          * setmeGoal)
+tr_torrentGetSeedRatioBytes (tr_torrent  * tor,
+                             uint64_t    * setmeLeft,
+                             uint64_t    * setmeGoal)
 {
-  double seedRatio;
-  bool seedRatioApplies = false;
+    double seedRatio;
+    bool seedRatioApplies = false;
 
-  assert (tr_isTorrent (tor));
-
-  if (tr_torrentGetSeedRatio (tor, &seedRatio))
+    if (tr_torrentGetSeedRatio (tor, &seedRatio))
     {
-      const uint64_t u = tor->uploadedCur + tor->uploadedPrev;
-      const uint64_t d = tor->downloadedCur + tor->downloadedPrev;
-      const uint64_t baseline = d ? d : tr_cpSizeWhenDone (&tor->completion);
-      const uint64_t goal = baseline * seedRatio;
-      if (setmeLeft) *setmeLeft = goal > u ? goal - u : 0;
-      if (setmeGoal) *setmeGoal = goal;
-      seedRatioApplies = tr_torrentIsSeed (tor);
+        const uint64_t u = tor->uploadedCur + tor->uploadedPrev;
+        const uint64_t d = tor->downloadedCur + tor->downloadedPrev;
+        const uint64_t baseline = d ? d : tr_cpSizeWhenDone (&tor->completion);
+        const uint64_t goal = baseline * seedRatio;
+        if (setmeLeft) *setmeLeft = goal > u ? goal - u : 0;
+        if (setmeGoal) *setmeGoal = goal;
+        seedRatioApplies = tr_torrentIsSeed (tor);
     }
 
-  return seedRatioApplies;
+    return seedRatioApplies;
 }
 
 static bool
-tr_torrentIsSeedRatioDone (const tr_torrent * tor)
+tr_torrentIsSeedRatioDone (tr_torrent * tor)
 {
     uint64_t bytesLeft;
     return tr_torrentGetSeedRatioBytes (tor, &bytesLeft, NULL) && !bytesLeft;
@@ -455,7 +446,7 @@ tr_torrentCheckSeedLimit (tr_torrent * tor)
     /* if we're seeding and reach our seed ratio limit, stop the torrent */
     if (tr_torrentIsSeedRatioDone (tor))
     {
-        tr_torinf (tor, "%s", "Seed ratio reached; pausing torrent");
+        tr_torinf (tor, "Seed ratio reached; pausing torrent");
 
         tor->isStopping = true;
 
@@ -466,7 +457,7 @@ tr_torrentCheckSeedLimit (tr_torrent * tor)
     /* if we're seeding and reach our inactiviy limit, stop the torrent */
     else if (tr_torrentIsSeedIdleLimitDone (tor))
     {
-        tr_torinf (tor, "%s", "Seeding idle limit reached; pausing torrent");
+        tr_torinf (tor, "Seeding idle limit reached; pausing torrent");
 
         tor->isStopping = true;
         tor->finishedSeedingByIdle = true;
@@ -901,11 +892,11 @@ torrentInit (tr_torrent * tor, const tr_ctor * ctor)
     /* maybe save our own copy of the metainfo */
     if (tr_ctorGetSave (ctor))
     {
-        const tr_variant * val;
+        const tr_benc * val;
         if (!tr_ctorGetMetainfo (ctor, &val))
         {
             const char * path = tor->info.torrent;
-            const int err = tr_variantToFile (val, TR_VARIANT_FMT_BENC, path);
+            const int err = tr_bencToFile (val, TR_FMT_BENC, path);
             if (err)
                 tr_torrentSetLocalError (tor, "Unable to save torrent file: %s", tr_strerror (err));
             tr_sessionSetTorrentFile (tor->session, tor->info.hashString, path);
@@ -935,7 +926,7 @@ torrentParseImpl (const tr_ctor * ctor, tr_info * setmeInfo,
     bool            didParse;
     bool            hasInfo = false;
     tr_info         tmp;
-    const tr_variant * metainfo;
+    const tr_benc * metainfo;
     tr_session    * session = tr_ctorGetSession (ctor);
     tr_parse_result result = TR_PARSE_OK;
 
@@ -1105,41 +1096,45 @@ tr_torrentSetVerifyState (tr_torrent * tor, tr_verify_state state)
     tor->anyDate = tr_time ();
 }
 
-tr_torrent_activity
-tr_torrentGetActivity (const tr_torrent * tor)
+static tr_torrent_activity
+torrentGetActivity (const tr_torrent * tor)
 {
-  tr_torrent_activity ret = TR_STATUS_STOPPED;
+    const bool is_seed = tr_torrentIsSeed (tor);
+    assert (tr_isTorrent (tor));
 
-  const bool is_seed = tr_torrentIsSeed (tor);
+    if (tor->verifyState == TR_VERIFY_NOW)
+        return TR_STATUS_CHECK;
 
-  if (tor->verifyState == TR_VERIFY_NOW)
-    {
-      ret = TR_STATUS_CHECK;
-    }
-  else if (tor->verifyState == TR_VERIFY_WAIT)
-    {
-      ret = TR_STATUS_CHECK_WAIT;
-    }
-  else if (tor->isRunning)
-    {
-      ret = is_seed ? TR_STATUS_SEED : TR_STATUS_DOWNLOAD;
-    }
-  else if (tr_torrentIsQueued (tor))
-    {
-      if (is_seed && tr_sessionGetQueueEnabled (tor->session, TR_UP))
-        ret = TR_STATUS_SEED_WAIT;
-      else if (!is_seed && tr_sessionGetQueueEnabled (tor->session, TR_DOWN))
-        ret = TR_STATUS_DOWNLOAD_WAIT;
+    if (tor->verifyState == TR_VERIFY_WAIT)
+        return TR_STATUS_CHECK_WAIT;
+
+    if (tor->isRunning)
+        return is_seed ? TR_STATUS_SEED : TR_STATUS_DOWNLOAD;
+
+    if (tr_torrentIsQueued (tor)) {
+        if (is_seed && tr_sessionGetQueueEnabled (tor->session, TR_UP))
+            return TR_STATUS_SEED_WAIT;
+        if (!is_seed && tr_sessionGetQueueEnabled (tor->session, TR_DOWN))
+            return TR_STATUS_DOWNLOAD_WAIT;
     }
 
-  return ret;
+    return TR_STATUS_STOPPED;
+}
+
+tr_torrent_activity
+tr_torrentGetActivity (tr_torrent * tor)
+{
+    /* FIXME: is this call still needed? */
+    tr_torrentRecheckCompleteness (tor);
+
+    return torrentGetActivity (tor);
 }
 
 static time_t
 torrentGetIdleSecs (const tr_torrent * tor)
 {
     int idle_secs;
-    const tr_torrent_activity activity = tr_torrentGetActivity (tor);
+    const tr_torrent_activity activity = torrentGetActivity (tor);
 
     if ((activity == TR_STATUS_DOWNLOAD || activity == TR_STATUS_SEED) && tor->startDate != 0)
         idle_secs = difftime (tr_time (), MAX (tor->startDate, tor->activityDate));
@@ -1160,166 +1155,166 @@ tr_torrentIsStalled (const tr_torrent * tor)
 static double
 getVerifyProgress (const tr_torrent * tor)
 {
-  double d = 0;
+    double d = 0;
 
-  if (tr_torrentHasMetadata (tor))
+    assert (tr_isTorrent (tor));
+
+    if (tr_torrentHasMetadata (tor))
     {
-      tr_piece_index_t i, n;
-      tr_piece_index_t checked = 0;
+        tr_piece_index_t i, n;
+        tr_piece_index_t checked = 0;
 
-      for (i=0, n=tor->info.pieceCount; i!=n; ++i)
-        if (tor->info.pieces[i].timeChecked)
-          ++checked;
+        for (i=0, n=tor->info.pieceCount; i!=n; ++i)
+            if (tor->info.pieces[i].timeChecked)
+                ++checked;
 
-      d = checked / (double)tor->info.pieceCount;
+        d = checked / (double)tor->info.pieceCount;
     }
 
-  return d;
+    return d;
 }
 
 const tr_stat *
 tr_torrentStat (tr_torrent * tor)
 {
-  tr_stat * s;
-  uint64_t seedRatioBytesLeft;
-  uint64_t seedRatioBytesGoal;
-  bool seedRatioApplies;
-  uint16_t seedIdleMinutes;
-  const uint64_t now = tr_time_msec ();
-  unsigned int pieceUploadSpeed_Bps;
-  unsigned int pieceDownloadSpeed_Bps;
+    tr_stat *               s;
+    uint64_t                now;
+    uint64_t                seedRatioBytesLeft;
+    uint64_t                seedRatioBytesGoal;
+    bool                    seedRatioApplies;
+    uint16_t                seedIdleMinutes;
 
-  assert (tr_isTorrent (tor));
+    if (!tor)
+        return NULL;
 
-  tor->lastStatTime = tr_time ();
+    assert (tr_isTorrent (tor));
+    tr_torrentLock (tor);
 
-  s = &tor->stats;
-  s->id = tor->uniqueId;
-  s->activity = tr_torrentGetActivity (tor);
-  s->error = tor->error;
-  s->queuePosition = tor->queuePosition;
-  s->isStalled = tr_torrentIsStalled (tor);
-  tr_strlcpy (s->errorString, tor->errorString, sizeof (s->errorString));
+    tor->lastStatTime = tr_time ();
 
-  s->manualAnnounceTime = tr_announcerNextManualAnnounce (tor);
+    s = &tor->stats;
+    s->id = tor->uniqueId;
+    s->activity = tr_torrentGetActivity (tor);
+    s->error = tor->error;
+    s->queuePosition = tor->queuePosition;
+    s->isStalled = tr_torrentIsStalled (tor);
+    tr_strlcpy (s->errorString, tor->errorString, sizeof (s->errorString));
 
-  tr_peerMgrTorrentStats (tor,
-                          &s->peersConnected,
-                          &s->webseedsSendingToUs,
-                          &s->peersSendingToUs,
-                          &s->peersGettingFromUs,
-                          s->peersFrom);
+    s->manualAnnounceTime = tr_announcerNextManualAnnounce (tor);
 
-  s->rawUploadSpeed_KBps     = toSpeedKBps (tr_bandwidthGetRawSpeed_Bps (&tor->bandwidth, now, TR_UP));
-  s->rawDownloadSpeed_KBps   = toSpeedKBps (tr_bandwidthGetRawSpeed_Bps (&tor->bandwidth, now, TR_DOWN));
-  pieceUploadSpeed_Bps       = tr_bandwidthGetPieceSpeed_Bps (&tor->bandwidth, now, TR_UP);
-  pieceDownloadSpeed_Bps     = tr_bandwidthGetPieceSpeed_Bps (&tor->bandwidth, now, TR_DOWN);
-  s->pieceUploadSpeed_KBps   = toSpeedKBps (pieceUploadSpeed_Bps);
-  s->pieceDownloadSpeed_KBps = toSpeedKBps (pieceDownloadSpeed_Bps);
+    tr_peerMgrTorrentStats (tor,
+                            &s->peersConnected,
+                            &s->webseedsSendingToUs,
+                            &s->peersSendingToUs,
+                            &s->peersGettingFromUs,
+                            s->peersFrom);
 
-  s->percentComplete = tr_cpPercentComplete (&tor->completion);
-  s->metadataPercentComplete = tr_torrentGetMetadataPercent (tor);
+    now = tr_time_msec ();
+    s->rawUploadSpeed_KBps     = toSpeedKBps (tr_bandwidthGetRawSpeed_Bps (&tor->bandwidth, now, TR_UP));
+    s->pieceUploadSpeed_KBps   = toSpeedKBps (tr_bandwidthGetPieceSpeed_Bps (&tor->bandwidth, now, TR_UP));
+    s->rawDownloadSpeed_KBps   = toSpeedKBps (tr_bandwidthGetRawSpeed_Bps (&tor->bandwidth, now, TR_DOWN));
+    s->pieceDownloadSpeed_KBps = toSpeedKBps (tr_bandwidthGetPieceSpeed_Bps (&tor->bandwidth, now, TR_DOWN));
 
-  s->percentDone         = tr_cpPercentDone (&tor->completion);
-  s->leftUntilDone       = tr_cpLeftUntilDone (&tor->completion);
-  s->sizeWhenDone        = tr_cpSizeWhenDone (&tor->completion);
-  s->recheckProgress     = s->activity == TR_STATUS_CHECK ? getVerifyProgress (tor) : 0;
-  s->activityDate        = tor->activityDate;
-  s->addedDate           = tor->addedDate;
-  s->doneDate            = tor->doneDate;
-  s->startDate           = tor->startDate;
-  s->secondsSeeding      = tor->secondsSeeding;
-  s->secondsDownloading  = tor->secondsDownloading;
-  s->idleSecs            = torrentGetIdleSecs (tor);
+    s->percentComplete = tr_cpPercentComplete (&tor->completion);
+    s->metadataPercentComplete = tr_torrentGetMetadataPercent (tor);
 
-  s->corruptEver      = tor->corruptCur    + tor->corruptPrev;
-  s->downloadedEver   = tor->downloadedCur + tor->downloadedPrev;
-  s->uploadedEver     = tor->uploadedCur   + tor->uploadedPrev;
-  s->haveValid        = tr_cpHaveValid (&tor->completion);
-  s->haveUnchecked    = tr_cpHaveTotal (&tor->completion) - s->haveValid;
-  s->desiredAvailable = tr_peerMgrGetDesiredAvailable (tor);
+    s->percentDone         = tr_cpPercentDone (&tor->completion);
+    s->leftUntilDone       = tr_cpLeftUntilDone (&tor->completion);
+    s->sizeWhenDone        = tr_cpSizeWhenDone (&tor->completion);
+    s->recheckProgress     = s->activity == TR_STATUS_CHECK ? getVerifyProgress (tor) : 0;
+    s->activityDate        = tor->activityDate;
+    s->addedDate           = tor->addedDate;
+    s->doneDate            = tor->doneDate;
+    s->startDate           = tor->startDate;
+    s->secondsSeeding      = tor->secondsSeeding;
+    s->secondsDownloading  = tor->secondsDownloading;
+    s->idleSecs            = torrentGetIdleSecs (tor);
 
-  s->ratio = tr_getRatio (s->uploadedEver,
-                          s->downloadedEver ? s->downloadedEver : s->haveValid);
+    s->corruptEver      = tor->corruptCur    + tor->corruptPrev;
+    s->downloadedEver   = tor->downloadedCur + tor->downloadedPrev;
+    s->uploadedEver     = tor->uploadedCur   + tor->uploadedPrev;
+    s->haveValid        = tr_cpHaveValid (&tor->completion);
+    s->haveUnchecked    = tr_cpHaveTotal (&tor->completion) - s->haveValid;
+    s->desiredAvailable = tr_peerMgrGetDesiredAvailable (tor);
 
-  seedRatioApplies = tr_torrentGetSeedRatioBytes (tor, &seedRatioBytesLeft,
-                                                       &seedRatioBytesGoal);
+    s->ratio = tr_getRatio (s->uploadedEver,
+                            s->downloadedEver ? s->downloadedEver : s->haveValid);
 
-  switch (s->activity)
+    seedRatioApplies = tr_torrentGetSeedRatioBytes (tor, &seedRatioBytesLeft,
+                                                         &seedRatioBytesGoal);
+
+    switch (s->activity)
     {
-      /* etaXLSpeed exists because if we use the piece speed directly,
-       * brief fluctuations cause the ETA to jump all over the place.
-       * so, etaXLSpeed is a smoothed-out version of the piece speed
-       * to dampen the effect of fluctuations */
-      case TR_STATUS_DOWNLOAD:
-        if ((tor->etaDLSpeedCalculatedAt + 800) < now)
-          {
-            tor->etaDLSpeedCalculatedAt = now;
-            tor->etaDLSpeed_Bps = ((tor->etaDLSpeedCalculatedAt + 4000) < now)
-              ? pieceDownloadSpeed_Bps /* if no recent previous speed, no need to smooth */
-              : ((tor->etaDLSpeed_Bps*4.0) + pieceDownloadSpeed_Bps)/5.0; /* smooth across 5 readings */
-          }
+        /* etaXLSpeed exists because if we use the piece speed directly,
+         * brief fluctuations cause the ETA to jump all over the place.
+         * so, etaXLSpeed is a smoothed-out version of the piece speed
+         * to dampen the effect of fluctuations */
 
-        if ((s->leftUntilDone > s->desiredAvailable) && (tor->info.webseedCount < 1))
-          s->eta = TR_ETA_NOT_AVAIL;
-        else if (tor->etaDLSpeed_Bps == 0)
-          s->eta = TR_ETA_UNKNOWN;
-        else
-          s->eta = s->leftUntilDone / tor->etaDLSpeed_Bps;
+        case TR_STATUS_DOWNLOAD:
+            if ((tor->etaDLSpeedCalculatedAt + 800) < now) {
+                tor->etaDLSpeed_KBps = ((tor->etaDLSpeedCalculatedAt + 4000) < now)
+                    ? s->pieceDownloadSpeed_KBps /* if no recent previous speed, no need to smooth */
+                    : ((tor->etaDLSpeed_KBps*4.0) + s->pieceDownloadSpeed_KBps)/5.0; /* smooth across 5 readings */
+                tor->etaDLSpeedCalculatedAt = now;
+            }
 
-        s->etaIdle = TR_ETA_NOT_AVAIL;
-        break;
-
-      case TR_STATUS_SEED:
-        if (!seedRatioApplies)
-          {
-            s->eta = TR_ETA_NOT_AVAIL;
-          }
-        else
-          {
-            if ((tor->etaULSpeedCalculatedAt + 800) < now)
-              {
-                tor->etaULSpeedCalculatedAt = now;
-                tor->etaULSpeed_Bps = ((tor->etaULSpeedCalculatedAt + 4000) < now)
-                  ? pieceUploadSpeed_Bps /* if no recent previous speed, no need to smooth */
-                  : ((tor->etaULSpeed_Bps*4.0) + pieceUploadSpeed_Bps)/5.0; /* smooth across 5 readings */
-              }
-
-            if (tor->etaULSpeed_Bps == 0)
-              s->eta = TR_ETA_UNKNOWN;
+            if ((s->leftUntilDone > s->desiredAvailable) && (tor->info.webseedCount < 1)) 
+                s->eta = TR_ETA_NOT_AVAIL;
+            else if (tor->etaDLSpeed_KBps < 1)
+                s->eta = TR_ETA_UNKNOWN;
             else
-              s->eta = seedRatioBytesLeft / tor->etaULSpeed_Bps;
-          }
+                s->eta = s->leftUntilDone / toSpeedBytes (tor->etaDLSpeed_KBps);
 
-        if (tor->etaULSpeed_Bps < 1 && tr_torrentGetSeedIdle (tor, &seedIdleMinutes))
-          s->etaIdle = seedIdleMinutes * 60 - s->idleSecs;
-        else
-          s->etaIdle = TR_ETA_NOT_AVAIL;
-        break;
+            s->etaIdle = TR_ETA_NOT_AVAIL;
+            break;
 
-      default:
-        s->eta = TR_ETA_NOT_AVAIL;
-        s->etaIdle = TR_ETA_NOT_AVAIL;
-        break;
+        case TR_STATUS_SEED: {
+            if (!seedRatioApplies)
+                s->eta = TR_ETA_NOT_AVAIL;
+            else {
+                if ((tor->etaULSpeedCalculatedAt + 800) < now) {
+                    tor->etaULSpeed_KBps = ((tor->etaULSpeedCalculatedAt + 4000) < now)
+                        ? s->pieceUploadSpeed_KBps /* if no recent previous speed, no need to smooth */
+                        : ((tor->etaULSpeed_KBps*4.0) + s->pieceUploadSpeed_KBps)/5.0; /* smooth across 5 readings */
+                    tor->etaULSpeedCalculatedAt = now;
+                }
+                if (tor->etaULSpeed_KBps < 1)
+                    s->eta = TR_ETA_UNKNOWN;
+                else
+                    s->eta = seedRatioBytesLeft / toSpeedBytes (tor->etaULSpeed_KBps);
+            }
+
+            if (tor->etaULSpeed_KBps < 1 && tr_torrentGetSeedIdle (tor, &seedIdleMinutes))
+                s->etaIdle = seedIdleMinutes * 60 - s->idleSecs;
+            else
+                s->etaIdle = TR_ETA_NOT_AVAIL;
+            break;
+        }
+
+        default:
+            s->eta = TR_ETA_NOT_AVAIL;
+            s->etaIdle = TR_ETA_NOT_AVAIL;
+            break;
     }
 
-  /* s->haveValid is here to make sure a torrent isn't marked 'finished'
-   * when the user hits "uncheck all" prior to starting the torrent... */
-  s->finished = tor->finishedSeedingByIdle || (seedRatioApplies && !seedRatioBytesLeft && s->haveValid);
+    /* s->haveValid is here to make sure a torrent isn't marked 'finished'
+     * when the user hits "uncheck all" prior to starting the torrent... */
+    s->finished = tor->finishedSeedingByIdle || (seedRatioApplies && !seedRatioBytesLeft && s->haveValid);
 
-  if (!seedRatioApplies || s->finished)
-    s->seedRatioPercentDone = 1;
-  else if (!seedRatioBytesGoal) /* impossible? safeguard for div by zero */
-    s->seedRatioPercentDone = 0;
-  else
-    s->seedRatioPercentDone = (double)(seedRatioBytesGoal - seedRatioBytesLeft) / seedRatioBytesGoal;
+    if (!seedRatioApplies || s->finished)
+        s->seedRatioPercentDone = 1;
+    else if (!seedRatioBytesGoal) /* impossible? safeguard for div by zero */
+        s->seedRatioPercentDone = 0;
+    else
+        s->seedRatioPercentDone = (double)(seedRatioBytesGoal - seedRatioBytesLeft) / seedRatioBytesGoal;
 
-  /* test some of the constraints */
-  assert (s->sizeWhenDone <= tor->info.totalSize);
-  assert (s->leftUntilDone <= s->sizeWhenDone);
-  assert (s->desiredAvailable <= s->leftUntilDone);
+    tr_torrentUnlock (tor);
 
-  return s;
+    /* test some of the constraints */
+    assert (s->sizeWhenDone <= tor->info.totalSize);
+    assert (s->leftUntilDone <= s->sizeWhenDone);
+    assert (s->desiredAvailable <= s->leftUntilDone);
+    return s;
 }
 
 /***
@@ -1403,52 +1398,81 @@ tr_torrentFilesFree (tr_file_stat *            files,
 double*
 tr_torrentWebSpeeds_KBps (const tr_torrent * tor)
 {
-  assert (tr_isTorrent (tor));
+    double * ret = NULL;
 
-  return tr_peerMgrWebSpeeds_KBps (tor);
+    if (tr_isTorrent (tor))
+    {
+        tr_torrentLock (tor);
+        ret = tr_peerMgrWebSpeeds_KBps (tor);
+        tr_torrentUnlock (tor);
+    }
+
+    return ret;
 }
 
 tr_peer_stat *
 tr_torrentPeers (const tr_torrent * tor, int * peerCount)
 {
-  assert (tr_isTorrent (tor));
+    tr_peer_stat * ret = NULL;
 
-  return tr_peerMgrPeerStats (tor, peerCount);
+    if (tr_isTorrent (tor))
+    {
+        tr_torrentLock (tor);
+        ret = tr_peerMgrPeerStats (tor, peerCount);
+        tr_torrentUnlock (tor);
+    }
+
+    return ret;
 }
 
 void
 tr_torrentPeersFree (tr_peer_stat * peers, int peerCount UNUSED)
 {
-  tr_free (peers);
+    tr_free (peers);
 }
 
 tr_tracker_stat *
-tr_torrentTrackers (const tr_torrent * tor, int * setmeTrackerCount)
+tr_torrentTrackers (const tr_torrent * torrent, int * setmeTrackerCount)
 {
-  assert (tr_isTorrent (tor));
+    tr_tracker_stat * ret = NULL;
 
-  return tr_announcerStats (tor, setmeTrackerCount);
+    if (tr_isTorrent (torrent))
+    {
+        tr_torrentLock (torrent);
+        ret = tr_announcerStats (torrent, setmeTrackerCount);
+        tr_torrentUnlock (torrent);
+    }
+
+    return ret;
 }
 
 void
 tr_torrentTrackersFree (tr_tracker_stat * trackers, int trackerCount)
 {
-  tr_announcerStatsFree (trackers, trackerCount);
+    tr_announcerStatsFree (trackers, trackerCount);
 }
 
 void
 tr_torrentAvailability (const tr_torrent * tor, int8_t * tab, int size)
 {
-  assert (tr_isTorrent (tor));
-
-  if ((tab != NULL) && (size > 0))
-    tr_peerMgrTorrentAvailability (tor, tab, size);
+    if (tr_isTorrent (tor) && (tab != NULL) && (size > 0))
+    {
+        tr_torrentLock (tor);
+        tr_peerMgrTorrentAvailability (tor, tab, size);
+        tr_torrentUnlock (tor);
+    }
 }
 
 void
-tr_torrentAmountFinished (const tr_torrent * tor, float * tab, int size)
+tr_torrentAmountFinished (const tr_torrent * tor,
+                          float *            tab,
+                          int                size)
 {
-  tr_cpGetAmountDone (&tor->completion, tab, size);
+    assert (tr_isTorrent (tor));
+
+    tr_torrentLock (tor);
+    tr_cpGetAmountDone (&tor->completion, tab, size);
+    tr_torrentUnlock (tor);
 }
 
 static void
@@ -1612,7 +1636,7 @@ torrentShouldQueue (const tr_torrent * tor)
 static void
 torrentStart (tr_torrent * tor, bool bypass_queue)
 {
-    switch (tr_torrentGetActivity (tor))
+    switch (torrentGetActivity (tor))
     {
         case TR_STATUS_SEED:
         case TR_STATUS_DOWNLOAD:
@@ -1650,7 +1674,7 @@ torrentStart (tr_torrent * tor, bool bypass_queue)
 
     /* allow finished torrents to be resumed */
     if (tr_torrentIsSeedRatioDone (tor)) {
-        tr_torinf (tor, "%s", _("Restarted manually -- disabling its seed ratio"));
+        tr_torinf (tor, _("Restarted manually -- disabling its seed ratio"));
         tr_torrentSetRatioMode (tor, TR_RATIOLIMIT_UNLIMITED);
     }
 
@@ -1751,25 +1775,25 @@ tr_torrentSave (tr_torrent * tor)
 static void
 stopTorrent (void * vtor)
 {
-  tr_torrent * tor = vtor;
-  tr_torinf (tor, "%s", "Pausing");
+    tr_torrent * tor = vtor;
+    tr_torinf (tor, "Pausing");
 
-  assert (tr_isTorrent (tor));
+    assert (tr_isTorrent (tor));
 
-  tr_torrentLock (tor);
+    tr_torrentLock (tor);
 
-  tr_verifyRemove (tor);
-  torrentSetQueued (tor, false);
-  tr_peerMgrStopTorrent (tor);
-  tr_announcerTorrentStopped (tor);
-  tr_cacheFlushTorrent (tor->session->cache, tor);
+    tr_verifyRemove (tor);
+    torrentSetQueued (tor, false);
+    tr_peerMgrStopTorrent (tor);
+    tr_announcerTorrentStopped (tor);
+    tr_cacheFlushTorrent (tor->session->cache, tor);
 
-  tr_fdTorrentClose (tor->session, tor->uniqueId);
+    tr_fdTorrentClose (tor->session, tor->uniqueId);
 
-  if (!tor->isDeleting)
-    tr_torrentSave (tor);
+    if (!tor->isDeleting)
+        tr_torrentSave (tor);
 
-  tr_torrentUnlock (tor);
+    tr_torrentUnlock (tor);
 }
 
 void
@@ -1793,14 +1817,14 @@ tr_torrentStop (tr_torrent * tor)
 static void
 closeTorrent (void * vtor)
 {
-    tr_variant * d;
+    tr_benc * d;
     tr_torrent * tor = vtor;
 
     assert (tr_isTorrent (tor));
 
-    d = tr_variantListAddDict (&tor->session->removedTorrents, 2);
-    tr_variantDictAddInt (d, TR_KEY_id, tor->uniqueId);
-    tr_variantDictAddInt (d, TR_KEY_date, tr_time ());
+    d = tr_bencListAddDict (&tor->session->removedTorrents, 2);
+    tr_bencDictAddInt (d, "id", tor->uniqueId);
+    tr_bencDictAddInt (d, "date", tr_time ());
 
     tr_torinf (tor, "%s", _("Removing torrent"));
 
@@ -1817,19 +1841,19 @@ closeTorrent (void * vtor)
 }
 
 void
-tr_torrentFree (tr_torrent * tor) 
+tr_torrentFree (tr_torrent * tor)
 {
-  if (tr_isTorrent (tor)) 
-    { 
-      tr_session * session = tor->session; 
-      assert (tr_isSession (session)); 
-      tr_sessionLock (session); 
+    if (tr_isTorrent (tor))
+    {
+        tr_session * session = tor->session;
+        assert (tr_isSession (session));
+        tr_sessionLock (session);
 
-      tr_torrentClearCompletenessCallback (tor); 
-      tr_runInEventThread (session, closeTorrent, tor); 
+        tr_torrentClearCompletenessCallback (tor);
+        tr_runInEventThread (session, closeTorrent, tor);
 
-      tr_sessionUnlock (session); 
-    } 
+        tr_sessionUnlock (session);
+    }
 }
 
 struct remove_data
@@ -2017,55 +2041,60 @@ torrentCallScript (const tr_torrent * tor, const char * script)
 void
 tr_torrentRecheckCompleteness (tr_torrent * tor)
 {
-  tr_completeness completeness;
+    tr_completeness completeness;
 
-  tr_torrentLock (tor);
+    assert (tr_isTorrent (tor));
 
-  completeness = tr_cpGetStatus (&tor->completion);
-  if (completeness != tor->completeness)
+    tr_torrentLock (tor);
+
+    completeness = tr_cpGetStatus (&tor->completion);
+
+    if (completeness != tor->completeness)
     {
-      const int recentChange = tor->downloadedCur != 0;
-      const bool wasLeeching = !tr_torrentIsSeed (tor);
-      const bool wasRunning = tor->isRunning;
+        const int recentChange = tor->downloadedCur != 0;
+        const bool wasLeeching = !tr_torrentIsSeed (tor);
+        const bool wasRunning = tor->isRunning;
 
-      if (recentChange)
-        tr_torinf (tor, _("State changed from \"%1$s\" to \"%2$s\""),
-                   getCompletionString (tor->completeness),
-                   getCompletionString (completeness));
-
-      tor->completeness = completeness;
-      tr_fdTorrentClose (tor->session, tor->uniqueId);
-
-      fireCompletenessChange (tor, completeness, wasRunning);
-
-      if (tr_torrentIsSeed (tor))
+        if (recentChange)
         {
-          if (recentChange)
-            {
-              tr_announcerTorrentCompleted (tor);
-              tor->doneDate = tor->anyDate = tr_time ();
-            }
-
-          if (wasLeeching && wasRunning)
-            {
-              /* clear interested flag on all peers */
-              tr_peerMgrClearInterest (tor);
-
-              /* if completeness was TR_LEECH then the seed limit check will have been skipped in bandwidthPulse */
-              tr_torrentCheckSeedLimit (tor);
-            }
-
-          if (tor->currentDir == tor->incompleteDir)
-            tr_torrentSetLocation (tor, tor->downloadDir, true, NULL, NULL);
-
-          if (tr_sessionIsTorrentDoneScriptEnabled (tor->session))
-            torrentCallScript (tor, tr_sessionGetTorrentDoneScript (tor->session));
+            tr_torinf (tor, _("State changed from \"%1$s\" to \"%2$s\""),
+                      getCompletionString (tor->completeness),
+                      getCompletionString (completeness));
         }
 
-      tr_torrentSetDirty (tor);
+        tor->completeness = completeness;
+        tr_fdTorrentClose (tor->session, tor->uniqueId);
+
+        fireCompletenessChange (tor, completeness, wasRunning);
+
+        if (tr_torrentIsSeed (tor))
+        {
+            if (recentChange)
+            {
+                tr_announcerTorrentCompleted (tor);
+                tor->doneDate = tor->anyDate = tr_time ();
+            }
+
+            if (wasLeeching && wasRunning)
+            {
+                /* clear interested flag on all peers */
+                tr_peerMgrClearInterest (tor);
+
+                /* if completeness was TR_LEECH then the seed limit check will have been skipped in bandwidthPulse */
+                tr_torrentCheckSeedLimit (tor);
+            }
+
+            if (tor->currentDir == tor->incompleteDir)
+                tr_torrentSetLocation (tor, tor->downloadDir, true, NULL, NULL);
+
+            if (tr_sessionIsTorrentDoneScriptEnabled (tor->session))
+                torrentCallScript (tor, tr_sessionGetTorrentDoneScript (tor->session));
+        }
+
+        tr_torrentSetDirty (tor);
     }
 
-  tr_torrentUnlock (tor);
+    tr_torrentUnlock (tor);
 }
 
 /***
@@ -2137,17 +2166,18 @@ tr_torrentSetFilePriorities (tr_torrent             * tor,
 tr_priority_t*
 tr_torrentGetFilePriorities (const tr_torrent * tor)
 {
-  tr_file_index_t i;
-  tr_priority_t * p;
+    tr_file_index_t i;
+    tr_priority_t * p;
 
-  assert (tr_isTorrent (tor));
+    assert (tr_isTorrent (tor));
 
-  p = tr_new0 (tr_priority_t, tor->info.fileCount);
+    tr_torrentLock (tor);
+    p = tr_new0 (tr_priority_t, tor->info.fileCount);
+    for (i = 0; i < tor->info.fileCount; ++i)
+        p[i] = tor->info.files[i].priority;
+    tr_torrentUnlock (tor);
 
-  for (i=0; i<tor->info.fileCount; ++i)
-    p[i] = tor->info.files[i].priority;
-
-  return p;
+    return p;
 }
 
 /**
@@ -2240,7 +2270,6 @@ tr_torrentSetFileDLs (tr_torrent             * tor,
 
     tr_torrentInitFileDLs (tor, files, fileCount, doDownload);
     tr_torrentSetDirty (tor);
-    tr_torrentRecheckCompleteness (tor);
     tr_peerMgrRebuildRequests (tor);
 
     tr_torrentUnlock (tor);
@@ -2504,7 +2533,7 @@ tr_torrentSetAnnounceList (tr_torrent             * tor,
                            int                      trackerCount)
 {
     int i;
-    tr_variant metainfo;
+    tr_benc metainfo;
     bool ok = true;
     tr_tracker_info * trackers;
 
@@ -2522,33 +2551,33 @@ tr_torrentSetAnnounceList (tr_torrent             * tor,
             ok = false;
 
     /* save to the .torrent file */
-    if (ok && !tr_variantFromFile (&metainfo, TR_VARIANT_FMT_BENC, tor->info.torrent))
+    if (ok && !tr_bencLoadFile (&metainfo, TR_FMT_BENC, tor->info.torrent))
     {
         bool hasInfo;
         tr_info tmpInfo;
 
         /* remove the old fields */
-        tr_variantDictRemove (&metainfo, TR_KEY_announce);
-        tr_variantDictRemove (&metainfo, TR_KEY_announce_list);
+        tr_bencDictRemove (&metainfo, "announce");
+        tr_bencDictRemove (&metainfo, "announce-list");
 
         /* add the new fields */
         if (trackerCount > 0)
         {
-            tr_variantDictAddStr (&metainfo, TR_KEY_announce, trackers[0].announce);
+            tr_bencDictAddStr (&metainfo, "announce", trackers[0].announce);
         }
         if (trackerCount > 1)
         {
             int i;
             int prevTier = -1;
-            tr_variant * tier = NULL;
-            tr_variant * announceList = tr_variantDictAddList (&metainfo, TR_KEY_announce_list, 0);
+            tr_benc * tier = NULL;
+            tr_benc * announceList = tr_bencDictAddList (&metainfo, "announce-list", 0);
 
             for (i=0; i<trackerCount; ++i) {
                 if (prevTier != trackers[i].tier) {
                     prevTier = trackers[i].tier;
-                    tier = tr_variantListAddList (announceList, 0);
+                    tier = tr_bencListAddList (announceList, 0);
                 }
-                tr_variantListAddStr (tier, trackers[i].announce);
+                tr_bencListAddStr (tier, trackers[i].announce);
             }
         }
 
@@ -2568,11 +2597,11 @@ tr_torrentSetAnnounceList (tr_torrent             * tor,
             tmpInfo.trackerCount = swap.trackerCount;
 
             tr_metainfoFree (&tmpInfo);
-            tr_variantToFile (&metainfo, TR_VARIANT_FMT_BENC, tor->info.torrent);
+            tr_bencToFile (&metainfo, TR_FMT_BENC, tor->info.torrent);
         }
 
         /* cleanup */
-        tr_variantFree (&metainfo);
+        tr_bencFree (&metainfo);
 
         /* if we had a tracker-related error on this torrent,
          * and that tracker's been removed,
@@ -2765,8 +2794,11 @@ deleteLocalData (tr_torrent * tor, tr_fileFunc func)
         if (filename != NULL)
         {
             char * target = tr_buildPath (tmpdir, tor->info.files[f].name, NULL);
-            tr_moveFile (filename, target, NULL);
+            char * target_dir = tr_dirname (target);
+            tr_mkdirp (target_dir, 0777);
+            rename (filename, target);
             tr_ptrArrayAppend (&files, target);
+            tr_free (target_dir);
             tr_free (filename);
         }
     }

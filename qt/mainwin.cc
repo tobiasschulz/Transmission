@@ -617,24 +617,16 @@ TrMainWindow :: setLocation( )
 }
 
 // Open Folder & select torrent's file or top folder
-#undef HAVE_OPEN_SELECT
-#if defined(Q_OS_WIN)
-# define HAVE_OPEN_SELECT
-static
 void openSelect(const QString& path)
 {
+#if defined(Q_OS_WIN)
     const QString explorer = "explorer";
         QString param;
         if (!QFileInfo(path).isDir())
             param = QLatin1String("/select,");
         param += QDir::toNativeSeparators(path);
         QProcess::startDetached(explorer, QStringList(param));
-}
 #elif defined(Q_OS_MAC)
-# define HAVE_OPEN_SELECT
-static
-void openSelect(const QString& path)
-{
     QStringList scriptArgs;
         scriptArgs << QLatin1String("-e")
                    << QString::fromLatin1("tell application \"Finder\" to reveal POSIX file \"%1\"")
@@ -644,28 +636,25 @@ void openSelect(const QString& path)
         scriptArgs << QLatin1String("-e")
                    << QLatin1String("tell application \"Finder\" to activate");
         QProcess::execute("/usr/bin/osascript", scriptArgs);
-}
+#elif defined(Q_OS_UNIX)
+    QDesktopServices :: openUrl( QUrl::fromLocalFile( path ) );
 #endif
+}
 
 void
 TrMainWindow :: openFolder( )
 {
     const int torrentId( *getSelectedTorrents().begin() );
     const Torrent * tor( myModel.getTorrentFromId( torrentId ) );
-    QString path( tor->getPath( ) );
+    const QString path( tor->getPath( ) );
     const FileList files = tor->files();
-    const QString firstfile = files.at(0).filename;
-    int slashIndex = firstfile.indexOf('/');
-    if (slashIndex > -1) {
-        path = path + "/" + firstfile.left(slashIndex);
-    }
-#ifdef HAVE_OPEN_SELECT
+    if (files.size() == 1)
+        openSelect( path + "/" + files.at(0).filename );
     else {
-        openSelect( path + "/" + firstfile );
-        return;
+        QDir dir( path + "/" + files.at(0).filename );
+        dir.cdUp();
+        openSelect( dir.path() );
     }
-#endif
-    QDesktopServices :: openUrl( QUrl::fromLocalFile( path ) );
 }
 
 void
@@ -728,9 +717,14 @@ TrMainWindow :: refreshTrayIconSoon( )
 void
 TrMainWindow :: refreshTrayIcon( )
 {
+    Speed u, d;
     const QString idle = tr( "Idle" );
-    const Speed u (myModel.getUploadSpeed());
-    const Speed d (myModel.getDownloadSpeed());
+
+    foreach( int id, myModel.getIds( ) ) {
+        const Torrent * tor = myModel.getTorrentFromId( id );
+        u += tor->uploadSpeed( );
+        d += tor->downloadSpeed( );
+    }
 
     myTrayIcon.setToolTip( tr( "Transmission\nUp: %1\nDown: %2" )
                            .arg( u.isZero() ? idle : Formatter::speedToString( u ) )
@@ -1326,38 +1320,27 @@ TrMainWindow :: removeTorrents( const bool deleteFiles )
 void
 TrMainWindow :: updateNetworkIcon( )
 {
-  const time_t now = time( NULL );
-  const int period = 3;
-  const time_t secondsSinceLastSend = now - myLastSendTime;
-  const time_t secondsSinceLastRead = now - myLastReadTime;
-  const bool isSending = secondsSinceLastSend <= period;
-  const bool isReading = secondsSinceLastRead <= period;
-  const char * key;
+    const time_t now = time( NULL );
+    const int period = 3;
+    const bool isSending = now - myLastSendTime <= period;
+    const bool isReading = now - myLastReadTime <= period;
+    const char * key;
 
-  if( isSending && isReading )
-    key = "network-transmit-receive";
-  else if( isSending )
-    key = "network-transmit";
-  else if( isReading )
-    key = "network-receive";
-  else
-    key = "network-idle";
-  const QIcon icon = getStockIcon (key, QStyle::SP_DriveNetIcon);
-  const QPixmap pixmap = icon.pixmap (16, 16);
+    if( isSending && isReading )
+        key = "network-transmit-receive";
+    else if( isSending )
+        key = "network-transmit";
+    else if( isReading )
+        key = "network-receive";
+    else
+        key = "network-idle";
 
-  QString tip;
-  const QString url = mySession.getRemoteUrl().host();
-  if( !myLastReadTime )
-    tip = tr( "%1 has not responded yet" ).arg (url);
-  else if( secondsSinceLastRead < 60 )
-    tip = tr( "%1 is responding" ).arg (url);
-  else if( secondsSinceLastRead < (60*10) )
-    tip = tr( "%1 last responded %2 ago" ).arg(url).arg(Formatter::timeToString(secondsSinceLastRead));
-  else
-    tip = tr( "%1 is not responding" ).arg (url);
-
-  myNetworkLabel->setPixmap (pixmap);
-  myNetworkLabel->setToolTip (tip);
+    QIcon icon = getStockIcon( key, QStyle::SP_DriveNetIcon );
+    QPixmap pixmap = icon.pixmap ( 16, 16 );
+    myNetworkLabel->setPixmap( pixmap );
+    myNetworkLabel->setToolTip( isSending || isReading
+        ? tr( "Transmission server is responding" )
+        : tr( "Last response from server was %1 ago" ).arg( Formatter::timeToString( now-std::max(myLastReadTime,myLastSendTime))));
 }
 
 void

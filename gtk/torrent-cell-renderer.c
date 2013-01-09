@@ -525,34 +525,33 @@ typedef GdkRGBA GtrColor;
 static void
 get_text_color (GtkWidget * w, const tr_stat * st, GtrColor * setme)
 {
-  static const GdkRGBA red = { 1.0, 0, 0, 0 };
-
-  if (st->error)
-    *setme = red;
-  else if (st->activity == TR_STATUS_STOPPED)
-    gtk_style_context_get_color (gtk_widget_get_style_context (w), GTK_STATE_FLAG_INSENSITIVE, setme);
-  else
-    gtk_style_context_get_color (gtk_widget_get_style_context (w), GTK_STATE_FLAG_NORMAL, setme);
+    static const GdkRGBA red = { 1.0, 0, 0, 0 };
+    if (st->error)
+        *setme = red;
+    else if (st->activity == TR_STATUS_STOPPED)
+        gtk_style_context_get_color (gtk_widget_get_style_context (w), GTK_STATE_FLAG_INSENSITIVE, setme);
+    else
+        gtk_style_context_get_color (gtk_widget_get_style_context (w), GTK_STATE_FLAG_NORMAL, setme);
 }
 
 
 static double
 get_percent_done (const tr_torrent * tor, const tr_stat * st, bool * seed)
 {
-  double d;
+    double d;
 
-  if ((st->activity == TR_STATUS_SEED) && tr_torrentGetSeedRatio (tor, &d))
+    if ((st->activity == TR_STATUS_SEED) && tr_torrentGetSeedRatio (tor, &d))
     {
-      *seed = true;
-      d = MAX (0.0, st->seedRatioPercentDone);
+        *seed = true;
+        d = MAX (0.0, st->seedRatioPercentDone);
     }
-  else
+    else
     {
-      *seed = false;
-      d = MAX (0.0, st->percentDone);
+        *seed = false;
+        d = MAX (0.0, st->percentDone);
     }
 
-  return d;
+    return d;
 }
 
 typedef cairo_t GtrDrawable;

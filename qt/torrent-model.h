@@ -25,7 +25,7 @@ class Prefs;
 
 extern "C"
 {
-    struct tr_variant;
+    struct tr_benc;
 };
 
 class TorrentModel: public QAbstractListModel
@@ -51,10 +51,10 @@ class TorrentModel: public QAbstractListModel
     public:
         Torrent* getTorrentFromId( int id );
         const Torrent* getTorrentFromId( int id ) const;
+        QSet<int> getIds( ) const;
 
     private:
         void addTorrent( Torrent * );
-        QSet<int> getIds( ) const;
 
     public:
         Speed getUploadSpeed( ) const;
@@ -64,8 +64,8 @@ class TorrentModel: public QAbstractListModel
         void torrentsAdded( QSet<int> );
 
     public slots:
-        void updateTorrents( tr_variant * torrentList, bool isCompleteList );
-        void removeTorrents( tr_variant * torrentList );
+        void updateTorrents( tr_benc * torrentList, bool isCompleteList );
+        void removeTorrents( tr_benc * torrentList );
         void removeTorrent( int id );
 
     private slots:

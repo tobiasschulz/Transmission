@@ -50,6 +50,7 @@
 
 /* libT */
 #include "transmission.h"
+#include "bencode.h"
 #include "crypto.h"
 #include "net.h"
 #include "peer-mgr.h" /* tr_peerMgrCompactToPex () */
@@ -59,7 +60,6 @@
 #include "tr-dht.h"
 #include "trevent.h" /* tr_runInEventThread () */
 #include "utils.h"
-#include "variant.h"
 
 static struct event *dht_timer = NULL;
 static unsigned char myid[20];
@@ -261,7 +261,7 @@ dht_bootstrap (void *closure)
 int
 tr_dhtInit (tr_session *ss)
 {
-    tr_variant benc;
+    tr_benc benc;
     int rc;
     bool have_id = false;
     char * dat_file;
@@ -279,21 +279,21 @@ tr_dhtInit (tr_session *ss)
         dht_debug = stderr;
 
     dat_file = tr_buildPath (ss->configDir, "dht.dat", NULL);
-    rc = tr_variantFromFile (&benc, TR_VARIANT_FMT_BENC, dat_file);
+    rc = tr_bencLoadFile (&benc, TR_FMT_BENC, dat_file);
     tr_free (dat_file);
     if (rc == 0) {
-        have_id = tr_variantDictFindRaw (&benc, TR_KEY_id, &raw, &len);
+        have_id = tr_bencDictFindRaw (&benc, "id", &raw, &len);
         if (have_id && len==20)
             memcpy (myid, raw, len);
         if (ss->udp_socket >= 0 &&
-            tr_variantDictFindRaw (&benc, TR_KEY_nodes, &raw, &len) && ! (len%6)) {
+            tr_bencDictFindRaw (&benc, "nodes", &raw, &len) && ! (len%6)) {
                 nodes = tr_memdup (raw, len);
         }
         if (ss->udp6_socket > 0 &&
-            tr_variantDictFindRaw (&benc, TR_KEY_nodes6, &raw, &len6) && ! (len6%18)) {
+            tr_bencDictFindRaw (&benc, "nodes6", &raw, &len6) && ! (len6%18)) {
             nodes6 = tr_memdup (raw, len6);
         }
-        tr_variantFree (&benc);
+        tr_bencFree (&benc);
     }
 
     if (nodes == NULL)
@@ -356,7 +356,7 @@ tr_dhtUninit (tr_session *ss)
       (tr_dhtStatus (ss, AF_INET6, NULL) < TR_DHT_FIREWALLED)) {
         tr_ninf ("DHT", "Not saving nodes, DHT not ready");
     } else {
-        tr_variant benc;
+        tr_benc benc;
         struct sockaddr_in sins[300];
         struct sockaddr_in6 sins6[300];
         char compact[300 * 6], compact6[300 * 18];
@@ -378,15 +378,15 @@ tr_dhtUninit (tr_session *ss)
             memcpy (compact6 + j + 16, &sins6[i].sin6_port, 2);
             j += 18;
         }
-        tr_variantInitDict (&benc, 3);
-        tr_variantDictAddRaw (&benc, TR_KEY_id, myid, 20);
+        tr_bencInitDict (&benc, 3);
+        tr_bencDictAddRaw (&benc, "id", myid, 20);
         if (num > 0)
-            tr_variantDictAddRaw (&benc, TR_KEY_nodes, compact, num * 6);
+            tr_bencDictAddRaw (&benc, "nodes", compact, num * 6);
         if (num6 > 0)
-            tr_variantDictAddRaw (&benc, TR_KEY_nodes6, compact6, num6 * 18);
+            tr_bencDictAddRaw (&benc, "nodes6", compact6, num6 * 18);
         dat_file = tr_buildPath (ss->configDir, "dht.dat", NULL);
-        tr_variantToFile (&benc, TR_VARIANT_FMT_BENC, dat_file);
-        tr_variantFree (&benc);
+        tr_bencToFile (&benc, TR_FMT_BENC, dat_file);
+        tr_bencFree (&benc);
         tr_free (dat_file);
     }
 
@@ -540,10 +540,10 @@ callback (void *ignore UNUSED, int event,
         tr_torrent * tor = tr_torrentFindFromHash (session, info_hash);
         if (tor) {
             if (event == DHT_EVENT_SEARCH_DONE) {
-                tr_torinf (tor, "%s", "IPv4 DHT announce done");
+                tr_torinf (tor, "IPv4 DHT announce done");
                 tor->dhtAnnounceInProgress = 0;
             } else {
-                tr_torinf (tor, "%s", "IPv6 DHT announce done");
+                tr_torinf (tor, "IPv6 DHT announce done");
                 tor->dhtAnnounce6InProgress = 0;
             }
         }

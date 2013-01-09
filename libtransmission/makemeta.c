@@ -27,10 +27,10 @@
 #include "crypto.h" /* tr_sha1 */
 #include "fdlimit.h" /* tr_open_file_for_scanning () */
 #include "session.h"
+#include "bencode.h"
 #include "makemeta.h"
 #include "platform.h" /* threads, locks */
 #include "utils.h" /* buildpath */
-#include "variant.h"
 #include "version.h"
 
 /****
@@ -290,13 +290,13 @@ getHashInfo (tr_metainfo_builder * b)
 static void
 getFileInfo (const char *                     topFile,
              const tr_metainfo_builder_file * file,
-             tr_variant *                        uninitialized_length,
-             tr_variant *                        uninitialized_path)
+             tr_benc *                        uninitialized_length,
+             tr_benc *                        uninitialized_path)
 {
     size_t offset;
 
     /* get the file size */
-    tr_variantInitInt (uninitialized_length, file->size);
+    tr_bencInitInt (uninitialized_length, file->size);
 
     /* how much of file->filename to walk past */
     offset = strlen (topFile);
@@ -304,65 +304,65 @@ getFileInfo (const char *                     topFile,
         ++offset; /* +1 for the path delimiter */
 
     /* build the path list */
-    tr_variantInitList (uninitialized_path, 0);
+    tr_bencInitList (uninitialized_path, 0);
     if (strlen (file->filename) > offset) {
         char * filename = tr_strdup (file->filename + offset);
         char * walk = filename;
         const char * token;
         while ((token = tr_strsep (&walk, TR_PATH_DELIMITER_STR)))
-            tr_variantListAddStr (uninitialized_path, token);
+            tr_bencListAddStr (uninitialized_path, token);
         tr_free (filename);
     }
 }
 
 static void
-makeInfoDict (tr_variant *             dict,
+makeInfoDict (tr_benc *             dict,
               tr_metainfo_builder * builder)
 {
     uint8_t * pch;
     char    * base;
 
-    tr_variantDictReserve (dict, 5);
+    tr_bencDictReserve (dict, 5);
 
     if (builder->isSingleFile)
     {
-        tr_variantDictAddInt (dict, TR_KEY_length, builder->files[0].size);
+        tr_bencDictAddInt (dict, "length", builder->files[0].size);
     }
     else /* root node is a directory */
     {
         uint32_t  i;
-        tr_variant * list = tr_variantDictAddList (dict, TR_KEY_files,
+        tr_benc * list = tr_bencDictAddList (dict, "files",
                                              builder->fileCount);
         for (i = 0; i < builder->fileCount; ++i)
         {
-            tr_variant * d = tr_variantListAddDict (list, 2);
-            tr_variant * length = tr_variantDictAdd (d, TR_KEY_length);
-            tr_variant * pathVal = tr_variantDictAdd (d, TR_KEY_path);
+            tr_benc * d = tr_bencListAddDict (list, 2);
+            tr_benc * length = tr_bencDictAdd (d, "length");
+            tr_benc * pathVal = tr_bencDictAdd (d, "path");
             getFileInfo (builder->top, &builder->files[i], length, pathVal);
         }
     }
 
     base = tr_basename (builder->top);
-    tr_variantDictAddStr (dict, TR_KEY_name, base);
+    tr_bencDictAddStr (dict, "name", base);
     tr_free (base);
 
-    tr_variantDictAddInt (dict, TR_KEY_piece_length, builder->pieceSize);
+    tr_bencDictAddInt (dict, "piece length", builder->pieceSize);
 
     if ((pch = getHashInfo (builder)))
     {
-        tr_variantDictAddRaw (dict, TR_KEY_pieces, pch,
-                              SHA_DIGEST_LENGTH * builder->pieceCount);
+        tr_bencDictAddRaw (dict, "pieces", pch,
+                           SHA_DIGEST_LENGTH * builder->pieceCount);
         tr_free (pch);
     }
 
-    tr_variantDictAddInt (dict, TR_KEY_private, builder->isPrivate ? 1 : 0);
+    tr_bencDictAddInt (dict, "private", builder->isPrivate ? 1 : 0);
 }
 
 static void
 tr_realMakeMetaInfo (tr_metainfo_builder * builder)
 {
     int     i;
-    tr_variant top;
+    tr_benc top;
 
     /* allow an empty set, but if URLs *are* listed, verify them. #814, #971 */
     for (i = 0; i < builder->trackerCount && !builder->result; ++i) {
@@ -373,7 +373,7 @@ tr_realMakeMetaInfo (tr_metainfo_builder * builder)
         }
     }
 
-    tr_variantInitDict (&top, 6);
+    tr_bencInitDict (&top, 6);
 
     if (!builder->fileCount || !builder->totalSize ||
         !builder->pieceSize || !builder->pieceCount)
@@ -387,40 +387,41 @@ tr_realMakeMetaInfo (tr_metainfo_builder * builder)
     if (!builder->result && builder->trackerCount)
     {
         int       prevTier = -1;
-        tr_variant * tier = NULL;
+        tr_benc * tier = NULL;
 
         if (builder->trackerCount > 1)
         {
-            tr_variant * annList = tr_variantDictAddList (&top, TR_KEY_announce_list, 0);
+            tr_benc * annList = tr_bencDictAddList (&top, "announce-list",
+                                                    0);
             for (i = 0; i < builder->trackerCount; ++i)
             {
                 if (prevTier != builder->trackers[i].tier)
                 {
                     prevTier = builder->trackers[i].tier;
-                    tier = tr_variantListAddList (annList, 0);
+                    tier = tr_bencListAddList (annList, 0);
                 }
-                tr_variantListAddStr (tier, builder->trackers[i].announce);
+                tr_bencListAddStr (tier, builder->trackers[i].announce);
             }
         }
 
-        tr_variantDictAddStr (&top, TR_KEY_announce, builder->trackers[0].announce);
+        tr_bencDictAddStr (&top, "announce", builder->trackers[0].announce);
     }
 
     if (!builder->result && !builder->abortFlag)
     {
         if (builder->comment && *builder->comment)
-            tr_variantDictAddStr (&top, TR_KEY_comment, builder->comment);
-        tr_variantDictAddStr (&top, TR_KEY_created_by,
+            tr_bencDictAddStr (&top, "comment", builder->comment);
+        tr_bencDictAddStr (&top, "created by",
                            TR_NAME "/" LONG_VERSION_STRING);
-        tr_variantDictAddInt (&top, TR_KEY_creation_date, time (NULL));
-        tr_variantDictAddStr (&top, TR_KEY_encoding, "UTF-8");
-        makeInfoDict (tr_variantDictAddDict (&top, TR_KEY_info, 666), builder);
+        tr_bencDictAddInt (&top, "creation date", time (NULL));
+        tr_bencDictAddStr (&top, "encoding", "UTF-8");
+        makeInfoDict (tr_bencDictAddDict (&top, "info", 666), builder);
     }
 
     /* save the file */
     if (!builder->result && !builder->abortFlag)
     {
-        if (tr_variantToFile (&top, TR_VARIANT_FMT_BENC, builder->outputFile))
+        if (tr_bencToFile (&top, TR_FMT_BENC, builder->outputFile))
         {
             builder->my_errno = errno;
             tr_strlcpy (builder->errfile, builder->outputFile,
@@ -430,7 +431,7 @@ tr_realMakeMetaInfo (tr_metainfo_builder * builder)
     }
 
     /* cleanup */
-    tr_variantFree (&top);
+    tr_bencFree (&top);
     if (builder->abortFlag)
         builder->result = TR_MAKEMETA_CANCELLED;
     builder->isDone = 1;

@@ -27,6 +27,7 @@
 #include <event2/http_struct.h> /* TODO: eventually remove this */
 
 #include "transmission.h"
+#include "bencode.h"
 #include "crypto.h" /* tr_cryptoRandBuf (), tr_ssha1_matches () */
 #include "fdlimit.h"
 #include "list.h"
@@ -38,7 +39,6 @@
 #include "session.h"
 #include "trevent.h"
 #include "utils.h"
-#include "variant.h"
 #include "web.h"
 
 /* session-id is used to make cross-site request forgery attacks difficult.
@@ -242,35 +242,35 @@ handle_upload (struct evhttp_request * req,
         {
             struct tr_mimepart * p = tr_ptrArrayNth (&parts, i);
             int body_len = p->body_len;
-            tr_variant top, *args;
-            tr_variant test;
+            tr_benc top, *args;
+            tr_benc test;
             bool have_source = false;
             char * body = p->body;
 
             if (body_len >= 2 && !memcmp (&body[body_len - 2], "\r\n", 2))
                 body_len -= 2;
 
-            tr_variantInitDict (&top, 2);
-            tr_variantDictAddStr (&top, TR_KEY_method, "torrent-add");
-            args = tr_variantDictAddDict (&top, TR_KEY_arguments, 2);
-            tr_variantDictAddBool (args, TR_KEY_paused, paused);
+            tr_bencInitDict (&top, 2);
+            tr_bencDictAddStr (&top, "method", "torrent-add");
+            args = tr_bencDictAddDict (&top, "arguments", 2);
+            tr_bencDictAddBool (args, "paused", paused);
 
             if (tr_urlIsValid (body, body_len))
             {
-                tr_variantDictAddRaw (args, TR_KEY_filename, body, body_len);
+                tr_bencDictAddRaw (args, "filename", body, body_len);
                 have_source = true;
             }
-            else if (!tr_variantFromBenc (&test, body, body_len))
+            else if (!tr_bencLoad (body, body_len, &test, NULL))
             {
                 char * b64 = tr_base64_encode (body, body_len, NULL);
-                tr_variantDictAddStr (args, TR_KEY_metainfo, b64);
+                tr_bencDictAddStr (args, "metainfo", b64);
                 tr_free (b64);
                 have_source = true;
             }
 
             if (have_source)
             {
-                struct evbuffer * json = tr_variantToBuf (&top, TR_VARIANT_FMT_JSON);
+                struct evbuffer * json = tr_bencToBuf (&top, TR_FMT_JSON);
                 tr_rpc_request_exec_json (server->session,
                                           evbuffer_pullup (json, -1),
                                           evbuffer_get_length (json),
@@ -278,7 +278,7 @@ handle_upload (struct evhttp_request * req,
                 evbuffer_free (json);
             }
 
-            tr_variantFree (&top);
+            tr_bencFree (&top);
         }
 
         tr_ptrArrayDestruct (&parts, (PtrArrayForeachFunc)tr_mimepart_free);
@@ -918,77 +918,70 @@ tr_rpcClose (tr_rpc_server ** ps)
     *ps = NULL;
 }
 
-static void
-missing_settings_key (const tr_quark q)
-{
-  const char * str = tr_quark_get_string (q, NULL);
-  tr_nerr (MY_NAME, _("Couldn't find settings key \"%s\""), str);
-} 
-
 tr_rpc_server *
-tr_rpcInit (tr_session  * session, tr_variant * settings)
+tr_rpcInit (tr_session  * session, tr_benc * settings)
 {
     tr_rpc_server * s;
     bool boolVal;
     int64_t i;
     const char * str;
-    tr_quark key;
+    const char * key;
     tr_address address;
 
     s = tr_new0 (tr_rpc_server, 1);
     s->session = session;
 
-    key = TR_KEY_rpc_enabled;
-    if (!tr_variantDictFindBool (settings, key, &boolVal))
-        missing_settings_key (key);
+    key = TR_PREFS_KEY_RPC_ENABLED;
+    if (!tr_bencDictFindBool (settings, key, &boolVal))
+        tr_nerr (MY_NAME, _("Couldn't find settings key \"%s\""), key);
     else
         s->isEnabled = boolVal;
 
-    key = TR_KEY_rpc_port;
-    if (!tr_variantDictFindInt (settings, key, &i))
-        missing_settings_key (key);
+    key = TR_PREFS_KEY_RPC_PORT;
+    if (!tr_bencDictFindInt (settings, key, &i))
+        tr_nerr (MY_NAME, _("Couldn't find settings key \"%s\""), key);
     else
         s->port = i;
 
-    key = TR_KEY_rpc_url;
-    if (!tr_variantDictFindStr (settings, key, &str, NULL))
-        missing_settings_key (key);
+    key = TR_PREFS_KEY_RPC_URL;
+    if (!tr_bencDictFindStr (settings, TR_PREFS_KEY_RPC_URL, &str))
+        tr_nerr (MY_NAME, _("Couldn't find settings key \"%s\""), key);
     else
         s->url = tr_strdup (str);
 
-    key = TR_KEY_rpc_whitelist_enabled;
-    if (!tr_variantDictFindBool (settings, key, &boolVal))
-        missing_settings_key (key);
+    key = TR_PREFS_KEY_RPC_WHITELIST_ENABLED;
+    if (!tr_bencDictFindBool (settings, key, &boolVal))
+        tr_nerr (MY_NAME, _("Couldn't find settings key \"%s\""), key);
     else
         tr_rpcSetWhitelistEnabled (s, boolVal);
 
-    key = TR_KEY_rpc_authentication_required;
-    if (!tr_variantDictFindBool (settings, key, &boolVal))
-        missing_settings_key (key);
+    key = TR_PREFS_KEY_RPC_AUTH_REQUIRED;
+    if (!tr_bencDictFindBool (settings, key, &boolVal))
+        tr_nerr (MY_NAME, _("Couldn't find settings key \"%s\""), key);
     else
         tr_rpcSetPasswordEnabled (s, boolVal);
 
-    key = TR_KEY_rpc_whitelist;
-    if (!tr_variantDictFindStr (settings, key, &str, NULL) && str)
-        missing_settings_key (key);
+    key = TR_PREFS_KEY_RPC_WHITELIST;
+    if (!tr_bencDictFindStr (settings, key, &str) && str)
+        tr_nerr (MY_NAME, _("Couldn't find settings key \"%s\""), key);
     else
         tr_rpcSetWhitelist (s, str);
 
-    key = TR_KEY_rpc_username;
-    if (!tr_variantDictFindStr (settings, key, &str, NULL))
-        missing_settings_key (key);
+    key = TR_PREFS_KEY_RPC_USERNAME;
+    if (!tr_bencDictFindStr (settings, key, &str))
+        tr_nerr (MY_NAME, _("Couldn't find settings key \"%s\""), key);
     else
         tr_rpcSetUsername (s, str);
 
-    key = TR_KEY_rpc_password;
-    if (!tr_variantDictFindStr (settings, key, &str, NULL))
-        missing_settings_key (key);
+    key = TR_PREFS_KEY_RPC_PASSWORD;
+    if (!tr_bencDictFindStr (settings, key, &str))
+        tr_nerr (MY_NAME, _("Couldn't find settings key \"%s\""), key);
     else
         tr_rpcSetPassword (s, str);
 
-    key = TR_KEY_rpc_bind_address;
-    if (!tr_variantDictFindStr (settings, key, &str, NULL)) {
-        missing_settings_key (key);
+    key = TR_PREFS_KEY_RPC_BIND_ADDRESS;
+    if (!tr_bencDictFindStr (settings, TR_PREFS_KEY_RPC_BIND_ADDRESS, &str)) {
+        tr_nerr (MY_NAME, _("Couldn't find settings key \"%s\""), key);
         address = tr_inaddr_any;
     } else if (!tr_address_from_string (&address, str)) {
         tr_nerr (MY_NAME, _("%s is not a valid address"), str);

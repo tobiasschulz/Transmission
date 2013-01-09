@@ -10,7 +10,6 @@
  * $Id$
  */
 
-#include <algorithm>
 #include <iostream>
 
 #include "filters.h"
@@ -206,21 +205,19 @@ TorrentFilter :: hiddenRowCount( ) const
     return sourceModel()->rowCount( ) - rowCount( );
 }
 
-void
-TorrentFilter :: countTorrentsPerMode (int * setmeCounts) const
+int
+TorrentFilter :: count( const FilterMode& mode ) const
 {
-  std::fill_n (setmeCounts, FilterMode::NUM_MODES, 0);
+    int count = 0;
 
-  for (int row(0); ; ++row)
-    { 
-      QModelIndex index (sourceModel()->index(row, 0));
-      if (!index.isValid())
-        break;
-
-      const Torrent * tor (index.data( TorrentModel::TorrentRole ).value<const Torrent*>());
-      for (int mode(0); mode<FilterMode::NUM_MODES; ++mode)
-        if (activityFilterAcceptsTorrent (tor, mode))
-          ++setmeCounts[mode];
+    for( int row=0; ; ++row ) {
+        QModelIndex index = sourceModel()->index( row, 0 );
+        if( !index.isValid( ) )
+            break;
+        const Torrent * tor = index.data( TorrentModel::TorrentRole ).value<const Torrent*>();
+        if( activityFilterAcceptsTorrent( tor, mode ) )
+            ++count;
     }
-}
 
+    return count;
+}

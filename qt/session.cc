@@ -33,9 +33,10 @@
 #include <event2/buffer.h>
 
 #include <libtransmission/transmission.h>
+#include <libtransmission/bencode.h>
+#include <libtransmission/json.h>
 #include <libtransmission/rpcimpl.h>
 #include <libtransmission/utils.h> // tr_free
-#include <libtransmission/variant.h>
 #include <libtransmission/version.h> // LONG_VERSION
 #include <libtransmission/web.h>
 
@@ -71,18 +72,18 @@ namespace
 
 namespace
 {
-  typedef Torrent::KeyList KeyList;
-  const KeyList& getInfoKeys() { return Torrent::getInfoKeys(); }
-  const KeyList& getStatKeys() { return Torrent::getStatKeys(); }
-  const KeyList& getExtraStatKeys() { return Torrent::getExtraStatKeys(); }
+    typedef Torrent::KeyList KeyList;
+    const KeyList& getInfoKeys( ) { return Torrent::getInfoKeys( ); }
+    const KeyList& getStatKeys( ) { return Torrent::getStatKeys( ); }
+    const KeyList& getExtraStatKeys( ) { return Torrent::getExtraStatKeys( ); }
 
-  void
-  addList (tr_variant * list, const KeyList& keys)
-  {
-    tr_variantListReserve (list, keys.size());
-    foreach (tr_quark key, keys)
-      tr_variantListAddQuark (list, key);
-  }
+    void
+    addList( tr_benc * list, const KeyList& strings )
+    {
+        tr_bencListReserve( list, strings.size( ) );
+        foreach( const char * str, strings )
+            tr_bencListAddStr( list, str );
+    }
 }
 
 /***
@@ -90,47 +91,47 @@ namespace
 ***/
 
 void
-Session :: sessionSet( const tr_quark key, const QVariant& value )
+Session :: sessionSet( const char * key, const QVariant& value )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 2 );
-    tr_variantDictAddStr( &top, TR_KEY_method, "session-set" );
-    tr_variant * args( tr_variantDictAddDict( &top, TR_KEY_arguments, 1 ) );
+    tr_benc top;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "session-set" );
+    tr_benc * args( tr_bencDictAddDict( &top, "arguments", 1 ) );
     switch( value.type( ) ) {
-        case QVariant::Bool:   tr_variantDictAddBool ( args, key, value.toBool() ); break;
-        case QVariant::Int:    tr_variantDictAddInt  ( args, key, value.toInt() ); break;
-        case QVariant::Double: tr_variantDictAddReal ( args, key, value.toDouble() ); break;
-        case QVariant::String: tr_variantDictAddStr  ( args, key, value.toString().toUtf8().constData() ); break;
+        case QVariant::Bool:   tr_bencDictAddBool ( args, key, value.toBool() ); break;
+        case QVariant::Int:    tr_bencDictAddInt  ( args, key, value.toInt() ); break;
+        case QVariant::Double: tr_bencDictAddReal ( args, key, value.toDouble() ); break;
+        case QVariant::String: tr_bencDictAddStr  ( args, key, value.toString().toUtf8().constData() ); break;
         default: assert( "unknown type" );
     }
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
 Session :: portTest( )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 2 );
-    tr_variantDictAddStr( &top, TR_KEY_method, "port-test" );
-    tr_variantDictAddInt( &top, TR_KEY_tag, TAG_PORT_TEST );
+    tr_benc top;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "port-test" );
+    tr_bencDictAddInt( &top, "tag", TAG_PORT_TEST );
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
 Session :: copyMagnetLinkToClipboard( int torrentId )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 3 );
-    tr_variantDictAddQuark( &top, TR_KEY_method, TR_KEY_torrent_get );
-    tr_variantDictAddInt( &top, TR_KEY_tag, TAG_MAGNET_LINK );
-    tr_variant * args = tr_variantDictAddDict( &top, TR_KEY_arguments, 2 );
-    tr_variantListAddInt( tr_variantDictAddList( args, TR_KEY_ids, 1 ), torrentId );
-    tr_variantListAddStr( tr_variantDictAddList( args, TR_KEY_fields, 1 ), "magnetLink" );
+    tr_benc top;
+    tr_bencInitDict( &top, 3 );
+    tr_bencDictAddStr( &top, "method", "torrent-get" );
+    tr_bencDictAddInt( &top, "tag", TAG_MAGNET_LINK );
+    tr_benc * args = tr_bencDictAddDict( &top, "arguments", 2 );
+    tr_bencListAddInt( tr_bencDictAddList( args, "ids", 1 ), torrentId );
+    tr_bencListAddStr( tr_bencDictAddList( args, "fields", 1 ), "magnetLink" );
 
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
@@ -174,14 +175,14 @@ Session :: updatePref( int key )
         case Prefs :: USPEED:
         case Prefs :: USPEED_ENABLED:
         case Prefs :: UTP_ENABLED:
-            sessionSet( myPrefs.getKey(key), myPrefs.variant(key) );
+            sessionSet( myPrefs.keyStr(key), myPrefs.variant(key) );
             break;
 
         case Prefs :: RATIO:
-            sessionSet( TR_KEY_seedRatioLimit, myPrefs.variant(key) );
+            sessionSet( "seedRatioLimit", myPrefs.variant(key) );
             break;
         case Prefs :: RATIO_ENABLED:
-            sessionSet( TR_KEY_seedRatioLimited, myPrefs.variant(key) );
+            sessionSet( "seedRatioLimited", myPrefs.variant(key) );
             break;
 
         case Prefs :: ENCRYPTION:
@@ -190,13 +191,13 @@ Session :: updatePref( int key )
                 switch( i )
                 {
                     case 0:
-                        sessionSet( myPrefs.getKey(key), "tolerated" );
+                        sessionSet( myPrefs.keyStr(key), "tolerated" );
                         break;
                     case 1:
-                        sessionSet( myPrefs.getKey(key), "preferred" );
+                        sessionSet( myPrefs.keyStr(key), "preferred" );
                         break;
                     case 2:
-                        sessionSet( myPrefs.getKey(key), "required" );
+                        sessionSet( myPrefs.keyStr(key), "required" );
                         break;
                 }
                 break;
@@ -329,11 +330,11 @@ Session :: start( )
     }
     else
     {
-        tr_variant settings;
-        tr_variantInitDict( &settings, 0 );
+        tr_benc settings;
+        tr_bencInitDict( &settings, 0 );
         tr_sessionLoadSettings( &settings, myConfigDir.toUtf8().constData(), "qt" );
         mySession = tr_sessionInit( "qt", myConfigDir.toUtf8().constData(), true, &settings );
-        tr_variantFree( &settings );
+        tr_bencFree( &settings );
 
         tr_ctor * ctor = tr_ctorNew( mySession );
         int torrentCount;
@@ -372,126 +373,124 @@ Session :: isLocal( ) const
 
 namespace
 {
-  tr_variant *
-  buildRequest (const char * method, tr_variant& top, int tag=-1)
-  {
-    tr_variantInitDict (&top, 3);
-    tr_variantDictAddStr (&top, TR_KEY_method, method);
+    tr_benc *
+    buildRequest( const char * method, tr_benc& top, int tag=-1 )
+    {
+        tr_bencInitDict( &top, 3 );
+        tr_bencDictAddStr( &top, "method", method );
+        if( tag >= 0 )
+            tr_bencDictAddInt( &top, "tag", tag );
+        return tr_bencDictAddDict( &top, "arguments", 0 );
+    }
 
-    if (tag >= 0)
-      tr_variantDictAddInt (&top, TR_KEY_tag, tag);
-
-    return tr_variantDictAddDict (&top, TR_KEY_arguments, 0);
-  }
-
-  void
-  addOptionalIds( tr_variant * args, const QSet<int>& ids )
-  {
-    if (!ids.isEmpty())
-      {
-        tr_variant * idList (tr_variantDictAddList (args, TR_KEY_ids, ids.size()));
-        foreach (int i, ids)
-          tr_variantListAddInt (idList, i);
-      }
-  }
+    void
+    addOptionalIds( tr_benc * args, const QSet<int>& ids )
+    {
+        if( !ids.isEmpty( ) )
+        {
+            tr_benc * idList( tr_bencDictAddList( args, "ids", ids.size( ) ) );
+            foreach( int i, ids )
+                tr_bencListAddInt( idList, i );
+        }
+    }
 }
 
 void
-Session :: torrentSet( const QSet<int>& ids, const tr_quark key, double value )
+Session :: torrentSet( const QSet<int>& ids, const QString& key, double value )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 2 );
-    tr_variantDictAddQuark( &top, TR_KEY_method, TR_KEY_torrent_set );
-    tr_variant * args = tr_variantDictAddDict( &top, TR_KEY_arguments, 2 );
-    tr_variantDictAddReal( args, key, value );
+    tr_benc top;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "torrent-set" );
+    tr_benc * args = tr_bencDictAddDict( &top, "arguments", 2 );
+    tr_bencDictAddReal( args, key.toUtf8().constData(), value );
     addOptionalIds( args, ids );
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
-Session :: torrentSet( const QSet<int>& ids, const tr_quark key, int value )
+Session :: torrentSet( const QSet<int>& ids, const QString& key, int value )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 2 );
-    tr_variantDictAddQuark( &top, TR_KEY_method, TR_KEY_torrent_set );
-    tr_variant * args = tr_variantDictAddDict( &top, TR_KEY_arguments, 2 );
-    tr_variantDictAddInt( args, key, value );
+    tr_benc top;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "torrent-set" );
+    tr_benc * args = tr_bencDictAddDict( &top, "arguments", 2 );
+    tr_bencDictAddInt( args, key.toUtf8().constData(), value );
     addOptionalIds( args, ids );
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
-Session :: torrentSet( const QSet<int>& ids, const tr_quark key, bool value )
+Session :: torrentSet( const QSet<int>& ids, const QString& key, bool value )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 2 );
-    tr_variantDictAddQuark( &top, TR_KEY_method, TR_KEY_torrent_set );
-    tr_variant * args = tr_variantDictAddDict( &top, TR_KEY_arguments, 2 );
-    tr_variantDictAddBool( args, key, value );
+    tr_benc top;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "torrent-set" );
+    tr_benc * args = tr_bencDictAddDict( &top, "arguments", 2 );
+    tr_bencDictAddBool( args, key.toUtf8().constData(), value );
     addOptionalIds( args, ids );
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
-Session :: torrentSet( const QSet<int>& ids, const tr_quark key, const QStringList& value )
+Session :: torrentSet( const QSet<int>& ids, const QString& key, const QStringList& value )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 2 );
-    tr_variantDictAddQuark( &top, TR_KEY_method, TR_KEY_torrent_set );
-    tr_variant * args = tr_variantDictAddDict( &top, TR_KEY_arguments, 2 );
+    tr_benc top;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "torrent-set" );
+    tr_benc * args = tr_bencDictAddDict( &top, "arguments", 2 );
     addOptionalIds( args, ids );
-    tr_variant * list( tr_variantDictAddList( args, key, value.size( ) ) );
+    tr_benc * list( tr_bencDictAddList( args, key.toUtf8().constData(), value.size( ) ) );
     foreach( const QString str, value )
-        tr_variantListAddStr( list, str.toUtf8().constData() );
+        tr_bencListAddStr( list, str.toUtf8().constData() );
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
-Session :: torrentSet( const QSet<int>& ids, const tr_quark key, const QList<int>& value )
+Session :: torrentSet( const QSet<int>& ids, const QString& key, const QList<int>& value )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 2 );
-    tr_variantDictAddQuark( &top, TR_KEY_method, TR_KEY_torrent_set );
-    tr_variant * args( tr_variantDictAddDict( &top, TR_KEY_arguments, 2 ) );
+    tr_benc top;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "torrent-set" );
+    tr_benc * args( tr_bencDictAddDict( &top, "arguments", 2 ) );
     addOptionalIds( args, ids );
-    tr_variant * list( tr_variantDictAddList( args, key, value.size( ) ) );
+    tr_benc * list( tr_bencDictAddList( args, key.toUtf8().constData(), value.size( ) ) );
     foreach( int i, value )
-        tr_variantListAddInt( list, i );
+        tr_bencListAddInt( list, i );
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
-Session :: torrentSet( const QSet<int>& ids, const tr_quark key, const QPair<int,QString>& value )
+Session :: torrentSet( const QSet<int>& ids, const QString& key, const QPair<int,QString>& value )
 {
-  tr_variant top;
-  tr_variantInitDict (&top, 2);
-  tr_variantDictAddQuark (&top, TR_KEY_method, TR_KEY_torrent_set);
-  tr_variant * args (tr_variantDictAddDict (&top, TR_KEY_arguments, 2));
-  addOptionalIds (args, ids);
-  tr_variant * list (tr_variantDictAddList (args, key, 2));
-  tr_variantListAddInt (list, value.first);
-  tr_variantListAddStr (list, value.second.toUtf8().constData());
-  exec (&top);
-  tr_variantFree (&top);
+    tr_benc top;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "torrent-set" );
+    tr_benc * args( tr_bencDictAddDict( &top, "arguments", 2 ) );
+    addOptionalIds( args, ids );
+    tr_benc * list( tr_bencDictAddList( args, key.toUtf8().constData(), 2 ) );
+    tr_bencListAddInt( list, value.first );
+    tr_bencListAddStr( list, value.second.toUtf8().constData() );
+    exec( &top );
+    tr_bencFree( &top );
 }
 
 void
-Session :: torrentSetLocation( const QSet<int>& ids, const QString& location, bool doMove)
+Session :: torrentSetLocation( const QSet<int>& ids, const QString& location, bool doMove )
 {
-  tr_variant top;
-  tr_variantInitDict (&top, 2);
-  tr_variantDictAddQuark (&top, TR_KEY_method, TR_KEY_torrent_set);
-  tr_variant * args (tr_variantDictAddDict(&top, TR_KEY_arguments, 3));
-  addOptionalIds (args, ids);
-  tr_variantDictAddStr (args, TR_KEY_location, location.toUtf8().constData());
-  tr_variantDictAddBool (args, TR_KEY_move, doMove);
-  exec (&top);
-  tr_variantFree (&top);
+    tr_benc top;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "torrent-set-location" );
+    tr_benc * args( tr_bencDictAddDict( &top, "arguments", 3 ) );
+    addOptionalIds( args, ids );
+    tr_bencDictAddStr( args, "location", location.toUtf8().constData() );
+    tr_bencDictAddBool( args, "move", doMove );
+    exec( &top );
+    tr_bencFree( &top );
 }
 
 void
@@ -503,123 +502,122 @@ Session :: refreshTorrents( const QSet<int>& ids )
     }
     else
     {
-        tr_variant top;
-        tr_variantInitDict( &top, 3 );
-        tr_variantDictAddQuark( &top, TR_KEY_method, TR_KEY_torrent_get );
-        tr_variantDictAddInt( &top, TR_KEY_tag, TAG_SOME_TORRENTS );
-        tr_variant * args( tr_variantDictAddDict( &top, TR_KEY_arguments, 2 ) );
-        addList( tr_variantDictAddList( args, TR_KEY_fields, 0 ), getStatKeys( ) );
+        tr_benc top;
+        tr_bencInitDict( &top, 3 );
+        tr_bencDictAddStr( &top, "method", "torrent-get" );
+        tr_bencDictAddInt( &top, "tag", TAG_SOME_TORRENTS );
+        tr_benc * args( tr_bencDictAddDict( &top, "arguments", 2 ) );
+        addList( tr_bencDictAddList( args, "fields", 0 ), getStatKeys( ) );
         addOptionalIds( args, ids );
         exec( &top );
-        tr_variantFree( &top );
+        tr_bencFree( &top );
     }
 }
 
 void
 Session :: refreshExtraStats( const QSet<int>& ids )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 3 );
-    tr_variantDictAddQuark( &top, TR_KEY_method, TR_KEY_torrent_get );
-    tr_variantDictAddInt( &top, TR_KEY_tag, TAG_SOME_TORRENTS );
-    tr_variant * args( tr_variantDictAddDict( &top, TR_KEY_arguments, 2 ) );
+    tr_benc top;
+    tr_bencInitDict( &top, 3 );
+    tr_bencDictAddStr( &top, "method", "torrent-get" );
+    tr_bencDictAddInt( &top, "tag", TAG_SOME_TORRENTS );
+    tr_benc * args( tr_bencDictAddDict( &top, "arguments", 2 ) );
     addOptionalIds( args, ids );
-    addList( tr_variantDictAddList( args, TR_KEY_fields, 0 ), getStatKeys( ) + getExtraStatKeys( ));
+    addList( tr_bencDictAddList( args, "fields", 0 ), getStatKeys( ) + getExtraStatKeys( ));
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
-Session :: sendTorrentRequest (const char * request, const QSet<int>& ids )
+Session :: sendTorrentRequest( const char * request, const QSet<int>& ids )
 {
-  tr_variant top;
+    tr_benc top;
+    tr_benc * args( buildRequest( request, top ) );
+    addOptionalIds( args, ids );
+    exec( &top );
+    tr_bencFree( &top );
 
-  tr_variant * args (buildRequest (request, top));
-  addOptionalIds (args, ids);
-  exec (&top);
-  tr_variantFree (&top);
-
-  refreshTorrents (ids);
+    refreshTorrents( ids );
 }
 
-void Session :: pauseTorrents    (const QSet<int>& ids) { sendTorrentRequest ("torrent-stop",        ids); }
-void Session :: startTorrents    (const QSet<int>& ids) { sendTorrentRequest ("torrent-start",       ids); } 
-void Session :: startTorrentsNow (const QSet<int>& ids) { sendTorrentRequest ("torrent-start-now",   ids); }
-void Session :: queueMoveTop     (const QSet<int>& ids) { sendTorrentRequest ("torrent-move-top",    ids); } 
-void Session :: queueMoveUp      (const QSet<int>& ids) { sendTorrentRequest ("torrent-move-up",     ids); } 
-void Session :: queueMoveDown    (const QSet<int>& ids) { sendTorrentRequest ("torrent-move-down",   ids); } 
-void Session :: queueMoveBottom  (const QSet<int>& ids) { sendTorrentRequest ("torrent-move-bottom", ids); } 
+void Session :: pauseTorrents    ( const QSet<int>& ids ) { sendTorrentRequest( "torrent-stop", ids ); }
+void Session :: startTorrents    ( const QSet<int>& ids ) { sendTorrentRequest( "torrent-start", ids ); } 
+void Session :: startTorrentsNow ( const QSet<int>& ids ) { sendTorrentRequest( "torrent-start-now", ids ); }
+void Session :: queueMoveTop     ( const QSet<int>& ids ) { sendTorrentRequest( "queue-move-top", ids ); } 
+void Session :: queueMoveUp      ( const QSet<int>& ids ) { sendTorrentRequest( "queue-move-up", ids ); } 
+void Session :: queueMoveDown    ( const QSet<int>& ids ) { sendTorrentRequest( "queue-move-down", ids ); } 
+void Session :: queueMoveBottom  ( const QSet<int>& ids ) { sendTorrentRequest( "queue-move-bottom", ids ); } 
 
 void
 Session :: refreshActiveTorrents( )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 3 );
-    tr_variantDictAddQuark( &top, TR_KEY_method, TR_KEY_torrent_get );
-    tr_variantDictAddInt( &top, TR_KEY_tag, TAG_SOME_TORRENTS );
-    tr_variant * args( tr_variantDictAddDict( &top, TR_KEY_arguments, 2 ) );
-    tr_variantDictAddStr( args, TR_KEY_ids, "recently-active" );
-    addList( tr_variantDictAddList( args, TR_KEY_fields, 0 ), getStatKeys( ) );
+    tr_benc top;
+    tr_bencInitDict( &top, 3 );
+    tr_bencDictAddStr( &top, "method", "torrent-get" );
+    tr_bencDictAddInt( &top, "tag", TAG_SOME_TORRENTS );
+    tr_benc * args( tr_bencDictAddDict( &top, "arguments", 2 ) );
+    tr_bencDictAddStr( args, "ids", "recently-active" );
+    addList( tr_bencDictAddList( args, "fields", 0 ), getStatKeys( ) );
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
 Session :: refreshAllTorrents( )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 3 );
-    tr_variantDictAddQuark( &top, TR_KEY_method, TR_KEY_torrent_get );
-    tr_variantDictAddInt( &top, TR_KEY_tag, TAG_ALL_TORRENTS );
-    tr_variant * args( tr_variantDictAddDict( &top, TR_KEY_arguments, 1 ) );
-    addList( tr_variantDictAddList( args, TR_KEY_fields, 0 ), getStatKeys( ) );
+    tr_benc top;
+    tr_bencInitDict( &top, 3 );
+    tr_bencDictAddStr( &top, "method", "torrent-get" );
+    tr_bencDictAddInt( &top, "tag", TAG_ALL_TORRENTS );
+    tr_benc * args( tr_bencDictAddDict( &top, "arguments", 1 ) );
+    addList( tr_bencDictAddList( args, "fields", 0 ), getStatKeys( ) );
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
 Session :: initTorrents( const QSet<int>& ids )
 {
-    tr_variant top;
+    tr_benc top;
     const int tag( ids.isEmpty() ? TAG_ALL_TORRENTS : TAG_SOME_TORRENTS );
-    tr_variant * args( buildRequest( "torrent-get", top, tag ) );
+    tr_benc * args( buildRequest( "torrent-get", top, tag ) );
     addOptionalIds( args, ids );
-    addList( tr_variantDictAddList( args, TR_KEY_fields, 0 ), getStatKeys()+getInfoKeys() );
+    addList( tr_bencDictAddList( args, "fields", 0 ), getStatKeys()+getInfoKeys() );
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
 Session :: refreshSessionStats( )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 2 );
-    tr_variantDictAddStr( &top, TR_KEY_method, "session-stats" );
-    tr_variantDictAddInt( &top, TR_KEY_tag, TAG_SESSION_STATS );
+    tr_benc top;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "session-stats" );
+    tr_bencDictAddInt( &top, "tag", TAG_SESSION_STATS );
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
 Session :: refreshSessionInfo( )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 2 );
-    tr_variantDictAddStr( &top, TR_KEY_method, "session-get" );
-    tr_variantDictAddInt( &top, TR_KEY_tag, TAG_SESSION_INFO );
+    tr_benc top;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "session-get" );
+    tr_bencDictAddInt( &top, "tag", TAG_SESSION_INFO );
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
 Session :: updateBlocklist( )
 {
-    tr_variant top;
-    tr_variantInitDict( &top, 2 );
-    tr_variantDictAddStr( &top, TR_KEY_method, "blocklist-update" );
-    tr_variantDictAddInt( &top, TR_KEY_tag, TAG_BLOCKLIST_UPDATE );
+    tr_benc top;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "blocklist-update" );
+    tr_bencDictAddInt( &top, "tag", TAG_BLOCKLIST_UPDATE );
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 /***
@@ -627,9 +625,9 @@ Session :: updateBlocklist( )
 ***/
 
 void
-Session :: exec( const tr_variant * request )
+Session :: exec( const tr_benc * request )
 {
-    char * str = tr_variantToStr( request, TR_VARIANT_FMT_JSON_LEAN, NULL );
+    char * str = tr_bencToStr( request, TR_FMT_JSON_LEAN, NULL );
     exec( str );
     tr_free( str );
 }
@@ -718,78 +716,79 @@ Session :: onFinished( QNetworkReply * reply )
 void
 Session :: parseResponse( const char * json, size_t jsonLength )
 {
-    tr_variant top;
-    const int err (tr_variantFromJson (&top, json, jsonLength));
+    tr_benc top;
+    const uint8_t * end( 0 );
+    const int err( tr_jsonParse( "rpc", json, jsonLength, &top, &end ) );
     if( !err )
     {
         int64_t tag = -1;
         const char * result = NULL;
-        tr_variant * args = NULL;
+        tr_benc * args = NULL;
 
-        tr_variantDictFindInt ( &top, TR_KEY_tag, &tag );
-        tr_variantDictFindStr ( &top, TR_KEY_result, &result, NULL );
-        tr_variantDictFindDict( &top, TR_KEY_arguments, &args );
+        tr_bencDictFindInt ( &top, "tag", &tag );
+        tr_bencDictFindStr ( &top, "result", &result );
+        tr_bencDictFindDict( &top, "arguments", &args );
 
         emit executed( tag, result, args );
 
-        tr_variant * torrents;
+        tr_benc * torrents;
         const char * str;
 
-        if( tr_variantDictFindInt( &top, TR_KEY_tag, &tag ) )
+        if( tr_bencDictFindInt( &top, "tag", &tag ) )
         {
             switch( tag )
             {
                 case TAG_SOME_TORRENTS:
                 case TAG_ALL_TORRENTS:
-                    if( tr_variantDictFindDict( &top, TR_KEY_arguments, &args ) ) {
-                        if( tr_variantDictFindList( args, TR_KEY_torrents, &torrents ) )
+                    if( tr_bencDictFindDict( &top, "arguments", &args ) ) {
+                        if( tr_bencDictFindList( args, "torrents", &torrents ) )
                             emit torrentsUpdated( torrents, tag==TAG_ALL_TORRENTS );
-                        if( tr_variantDictFindList( args, TR_KEY_removed, &torrents ) )
+                        if( tr_bencDictFindList( args, "removed", &torrents ) )
                             emit torrentsRemoved( torrents );
                     }
                     break;
 
                 case TAG_SESSION_STATS:
-                    if( tr_variantDictFindDict( &top, TR_KEY_arguments, &args ) )
+                    if( tr_bencDictFindDict( &top, "arguments", &args ) )
                         updateStats( args );
                     break;
 
                 case TAG_SESSION_INFO:
-                    if( tr_variantDictFindDict( &top, TR_KEY_arguments, &args ) )
+                    if( tr_bencDictFindDict( &top, "arguments", &args ) )
                         updateInfo( args );
                     break;
 
                 case TAG_BLOCKLIST_UPDATE: {
                     int64_t intVal = 0;
-                    if( tr_variantDictFindDict( &top, TR_KEY_arguments, &args ) )
-                        if( tr_variantDictFindInt( args, TR_KEY_blocklist_size, &intVal ) )
+                    if( tr_bencDictFindDict( &top, "arguments", &args ) )
+                        if( tr_bencDictFindInt( args, "blocklist-size", &intVal ) )
                             setBlocklistSize( intVal );
                     break;
                 }
 
                 case TAG_PORT_TEST: {
                     bool isOpen = 0;
-                    if( tr_variantDictFindDict( &top, TR_KEY_arguments, &args ) )
-                        tr_variantDictFindBool( args, TR_KEY_port_is_open, &isOpen );
+                    if( tr_bencDictFindDict( &top, "arguments", &args ) )
+                        tr_bencDictFindBool( args, "port-is-open", &isOpen );
                     emit portTested( (bool)isOpen );
                 }
 
                 case TAG_MAGNET_LINK: {
-                    tr_variant * args;
-                    tr_variant * torrents;
-                    tr_variant * child;
+                    tr_benc * args;
+                    tr_benc * torrents;
+                    tr_benc * child;
                     const char * str;
-                    if( tr_variantDictFindDict( &top, TR_KEY_arguments, &args )
-                        && tr_variantDictFindList( args, TR_KEY_torrents, &torrents )
-                        && (( child = tr_variantListChild( torrents, 0 )))
-                        && tr_variantDictFindStr( child, TR_KEY_magnetLink, &str, NULL ) )
+                    if( tr_bencDictFindDict( &top, "arguments", &args )
+                        && tr_bencDictFindList( args, "torrents", &torrents )
+                        && (( child = tr_bencListChild( torrents, 0 )))
+                        && tr_bencDictFindStr( child, "magnetLink", &str ) )
                             QApplication::clipboard()->setText( str );
                     break;
                 }
 
                 case TAG_ADD_TORRENT:
                     str = "";
-                    if( tr_variantDictFindStr( &top, TR_KEY_result, &str, NULL ) && strcmp( str, "success" ) ) {
+                    if( tr_bencDictFindStr( &top, "result", &str ) && strcmp( str, "success" ) ) {
                         QMessageBox * d = new QMessageBox( QMessageBox::Information,
                                                            tr( "Add Torrent" ),
                                                            QString::fromUtf8(str),
@@ -804,24 +803,24 @@ Session :: parseResponse( const char * json, size_t jsonLength )
                     break;
             }
         }
-        tr_variantFree( &top );
+        tr_bencFree( &top );
     }
 }
 
 void
-Session :: updateStats( tr_variant * d, struct tr_session_stats * stats )
+Session :: updateStats( tr_benc * d, struct tr_session_stats * stats )
 {
     int64_t i;
 
-    if( tr_variantDictFindInt( d, TR_KEY_uploadedBytes, &i ) )
+    if( tr_bencDictFindInt( d, "uploadedBytes", &i ) )
         stats->uploadedBytes = i;
-    if( tr_variantDictFindInt( d, TR_KEY_downloadedBytes, &i ) )
+    if( tr_bencDictFindInt( d, "downloadedBytes", &i ) )
         stats->downloadedBytes = i;
-    if( tr_variantDictFindInt( d, TR_KEY_filesAdded, &i ) )
+    if( tr_bencDictFindInt( d, "filesAdded", &i ) )
         stats->filesAdded = i;
-    if( tr_variantDictFindInt( d, TR_KEY_sessionCount, &i ) )
+    if( tr_bencDictFindInt( d, "sessionCount", &i ) )
         stats->sessionCount = i;
-    if( tr_variantDictFindInt( d, TR_KEY_secondsActive, &i ) )
+    if( tr_bencDictFindInt( d, "secondsActive", &i ) )
         stats->secondsActive = i;
 
     stats->ratio = tr_getRatio( stats->uploadedBytes, stats->downloadedBytes );
@@ -829,66 +828,65 @@ Session :: updateStats( tr_variant * d, struct tr_session_stats * stats )
 }
 
 void
-Session :: updateStats( tr_variant * d )
+Session :: updateStats( tr_benc * d )
 {
-    tr_variant * c;
+    tr_benc * c;
 
-    if( tr_variantDictFindDict( d, TR_KEY_current_stats, &c ) )
+    if( tr_bencDictFindDict( d, "current-stats", &c ) )
         updateStats( c, &myStats );
 
-    if( tr_variantDictFindDict( d, TR_KEY_cumulative_stats, &c ) )
+    if( tr_bencDictFindDict( d, "cumulative-stats", &c ) )
         updateStats( c, &myCumulativeStats );
 
     emit statsUpdated( );
 }
 
 void
-Session :: updateInfo (tr_variant * d)
+Session :: updateInfo( tr_benc * d )
 {
-  int64_t i;
-  const char * str;
+    int64_t i;
+    const char * str;
+    disconnect( &myPrefs, SIGNAL(changed(int)), this, SLOT(updatePref(int)) );
 
-  disconnect (&myPrefs, SIGNAL(changed(int)), this, SLOT(updatePref(int)));
-
-  for (int i=Prefs::FIRST_CORE_PREF; i<=Prefs::LAST_CORE_PREF; ++i)
+    for( int i=Prefs::FIRST_CORE_PREF; i<=Prefs::LAST_CORE_PREF; ++i )
     {
-      const tr_variant * b( tr_variantDictFind (d, myPrefs.getKey(i)));
+        const tr_benc * b( tr_bencDictFind( d, myPrefs.keyStr( i ) ) );
 
-      if (!b)
-        continue;
+        if( !b )
+            continue;
 
-      if (i == Prefs :: ENCRYPTION)
+        if( i == Prefs :: ENCRYPTION )
         {
-          const char * val;
-          if( tr_variantGetStr( b, &val, NULL ) )
+            const char * val;
+            if( tr_bencGetStr( b, &val ) )
             {
-              if( !qstrcmp( val , "required" ) )
-                myPrefs.set( i, 2 );
-              else if( !qstrcmp( val , "preferred" ) )
-                myPrefs.set( i, 1 );
-              else if( !qstrcmp( val , "tolerated" ) )
-                myPrefs.set( i, 0 );
+                if( !qstrcmp( val , "required" ) )
+                    myPrefs.set( i, 2 );
+                else if( !qstrcmp( val , "preferred" ) )
+                    myPrefs.set( i, 1 );
+                else if( !qstrcmp( val , "tolerated" ) )
+                    myPrefs.set( i, 0 );
             }
-          continue;
+            continue;
         }
 
         switch( myPrefs.type( i ) )
         {
             case QVariant :: Int: {
                 int64_t val;
-                if( tr_variantGetInt( b, &val ) )
+                if( tr_bencGetInt( b, &val ) )
                     myPrefs.set( i, (int)val );
                 break;
             }
             case QVariant :: Double: {
                 double val;
-                if( tr_variantGetReal( b, &val ) )
+                if( tr_bencGetReal( b, &val ) )
                     myPrefs.set( i, val );
                 break;
             }
             case QVariant :: Bool: {
                 bool val;
-                if( tr_variantGetBool( b, &val ) )
+                if( tr_bencGetBool( b, &val ) )
                     myPrefs.set( i, (bool)val );
                 break;
             }
@@ -896,7 +894,7 @@ Session :: updateInfo (tr_variant * d)
             case TrTypes :: SortModeType:
             case QVariant :: String: {
                 const char * val;
-                if( tr_variantGetStr( b, &val, NULL ) )
+                if( tr_bencGetStr( b, &val ) )
                     myPrefs.set( i, QString(val) );
                 break;
             }
@@ -907,9 +905,9 @@ Session :: updateInfo (tr_variant * d)
 
     bool b;
     double x;
-    if( tr_variantDictFindBool( d, TR_KEY_seedRatioLimited, &b ) )
+    if( tr_bencDictFindBool( d, "seedRatioLimited", &b ) )
         myPrefs.set( Prefs::RATIO_ENABLED, b ? true : false );
-    if( tr_variantDictFindReal( d, TR_KEY_seedRatioLimit, &x ) )
+    if( tr_bencDictFindReal( d, "seedRatioLimit", &x ) )
         myPrefs.set( Prefs::RATIO, x );
 
     /* Use the C API to get settings that, for security reasons, aren't supported by RPC */
@@ -924,10 +922,10 @@ Session :: updateInfo (tr_variant * d)
         myPrefs.set( Prefs::RPC_WHITELIST,         tr_sessionGetRPCWhitelist        ( mySession ) );
     }
 
-    if( tr_variantDictFindInt( d, TR_KEY_blocklist_size, &i ) && i!=blocklistSize( ) )
+    if( tr_bencDictFindInt( d, "blocklist-size", &i ) && i!=blocklistSize( ) )
         setBlocklistSize( i );
 
-    if( tr_variantDictFindStr( d, TR_KEY_version, &str, NULL ) && ( mySessionVersion != str ) )
+    if( tr_bencDictFindStr( d, "version", &str ) && ( mySessionVersion != str ) )
         mySessionVersion = str;
 
     //std::cerr << "Session :: updateInfo end" << std::endl;
@@ -949,20 +947,20 @@ Session :: addTorrent( const AddData& addMe )
 {
     const QByteArray b64 = addMe.toBase64();
 
-    tr_variant top, *args;
-    tr_variantInitDict( &top, 2 );
-    tr_variantDictAddStr( &top, TR_KEY_method, "torrent-add" );
-    args = tr_variantDictAddDict( &top, TR_KEY_arguments, 2 );
-    tr_variantDictAddBool( args, TR_KEY_paused, !myPrefs.getBool( Prefs::START ) );
+    tr_benc top, *args;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "torrent-add" );
+    args = tr_bencDictAddDict( &top, "arguments", 2 );
+    tr_bencDictAddBool( args, "paused", !myPrefs.getBool( Prefs::START ) );
     switch( addMe.type ) {
-        case AddData::MAGNET:   tr_variantDictAddStr( args, TR_KEY_filename, addMe.magnet.toUtf8().constData() ); break;
-        case AddData::URL:      tr_variantDictAddStr( args, TR_KEY_filename, addMe.url.toString().toUtf8().constData() ); break;
+        case AddData::MAGNET:   tr_bencDictAddStr( args, "filename", addMe.magnet.toUtf8().constData() ); break;
+        case AddData::URL:      tr_bencDictAddStr( args, "filename", addMe.url.toString().toUtf8().constData() ); break;
         case AddData::FILENAME: /* fall-through */
-        case AddData::METAINFO: tr_variantDictAddRaw( args, TR_KEY_metainfo, b64.constData(), b64.size() ); break;
+        case AddData::METAINFO: tr_bencDictAddRaw( args, "metainfo", b64.constData(), b64.size() ); break;
         default: std::cerr << "Unhandled AddData type: " << addMe.type << std::endl;
     }
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
@@ -970,15 +968,15 @@ Session :: addNewlyCreatedTorrent( const QString& filename, const QString& local
 {
     const QByteArray b64 = AddData(filename).toBase64();
 
-    tr_variant top, *args;
-    tr_variantInitDict( &top, 2 );
-    tr_variantDictAddStr( &top, TR_KEY_method, "torrent-add" );
-    args = tr_variantDictAddDict( &top, TR_KEY_arguments, 3 );
-    tr_variantDictAddStr( args, TR_KEY_download_dir, qPrintable(localPath) );
-    tr_variantDictAddBool( args, TR_KEY_paused, !myPrefs.getBool( Prefs::START ) );
-    tr_variantDictAddRaw( args, TR_KEY_metainfo, b64.constData(), b64.size() );
+    tr_benc top, *args;
+    tr_bencInitDict( &top, 2 );
+    tr_bencDictAddStr( &top, "method", "torrent-add" );
+    args = tr_bencDictAddDict( &top, "arguments", 3 );
+    tr_bencDictAddStr( args, "download-dir", qPrintable(localPath) );
+    tr_bencDictAddBool( args, "paused", !myPrefs.getBool( Prefs::START ) );
+    tr_bencDictAddRaw( args, "metainfo", b64.constData(), b64.size() );
     exec( &top );
-    tr_variantFree( &top );
+    tr_bencFree( &top );
 }
 
 void
@@ -986,14 +984,14 @@ Session :: removeTorrents( const QSet<int>& ids, bool deleteFiles )
 {
     if( !ids.isEmpty( ) )
     {
-        tr_variant top, *args;
-        tr_variantInitDict( &top, 2 );
-        tr_variantDictAddStr( &top, TR_KEY_method, "torrent-remove" );
-        args = tr_variantDictAddDict( &top, TR_KEY_arguments, 2 );
+        tr_benc top, *args;
+        tr_bencInitDict( &top, 2 );
+        tr_bencDictAddStr( &top, "method", "torrent-remove" );
+        args = tr_bencDictAddDict( &top, "arguments", 2 );
         addOptionalIds( args, ids );
-        tr_variantDictAddInt( args, TR_KEY_delete_local_data, deleteFiles );
+        tr_bencDictAddInt( args, "delete-local-data", deleteFiles );
         exec( &top );
-        tr_variantFree( &top );
+        tr_bencFree( &top );
     }
 }
 
@@ -1002,13 +1000,13 @@ Session :: verifyTorrents( const QSet<int>& ids )
 {
     if( !ids.isEmpty( ) )
     {
-        tr_variant top, *args;
-        tr_variantInitDict( &top, 2 );
-        tr_variantDictAddStr( &top, TR_KEY_method, "torrent-verify" );
-        args = tr_variantDictAddDict( &top, TR_KEY_arguments, 1 );
+        tr_benc top, *args;
+        tr_bencInitDict( &top, 2 );
+        tr_bencDictAddStr( &top, "method", "torrent-verify" );
+        args = tr_bencDictAddDict( &top, "arguments", 1 );
         addOptionalIds( args, ids );
         exec( &top );
-        tr_variantFree( &top );
+        tr_bencFree( &top );
     }
 }
 
@@ -1017,13 +1015,13 @@ Session :: reannounceTorrents( const QSet<int>& ids )
 {
     if( !ids.isEmpty( ) )
     {
-        tr_variant top, *args;
-        tr_variantInitDict( &top, 2 );
-        tr_variantDictAddStr( &top, TR_KEY_method, "torrent-reannounce" );
-        args = tr_variantDictAddDict( &top, TR_KEY_arguments, 1 );
+        tr_benc top, *args;
+        tr_bencInitDict( &top, 2 );
+        tr_bencDictAddStr( &top, "method", "torrent-reannounce" );
+        args = tr_bencDictAddDict( &top, "arguments", 1 );
         addOptionalIds( args, ids );
         exec( &top );
-        tr_variantFree( &top );
+        tr_bencFree( &top );
     }
 }
 

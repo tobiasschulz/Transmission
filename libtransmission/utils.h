@@ -343,9 +343,6 @@ int tr_lowerBound (const void * key,
                    int     (* compar)(const void* key, const void* arrayMember),
                    bool       * exact_match) TR_GNUC_HOT TR_GNUC_NONNULL (1,5,6);
 
-/** @brief moves the best k items to the first slots in the array. O(n) */
-void tr_quickfindFirstK (void * base, size_t nmemb, size_t size,
-                         int (*compar)(const void *, const void *), size_t k);
 
 /**
  * @brief sprintf () a string into a newly-allocated buffer large enough to hold it
@@ -564,7 +561,7 @@ static inline char* tr_formatter_mem_MB (char * buf, double MBps, size_t buflen)
 /* format a file size from bytes into a user-readable string. */
 char* tr_formatter_size_B (char * buf, int64_t bytes, size_t buflen);
 
-void tr_formatter_get_units (void * dict);
+void tr_formatter_get_units (struct tr_benc * dict);
 
 /***
 ****

@@ -32,8 +32,8 @@
 #include <QLineEdit>
 
 #include <libtransmission/transmission.h>
+#include <libtransmission/bencode.h>
 #include <libtransmission/utils.h> /* mime64 */
-#include <libtransmission/variant.h>
 
 #include "add-data.h"
 #include "file-tree.h"
@@ -49,7 +49,7 @@
 ***/
 
 void
-FileAdded :: executed( int64_t tag, const QString& result, struct tr_variant * arguments )
+FileAdded :: executed( int64_t tag, const QString& result, struct tr_benc * arguments )
 {
     Q_UNUSED( arguments );
 
@@ -325,35 +325,35 @@ Options :: onAccepted( )
     // rpc spec section 3.4 "adding a torrent"
 
     const int64_t tag = mySession.getUniqueTag( );
-    tr_variant top;
-    tr_variantInitDict (&top, 3);
-    tr_variantDictAddStr (&top, TR_KEY_method, "torrent-add" );
-    tr_variantDictAddInt (&top, TR_KEY_tag, tag );
-    tr_variant * args (tr_variantDictAddDict(&top, TR_KEY_arguments, 10));
+    tr_benc top;
+    tr_bencInitDict( &top, 3 );
+    tr_bencDictAddStr( &top, "method", "torrent-add" );
+    tr_bencDictAddInt( &top, "tag", tag );
+    tr_benc * args( tr_bencDictAddDict( &top, "arguments", 10 ) );
     QString downloadDir;
 
     // "download-dir"
-    if (myDestinationButton)
+    if( myDestinationButton )
         downloadDir = myDestination.absolutePath();
     else
         downloadDir = myDestinationEdit->text();
-    tr_variantDictAddStr (args, TR_KEY_download_dir, downloadDir.toUtf8().constData() );
+    tr_bencDictAddStr( args, "download-dir", downloadDir.toUtf8().constData() );
 
     // "metainfo"
     switch( myAdd.type )
     {
         case AddData::MAGNET:
-            tr_variantDictAddStr (args, TR_KEY_filename, myAdd.magnet.toUtf8().constData());
+            tr_bencDictAddStr( args, "filename", myAdd.magnet.toUtf8().constData() );
             break;
 
         case AddData::URL:
-            tr_variantDictAddStr (args, TR_KEY_filename, myAdd.url.toString().toUtf8().constData());
+            tr_bencDictAddStr( args, "filename", myAdd.url.toString().toUtf8().constData() );
             break;
 
         case AddData::FILENAME:
         case AddData::METAINFO: {
             const QByteArray b64 = myAdd.toBase64( );
-            tr_variantDictAddRaw( args, TR_KEY_metainfo, b64.constData(), b64.size() );
+            tr_bencDictAddRaw( args, "metainfo", b64.constData(), b64.size() );
             break;
         }
 
@@ -362,51 +362,51 @@ Options :: onAccepted( )
     }
 
     // paused
-    tr_variantDictAddBool( args, TR_KEY_paused, !myStartCheck->isChecked( ) );
+    tr_bencDictAddBool( args, "paused", !myStartCheck->isChecked( ) );
 
     // priority
     const int index = myPriorityCombo->currentIndex( );
     const int priority = myPriorityCombo->itemData(index).toInt( );
-    tr_variantDictAddInt( args, TR_KEY_bandwidthPriority, priority );
+    tr_bencDictAddInt( args, "bandwidthPriority", priority );
 
     // files-unwanted
     int count = myWanted.count( false );
     if( count > 0 ) {
-        tr_variant * l = tr_variantDictAddList( args, TR_KEY_files_unwanted, count );
+        tr_benc * l = tr_bencDictAddList( args, "files-unwanted", count );
         for( int i=0, n=myWanted.size(); i<n; ++i )
             if( myWanted.at(i) == false )
-                tr_variantListAddInt( l, i );
+                tr_bencListAddInt( l, i );
     }
 
     // priority-low
     count = myPriorities.count( TR_PRI_LOW );
     if( count > 0 ) {
-        tr_variant * l = tr_variantDictAddList( args, TR_KEY_priority_low, count );
+        tr_benc * l = tr_bencDictAddList( args, "priority-low", count );
         for( int i=0, n=myPriorities.size(); i<n; ++i )
             if( myPriorities.at(i) == TR_PRI_LOW )
-                tr_variantListAddInt( l, i );
+                tr_bencListAddInt( l, i );
     }
 
     // priority-high
     count = myPriorities.count( TR_PRI_HIGH );
     if( count > 0 ) {
-        tr_variant * l = tr_variantDictAddList( args, TR_KEY_priority_high, count );
+        tr_benc * l = tr_bencDictAddList( args, "priority-high", count );
         for( int i=0, n=myPriorities.size(); i<n; ++i )
             if( myPriorities.at(i) == TR_PRI_HIGH )
-                tr_variantListAddInt( l, i );
+                tr_bencListAddInt( l, i );
     }
 
     // maybe delete the source .torrent
     FileAdded * fileAdded = new FileAdded( tag, myAdd.readableName() );
     if( myTrashCheck->isChecked( ) && ( myAdd.type==AddData::FILENAME ) )
         fileAdded->setFileToDelete( myAdd.filename );
-    connect( &mySession, SIGNAL(executed(int64_t,const QString&, struct tr_variant*)),
-             fileAdded, SLOT(executed(int64_t,const QString&, struct tr_variant*)));
+    connect( &mySession, SIGNAL(executed(int64_t,const QString&, struct tr_benc*)),
+             fileAdded, SLOT(executed(int64_t,const QString&, struct tr_benc*)));
 
-//std::cerr << tr_variantToStr(&top,TR_FMT_JSON,NULL) << std::endl;
+//std::cerr << tr_bencToStr(&top,TR_FMT_JSON,NULL) << std::endl;
     mySession.exec( &top );
 
-    tr_variantFree( &top );
+    tr_bencFree( &top );
     deleteLater( );
 }
 

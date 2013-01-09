@@ -44,6 +44,7 @@
 #include <QVBoxLayout>
 
 #include <libtransmission/transmission.h>
+#include <libtransmission/bencode.h>
 #include <libtransmission/utils.h> // tr_getRatio()
 
 #include "details.h"
@@ -891,154 +892,154 @@ Details :: createInfoTab( )
 ***/
 
 void
-Details :: onShowTrackerScrapesToggled (bool val)
+Details :: onShowTrackerScrapesToggled( bool val )
 {
-    myPrefs.set (Prefs::SHOW_TRACKER_SCRAPES, val);
+    myPrefs.set( Prefs::SHOW_TRACKER_SCRAPES, val );
 }
 
 void
-Details :: onShowBackupTrackersToggled (bool val)
+Details :: onShowBackupTrackersToggled( bool val )
 {
-  myPrefs.set (Prefs::SHOW_BACKUP_TRACKERS, val);
+    myPrefs.set( Prefs::SHOW_BACKUP_TRACKERS, val );
 }
 
 void
-Details :: onHonorsSessionLimitsToggled (bool val)
+Details :: onHonorsSessionLimitsToggled( bool val )
 {
-  mySession.torrentSet (myIds, TR_KEY_honorsSessionLimits, val);
-  getNewData ();
+    mySession.torrentSet( myIds, "honorsSessionLimits", val );
+    getNewData( );
 }
 void
-Details :: onDownloadLimitedToggled (bool val)
+Details :: onDownloadLimitedToggled( bool val )
 {
-  mySession.torrentSet (myIds, TR_KEY_downloadLimited, val);
-  getNewData ();
+    mySession.torrentSet( myIds, "downloadLimited", val );
+    getNewData( );
 }
 void
-Details :: onSpinBoxEditingFinished ()
+Details :: onSpinBoxEditingFinished( )
 {
-  const QObject * spin = sender();
-  const tr_quark key = spin->property(PREF_KEY).toInt();
-  const QDoubleSpinBox * d = qobject_cast<const QDoubleSpinBox*>( spin );
-  if (d)
-    mySession.torrentSet( myIds, key, d->value( ) );
-  else
-    mySession.torrentSet( myIds, key, qobject_cast<const QSpinBox*>(spin)->value( ) );
-  getNewData( );
-}
-
-void
-Details :: onUploadLimitedToggled (bool val)
-{
-  mySession.torrentSet (myIds, TR_KEY_uploadLimited, val);
-  getNewData ();
+    const QObject * spin = sender();
+    const QString key = spin->property( PREF_KEY ).toString( );
+    const QDoubleSpinBox * d = qobject_cast<const QDoubleSpinBox*>( spin );
+    if( d )
+        mySession.torrentSet( myIds, key, d->value( ) );
+    else
+        mySession.torrentSet( myIds, key, qobject_cast<const QSpinBox*>(spin)->value( ) );
+    getNewData( );
 }
 
 void
-Details :: onIdleModeChanged (int index)
+Details :: onUploadLimitedToggled( bool val )
 {
-  const int val = myIdleCombo->itemData(index).toInt();
-  mySession.torrentSet (myIds, TR_KEY_seedIdleMode, val);
-  getNewData ();
+    mySession.torrentSet( myIds, "uploadLimited", val );
+    getNewData( );
 }
 
 void
-Details :: onRatioModeChanged (int index)
+Details :: onIdleModeChanged( int index )
 {
-  const int val = myRatioCombo->itemData(index).toInt();
-  mySession.torrentSet (myIds, TR_KEY_seedRatioMode, val);
+    const int val = myIdleCombo->itemData( index ).toInt( );
+    mySession.torrentSet( myIds, "seedIdleMode", val );
+    getNewData( );
 }
 
 void
-Details :: onBandwidthPriorityChanged (int index)
+Details :: onRatioModeChanged( int index )
 {
-  if( index != -1 )
+    const int val = myRatioCombo->itemData( index ).toInt( );
+    mySession.torrentSet( myIds, "seedRatioMode", val );
+}
+
+void
+Details :: onBandwidthPriorityChanged( int index )
+{
+    if( index != -1 )
     {
-      const int priority = myBandwidthPriorityCombo->itemData(index).toInt();
-      mySession.torrentSet( myIds, TR_KEY_bandwidthPriority, priority );
-      getNewData( );
+        const int priority = myBandwidthPriorityCombo->itemData(index).toInt( );
+        mySession.torrentSet( myIds, "bandwidthPriority", priority );
+        getNewData( );
     }
 }
 
 void
-Details :: onTrackerSelectionChanged ()
+Details :: onTrackerSelectionChanged( )
 {
-  const int selectionCount = myTrackerView->selectionModel()->selectedRows().size();
-  myEditTrackerButton->setEnabled (selectionCount == 1);
-  myRemoveTrackerButton->setEnabled (selectionCount > 0);
+    const int selectionCount = myTrackerView->selectionModel()->selectedRows().size();
+    myEditTrackerButton->setEnabled( selectionCount == 1 );
+    myRemoveTrackerButton->setEnabled( selectionCount > 0 );
 }
 
 void
-Details :: onAddTrackerClicked ()
+Details :: onAddTrackerClicked( )
 {
-  bool ok = false;
-  const QString url = QInputDialog::getText (this,
-                                             tr("Add URL "),
-                                             tr("Add tracker announce URL:"),
-                                             QLineEdit::Normal, QString(), &ok);
-  if(!ok)
+    bool ok = false;
+    const QString url = QInputDialog::getText( this,
+                                               tr( "Add URL " ),
+                                               tr( "Add tracker announce URL:" ),
+                                               QLineEdit::Normal, QString(), &ok );
+    if( !ok )
     {
-      // user pressed "cancel" -- noop
+        // user pressed "cancel" -- noop
     }
-  else if (!QUrl(url).isValid())
+    else if( !QUrl(url).isValid( ) )
     {
-      QMessageBox::warning( this, tr("Error"), tr("Invalid URL \"%1\"").arg(url));
-    }
-  else
-    {
-      QSet<int> ids;
-
-      foreach (int id, myIds)
-        if (myTrackerModel->find(id,url) == -1)
-          ids.insert (id);
-
-      if (ids.empty()) // all the torrents already have this tracker
-        {
-          QMessageBox::warning (this, tr("Error"), tr("Tracker already exists."));
-        }
-        else
-        {
-          QStringList urls;
-          urls << url;
-          mySession.torrentSet (ids, TR_KEY_trackerAdd, urls);
-          getNewData ();
-        }
-    }
-}
-
-void
-Details :: onEditTrackerClicked ()
-{
-  QItemSelectionModel * selectionModel = myTrackerView->selectionModel();
-  QModelIndexList selectedRows = selectionModel->selectedRows();
-  assert (selectedRows.size() == 1);
-  QModelIndex i = selectionModel->currentIndex();
-  const TrackerInfo trackerInfo = myTrackerView->model()->data(i, TrackerModel::TrackerRole).value<TrackerInfo>();
-
-  bool ok = false;
-  const QString newval = QInputDialog::getText (this,
-                                                tr("Edit URL "),
-                                                tr("Edit tracker announce URL:"),
-                                                QLineEdit::Normal,
-                                                trackerInfo.st.announce, &ok);
-
-  if (!ok)
-    {
-      // user pressed "cancel" -- noop
-    }
-  else if( !QUrl(newval).isValid( ) )
-    {
-      QMessageBox::warning (this, tr("Error"), tr("Invalid URL \"%1\"").arg(newval));
+        QMessageBox::warning( this, tr( "Error" ), tr( "Invalid URL \"%1\"" ).arg( url ) );
     }
     else
     {
-      QSet<int> ids;
-      ids << trackerInfo.torrentId;
+        QSet<int> ids;
 
-      const QPair<int,QString> idUrl = qMakePair (trackerInfo.st.id, newval);
+        foreach( int id, myIds )
+            if( myTrackerModel->find( id, url ) == -1 )
+                ids.insert( id );
 
-      mySession.torrentSet (ids, TR_KEY_trackerReplace, idUrl);
-      getNewData ();
+        if( ids.empty( ) ) // all the torrents already have this tracker
+        {
+            QMessageBox::warning( this, tr( "Error" ), tr( "Tracker already exists." ) );
+        }
+        else
+        {
+            QStringList urls;
+            urls << url;
+            mySession.torrentSet( ids, "trackerAdd", urls );
+            getNewData( );
+        }
+    }
+}
+
+void
+Details :: onEditTrackerClicked( )
+{
+    QItemSelectionModel * selectionModel = myTrackerView->selectionModel( );
+    QModelIndexList selectedRows = selectionModel->selectedRows( );
+    assert( selectedRows.size( ) == 1 );
+    QModelIndex i = selectionModel->currentIndex( );
+    const TrackerInfo trackerInfo = myTrackerView->model()->data( i, TrackerModel::TrackerRole ).value<TrackerInfo>();
+
+    bool ok = false;
+    const QString newval = QInputDialog::getText( this,
+                                                  tr( "Edit URL " ),
+                                                  tr( "Edit tracker announce URL:" ),
+                                                  QLineEdit::Normal,
+                                                  trackerInfo.st.announce, &ok );
+
+    if( !ok )
+    {
+        // user pressed "cancel" -- noop
+    }
+    else if( !QUrl(newval).isValid( ) )
+    {
+        QMessageBox::warning( this, tr( "Error" ), tr( "Invalid URL \"%1\"" ).arg( newval ) );
+    }
+    else
+    {
+        QSet<int> ids;
+        ids << trackerInfo.torrentId;
+
+        const QPair<int,QString> idUrl = qMakePair( trackerInfo.st.id, newval );
+
+        mySession.torrentSet( ids, "trackerReplace", idUrl );
+        getNewData( );
     }
 }
 
@@ -1060,7 +1061,7 @@ Details :: onRemoveTrackerClicked( )
     {
         QSet<int> ids;
         ids << id;
-        mySession.torrentSet( ids, TR_KEY_trackerRemove, torrentId_to_trackerIds.values( id ) );
+        mySession.torrentSet( ids, "trackerRemove", torrentId_to_trackerIds.values( id ) );
     }
 
     selectionModel->clearSelection( );
@@ -1088,7 +1089,7 @@ Details :: createOptionsTab( )
     c = new QCheckBox( tr( "Limit &download speed (%1):" ).arg( speed_K_str ) );
     mySingleDownCheck = c;
     s = new QSpinBox( );
-    s->setProperty (PREF_KEY, TR_KEY_downloadLimit);
+    s->setProperty( PREF_KEY, QString( "downloadLimit" ) );
     s->setSingleStep( 5 );
     s->setRange( 0, INT_MAX );
     mySingleDownSpin = s;
@@ -1102,7 +1103,7 @@ Details :: createOptionsTab( )
     s = new QSpinBox( );
     s->setSingleStep( 5 );
     s->setRange( 0, INT_MAX );
-    s->setProperty( PREF_KEY, TR_KEY_uploadLimit );
+    s->setProperty( PREF_KEY, QString( "uploadLimit" ) );
     mySingleUpSpin = s;
     hig->addRow( c, s );
     enableWhenChecked( c, s );
@@ -1130,7 +1131,7 @@ Details :: createOptionsTab( )
     h->addWidget( myRatioCombo = m );
     ds = new QDoubleSpinBox( );
     ds->setRange( 0.5, INT_MAX );
-    ds->setProperty( PREF_KEY, TR_KEY_seedRatioLimit );
+    ds->setProperty( PREF_KEY, QString( "seedRatioLimit" ) );
     connect( ds, SIGNAL(editingFinished()), this, SLOT(onSpinBoxEditingFinished()));
     h->addWidget( myRatioSpin = ds );
     hig->addRow( tr( "&Ratio:" ), h, m );
@@ -1146,7 +1147,7 @@ Details :: createOptionsTab( )
     s = new QSpinBox( );
     s->setSingleStep( 5 );
     s->setRange( 1, 9999 );
-    s->setProperty( PREF_KEY, TR_KEY_seedIdleLimit );
+    s->setProperty( PREF_KEY, QString( "seedIdleLimit" ) );
     connect( s, SIGNAL(editingFinished()), this, SLOT(onSpinBoxEditingFinished()));
     h->addWidget( myIdleSpin = s );
     hig->addRow( tr( "&Idle:" ), h, m );
@@ -1158,7 +1159,7 @@ Details :: createOptionsTab( )
     s = new QSpinBox( );
     s->setSingleStep( 5 );
     s->setRange( 1, 300 );
-    s->setProperty( PREF_KEY, TR_KEY_peer_limit );
+    s->setProperty( PREF_KEY, QString( "peer-limit" ) );
     connect( s, SIGNAL(editingFinished()), this, SLOT(onSpinBoxEditingFinished()));
     myPeerLimitSpin = s;
     hig->addRow( tr( "&Maximum peers:" ), s );
@@ -1207,14 +1208,14 @@ Details :: createTrackerTab( )
 
     p = new QPushButton();
     p->setIcon( getStockIcon( "list-add", QStyle::SP_DialogOpenButton ) );
-    p->setToolTip( tr( "Add Tracker" ));
+    p->setToolTip( "Add Tracker" );
     myAddTrackerButton = p;
     v2->addWidget( p, 1 );
     connect( p, SIGNAL(clicked(bool)), this, SLOT(onAddTrackerClicked()));
 
     p = new QPushButton();
     p->setIcon( getStockIcon( "document-properties", QStyle::SP_DesktopIcon ) );
-    p->setToolTip( tr( "Edit Tracker" ));
+    p->setToolTip( "Edit Tracker" );
     myAddTrackerButton = p;
     p->setEnabled( false );
     myEditTrackerButton = p;
@@ -1223,7 +1224,7 @@ Details :: createTrackerTab( )
 
     p = new QPushButton();
     p->setIcon( getStockIcon( "list-remove", QStyle::SP_TrashIcon ) );
-    p->setToolTip( tr( "Remove Trackers" ));
+    p->setToolTip( "Remove Trackers" );
     p->setEnabled( false );
     myRemoveTrackerButton = p;
     v2->addWidget( p, 1 );
@@ -1311,33 +1312,22 @@ Details :: createFilesTab( )
 }
 
 void
-Details :: onFilePriorityChanged (const QSet<int>& indices, int priority)
+Details :: onFilePriorityChanged( const QSet<int>& indices, int priority )
 {
-  tr_quark key;
-
-  switch (priority)
-    {
-      case TR_PRI_LOW:
-        key = TR_KEY_priority_low;
-        break;
-
-      case TR_PRI_HIGH:
-        key = TR_KEY_priority_high;
-        break;
-
-      default:
-        key = TR_KEY_priority_normal;
-        break;
+    QString key;
+    switch( priority ) {
+        case TR_PRI_LOW:   key = "priority-low"; break;
+        case TR_PRI_HIGH:  key = "priority-high"; break;
+        default:           key = "priority-normal"; break;
     }
-
-  mySession.torrentSet (myIds, key, indices.toList());
+    mySession.torrentSet( myIds, key, indices.toList( ) );
     getNewData( );
 }
 
 void
-Details :: onFileWantedChanged (const QSet<int>& indices, bool wanted)
+Details :: onFileWantedChanged( const QSet<int>& indices, bool wanted )
 {
-  const tr_quark key = wanted ? TR_KEY_files_wanted : TR_KEY_files_unwanted;
-  mySession.torrentSet (myIds, key, indices.toList());
-  getNewData ();
+    QString key( wanted ? "files-wanted" : "files-unwanted" );
+    mySession.torrentSet( myIds, key, indices.toList( ) );
+    getNewData( );
 }

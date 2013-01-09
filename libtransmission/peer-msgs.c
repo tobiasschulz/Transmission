@@ -21,6 +21,7 @@
 #include <event2/event.h>
 
 #include "transmission.h"
+#include "bencode.h"
 #include "cache.h"
 #include "completion.h"
 #include "crypto.h" /* tr_sha1 () */
@@ -32,7 +33,6 @@
 #include "torrent-magnet.h"
 #include "tr-dht.h"
 #include "utils.h"
-#include "variant.h"
 #include "version.h"
 
 /**
@@ -85,9 +85,6 @@ enum
 
     /* number of pieces we'll allow in our fast set */
     MAX_FAST_SET_SIZE = 3,
-
-    /* how many blocks to keep prefetched per peer */
-    PREFETCH_SIZE = 18,
 
     /* defined in BEP #9 */
     METADATA_MSG_TYPE_REQUEST = 0,
@@ -248,7 +245,7 @@ myDebug (const char * file, int line,
                              tr_getLogTimeStr (timestr, sizeof (timestr)),
                              tr_torrentName (msgs->torrent),
                              tr_peerIoGetAddrStr (msgs->peer->io),
-                             tr_quark_get_string (msgs->peer->client, NULL));
+                             msgs->peer->client);
         va_start (args, fmt);
         evbuffer_add_vprintf (buf, fmt, args);
         va_end (args);
@@ -793,19 +790,15 @@ tr_peerMsgsCancel (tr_peermsgs * msgs, tr_block_index_t block)
 static void
 sendLtepHandshake (tr_peermsgs * msgs)
 {
-    tr_variant val;
+    tr_benc val;
     bool allow_pex;
     bool allow_metadata_xfer;
     struct evbuffer * payload;
     struct evbuffer * out = msgs->outMessages;
     const unsigned char * ipv6 = tr_globalIPv6 ();
-    static tr_quark version_quark = 0;
 
     if (msgs->clientSentLtepHandshake)
         return;
-
-    if (!version_quark)
-      version_quark = tr_quark_new (TR_NAME " " USERAGENT_PREFIX, -1);
 
     dbgmsg (msgs, "sending an ltep handshake");
     msgs->clientSentLtepHandshake = 1;
@@ -824,26 +817,26 @@ sendLtepHandshake (tr_peermsgs * msgs)
     else
         allow_pex = 1;
 
-    tr_variantInitDict (&val, 8);
-    tr_variantDictAddInt (&val, TR_KEY_e, getSession (msgs)->encryptionMode != TR_CLEAR_PREFERRED);
+    tr_bencInitDict (&val, 8);
+    tr_bencDictAddInt (&val, "e", getSession (msgs)->encryptionMode != TR_CLEAR_PREFERRED);
     if (ipv6 != NULL)
-        tr_variantDictAddRaw (&val, TR_KEY_ipv6, ipv6, 16);
+        tr_bencDictAddRaw (&val, "ipv6", ipv6, 16);
     if (allow_metadata_xfer && tr_torrentHasMetadata (msgs->torrent)
                             && (msgs->torrent->infoDictLength > 0))
-        tr_variantDictAddInt (&val, TR_KEY_metadata_size, msgs->torrent->infoDictLength);
-    tr_variantDictAddInt (&val, TR_KEY_p, tr_sessionGetPublicPeerPort (getSession (msgs)));
-    tr_variantDictAddInt (&val, TR_KEY_reqq, REQQ);
-    tr_variantDictAddInt (&val, TR_KEY_upload_only, tr_torrentIsSeed (msgs->torrent));
-    tr_variantDictAddQuark (&val, TR_KEY_v, version_quark);
+        tr_bencDictAddInt (&val, "metadata_size", msgs->torrent->infoDictLength);
+    tr_bencDictAddInt (&val, "p", tr_sessionGetPublicPeerPort (getSession (msgs)));
+    tr_bencDictAddInt (&val, "reqq", REQQ);
+    tr_bencDictAddInt (&val, "upload_only", tr_torrentIsSeed (msgs->torrent));
+    tr_bencDictAddStr (&val, "v", TR_NAME " " USERAGENT_PREFIX);
     if (allow_metadata_xfer || allow_pex) {
-        tr_variant * m  = tr_variantDictAddDict (&val, TR_KEY_m, 2);
+        tr_benc * m  = tr_bencDictAddDict (&val, "m", 2);
         if (allow_metadata_xfer)
-            tr_variantDictAddInt (m, TR_KEY_ut_metadata, UT_METADATA_ID);
+            tr_bencDictAddInt (m, "ut_metadata", UT_METADATA_ID);
         if (allow_pex)
-            tr_variantDictAddInt (m, TR_KEY_ut_pex, UT_PEX_ID);
+            tr_bencDictAddInt (m, "ut_pex", UT_PEX_ID);
     }
 
-    payload = tr_variantToBuf (&val, TR_VARIANT_FMT_BENC);
+    payload = tr_bencToBuf (&val, TR_FMT_BENC);
 
     evbuffer_add_uint32 (out, 2 * sizeof (uint8_t) + evbuffer_get_length (payload));
     evbuffer_add_uint8 (out, BT_LTEP);
@@ -854,14 +847,14 @@ sendLtepHandshake (tr_peermsgs * msgs)
 
     /* cleanup */
     evbuffer_free (payload);
-    tr_variantFree (&val);
+    tr_bencFree (&val);
 }
 
 static void
 parseLtepHandshake (tr_peermsgs * msgs, int len, struct evbuffer * inbuf)
 {
     int64_t   i;
-    tr_variant   val, * sub;
+    tr_benc   val, * sub;
     uint8_t * tmp = tr_new (uint8_t, len);
     const uint8_t *addr;
     size_t addr_len;
@@ -873,7 +866,7 @@ parseLtepHandshake (tr_peermsgs * msgs, int len, struct evbuffer * inbuf)
     tr_peerIoReadBytes (msgs->peer->io, inbuf, tmp, len);
     msgs->peerSentLtepHandshake = 1;
 
-    if (tr_variantFromBenc (&val, tmp, len) || !tr_variantIsDict (&val))
+    if (tr_bencLoad (tmp, len, &val, NULL) || !tr_bencIsDict (&val))
     {
         dbgmsg (msgs, "GET  extended-handshake, couldn't get dictionary");
         tr_free (tmp);
@@ -883,7 +876,7 @@ parseLtepHandshake (tr_peermsgs * msgs, int len, struct evbuffer * inbuf)
     dbgmsg (msgs, "here is the handshake: [%*.*s]", len, len,  tmp);
 
     /* does the peer prefer encrypted connections? */
-    if (tr_variantDictFindInt (&val, TR_KEY_e, &i)) {
+    if (tr_bencDictFindInt (&val, "e", &i)) {
         msgs->peer->encryption_preference = i ? ENCRYPTION_PREFERENCE_YES
                                               : ENCRYPTION_PREFERENCE_NO;
         if (i)
@@ -894,18 +887,18 @@ parseLtepHandshake (tr_peermsgs * msgs, int len, struct evbuffer * inbuf)
     msgs->peerSupportsPex = 0;
     msgs->peerSupportsMetadataXfer = 0;
 
-    if (tr_variantDictFindDict (&val, TR_KEY_m, &sub)) {
-        if (tr_variantDictFindInt (sub, TR_KEY_ut_pex, &i)) {
+    if (tr_bencDictFindDict (&val, "m", &sub)) {
+        if (tr_bencDictFindInt (sub, "ut_pex", &i)) {
             msgs->peerSupportsPex = i != 0;
             msgs->ut_pex_id = (uint8_t) i;
             dbgmsg (msgs, "msgs->ut_pex is %d", (int)msgs->ut_pex_id);
         }
-        if (tr_variantDictFindInt (sub, TR_KEY_ut_metadata, &i)) {
+        if (tr_bencDictFindInt (sub, "ut_metadata", &i)) {
             msgs->peerSupportsMetadataXfer = i != 0;
             msgs->ut_metadata_id = (uint8_t) i;
             dbgmsg (msgs, "msgs->ut_metadata_id is %d", (int)msgs->ut_metadata_id);
         }
-        if (tr_variantDictFindInt (sub, TR_KEY_ut_holepunch, &i)) {
+        if (tr_bencDictFindInt (sub, "ut_holepunch", &i)) {
             /* Mysterious µTorrent extension that we don't grok.  However,
                it implies support for µTP, so use it to indicate that. */
             tr_peerMgrSetUtpFailed (msgs->torrent,
@@ -915,24 +908,24 @@ parseLtepHandshake (tr_peermsgs * msgs, int len, struct evbuffer * inbuf)
     }
 
     /* look for metainfo size (BEP 9) */
-    if (tr_variantDictFindInt (&val, TR_KEY_metadata_size, &i)) {
+    if (tr_bencDictFindInt (&val, "metadata_size", &i)) {
         tr_torrentSetMetadataSizeHint (msgs->torrent, i);
         msgs->metadata_size_hint = (size_t) i;
     }
 
     /* look for upload_only (BEP 21) */
-    if (tr_variantDictFindInt (&val, TR_KEY_upload_only, &i))
+    if (tr_bencDictFindInt (&val, "upload_only", &i))
         seedProbability = i==0 ? 0 : 100;
 
     /* get peer's listening port */
-    if (tr_variantDictFindInt (&val, TR_KEY_p, &i)) {
+    if (tr_bencDictFindInt (&val, "p", &i)) {
         pex.port = htons ((uint16_t)i);
         fireClientGotPort (msgs, pex.port);
         dbgmsg (msgs, "peer's port is now %d", (int)i);
     }
 
     if (tr_peerIoIsIncoming (msgs->peer->io)
-        && tr_variantDictFindRaw (&val, TR_KEY_ipv4, &addr, &addr_len)
+        && tr_bencDictFindRaw (&val, "ipv4", &addr, &addr_len)
         && (addr_len == 4))
     {
         pex.addr.type = TR_AF_INET;
@@ -941,7 +934,7 @@ parseLtepHandshake (tr_peermsgs * msgs, int len, struct evbuffer * inbuf)
     }
 
     if (tr_peerIoIsIncoming (msgs->peer->io)
-        && tr_variantDictFindRaw (&val, TR_KEY_ipv6, &addr, &addr_len)
+        && tr_bencDictFindRaw (&val, "ipv6", &addr, &addr_len)
         && (addr_len == 16))
     {
         pex.addr.type = TR_AF_INET6;
@@ -950,19 +943,19 @@ parseLtepHandshake (tr_peermsgs * msgs, int len, struct evbuffer * inbuf)
     }
 
     /* get peer's maximum request queue size */
-    if (tr_variantDictFindInt (&val, TR_KEY_reqq, &i))
+    if (tr_bencDictFindInt (&val, "reqq", &i))
         msgs->reqq = i;
 
-    tr_variantFree (&val);
+    tr_bencFree (&val);
     tr_free (tmp);
 }
 
 static void
 parseUtMetadata (tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf)
 {
-    tr_variant dict;
+    tr_benc dict;
     char * msg_end;
-    const char * benc_end;
+    char * benc_end;
     int64_t msg_type = -1;
     int64_t piece = -1;
     int64_t total_size = 0;
@@ -971,12 +964,12 @@ parseUtMetadata (tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf)
     tr_peerIoReadBytes (msgs->peer->io, inbuf, tmp, msglen);
     msg_end = (char*)tmp + msglen;
 
-    if (!tr_variantFromBencFull (&dict, tmp, msglen, NULL, &benc_end))
+    if (!tr_bencLoad (tmp, msglen, &dict, &benc_end))
     {
-        tr_variantDictFindInt (&dict, TR_KEY_msg_type, &msg_type);
-        tr_variantDictFindInt (&dict, TR_KEY_piece, &piece);
-        tr_variantDictFindInt (&dict, TR_KEY_total_size, &total_size);
-        tr_variantFree (&dict);
+        tr_bencDictFindInt (&dict, "msg_type", &msg_type);
+        tr_bencDictFindInt (&dict, "piece", &piece);
+        tr_bencDictFindInt (&dict, "total_size", &total_size);
+        tr_bencFree (&dict);
     }
 
     dbgmsg (msgs, "got ut_metadata msg: type %d, piece %d, total_size %d",
@@ -1007,15 +1000,15 @@ parseUtMetadata (tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf)
         }
         else
         {
-            tr_variant tmp;
+            tr_benc tmp;
             struct evbuffer * payload;
             struct evbuffer * out = msgs->outMessages;
 
             /* build the rejection message */
-            tr_variantInitDict (&tmp, 2);
-            tr_variantDictAddInt (&tmp, TR_KEY_msg_type, METADATA_MSG_TYPE_REJECT);
-            tr_variantDictAddInt (&tmp, TR_KEY_piece, piece);
-            payload = tr_variantToBuf (&tmp, TR_VARIANT_FMT_BENC);
+            tr_bencInitDict (&tmp, 2);
+            tr_bencDictAddInt (&tmp, "msg_type", METADATA_MSG_TYPE_REJECT);
+            tr_bencDictAddInt (&tmp, "piece", piece);
+            payload = tr_bencToBuf (&tmp, TR_FMT_BENC);
 
             /* write it out as a LTEP message to our outMessages buffer */
             evbuffer_add_uint32 (out, 2 * sizeof (uint8_t) + evbuffer_get_length (payload));
@@ -1027,7 +1020,7 @@ parseUtMetadata (tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf)
 
             /* cleanup */
             evbuffer_free (payload);
-            tr_variantFree (&tmp);
+            tr_bencFree (&tmp);
         }
     }
 
@@ -1039,7 +1032,7 @@ parseUtPex (tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf)
 {
     int loaded = 0;
     uint8_t * tmp = tr_new (uint8_t, msglen);
-    tr_variant val;
+    tr_benc val;
     tr_torrent * tor = msgs->torrent;
     const uint8_t * added;
     size_t added_len;
@@ -1047,16 +1040,16 @@ parseUtPex (tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf)
     tr_peerIoReadBytes (msgs->peer->io, inbuf, tmp, msglen);
 
     if (tr_torrentAllowsPex (tor)
-      && ((loaded = !tr_variantFromBenc (&val, tmp, msglen))))
+      && ((loaded = !tr_bencLoad (tmp, msglen, &val, NULL))))
     {
-        if (tr_variantDictFindRaw (&val, TR_KEY_added, &added, &added_len))
+        if (tr_bencDictFindRaw (&val, "added", &added, &added_len))
         {
             tr_pex * pex;
             size_t i, n;
             size_t added_f_len = 0;
             const uint8_t * added_f = NULL;
 
-            tr_variantDictFindRaw (&val, TR_KEY_added_f, &added_f, &added_f_len);
+            tr_bencDictFindRaw (&val, "added.f", &added_f, &added_f_len);
             pex = tr_peerMgrCompactToPex (added, added_len, added_f, added_f_len, &n);
 
             n = MIN (n, MAX_PEX_PEER_COUNT);
@@ -1070,14 +1063,14 @@ parseUtPex (tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf)
             tr_free (pex);
         }
 
-        if (tr_variantDictFindRaw (&val, TR_KEY_added6, &added, &added_len))
+        if (tr_bencDictFindRaw (&val, "added6", &added, &added_len))
         {
             tr_pex * pex;
             size_t i, n;
             size_t added_f_len = 0;
             const uint8_t * added_f = NULL;
 
-            tr_variantDictFindRaw (&val, TR_KEY_added6_f, &added_f, &added_f_len);
+            tr_bencDictFindRaw (&val, "added6.f", &added_f, &added_f_len);
             pex = tr_peerMgrCompact6ToPex (added, added_len, added_f, added_f_len, &n);
 
             n = MIN (n, MAX_PEX_PEER_COUNT);
@@ -1093,7 +1086,7 @@ parseUtPex (tr_peermsgs * msgs, int msglen, struct evbuffer * inbuf)
     }
 
     if (loaded)
-        tr_variantFree (&val);
+        tr_bencFree (&val);
     tr_free (tmp);
 }
 
@@ -1201,7 +1194,8 @@ prefetchPieces (tr_peermsgs *msgs)
     if (!getSession (msgs)->isPrefetchEnabled)
         return;
 
-    for (i=msgs->prefetchCount; i<msgs->peer->pendingReqsToClient && i<PREFETCH_SIZE; ++i)
+    /* Maintain 12 prefetched blocks per unchoked peer */
+    for (i=msgs->prefetchCount; i<msgs->peer->pendingReqsToClient && i<12; ++i)
     {
         const struct peer_request * req = msgs->peerAskedFor + i;
         if (requestIsValid (msgs, req))
@@ -1672,7 +1666,7 @@ tr_peerMsgsIsReadingBlock (const tr_peermsgs * msgs, tr_block_index_t block)
 static void
 updateDesiredRequestCount (tr_peermsgs * msgs)
 {
-    tr_torrent * const torrent = msgs->torrent;
+    const tr_torrent * const torrent = msgs->torrent;
 
     /* there are lots of reasons we might not want to request any blocks... */
     if (tr_torrentIsSeed (torrent) || !tr_torrentHasMetadata (torrent)
@@ -1721,15 +1715,15 @@ updateMetadataRequests (tr_peermsgs * msgs, time_t now)
     if (msgs->peerSupportsMetadataXfer
         && tr_torrentGetNextMetadataRequest (msgs->torrent, now, &piece))
     {
-        tr_variant tmp;
+        tr_benc tmp;
         struct evbuffer * payload;
         struct evbuffer * out = msgs->outMessages;
 
         /* build the data message */
-        tr_variantInitDict (&tmp, 3);
-        tr_variantDictAddInt (&tmp, TR_KEY_msg_type, METADATA_MSG_TYPE_REQUEST);
-        tr_variantDictAddInt (&tmp, TR_KEY_piece, piece);
-        payload = tr_variantToBuf (&tmp, TR_VARIANT_FMT_BENC);
+        tr_bencInitDict (&tmp, 3);
+        tr_bencDictAddInt (&tmp, "msg_type", METADATA_MSG_TYPE_REQUEST);
+        tr_bencDictAddInt (&tmp, "piece", piece);
+        payload = tr_bencToBuf (&tmp, TR_FMT_BENC);
 
         dbgmsg (msgs, "requesting metadata piece #%d", piece);
 
@@ -1743,7 +1737,7 @@ updateMetadataRequests (tr_peermsgs * msgs, time_t now)
 
         /* cleanup */
         evbuffer_free (payload);
-        tr_variantFree (&tmp);
+        tr_bencFree (&tmp);
     }
 }
 
@@ -1816,16 +1810,16 @@ fillOutputBuffer (tr_peermsgs * msgs, time_t now)
         data = tr_torrentGetMetadataPiece (msgs->torrent, piece, &dataLen);
         if ((dataLen > 0) && (data != NULL))
         {
-            tr_variant tmp;
+            tr_benc tmp;
             struct evbuffer * payload;
             struct evbuffer * out = msgs->outMessages;
 
             /* build the data message */
-            tr_variantInitDict (&tmp, 3);
-            tr_variantDictAddInt (&tmp, TR_KEY_msg_type, METADATA_MSG_TYPE_DATA);
-            tr_variantDictAddInt (&tmp, TR_KEY_piece, piece);
-            tr_variantDictAddInt (&tmp, TR_KEY_total_size, msgs->torrent->infoDictLength);
-            payload = tr_variantToBuf (&tmp, TR_VARIANT_FMT_BENC);
+            tr_bencInitDict (&tmp, 3);
+            tr_bencDictAddInt (&tmp, "msg_type", METADATA_MSG_TYPE_DATA);
+            tr_bencDictAddInt (&tmp, "piece", piece);
+            tr_bencDictAddInt (&tmp, "total_size", msgs->torrent->infoDictLength);
+            payload = tr_bencToBuf (&tmp, TR_FMT_BENC);
 
             /* write it out as a LTEP message to our outMessages buffer */
             evbuffer_add_uint32 (out, 2 * sizeof (uint8_t) + evbuffer_get_length (payload) + dataLen);
@@ -1837,7 +1831,7 @@ fillOutputBuffer (tr_peermsgs * msgs, time_t now)
             dbgOutMessageLen (msgs);
 
             evbuffer_free (payload);
-            tr_variantFree (&tmp);
+            tr_bencFree (&tmp);
             tr_free (data);
 
             ok = true;
@@ -1845,15 +1839,15 @@ fillOutputBuffer (tr_peermsgs * msgs, time_t now)
 
         if (!ok) /* send a rejection message */
         {
-            tr_variant tmp;
+            tr_benc tmp;
             struct evbuffer * payload;
             struct evbuffer * out = msgs->outMessages;
 
             /* build the rejection message */
-            tr_variantInitDict (&tmp, 2);
-            tr_variantDictAddInt (&tmp, TR_KEY_msg_type, METADATA_MSG_TYPE_REJECT);
-            tr_variantDictAddInt (&tmp, TR_KEY_piece, piece);
-            payload = tr_variantToBuf (&tmp, TR_VARIANT_FMT_BENC);
+            tr_bencInitDict (&tmp, 2);
+            tr_bencDictAddInt (&tmp, "msg_type", METADATA_MSG_TYPE_REJECT);
+            tr_bencDictAddInt (&tmp, "piece", piece);
+            payload = tr_bencToBuf (&tmp, TR_FMT_BENC);
 
             /* write it out as a LTEP message to our outMessages buffer */
             evbuffer_add_uint32 (out, 2 * sizeof (uint8_t) + evbuffer_get_length (payload));
@@ -1864,7 +1858,7 @@ fillOutputBuffer (tr_peermsgs * msgs, time_t now)
             dbgOutMessageLen (msgs);
 
             evbuffer_free (payload);
-            tr_variantFree (&tmp);
+            tr_bencFree (&tmp);
         }
     }
 
@@ -2199,7 +2193,7 @@ sendPex (tr_peermsgs * msgs)
         else
         {
             int  i;
-            tr_variant val;
+            tr_benc val;
             uint8_t * tmp, *walk;
             struct evbuffer * payload;
             struct evbuffer * out = msgs->outMessages;
@@ -2213,7 +2207,7 @@ sendPex (tr_peermsgs * msgs)
             msgs->pexCount6 = diffs6.elementCount;
 
             /* build the pex payload */
-            tr_variantInitDict (&val, 3); /* ipv6 support: left as 3:
+            tr_bencInitDict (&val, 3); /* ipv6 support: left as 3:
                                          * speed vs. likelihood? */
 
             if (diffs.addedCount > 0)
@@ -2225,7 +2219,7 @@ sendPex (tr_peermsgs * msgs)
                     memcpy (walk, &diffs.added[i].port, 2); walk += 2;
                 }
                 assert ((walk - tmp) == diffs.addedCount * 6);
-                tr_variantDictAddRaw (&val, TR_KEY_added, tmp, walk - tmp);
+                tr_bencDictAddRaw (&val, "added", tmp, walk - tmp);
                 tr_free (tmp);
 
                 /* "added.f"
@@ -2234,7 +2228,7 @@ sendPex (tr_peermsgs * msgs)
                 for (i = 0; i < diffs.addedCount; ++i)
                     *walk++ = diffs.added[i].flags & ~ADDED_F_HOLEPUNCH;
                 assert ((walk - tmp) == diffs.addedCount);
-                tr_variantDictAddRaw (&val, TR_KEY_added_f, tmp, walk - tmp);
+                tr_bencDictAddRaw (&val, "added.f", tmp, walk - tmp);
                 tr_free (tmp);
             }
 
@@ -2247,7 +2241,7 @@ sendPex (tr_peermsgs * msgs)
                     memcpy (walk, &diffs.dropped[i].port, 2); walk += 2;
                 }
                 assert ((walk - tmp) == diffs.droppedCount * 6);
-                tr_variantDictAddRaw (&val, TR_KEY_dropped, tmp, walk - tmp);
+                tr_bencDictAddRaw (&val, "dropped", tmp, walk - tmp);
                 tr_free (tmp);
             }
 
@@ -2262,7 +2256,7 @@ sendPex (tr_peermsgs * msgs)
                     walk += 2;
                 }
                 assert ((walk - tmp) == diffs6.addedCount * 18);
-                tr_variantDictAddRaw (&val, TR_KEY_added6, tmp, walk - tmp);
+                tr_bencDictAddRaw (&val, "added6", tmp, walk - tmp);
                 tr_free (tmp);
 
                 /* "added6.f"
@@ -2271,7 +2265,7 @@ sendPex (tr_peermsgs * msgs)
                 for (i = 0; i < diffs6.addedCount; ++i)
                     *walk++ = diffs6.added[i].flags & ~ADDED_F_HOLEPUNCH;
                 assert ((walk - tmp) == diffs6.addedCount);
-                tr_variantDictAddRaw (&val, TR_KEY_added6_f, tmp, walk - tmp);
+                tr_bencDictAddRaw (&val, "added6.f", tmp, walk - tmp);
                 tr_free (tmp);
             }
 
@@ -2286,12 +2280,12 @@ sendPex (tr_peermsgs * msgs)
                     walk += 2;
                 }
                 assert ((walk - tmp) == diffs6.droppedCount * 18);
-                tr_variantDictAddRaw (&val, TR_KEY_dropped6, tmp, walk - tmp);
+                tr_bencDictAddRaw (&val, "dropped6", tmp, walk - tmp);
                 tr_free (tmp);
             }
 
             /* write the pex message */
-            payload = tr_variantToBuf (&val, TR_VARIANT_FMT_BENC);
+            payload = tr_bencToBuf (&val, TR_FMT_BENC);
             evbuffer_add_uint32 (out, 2 * sizeof (uint8_t) + evbuffer_get_length (payload));
             evbuffer_add_uint8 (out, BT_LTEP);
             evbuffer_add_uint8 (out, msgs->ut_pex_id);
@@ -2301,7 +2295,7 @@ sendPex (tr_peermsgs * msgs)
             dbgOutMessageLen (msgs);
 
             evbuffer_free (payload);
-            tr_variantFree (&val);
+            tr_bencFree (&val);
         }
 
         /* cleanup */

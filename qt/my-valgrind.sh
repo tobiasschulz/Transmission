@@ -1,4 +1,5 @@
 #/bin/sh
-#valgrind --tool=cachegrind ./transmission-qt 2>&1 | tee runlog
-valgrind --tool=massif --threshold=0.2 ./transmission-qt 2>&1 | tee runlog
-#valgrind --tool=memcheck --leak-check=full --leak-resolution=high --num-callers=48 --log-file=x-valgrind --show-reachable=no ./transmission-qt 2>&1 | tee runlog
+export G_SLICE=always-malloc
+export G_DEBUG=gc-friendly
+export GLIBCXX_FORCE_NEW=1
+valgrind --tool=memcheck --leak-check=full --leak-resolution=high --num-callers=32 --log-file=x-valgrind --show-reachable=yes ./transmission-qt

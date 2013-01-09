@@ -304,13 +304,19 @@ FilterBar :: refreshTrackers( )
         if( !index.isValid( ) )
             break;
         const Torrent * tor = index.data( TorrentModel::TorrentRole ).value<const Torrent*>();
+        const QStringList trackers = tor->trackers( );
         QSet<QString> torrentNames;
-        foreach (QString host, tor->hosts()) {
-          newHosts.insert (host);
-          torrentNames.insert (readableHostName(host));
+        foreach( QString tracker, trackers ) {
+            const QString host = Favicons::getHost( QUrl( tracker ) );
+            if( host.isEmpty( ) )
+                qWarning() << "torrent" << qPrintable(tor->name()) << "has an invalid announce URL:" << tracker;
+            else {
+                newHosts.insert( host );
+                torrentNames.insert( readableHostName( host ) );
+            }
         }
-        foreach (QString name, torrentNames)
-          ++torrentsPerHost[name];
+        foreach( QString name, torrentNames )
+            ++torrentsPerHost[ name ];
     }
 
     // update the "All" row
@@ -466,7 +472,7 @@ FilterBar :: refreshPref( int key )
         case Prefs :: FILTER_MODE: {
             const FilterMode m = myPrefs.get<FilterMode>( key );
             QAbstractItemModel * model = myActivityCombo->model( );
-            QModelIndexList indices = model->match( model->index(0,0), ActivityRole, m.mode() );
+            QModelIndexList indices = model->match( model->index(0,0), ActivityRole, m.mode(), -1 );
             myActivityCombo->setCurrentIndex( indices.isEmpty() ? 0 : indices.first().row( ) );
             break;
         }
@@ -538,25 +544,23 @@ FilterBar :: recountSoon( )
     if( !myRecountTimer->isActive( ) )
     {
         myRecountTimer->setSingleShot( true );
-        myRecountTimer->start( 800 );
+        myRecountTimer->start( 500 );
     }
 }
 void
-FilterBar :: recount ()
+FilterBar :: recount ( )
 {
-  QAbstractItemModel * model = myActivityCombo->model();
-
-  int torrentsPerMode[FilterMode::NUM_MODES] = { };
-  myFilter.countTorrentsPerMode (torrentsPerMode);
-
-  for (int row=0, n=model->rowCount(); row<n; ++row)
+    // recount the activity combobox...
+    for( int i=0, n=FilterMode::NUM_MODES; i<n; ++i )
     {
-      QModelIndex index = model->index (row, 0);
-      const int mode = index.data(ActivityRole).toInt();
-      model->setData (index, getCountString(torrentsPerMode[mode]), TorrentCountRole);
+        const FilterMode m( i );
+        QAbstractItemModel * model = myActivityCombo->model( );
+        QModelIndexList indices = model->match( model->index(0,0), ActivityRole, m.mode(), -1 );
+        if( !indices.isEmpty( ) )
+            model->setData( indices.first(), getCountString(myFilter.count(m)), TorrentCountRole );
     }
 
-  refreshTrackers ();
+    refreshTrackers( );
 }
 
 QString

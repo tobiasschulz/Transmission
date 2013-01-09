@@ -28,9 +28,9 @@
 #endif
 
 #include "bandwidth.h"
+#include "bencode.h"
 #include "bitfield.h"
 #include "utils.h"
-#include "variant.h"
 
 typedef enum { TR_NET_OK, TR_NET_ERROR, TR_NET_WAIT } tr_tristate_t;
 
@@ -118,7 +118,7 @@ struct tr_session
     bool                         deleteSourceTorrent;
     bool                         scrapePausedTorrents;
 
-    tr_variant                   removedTorrents;
+    tr_benc                      removedTorrents;
 
     bool                         stalledEnabled;
     bool                         queueEnabled[2];
@@ -182,8 +182,6 @@ struct tr_session
     char *                       tag;
     char *                       configDir;
     char *                       downloadDir;
-    char                         downloadDirBlkDev[TR_PATH_MAX + 1];
-    char                         downloadDirFsType[TR_PATH_MAX + 1];
     char *                       resumeDir;
     char *                       torrentDir;
     char *                       incompleteDir;
@@ -209,7 +207,7 @@ struct tr_session
     struct tr_announcer        * announcer;
     struct tr_announcer_udp    * announcer_udp;
 
-    tr_variant                 * metainfoLookup;
+    tr_benc                    * metainfoLookup;
 
     struct event               * nowTimer;
     struct event               * saveTimer;
@@ -328,10 +326,8 @@ bool  tr_sessionGetActiveSpeedLimit_Bps (const tr_session  * session,
                                          tr_direction        dir,
                                          unsigned int      * setme);
 
-void tr_sessionGetNextQueuedTorrents (tr_session   * session,
-                                      tr_direction   dir,
-                                      size_t         numwanted,
-                                      tr_ptrArray  * setme);
+tr_torrent * tr_sessionGetNextQueuedSeed (tr_session * session);
+tr_torrent * tr_sessionGetNextQueuedTorrent (tr_session * session, tr_direction);
 
 int tr_sessionCountQueueFreeSlots (tr_session * session, tr_direction);
 

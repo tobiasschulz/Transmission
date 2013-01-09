@@ -12,10 +12,10 @@
 
 #include "transmission.h"
 #include "session.h"
+#include "bencode.h"
 #include "platform.h" /* tr_sessionGetConfigDir () */
 #include "stats.h"
 #include "utils.h" /* tr_buildPath */
-#include "variant.h"
 
 /***
 ****
@@ -47,18 +47,18 @@ getFilename (const tr_session * session)
 static void
 loadCumulativeStats (const tr_session * session, tr_session_stats * setme)
 {
-  tr_variant top;
+  tr_benc top;
   char * filename;
   bool loaded = false;
 
   filename = getFilename (session);
-  loaded = !tr_variantFromFile (&top, TR_VARIANT_FMT_JSON, filename);
+  loaded = !tr_bencLoadFile (&top, TR_FMT_JSON, filename);
   tr_free (filename);
 
   if (!loaded)
     {
       filename = getOldFilename (session);
-      loaded = !tr_variantFromFile (&top, TR_VARIANT_FMT_BENC, filename);
+      loaded = !tr_bencLoadFile (&top, TR_FMT_BENC, filename);
       tr_free (filename);
     }
 
@@ -66,18 +66,18 @@ loadCumulativeStats (const tr_session * session, tr_session_stats * setme)
     {
       int64_t i;
 
-      if (tr_variantDictFindInt (&top, TR_KEY_downloaded_bytes, &i))
+      if (tr_bencDictFindInt (&top, "downloaded-bytes", &i))
         setme->downloadedBytes = (uint64_t) i;
-      if (tr_variantDictFindInt (&top, TR_KEY_files_added, &i))
+      if (tr_bencDictFindInt (&top, "files-added", &i))
         setme->filesAdded = (uint64_t) i;
-      if (tr_variantDictFindInt (&top, TR_KEY_seconds_active, &i))
+      if (tr_bencDictFindInt (&top, "seconds-active", &i))
         setme->secondsActive = (uint64_t) i;
-      if (tr_variantDictFindInt (&top, TR_KEY_session_count, &i))
+      if (tr_bencDictFindInt (&top, "session-count", &i))
         setme->sessionCount = (uint64_t) i;
-      if (tr_variantDictFindInt (&top, TR_KEY_uploaded_bytes, &i))
+      if (tr_bencDictFindInt (&top, "uploaded-bytes", &i))
         setme->uploadedBytes = (uint64_t) i;
 
-      tr_variantFree (&top);
+      tr_bencFree (&top);
     }
 }
 
@@ -85,21 +85,21 @@ static void
 saveCumulativeStats (const tr_session * session, const tr_session_stats * s)
 {
   char * filename;
-  tr_variant top;
+  tr_benc top;
 
-  tr_variantInitDict (&top, 5);
-  tr_variantDictAddInt (&top, TR_KEY_downloaded_bytes, s->downloadedBytes);
-  tr_variantDictAddInt (&top, TR_KEY_files_added,      s->filesAdded);
-  tr_variantDictAddInt (&top, TR_KEY_seconds_active,   s->secondsActive);
-  tr_variantDictAddInt (&top, TR_KEY_session_count,    s->sessionCount);
-  tr_variantDictAddInt (&top, TR_KEY_uploaded_bytes,   s->uploadedBytes);
+  tr_bencInitDict (&top, 5);
+  tr_bencDictAddInt (&top, "downloaded-bytes", s->downloadedBytes);
+  tr_bencDictAddInt (&top, "files-added",      s->filesAdded);
+  tr_bencDictAddInt (&top, "seconds-active",   s->secondsActive);
+  tr_bencDictAddInt (&top, "session-count",    s->sessionCount);
+  tr_bencDictAddInt (&top, "uploaded-bytes",   s->uploadedBytes);
 
   filename = getFilename (session);
   tr_deepLog (__FILE__, __LINE__, NULL, "Saving stats to \"%s\"", filename);
-  tr_variantToFile (&top, TR_VARIANT_FMT_JSON, filename);
+  tr_bencToFile (&top, TR_FMT_JSON, filename);
 
   tr_free (filename);
-  tr_variantFree (&top);
+  tr_bencFree (&top);
 }
 
 /***

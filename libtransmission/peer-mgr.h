@@ -27,7 +27,6 @@
 #include "history.h"
 #include "net.h" /* tr_address */
 #include "peer-common.h" /* struct peer_request */
-#include "quark.h"
 
 /**
  * @addtogroup peers Peers
@@ -117,7 +116,7 @@ typedef struct tr_peer
     float                    progress;
 
     /* the client name from the `v' string in LTEP's handshake dictionary */
-    tr_quark                 client;
+    char                   * client;
 
     time_t                   chokeChangedAt;
 
@@ -226,9 +225,9 @@ void tr_peerMgrAddTorrent (tr_peerMgr         * manager,
 
 void tr_peerMgrRemoveTorrent (tr_torrent * tor);
 
-void tr_peerMgrTorrentAvailability (const tr_torrent   * tor,
-                                    int8_t             * tab,
-                                    unsigned int         tabCount);
+void tr_peerMgrTorrentAvailability (const tr_torrent * tor,
+                                    int8_t           * tab,
+                                    unsigned int       tabCount);
 
 uint64_t tr_peerMgrGetDesiredAvailable (const tr_torrent * tor);
 

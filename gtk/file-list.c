@@ -279,8 +279,7 @@ static gboolean
 refreshModel (gpointer file_data)
 {
     refresh (file_data);
-
-    return G_SOURCE_CONTINUE;
+    return TRUE;
 }
 
 /***

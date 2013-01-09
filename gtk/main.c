@@ -267,7 +267,7 @@ refresh_actions (gpointer gdata)
   gtr_action_set_sensitive ("torrent-reannounce", canUpdate != 0);
 
   data->refresh_actions_tag = 0;
-  return G_SOURCE_REMOVE;
+  return FALSE;
 }
 
 static void
@@ -316,17 +316,17 @@ on_main_window_size_allocated (GtkWidget      * gtk_window,
   const gboolean isMaximized = (gdk_window != NULL)
                             && (gdk_window_get_state (gdk_window) & GDK_WINDOW_STATE_MAXIMIZED);
 
-  gtr_pref_int_set (TR_KEY_main_window_is_maximized, isMaximized);
+  gtr_pref_int_set (PREF_KEY_MAIN_WINDOW_IS_MAXIMIZED, isMaximized);
 
   if (!isMaximized)
     {
       int x, y, w, h;
       gtk_window_get_position (GTK_WINDOW (gtk_window), &x, &y);
       gtk_window_get_size (GTK_WINDOW (gtk_window), &w, &h);
-      gtr_pref_int_set (TR_KEY_main_window_x, x);
-      gtr_pref_int_set (TR_KEY_main_window_y, y);
-      gtr_pref_int_set (TR_KEY_main_window_width, w);
-      gtr_pref_int_set (TR_KEY_main_window_height, h);
+      gtr_pref_int_set (PREF_KEY_MAIN_WINDOW_X, x);
+      gtr_pref_int_set (PREF_KEY_MAIN_WINDOW_Y, y);
+      gtr_pref_int_set (PREF_KEY_MAIN_WINDOW_WIDTH, w);
+      gtr_pref_int_set (PREF_KEY_MAIN_WINDOW_HEIGHT, h);
     }
 }
 
@@ -334,76 +334,109 @@ on_main_window_size_allocated (GtkWidget      * gtk_window,
 **** listen to changes that come from RPC
 ***/
 
-struct on_rpc_changed_struct
+struct rpc_idle_data
 {
   TrCore * core;
-  tr_rpc_callback_type type;
-  int torrent_id;
+  int id;
+  gboolean delete_files;
 };
 
 static gboolean
-on_rpc_changed_idle (gpointer gdata)
+rpc_torrent_remove_idle (gpointer gdata)
+{
+  struct rpc_idle_data * data = gdata;
+
+  gtr_core_remove_torrent (data->core, data->id, data->delete_files);
+
+  g_free (data);
+  return FALSE; /* tell g_idle not to call this func twice */
+}
+
+static gboolean
+rpc_torrent_add_idle (gpointer gdata)
 {
   tr_torrent * tor;
-  struct on_rpc_changed_struct * data = gdata;
+  struct rpc_idle_data * data = gdata;
 
-  switch (data->type)
+  if ((tor = gtr_core_find_torrent (data->core, data->id)))
+    gtr_core_add_torrent (data->core, tor, TRUE);
+
+  g_free (data);
+  return FALSE; /* tell g_idle not to call this func twice */
+}
+
+static tr_rpc_callback_status
+on_rpc_changed (tr_session            * session,
+                tr_rpc_callback_type    type,
+                struct tr_torrent     * tor,
+                void                  * gdata)
+{
+  tr_rpc_callback_status status = TR_RPC_OK;
+  struct cbdata * cbdata = gdata;
+  gdk_threads_enter ();
+
+  switch (type)
     {
       case TR_RPC_SESSION_CLOSE:
         gtr_action_activate ("quit");
         break;
 
-      case TR_RPC_TORRENT_ADDED:
-        if ((tor = gtr_core_find_torrent (data->core, data->torrent_id)))
-          gtr_core_add_torrent (data->core, tor, true);
+      case TR_RPC_TORRENT_ADDED: {
+        struct rpc_idle_data * data = g_new0 (struct rpc_idle_data, 1);
+        data->id = tr_torrentId (tor);
+        data->core = cbdata->core;
+        gdk_threads_add_idle (rpc_torrent_add_idle, data);
         break;
+      }
 
       case TR_RPC_TORRENT_REMOVING:
-        gtr_core_remove_torrent (data->core, data->torrent_id, false);
+      case TR_RPC_TORRENT_TRASHING: {
+        struct rpc_idle_data * data = g_new0 (struct rpc_idle_data, 1);
+        data->id = tr_torrentId (tor);
+        data->core = cbdata->core;
+        data->delete_files = type == TR_RPC_TORRENT_TRASHING;
+        gdk_threads_add_idle (rpc_torrent_remove_idle, data);
+        status = TR_RPC_NOREMOVE;
         break;
-
-      case TR_RPC_TORRENT_TRASHING:
-        gtr_core_remove_torrent (data->core, data->torrent_id, true);
-        break;
+      }
 
       case TR_RPC_SESSION_CHANGED: {
         int i;
-        tr_variant tmp;
-        tr_variant * newval;
-        tr_variant * oldvals = gtr_pref_get_all ();
-        tr_quark key;
+        tr_benc tmp;
+        tr_benc * newval;
+        tr_benc * oldvals = gtr_pref_get_all ();
+        const char * key;
         GSList * l;
         GSList * changed_keys = NULL;
-        tr_session * session = gtr_core_session (data->core);
-        tr_variantInitDict (&tmp, 100);
+        tr_bencInitDict (&tmp, 100);
         tr_sessionGetSettings (session, &tmp);
-        for (i=0; tr_variantDictChild (&tmp, i, &key, &newval); ++i)
+        for (i=0; tr_bencDictChild (&tmp, i, &key, &newval); ++i)
           {
             bool changed;
-            tr_variant * oldval = tr_variantDictFind (oldvals, key);
+            tr_benc * oldval = tr_bencDictFind (oldvals, key);
             if (!oldval)
               {
                 changed = true;
               }
             else
               {
-                char * a = tr_variantToStr (oldval, TR_VARIANT_FMT_BENC, NULL);
-                char * b = tr_variantToStr (newval, TR_VARIANT_FMT_BENC, NULL);
+                char * a = tr_bencToStr (oldval, TR_FMT_BENC, NULL);
+                char * b = tr_bencToStr (newval, TR_FMT_BENC, NULL);
                 changed = strcmp (a, b) != 0;
                 tr_free (b);
                 tr_free (a);
               }
 
             if (changed)
-              changed_keys = g_slist_append (changed_keys, GINT_TO_POINTER(key));
+              changed_keys = g_slist_append (changed_keys, (gpointer)key);
           }
         tr_sessionGetSettings (session, oldvals);
 
         for (l=changed_keys; l!=NULL; l=l->next)
-          gtr_core_pref_changed (data->core, GPOINTER_TO_INT(l->data));
+          gtr_core_pref_changed (cbdata->core, l->data);
 
         g_slist_free (changed_keys);
-        tr_variantFree (&tmp);
+        tr_bencFree (&tmp);
         break;
       }
 
@@ -416,26 +449,8 @@ on_rpc_changed_idle (gpointer gdata)
         break;
     }
 
-  g_free (data);
-  return G_SOURCE_REMOVE;
-}
-
-static tr_rpc_callback_status
-on_rpc_changed (tr_session            * session G_GNUC_UNUSED,
-                tr_rpc_callback_type    type,
-                struct tr_torrent     * tor,
-                void                  * gdata)
-{
-  struct cbdata * cbdata = gdata;
-  struct on_rpc_changed_struct * data;
-
-  data = g_new (struct on_rpc_changed_struct, 1);
-  data->core = cbdata->core;
-  data->type = type;
-  data->torrent_id = tr_torrentId (tor);
-  gdk_threads_add_idle (on_rpc_changed_idle, data);
-  
-  return TR_RPC_NOREMOVE;
+  gdk_threads_leave ();
+  return status;
 }
 
 /***
@@ -483,16 +498,16 @@ on_startup (GApplication * application, gpointer user_data)
   sighandler_cbdata = cbdata;
 
   /* ensure the directories are created */
-  if ((str = gtr_pref_string_get (TR_KEY_download_dir)))
+  if ((str = gtr_pref_string_get (TR_PREFS_KEY_DOWNLOAD_DIR)))
     g_mkdir_with_parents (str, 0777);
-  if ((str = gtr_pref_string_get (TR_KEY_incomplete_dir)))
+  if ((str = gtr_pref_string_get (TR_PREFS_KEY_INCOMPLETE_DIR)))
     g_mkdir_with_parents (str, 0777);
 
   /* initialize the libtransmission session */
   session = tr_sessionInit ("gtk", cbdata->config_dir, TRUE, gtr_pref_get_all ());
 
-  gtr_pref_flag_set (TR_KEY_alt_speed_enabled, tr_sessionUsesAltSpeed (session));
-  gtr_pref_int_set  (TR_KEY_peer_port, tr_sessionGetPeerPort (session));
+  gtr_pref_flag_set (TR_PREFS_KEY_ALT_SPEED_ENABLED, tr_sessionUsesAltSpeed (session));
+  gtr_pref_int_set (TR_PREFS_KEY_PEER_PORT, tr_sessionGetPeerPort (session));
   cbdata->core = gtr_core_new (session);
 
   /* init the ui manager */
@@ -512,11 +527,11 @@ on_startup (GApplication * application, gpointer user_data)
   tr_sessionSetRPCCallback (session, on_rpc_changed, cbdata);
 
   /* check & see if it's time to update the blocklist */
-  if (gtr_pref_flag_get (TR_KEY_blocklist_enabled))
+  if (gtr_pref_flag_get (TR_PREFS_KEY_BLOCKLIST_ENABLED))
     {
-      if (gtr_pref_flag_get (TR_KEY_blocklist_updates_enabled))
+      if (gtr_pref_flag_get (PREF_KEY_BLOCKLIST_UPDATES_ENABLED))
         {
-          const int64_t last_time = gtr_pref_int_get (TR_KEY_blocklist_date);
+          const int64_t last_time = gtr_pref_int_get ("blocklist-date");
           const int SECONDS_IN_A_WEEK = 7 * 24 * 60 * 60;
           const time_t now = time (NULL);
           if (last_time + SECONDS_IN_A_WEEK < now)
@@ -546,8 +561,8 @@ static void
 open_files (GSList * files, gpointer gdata)
 {
   struct cbdata * cbdata = gdata;
-  const gboolean do_start = gtr_pref_flag_get (TR_KEY_start_added_torrents) && !cbdata->start_paused;
-  const gboolean do_prompt = gtr_pref_flag_get (TR_KEY_show_options_window);
+  const gboolean do_start = gtr_pref_flag_get (TR_PREFS_KEY_START) && !cbdata->start_paused;
+  const gboolean do_prompt = gtr_pref_flag_get (PREF_KEY_OPTIONS_PROMPT);
   const gboolean do_notify = TRUE;
 
   gtr_core_add_files (cbdata->core, files, do_start, do_prompt, do_notify);
@@ -664,7 +679,7 @@ on_core_busy (TrCore * core UNUSED, gboolean busy, struct cbdata * c)
 
 static void on_core_error (TrCore *, guint, const char *, struct cbdata *);
 static void on_add_torrent (TrCore *, tr_ctor *, gpointer);
-static void on_prefs_changed (TrCore * core, const tr_quark key, gpointer);
+static void on_prefs_changed (TrCore * core, const char * key, gpointer);
 static void main_window_setup (struct cbdata * cbdata, GtkWindow * wind);
 static gboolean update_model_loop (gpointer gdata);
 static gboolean update_model_once (gpointer gdata);
@@ -673,7 +688,7 @@ static void
 app_setup (GtkWindow * wind, struct cbdata * cbdata)
 {
   if (cbdata->is_iconified)
-    gtr_pref_flag_set (TR_KEY_show_notification_area_icon, TRUE);
+    gtr_pref_flag_set (PREF_KEY_SHOW_TRAY_ICON, TRUE);
 
   gtr_actions_set_core (cbdata->core);
 
@@ -691,7 +706,7 @@ app_setup (GtkWindow * wind, struct cbdata * cbdata)
   main_window_setup (cbdata, wind);
 
   /* set up the icon */
-  on_prefs_changed (cbdata->core, TR_KEY_show_notification_area_icon, cbdata);
+  on_prefs_changed (cbdata->core, PREF_KEY_SHOW_TRAY_ICON, cbdata);
 
   /* start model update timer */
   cbdata->timer = gdk_threads_add_timeout_seconds (MAIN_WINDOW_REFRESH_INTERVAL_SECONDS, update_model_loop, cbdata);
@@ -710,7 +725,7 @@ app_setup (GtkWindow * wind, struct cbdata * cbdata)
       gtr_action_set_toggled ("toggle-main-window", FALSE);
     }
 
-  if (!gtr_pref_flag_get (TR_KEY_user_has_given_informed_consent))
+  if (!gtr_pref_flag_get (PREF_KEY_USER_HAS_GIVEN_INFORMED_CONSENT))
     {
       GtkWidget * w = gtk_message_dialog_new (GTK_WINDOW (wind),
                                               GTK_DIALOG_DESTROY_WITH_PARENT,
@@ -725,7 +740,7 @@ app_setup (GtkWindow * wind, struct cbdata * cbdata)
         {
           case GTK_RESPONSE_ACCEPT:
             /* only show it once */
-            gtr_pref_flag_set (TR_KEY_user_has_given_informed_consent, TRUE);
+            gtr_pref_flag_set (PREF_KEY_USER_HAS_GIVEN_INFORMED_CONSENT, TRUE);
             gtk_widget_destroy (w);
             break;
 
@@ -749,10 +764,10 @@ presentMainWindow (struct cbdata * cbdata)
 
   if (!gtk_widget_get_visible (GTK_WIDGET (window)))
     {
-      gtk_window_resize (window, gtr_pref_int_get (TR_KEY_main_window_width),
-                                 gtr_pref_int_get (TR_KEY_main_window_height));
-      gtk_window_move (window, gtr_pref_int_get (TR_KEY_main_window_x),
-                               gtr_pref_int_get (TR_KEY_main_window_y));
+      gtk_window_resize (window, gtr_pref_int_get (PREF_KEY_MAIN_WINDOW_WIDTH),
+                                 gtr_pref_int_get (PREF_KEY_MAIN_WINDOW_HEIGHT));
+      gtk_window_move (window, gtr_pref_int_get (PREF_KEY_MAIN_WINDOW_X),
+                               gtr_pref_int_get (PREF_KEY_MAIN_WINDOW_Y));
       gtr_widget_set_visible (GTK_WIDGET (window), TRUE);
     }
 
@@ -882,25 +897,20 @@ on_session_closed (gpointer gdata)
   g_slist_foreach (cbdata->duplicates_list, (GFunc)g_free, NULL);
   g_slist_free (cbdata->duplicates_list);
 
-  return G_SOURCE_REMOVE;
+  return FALSE;
 }
 
-struct session_close_struct
-{
-  tr_session * session;
-  struct cbdata * cbdata;
-};
-
-/* since tr_sessionClose () is a blocking function,
- * delegate its call to another thread here... when it's done,
- * punt the GUI teardown back to the GTK+ thread */
 static gpointer
 session_close_threadfunc (gpointer gdata)
 {
-  struct session_close_struct * data = gdata;
-  tr_sessionClose (data->session);
-  gdk_threads_add_idle (on_session_closed, data->cbdata);
-  g_free (data);
+  /* since tr_sessionClose () is a blocking function,
+   * call it from another thread... when it's done,
+   * punt the GUI teardown back to the GTK+ thread */
+  struct cbdata * cbdata = gdata;
+  gdk_threads_enter ();
+  gtr_core_close (cbdata->core);
+  gdk_threads_add_idle (on_session_closed, gdata);
+  gdk_threads_leave ();
   return NULL;
 }
 
@@ -915,7 +925,6 @@ on_app_exit (gpointer vdata)
 {
   GtkWidget *r, *p, *b, *w, *c;
   struct cbdata *cbdata = vdata;
-  struct session_close_struct * session_close_data;
 
   /* stop the update timer */
   if (cbdata->timer)
@@ -961,16 +970,13 @@ on_app_exit (gpointer vdata)
   /* ensure the window is in its previous position & size.
    * this seems to be necessary because changing the main window's
    * child seems to unset the size */
-  gtk_window_resize (cbdata->wind, gtr_pref_int_get (TR_KEY_main_window_width),
-                                   gtr_pref_int_get (TR_KEY_main_window_height));
-  gtk_window_move (cbdata->wind, gtr_pref_int_get (TR_KEY_main_window_x),
-                                 gtr_pref_int_get (TR_KEY_main_window_y));
+  gtk_window_resize (cbdata->wind, gtr_pref_int_get (PREF_KEY_MAIN_WINDOW_WIDTH),
+                                   gtr_pref_int_get (PREF_KEY_MAIN_WINDOW_HEIGHT));
+  gtk_window_move (cbdata->wind, gtr_pref_int_get (PREF_KEY_MAIN_WINDOW_X),
+                                 gtr_pref_int_get (PREF_KEY_MAIN_WINDOW_Y));
 
   /* shut down libT */
-  session_close_data = g_new (struct session_close_struct, 1);
-  session_close_data->cbdata = cbdata;
-  session_close_data->session = gtr_core_close (cbdata->core);
-  g_thread_new ("shutdown-thread", session_close_threadfunc, session_close_data);
+  g_thread_new ("shutdown-thread", session_close_threadfunc, vdata);
 }
 
 static void
@@ -1072,201 +1078,192 @@ on_add_torrent (TrCore * core, tr_ctor * ctor, gpointer gdata)
 }
 
 static void
-on_prefs_changed (TrCore * core UNUSED, const tr_quark key, gpointer data)
+on_prefs_changed (TrCore * core UNUSED, const char * key, gpointer data)
 {
   struct cbdata * cbdata = data;
   tr_session * tr = gtr_core_session (cbdata->core);
 
-  switch (key)
+  if (!strcmp (key, TR_PREFS_KEY_ENCRYPTION))
     {
-      case TR_KEY_encryption:
-        tr_sessionSetEncryption (tr, gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_download_dir:
-        tr_sessionSetDownloadDir (tr, gtr_pref_string_get (key));
-        break;
-
-      case TR_KEY_message_level:
-        tr_setMessageLevel (gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_peer_port:
-        tr_sessionSetPeerPort (tr, gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_blocklist_enabled:
+      tr_sessionSetEncryption (tr, gtr_pref_int_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_DOWNLOAD_DIR))
+    {
+      tr_sessionSetDownloadDir (tr, gtr_pref_string_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_MSGLEVEL))
+    {
+      tr_setMessageLevel (gtr_pref_int_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_PEER_PORT))
+    {
+      tr_sessionSetPeerPort (tr, gtr_pref_int_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_BLOCKLIST_ENABLED))
+    {
         tr_blocklistSetEnabled (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_blocklist_url:
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_BLOCKLIST_URL))
+    {
         tr_blocklistSetURL (tr, gtr_pref_string_get (key));
-        break;
-
-      case TR_KEY_show_notification_area_icon:
-        {
-          const bool show = gtr_pref_flag_get (key);
-          if (show && !cbdata->icon)
-            cbdata->icon = gtr_icon_new (cbdata->core);
-          else if (!show && cbdata->icon)
-            g_clear_object (&cbdata->icon);
-          break;
-        }
-
-      case TR_KEY_speed_limit_down_enabled:
-        tr_sessionLimitSpeed (tr, TR_DOWN, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_speed_limit_down:
-        tr_sessionSetSpeedLimit_KBps (tr, TR_DOWN, gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_speed_limit_up_enabled:
-        tr_sessionLimitSpeed (tr, TR_UP, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_speed_limit_up:
-        tr_sessionSetSpeedLimit_KBps (tr, TR_UP, gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_ratio_limit_enabled:
-        tr_sessionSetRatioLimited (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_ratio_limit:
-        tr_sessionSetRatioLimit (tr, gtr_pref_double_get (key));
-        break;
-
-      case TR_KEY_idle_seeding_limit:
-        tr_sessionSetIdleLimit (tr, gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_idle_seeding_limit_enabled:
-        tr_sessionSetIdleLimited (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_port_forwarding_enabled:
-        tr_sessionSetPortForwardingEnabled (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_pex_enabled:
-        tr_sessionSetPexEnabled (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_rename_partial_files:
-        tr_sessionSetIncompleteFileNamingEnabled (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_download_queue_size:
-        tr_sessionSetQueueSize (tr, TR_DOWN, gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_queue_stalled_minutes:
-        tr_sessionSetQueueStalledMinutes (tr, gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_dht_enabled:
-        tr_sessionSetDHTEnabled (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_utp_enabled:
-        tr_sessionSetUTPEnabled (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_lpd_enabled:
-        tr_sessionSetLPDEnabled (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_rpc_port:
-        tr_sessionSetRPCPort (tr, gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_rpc_enabled:
-        tr_sessionSetRPCEnabled (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_rpc_whitelist:
-        tr_sessionSetRPCWhitelist (tr, gtr_pref_string_get (key));
-        break;
-
-      case TR_KEY_rpc_whitelist_enabled:
-        tr_sessionSetRPCWhitelistEnabled (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_rpc_username:
-        tr_sessionSetRPCUsername (tr, gtr_pref_string_get (key));
-        break;
-
-      case TR_KEY_rpc_password:
-        tr_sessionSetRPCPassword (tr, gtr_pref_string_get (key));
-        break;
-
-      case TR_KEY_rpc_authentication_required:
-        tr_sessionSetRPCPasswordEnabled (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_alt_speed_up:
-        tr_sessionSetAltSpeed_KBps (tr, TR_UP, gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_alt_speed_down:
+    }
+  else if (!strcmp (key, PREF_KEY_SHOW_TRAY_ICON))
+    {
+      const int show = gtr_pref_flag_get (key);
+      if (show && !cbdata->icon)
+        cbdata->icon = gtr_icon_new (cbdata->core);
+      else if (!show && cbdata->icon)
+        g_clear_object (&cbdata->icon);
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_DSPEED_ENABLED))
+    {
+      tr_sessionLimitSpeed (tr, TR_DOWN, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_DSPEED_KBps))
+    {
+      tr_sessionSetSpeedLimit_KBps (tr, TR_DOWN, gtr_pref_int_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_USPEED_ENABLED))
+    {
+      tr_sessionLimitSpeed (tr, TR_UP, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_USPEED_KBps))
+    {
+      tr_sessionSetSpeedLimit_KBps (tr, TR_UP, gtr_pref_int_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_RATIO_ENABLED))
+    {
+      tr_sessionSetRatioLimited (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_RATIO))
+    {
+      tr_sessionSetRatioLimit (tr, gtr_pref_double_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_IDLE_LIMIT))
+    {
+      tr_sessionSetIdleLimit (tr, gtr_pref_int_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_IDLE_LIMIT_ENABLED))
+    {
+      tr_sessionSetIdleLimited (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_PORT_FORWARDING))
+    {
+      tr_sessionSetPortForwardingEnabled (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_PEX_ENABLED))
+    {
+      tr_sessionSetPexEnabled (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_RENAME_PARTIAL_FILES))
+    {
+      tr_sessionSetIncompleteFileNamingEnabled (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_DOWNLOAD_QUEUE_SIZE))
+    {
+      tr_sessionSetQueueSize (tr, TR_DOWN, gtr_pref_int_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_QUEUE_STALLED_MINUTES))
+    {
+      tr_sessionSetQueueStalledMinutes (tr, gtr_pref_int_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_DHT_ENABLED))
+    {
+      tr_sessionSetDHTEnabled (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_UTP_ENABLED))
+    {
+      tr_sessionSetUTPEnabled (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_LPD_ENABLED))
+    {
+      tr_sessionSetLPDEnabled (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_RPC_PORT))
+    {
+      tr_sessionSetRPCPort (tr, gtr_pref_int_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_RPC_ENABLED))
+    {
+      tr_sessionSetRPCEnabled (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_RPC_WHITELIST))
+    {
+      tr_sessionSetRPCWhitelist (tr, gtr_pref_string_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_RPC_WHITELIST_ENABLED))
+    {
+      tr_sessionSetRPCWhitelistEnabled (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_RPC_USERNAME))
+    {
+      tr_sessionSetRPCUsername (tr, gtr_pref_string_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_RPC_PASSWORD))
+    {
+      tr_sessionSetRPCPassword (tr, gtr_pref_string_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_RPC_AUTH_REQUIRED))
+    {
+      tr_sessionSetRPCPasswordEnabled (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_ALT_SPEED_UP_KBps))
+    {
+      tr_sessionSetAltSpeed_KBps (tr, TR_UP, gtr_pref_int_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_ALT_SPEED_DOWN_KBps))
+    {
         tr_sessionSetAltSpeed_KBps (tr, TR_DOWN, gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_alt_speed_enabled:
-        {
-          const bool b = gtr_pref_flag_get (key);
-          tr_sessionUseAltSpeed (tr, b);
-          gtr_action_set_toggled (tr_quark_get_string(key,NULL), b);
-          break;
-        }
-
-      case TR_KEY_alt_speed_time_begin:
-        tr_sessionSetAltSpeedBegin (tr, gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_alt_speed_time_end:
-        tr_sessionSetAltSpeedEnd (tr, gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_alt_speed_time_enabled:
-        tr_sessionUseAltSpeedTime (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_alt_speed_time_day:
-        tr_sessionSetAltSpeedDay (tr, gtr_pref_int_get (key));
-        break;
-
-      case TR_KEY_peer_port_random_on_start:
-        tr_sessionSetPeerPortRandomOnStart (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_incomplete_dir:
-        tr_sessionSetIncompleteDir (tr, gtr_pref_string_get (key));
-        break;
-
-      case TR_KEY_incomplete_dir_enabled:
-        tr_sessionSetIncompleteDirEnabled (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_script_torrent_done_enabled:
-        tr_sessionSetTorrentDoneScriptEnabled (tr, gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_script_torrent_done_filename:
-        tr_sessionSetTorrentDoneScript (tr, gtr_pref_string_get (key));
-        break;
-
-      case TR_KEY_start_added_torrents:
-        tr_sessionSetPaused (tr, !gtr_pref_flag_get (key));
-        break;
-
-      case TR_KEY_trash_original_torrent_files:
-        tr_sessionSetDeleteSource (tr, gtr_pref_flag_get (key));
-        break;
-
-      default:
-        break;
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_ALT_SPEED_ENABLED))
+    {
+      const gboolean b = gtr_pref_flag_get (key);
+      tr_sessionUseAltSpeed (tr, b);
+      gtr_action_set_toggled (key, b);
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_ALT_SPEED_TIME_BEGIN))
+    {
+      tr_sessionSetAltSpeedBegin (tr, gtr_pref_int_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_ALT_SPEED_TIME_END))
+    {
+      tr_sessionSetAltSpeedEnd (tr, gtr_pref_int_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_ALT_SPEED_TIME_ENABLED))
+    {
+      tr_sessionUseAltSpeedTime (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_ALT_SPEED_TIME_DAY))
+    {
+      tr_sessionSetAltSpeedDay (tr, gtr_pref_int_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_PEER_PORT_RANDOM_ON_START))
+    {
+      tr_sessionSetPeerPortRandomOnStart (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_INCOMPLETE_DIR))
+    {
+      tr_sessionSetIncompleteDir (tr, gtr_pref_string_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_INCOMPLETE_DIR_ENABLED))
+    {
+      tr_sessionSetIncompleteDirEnabled (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_ENABLED))
+    {
+      tr_sessionSetTorrentDoneScriptEnabled (tr, gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_SCRIPT_TORRENT_DONE_FILENAME))
+    {
+      tr_sessionSetTorrentDoneScript (tr, gtr_pref_string_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_START))
+    {
+      tr_sessionSetPaused (tr, !gtr_pref_flag_get (key));
+    }
+  else if (!strcmp (key, TR_PREFS_KEY_TRASH_ORIGINAL))
+    {
+      tr_sessionSetDeleteSource (tr, gtr_pref_flag_get (key));
     }
 }
 
@@ -1290,7 +1287,7 @@ update_model_once (gpointer gdata)
     gtr_icon_refresh (data->icon);
 
   data->update_model_soon_tag = 0;
-  return G_SOURCE_REMOVE;
+  return FALSE;
 }
 
 static void
@@ -1347,33 +1344,33 @@ append_id_to_benc_list (GtkTreeModel * m, GtkTreePath * path UNUSED,
 {
   tr_torrent * tor = NULL;
   gtk_tree_model_get (m, iter, MC_TORRENT, &tor, -1);
-  tr_variantListAddInt (list, tr_torrentId (tor));
+  tr_bencListAddInt (list, tr_torrentId (tor));
 }
 
 static gboolean
 call_rpc_for_selected_torrents (struct cbdata * data, const char * method)
 {
-  tr_variant top, *args, *ids;
+  tr_benc top, *args, *ids;
   gboolean invoked = FALSE;
   GtkTreeSelection * s = data->sel;
   tr_session * session = gtr_core_session (data->core);
 
-  tr_variantInitDict (&top, 2);
-  tr_variantDictAddStr (&top, TR_KEY_method, method);
-  args = tr_variantDictAddDict (&top, TR_KEY_arguments, 1);
-  ids = tr_variantDictAddList (args, TR_KEY_ids, 0);
+  tr_bencInitDict (&top, 2);
+  tr_bencDictAddStr (&top, "method", method);
+  args = tr_bencDictAddDict (&top, "arguments", 1);
+  ids = tr_bencDictAddList (args, "ids", 0);
   gtk_tree_selection_selected_foreach (s, append_id_to_benc_list, ids);
 
-  if (tr_variantListSize (ids) != 0)
+  if (tr_bencListSize (ids) != 0)
     {
       int json_len;
-      char * json = tr_variantToStr (&top, TR_VARIANT_FMT_JSON_LEAN, &json_len);
+      char * json = tr_bencToStr (&top, TR_FMT_JSON_LEAN, &json_len);
       tr_rpc_request_exec_json (session, json, json_len, NULL, NULL);
       g_free (json);
       invoked = TRUE;
     }
 
-  tr_variantFree (&top);
+  tr_bencFree (&top);
   return invoked;
 }
 

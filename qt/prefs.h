@@ -21,11 +21,9 @@
 
 #include "filters.h"
 
-#include <libtransmission/quark.h>
-
 extern "C"
 {
-    struct tr_variant;
+    struct tr_benc;
 }
 
 class Prefs: public QObject
@@ -43,7 +41,6 @@ class Prefs: public QObject
             DIR_WATCH,
             DIR_WATCH_ENABLED,
             SHOW_TRAY_ICON,
-            START_MINIMIZED,
             SHOW_DESKTOP_NOTIFICATION,
             ASKQUIT,
             SORT_MODE,
@@ -135,7 +132,7 @@ class Prefs: public QObject
 
         struct PrefItem {
             int id;
-            tr_quark key;
+            const char * key;
             int type;
         };
 
@@ -145,13 +142,12 @@ class Prefs: public QObject
         QSet<int> myTemporaryPrefs;
         QString myConfigDir;
         mutable QVariant myValues[PREFS_COUNT];
-        void initDefaults( struct tr_variant* );
+        void initDefaults( struct tr_benc* );
 
     public:
         bool isCore( int key ) const { return FIRST_CORE_PREF<=key && key<=LAST_CORE_PREF; }
         bool isClient( int key ) const { return !isCore( key ); }
-        const char * keyStr( int i ) const { return tr_quark_get_string(myItems[i].key,NULL); }
-        tr_quark getKey (int i) const { return myItems[i].key; }
+        const char * keyStr( int i ) const { return myItems[i].key; }
         int type( int i ) const { return myItems[i].type; }
         const QVariant& variant( int i ) const { return myValues[i]; }
 

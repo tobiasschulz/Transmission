@@ -14,7 +14,7 @@
 #include <iostream>
 
 #include <libtransmission/transmission.h>
-#include <libtransmission/variant.h>
+#include <libtransmission/bencode.h>
 
 #include "torrent-delegate.h"
 #include "torrent-model.h"
@@ -38,34 +38,35 @@ TorrentModel :: rowCount( const QModelIndex& parent ) const
 }
 
 QVariant
-TorrentModel :: data (const QModelIndex& index, int role) const
+TorrentModel :: data( const QModelIndex& index, int role ) const
 {
-  QVariant var;
+    QVariant var;
+    const int row = index.row( );
+    if( row<0 || row>=myTorrents.size() )
+        return QVariant( );
 
-  const Torrent * t = myTorrents.value (index.row(), 0);
-  if (t != 0)
+    const Torrent* t = myTorrents.at( row );
+
+    switch( role )
     {
-      switch (role)
-        {
-          case Qt::DisplayRole:
-            var.setValue (t->name());
+        case Qt::DisplayRole:
+            var = QString( t->name() );
             break;
 
-          case Qt::DecorationRole:
-            var.setValue (t->getMimeTypeIcon());
+        case Qt::DecorationRole:
+            var = t->getMimeTypeIcon( );
             break;
 
-          case TorrentRole:
-            var = qVariantFromValue(t);
+        case TorrentRole:
+            var = qVariantFromValue( t );
             break;
 
-          default:
+        default:
             //std::cerr << "Unhandled role: " << role << std::endl;
             break;
-        }
     }
 
-  return var;
+    return var;
 }
 
 /***
@@ -123,37 +124,34 @@ TorrentModel :: onTorrentChanged( int torrentId )
 }
 
 void
-TorrentModel :: removeTorrents( tr_variant * torrents )
+TorrentModel :: removeTorrents( tr_benc * torrents )
 {
     int i = 0;
-    tr_variant * child;
-    while(( child = tr_variantListChild( torrents, i++ ))) {
+    tr_benc * child;
+    while(( child = tr_bencListChild( torrents, i++ ))) {
         int64_t intVal;
-        if( tr_variantGetInt( child, &intVal ) )
+        if( tr_bencGetInt( child, &intVal ) )
             removeTorrent( intVal );
     }
 }
 
 void
-TorrentModel :: updateTorrents( tr_variant * torrents, bool isCompleteList )
+TorrentModel :: updateTorrents( tr_benc * torrents, bool isCompleteList )
 {
     QList<Torrent*> newTorrents;
-    QSet<int> oldIds;
+    QSet<int> oldIds( getIds( ) );
     QSet<int> addIds;
     QSet<int> newIds;
     int updatedCount = 0;
 
-    if ( isCompleteList )
-      oldIds = getIds( );
-
-    if( tr_variantIsList( torrents ) )
+    if( tr_bencIsList( torrents ) )
     {
         size_t i( 0 );
-        tr_variant * child;
-        while(( child = tr_variantListChild( torrents, i++ )))
+        tr_benc * child;
+        while(( child = tr_bencListChild( torrents, i++ )))
         {
             int64_t id;
-            if( tr_variantDictFindInt( child, TR_KEY_id, &id ) )
+            if( tr_bencDictFindInt( child, "id", &id ) )
             {
                 newIds.insert( id );
 
@@ -249,15 +247,12 @@ TorrentModel :: getDownloadSpeed( ) const
 }
 
 QSet<int>
-TorrentModel :: getIds () const
+TorrentModel :: getIds( ) const
 {
-  QSet<int> ids;
-
-  ids.reserve (myTorrents.size());
-  foreach (const Torrent * tor, myTorrents)
-    ids.insert (tor->id());
-
-  return ids;
+    QSet<int> ids;
+    foreach( const Torrent * tor, myTorrents )
+        ids.insert( tor->id( ) );
+    return ids;
 }
 
 bool
