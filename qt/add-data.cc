@@ -13,6 +13,7 @@
 #include <QFile>
 
 #include <libtransmission/transmission.h>
+#include <libtransmission/bencode.h> // tr_base64_encode()
 #include <libtransmission/utils.h> // tr_base64_encode()
 
 #include "add-data.h"

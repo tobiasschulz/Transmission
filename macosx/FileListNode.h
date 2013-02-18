@@ -40,16 +40,14 @@
     BOOL fIsFolder;
 }
 
-@property (nonatomic, copy, readonly) NSString * name;
-@property (nonatomic, copy, readonly) NSString * path;
+@property (nonatomic, readonly) NSString * name;
+@property (nonatomic, readonly) NSString * path;
 
 @property (nonatomic, readonly) Torrent * torrent;
 
 @property (nonatomic, readonly) uint64_t size;
-@property (nonatomic, retain, readonly) NSImage * icon;
+@property (nonatomic, readonly) NSImage * icon;
 @property (nonatomic, readonly) BOOL isFolder;
-
-@property (nonatomic, retain, readonly) NSIndexSet * indexes;
 
 - (id) initWithFolderName: (NSString *) name path: (NSString *) path torrent: (Torrent *) torrent;
 - (id) initWithFileName: (NSString *) name path: (NSString *) path size: (uint64_t) size index: (NSUInteger) index torrent: (Torrent *) torrent;
@@ -59,8 +57,8 @@
 
 - (NSString *) description;
 
-- (NSMutableArray *) children;
+- (NSIndexSet *) indexes;
 
-- (BOOL) updateFromOldName: (NSString *) oldName toNewName: (NSString *) newName inPath: (NSString *) path;
+- (NSMutableArray *) children;
 
 @end

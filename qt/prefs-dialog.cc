@@ -36,7 +36,6 @@
 #include <QTimer>
 #include <QVBoxLayout>
 
-#include "freespace-label.h"
 #include "formatter.h"
 #include "hig.h"
 #include "prefs.h"
@@ -170,19 +169,19 @@ PrefsDialog :: lineEditNew( int key, int echoMode )
 ***/
 
 QWidget *
-PrefsDialog :: createRemoteTab( Session& session )
+PrefsDialog :: createWebTab( Session& session )
 {
     HIG * hig = new HIG( this );
-    hig->addSectionTitle( tr( "Remote Control" ) );
+    hig->addSectionTitle( tr( "Web Client" ) );
     QWidget * w;
     QHBoxLayout * h = new QHBoxLayout( );
     QPushButton * b = new QPushButton( tr( "&Open web client" ) );
     connect( b, SIGNAL(clicked()), &session, SLOT(launchWebInterface()) );
     h->addWidget( b, 0, Qt::AlignRight );
-    QWidget * l = checkBoxNew( tr( "Allow &remote access" ), Prefs::RPC_ENABLED );
+    QWidget * l = checkBoxNew( tr( "&Enable web client" ), Prefs::RPC_ENABLED );
     myUnsupportedWhenRemote << l;
     hig->addRow( l, h, 0 );
-    l = hig->addRow( tr( "HTTP &port:" ), w = spinBoxNew( Prefs::RPC_PORT, 0, 65535, 1 ) );
+    l = hig->addRow( tr( "Listening &port:" ), w = spinBoxNew( Prefs::RPC_PORT, 0, 65535, 1 ) );
     myWebWidgets << l << w;
     hig->addWideControl( w = checkBoxNew( tr( "Use &authentication" ), Prefs::RPC_AUTH_REQUIRED ) );
     myWebWidgets << w;
@@ -190,7 +189,7 @@ PrefsDialog :: createRemoteTab( Session& session )
     myWebAuthWidgets << l << w;
     l = hig->addRow( tr( "Pass&word:" ), w = lineEditNew( Prefs::RPC_PASSWORD, QLineEdit::Password ) );
     myWebAuthWidgets << l << w;
-    hig->addWideControl( w = checkBoxNew( tr( "Only allow these IP a&ddresses:" ), Prefs::RPC_WHITELIST_ENABLED ) );
+    hig->addWideControl( w = checkBoxNew( tr( "Only allow these IP a&ddresses to connect:" ), Prefs::RPC_WHITELIST_ENABLED ) );
     myWebWidgets << w;
     l = hig->addRow( tr( "Addresses:" ), w = lineEditNew( Prefs::RPC_WHITELIST ) );
     myWebWhitelistWidgets << l << w;
@@ -219,13 +218,13 @@ PrefsDialog :: createSpeedTab( )
     hig->addSectionTitle( tr( "Speed Limits" ) );
     const QString speed_K_str = Formatter::unitStr( Formatter::SPEED, Formatter::KB );
 
-        l = checkBoxNew( tr( "&Upload (%1):" ).arg( speed_K_str ), Prefs::USPEED_ENABLED );
-        r = spinBoxNew( Prefs::USPEED, 0, INT_MAX, 5 );
+        l = checkBoxNew( tr( "Limit &download speed (%1):" ).arg( speed_K_str ), Prefs::DSPEED_ENABLED );
+        r = spinBoxNew( Prefs::DSPEED, 0, INT_MAX, 5 );
         hig->addRow( l, r );
         enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), r );
 
-        l = checkBoxNew( tr( "&Download (%1):" ).arg( speed_K_str ), Prefs::DSPEED_ENABLED );
-        r = spinBoxNew( Prefs::DSPEED, 0, INT_MAX, 5 );
+        l = checkBoxNew( tr( "Limit &upload speed (%1):" ).arg( speed_K_str ), Prefs::USPEED_ENABLED );
+        r = spinBoxNew( Prefs::USPEED, 0, INT_MAX, 5 );
         hig->addRow( l, r );
         enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), r );
 
@@ -245,12 +244,12 @@ PrefsDialog :: createSpeedTab( )
         QString s = tr( "<small>Override normal speed limits manually or at scheduled times</small>" );
         hig->addWideControl( new QLabel( s ) );
 
-        s = tr( "U&pload (%1):" ).arg( speed_K_str );
-        r = spinBoxNew( Prefs :: ALT_SPEED_LIMIT_UP, 0, INT_MAX, 5 );
+        s = tr( "Limit do&wnload speed (%1):" ).arg( speed_K_str );
+        r = spinBoxNew( Prefs :: ALT_SPEED_LIMIT_DOWN, 0, INT_MAX, 5 );
         hig->addRow( s, r );
 
-        s = tr( "Do&wnload (%1):" ).arg( speed_K_str );
-        r = spinBoxNew( Prefs :: ALT_SPEED_LIMIT_DOWN, 0, INT_MAX, 5 );
+        s = tr( "Limit u&pload speed (%1):" ).arg( speed_K_str );
+        r = spinBoxNew( Prefs :: ALT_SPEED_LIMIT_UP, 0, INT_MAX, 5 );
         hig->addRow( s, r );
 
         QCheckBox * c = checkBoxNew( tr( "&Scheduled times:" ), Prefs::ALT_SPEED_LIMIT_TIME_ENABLED );
@@ -300,15 +299,8 @@ PrefsDialog :: createDesktopTab( )
     HIG * hig = new HIG( this );
     hig->addSectionTitle( tr( "Desktop" ) );
 
-      hig->addWideControl( checkBoxNew( tr( "Show Transmission icon in the &notification area" ), Prefs::SHOW_TRAY_ICON ) );
-      hig->addWideControl( checkBoxNew( tr( "Start &minimized in notification area" ), Prefs::START_MINIMIZED ) );
-
-    hig->addSectionDivider( );
-    hig->addSectionTitle( tr ("Notification") );
-
-      hig->addWideControl( checkBoxNew( tr( "Show a notification when torrents are a&dded" ), Prefs::SHOW_NOTIFICATION_ON_ADD ) );
-      hig->addWideControl( checkBoxNew( tr( "Show a notification when torrents &finish" ), Prefs::SHOW_NOTIFICATION_ON_COMPLETE ) );
-      hig->addWideControl( checkBoxNew( tr( "Play a &sound when torrents finish" ), Prefs::COMPLETE_SOUND_ENABLED ) );
+    hig->addWideControl( checkBoxNew( tr( "Show Transmission icon in the &notification area" ), Prefs::SHOW_TRAY_ICON ) );
+    hig->addWideControl( checkBoxNew( tr( "Show &popup notifications" ), Prefs::SHOW_DESKTOP_NOTIFICATION ) );
 
     hig->finish( );
     return hig;
@@ -359,7 +351,7 @@ PrefsDialog :: createNetworkTab( )
     hig->addWideControl( checkBoxNew( tr( "Use UPnP or NAT-PMP port &forwarding from my router" ), Prefs::PORT_FORWARDING ) );
 
     hig->addSectionDivider( );
-    hig->addSectionTitle( tr( "Peer Limits" ) );
+    hig->addSectionTitle( tr( "Limits" ) );
     hig->addRow( tr( "Maximum peers per &torrent:" ), spinBoxNew( Prefs::PEER_LIMIT_TORRENT, 1, FD_SETSIZE, 5 ) );
     hig->addRow( tr( "Maximum peers &overall:" ), spinBoxNew( Prefs::PEER_LIMIT_GLOBAL, 1, FD_SETSIZE, 5 ) );
 
@@ -369,12 +361,6 @@ PrefsDialog :: createNetworkTab( )
     QWidget * w;
     hig->addWideControl( w = checkBoxNew( tr( "Enable &uTP for peer connections" ), Prefs::UTP_ENABLED ) );
     w->setToolTip( tr( "uTP is a tool for reducing network congestion." ) );
-    hig->addWideControl( w = checkBoxNew( tr( "Use PE&X to find more peers" ), Prefs::PEX_ENABLED ) );
-    w->setToolTip( tr( "PEX is a tool for exchanging peer lists with the peers you're connected to." ) );
-    hig->addWideControl( w = checkBoxNew( tr( "Use &DHT to find more peers" ), Prefs::DHT_ENABLED ) );
-    w->setToolTip( tr( "DHT is a tool for finding peers without a tracker." ) );
-    hig->addWideControl( w = checkBoxNew( tr( "Use &Local Peer Discovery to find more peers" ), Prefs::LPD_ENABLED ) );
-    w->setToolTip( tr( "LPD is a tool for finding peers on your local network." ) );
 
     hig->finish( );
     return hig;
@@ -433,18 +419,6 @@ PrefsDialog :: createPrivacyTab( )
     QWidget * w;
     HIG * hig = new HIG( this );
 
-    hig->addSectionTitle( tr( "Encryption" ) );
-
-    QComboBox * box = new QComboBox( );
-    box->addItem( tr( "Allow encryption" ), 0 );
-    box->addItem( tr( "Prefer encryption" ), 1 );
-    box->addItem( tr( "Require encryption" ), 2 );
-    myWidgets.insert( Prefs :: ENCRYPTION, box );
-    connect( box, SIGNAL(activated(int)), this, SLOT(encryptionEdited(int)));
-
-    hig->addRow( tr( "&Encryption mode:" ), box );
-
-    hig->addSectionDivider( );
     hig->addSectionTitle( tr( "Blocklist" ) );
 
     QWidget * l = checkBoxNew( tr("Enable &blocklist:"), Prefs::BLOCKLIST_ENABLED );
@@ -466,6 +440,24 @@ PrefsDialog :: createPrivacyTab( )
     l = checkBoxNew( tr( "Enable &automatic updates" ), Prefs::BLOCKLIST_UPDATES_ENABLED );
     myBlockWidgets << l;
     hig->addWideControl( l );
+
+    hig->addSectionDivider( );
+    hig->addSectionTitle( tr( "Privacy" ) );
+
+    QComboBox * box = new QComboBox( );
+    box->addItem( tr( "Allow encryption" ), 0 );
+    box->addItem( tr( "Prefer encryption" ), 1 );
+    box->addItem( tr( "Require encryption" ), 2 );
+    myWidgets.insert( Prefs :: ENCRYPTION, box );
+    connect( box, SIGNAL(activated(int)), this, SLOT(encryptionEdited(int)));
+
+    hig->addRow( tr( "&Encryption mode:" ), box );
+    hig->addWideControl( w = checkBoxNew( tr( "Use PE&X to find more peers" ), Prefs::PEX_ENABLED ) );
+    w->setToolTip( tr( "PEX is a tool for exchanging peer lists with the peers you're connected to." ) );
+    hig->addWideControl( w = checkBoxNew( tr( "Use &DHT to find more peers" ), Prefs::DHT_ENABLED ) );
+    w->setToolTip( tr( "DHT is a tool for finding peers without a tracker." ) );
+    hig->addWideControl( w = checkBoxNew( tr( "Use &Local Peer Discovery to find more peers" ), Prefs::LPD_ENABLED ) );
+    w->setToolTip( tr( "LPD is a tool for finding peers on your local network." ) );
 
     hig->finish( );
     updateBlocklistLabel( );
@@ -527,7 +519,7 @@ PrefsDialog :: onLocationSelected( const QString& path, int key )
 }
 
 QWidget *
-PrefsDialog :: createSeedingTab( )
+PrefsDialog :: createTorrentsTab( )
 {
     const int iconSize( style( )->pixelMetric( QStyle :: PM_SmallIconSize ) );
     const QFileIconProvider iconProvider;
@@ -538,7 +530,22 @@ PrefsDialog :: createSeedingTab( )
 
     QWidget *l, *r;
     HIG * hig = new HIG( this );
-    hig->addSectionTitle( tr( "Limits" ) );
+    hig->addSectionTitle( tr( "Adding" ) );
+
+        hig->addWideControl( checkBoxNew( tr( "Show &options dialog" ), Prefs::OPTIONS_PROMPT ) );
+        hig->addWideControl( checkBoxNew( tr( "&Start when added" ), Prefs::START ) );
+        hig->addWideControl( checkBoxNew( tr( "Mo&ve .torrent file to the trash" ), Prefs::TRASH_ORIGINAL ) );
+
+        l = checkBoxNew( tr( "Automatically &add torrents from:" ), Prefs::DIR_WATCH_ENABLED );
+        QPushButton * b = myWatchButton = new QPushButton;
+        b->setIcon( folderPixmap );
+        b->setStyleSheet( QString::fromAscii( "text-align: left; padding-left: 5; padding-right: 5" ) );
+        connect( b, SIGNAL(clicked(bool)), this, SLOT(onWatchClicked(void)) );
+        hig->addRow( l, b );
+        enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), b );
+
+    hig->addSectionDivider( );
+    hig->addSectionTitle( tr( "Seeding Limits" ) );
 
         l = checkBoxNew( tr( "Stop seeding at &ratio:" ), Prefs::RATIO_ENABLED );
         r = doubleSpinBoxNew( Prefs::RATIO, 0, INT_MAX, 0.5, 2 );
@@ -555,7 +562,7 @@ PrefsDialog :: createSeedingTab( )
 }
 
 QWidget *
-PrefsDialog :: createDownloadingTab( )
+PrefsDialog :: createDownloadTab( )
 {
     const int iconSize( style( )->pixelMetric( QStyle :: PM_SmallIconSize ) );
     const QFileIconProvider iconProvider;
@@ -564,43 +571,21 @@ PrefsDialog :: createDownloadingTab( )
     const QIcon fileIcon = iconProvider.icon( QFileIconProvider::File );
     const QPixmap filePixmap = fileIcon.pixmap( iconSize );
 
-    QWidget * l;
-    QPushButton * b;
+    QWidget *l;
     HIG * hig = new HIG( this );
-    hig->addSectionTitle( tr( "Adding" ) );
+    hig->addSectionTitle( tr( "Location" ) );
 
-        l = checkBoxNew( tr( "Automatically add .torrent files &from:" ), Prefs::DIR_WATCH_ENABLED );
-        b = myWatchButton = new QPushButton;
-        b->setIcon( folderPixmap );
-        b->setStyleSheet( QString::fromAscii( "text-align: left; padding-left: 5; padding-right: 5" ) );
-        connect( b, SIGNAL(clicked(bool)), this, SLOT(onWatchClicked(void)) );
-        hig->addRow( l, b );
-        enableBuddyWhenChecked( qobject_cast<QCheckBox*>(l), b );
-
-        hig->addWideControl( checkBoxNew( tr( "Show the Torrent Options &dialog" ), Prefs::OPTIONS_PROMPT ) );
-
-        hig->addWideControl( checkBoxNew( tr( "&Start added torrents" ), Prefs::START ) );
-
-        hig->addWideControl( checkBoxNew( tr( "Mo&ve the .torrent file to the trash" ), Prefs::TRASH_ORIGINAL ) );
-
-        b = myDestinationButton = new QPushButton;
+        QPushButton * b = myDestinationButton = new QPushButton;
         b->setIcon( folderPixmap );
         b->setStyleSheet( QString::fromAscii( "text-align: left; padding-left: 5; padding-right: 5" ) );
         connect( b, SIGNAL(clicked(bool)), this, SLOT(onDestinationClicked(void)) );
         hig->addRow( tr( "Save to &Location:" ), b );
 
-        const QString downloadDir (myPrefs.getString(Prefs::DOWNLOAD_DIR));
-        l = myFreespaceLabel = new FreespaceLabel (mySession, downloadDir, this);
-        QHBoxLayout * h = new QHBoxLayout ();
-        h->addStretch (1);
-        h->addWidget (l);
-        hig->addWideControl (h);
-
     hig->addSectionDivider( );
-    hig->addSectionTitle( tr( "Download Queue" ) );
+    hig->addSectionTitle( tr( "Queue" ) );
     
-        hig->addRow( tr( "Ma&ximum active downloads:" ), spinBoxNew( Prefs::DOWNLOAD_QUEUE_SIZE, 1, INT_MAX, 1 ) );
-        hig->addRow( tr( "Downloads sharing data in the last &N minutes are active:" ), spinBoxNew( Prefs::QUEUE_STALLED_MINUTES, 1, INT_MAX, 10 ) );
+        hig->addRow( tr( "Maximum active &downloads:" ), spinBoxNew( Prefs::DOWNLOAD_QUEUE_SIZE, 1, INT_MAX, 1 ) );
+        hig->addRow( tr( "Downloads sharing data in the last N minutes are &active:" ), spinBoxNew( Prefs::QUEUE_STALLED_MINUTES, 1, INT_MAX, 10 ) );
 
     hig->addSectionDivider( );
     hig->addSectionTitle( tr( "Incomplete" ) );
@@ -641,13 +626,13 @@ PrefsDialog :: PrefsDialog( Session& session, Prefs& prefs, QWidget * parent ):
     setWindowTitle( tr( "Transmission Preferences" ) );
 
     QTabWidget * t = new QTabWidget( this );
+    t->addTab( createTorrentsTab( ),     tr( "Torrents" ) );
+    t->addTab( createDownloadTab( ),     tr( "Download" ) );
     t->addTab( createSpeedTab( ),        tr( "Speed" ) );
-    t->addTab( createDownloadingTab( ),  tr( "Downloading" ) );
-    t->addTab( createSeedingTab( ),      tr( "Seeding" ) );
     t->addTab( createPrivacyTab( ),      tr( "Privacy" ) );
     t->addTab( createNetworkTab( ),      tr( "Network" ) );
     t->addTab( createDesktopTab( ),      tr( "Desktop" ) );
-    t->addTab( createRemoteTab(session), tr( "Remote" ) );
+    t->addTab( createWebTab( session ),  tr( "Web" ) );
     myLayout->addWidget( t );
 
     QDialogButtonBox * buttons = new QDialogButtonBox( QDialogButtonBox::Close, Qt::Horizontal, this );
@@ -754,9 +739,8 @@ PrefsDialog :: refreshPref( int key )
             break;
 
         case Prefs :: DOWNLOAD_DIR: {
-            const QString path( myPrefs.getString( key ) );
+            QString path( myPrefs.getString( key ) );
             myDestinationButton->setText( QFileInfo(path).fileName() );
-            myFreespaceLabel->setPath (path);
             break;
         }
 

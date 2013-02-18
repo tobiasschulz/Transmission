@@ -3,6 +3,7 @@
 #include "peer-msgs.h"
 #include "utils.h"
 
+#undef VERBOSE
 #include "libtransmission-test.h"
 
 int

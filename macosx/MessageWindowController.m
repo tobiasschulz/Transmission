@@ -27,8 +27,8 @@
 #import "NSApplicationAdditions.h"
 #import "NSMutableArrayAdditions.h"
 #import "NSStringAdditions.h"
-#import <log.h>
 #import <transmission.h>
+#import <utils.h>
 
 #define LEVEL_ERROR 0
 #define LEVEL_INFO  1
@@ -114,17 +114,17 @@
     //select proper level in popup button
     switch ([[NSUserDefaults standardUserDefaults] integerForKey: @"MessageLevel"])
     {
-        case TR_LOG_ERROR:
+        case TR_MSG_ERR:
             [fLevelButton selectItemAtIndex: LEVEL_ERROR];
             break;
-        case TR_LOG_INFO:
+        case TR_MSG_INF:
             [fLevelButton selectItemAtIndex: LEVEL_INFO];
             break;
-        case TR_LOG_DEBUG:
+        case TR_MSG_DBG:
             [fLevelButton selectItemAtIndex: LEVEL_DEBUG];
             break;
         default: //safety
-            [[NSUserDefaults standardUserDefaults] setInteger: TR_LOG_ERROR forKey: @"MessageLevel"];
+            [[NSUserDefaults standardUserDefaults] setInteger: TR_MSG_ERR forKey: @"MessageLevel"];
             [fLevelButton selectItemAtIndex: LEVEL_ERROR];
     }
     
@@ -184,8 +184,8 @@
 
 - (void) updateLog: (NSTimer *) timer
 {
-    tr_log_message * messages;
-    if ((messages = tr_logGetQueue()) == NULL)
+    tr_msg_list * messages;
+    if ((messages = tr_getQueuedMessages()) == NULL)
         return;
     
     [fLock lock];
@@ -201,7 +201,7 @@
     
     BOOL changed = NO;
     
-    for (tr_log_message * currentMessage = messages; currentMessage != NULL; currentMessage = currentMessage->next)
+    for (tr_msg_list * currentMessage = messages; currentMessage != NULL; currentMessage = currentMessage->next)
     {
         NSString * name = currentMessage->name != NULL ? [NSString stringWithUTF8String: currentMessage->name]
                             : [[NSProcessInfo processInfo] processName];
@@ -226,11 +226,11 @@
         }
     }
     
-    if ([fMessages count] > TR_LOG_MAX_QUEUE_LENGTH)
+    if ([fMessages count] > TR_MAX_MSG_LOG)
     {
         const NSUInteger oldCount = [fDisplayedMessages count];
         
-        NSIndexSet * removeIndexes = [NSIndexSet indexSetWithIndexesInRange: NSMakeRange(0, [fMessages count]-TR_LOG_MAX_QUEUE_LENGTH)];
+        NSIndexSet * removeIndexes = [NSIndexSet indexSetWithIndexesInRange: NSMakeRange(0, [fMessages count]-TR_MAX_MSG_LOG)];
         NSArray * itemsToRemove = [fMessages objectsAtIndexes: removeIndexes];
         
         [fMessages removeObjectsAtIndexes: removeIndexes];
@@ -250,7 +250,7 @@
     
     [fLock unlock];
     
-    tr_logFreeQueue (messages);
+    tr_freeMessageList(messages);
 }
 
 - (NSInteger) numberOfRowsInTableView: (NSTableView *) tableView
@@ -270,11 +270,11 @@
         const NSInteger level = [[message objectForKey: @"Level"] integerValue];
         switch (level)
         {
-            case TR_LOG_ERROR:
+            case TR_MSG_ERR:
                 return [NSImage imageNamed: @"RedDot"];
-            case TR_LOG_INFO:
+            case TR_MSG_INF:
                 return [NSImage imageNamed: @"YellowDot"];
-            case TR_LOG_DEBUG:
+            case TR_MSG_DBG:
                 return [NSImage imageNamed: @"PurpleDot"];
             default:
                 NSAssert1(NO, @"Unknown message log level: %ld", level);
@@ -342,13 +342,13 @@
     switch ([fLevelButton indexOfSelectedItem])
     {
         case LEVEL_ERROR:
-            level = TR_LOG_ERROR;
+            level = TR_MSG_ERR;
             break;
         case LEVEL_INFO:
-            level = TR_LOG_INFO;
+            level = TR_MSG_INF;
             break;
         case LEVEL_DEBUG:
-            level = TR_LOG_DEBUG;
+            level = TR_MSG_DBG;
             break;
         default:
             NSAssert1(NO, @"Unknown message log level: %ld", [fLevelButton indexOfSelectedItem]);
@@ -535,13 +535,13 @@
     const NSInteger level = [[message objectForKey: @"Level"] integerValue];
     switch (level)
     {
-        case TR_LOG_ERROR:
+        case TR_MSG_ERR:
             levelString = NSLocalizedString(@"Error", "Message window -> level");
             break;
-        case TR_LOG_INFO:
+        case TR_MSG_INF:
             levelString = NSLocalizedString(@"Info", "Message window -> level");
             break;
-        case TR_LOG_DEBUG:
+        case TR_MSG_DBG:
             levelString = NSLocalizedString(@"Debug", "Message window -> level");
             break;
         default:

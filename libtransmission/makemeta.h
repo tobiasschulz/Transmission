@@ -91,16 +91,9 @@ typedef struct tr_metainfo_builder
 tr_metainfo_builder;
 
 
-tr_metainfo_builder * tr_metaInfoBuilderCreate (const char * topFile);
+tr_metainfo_builder*tr_metaInfoBuilderCreate (const char * topFile);
 
-/**
- * Call this before tr_makeMetaInfo() to override the builder.pieceSize
- * and builder.pieceCount values that were set by tr_metainfoBuilderCreate()
- */
-void tr_metaInfoBuilderSetPieceSize (tr_metainfo_builder * builder,
-                                     uint32_t              bytes);
-
-void tr_metaInfoBuilderFree (tr_metainfo_builder*);
+void                tr_metaInfoBuilderFree (tr_metainfo_builder*);
 
 /**
  * @brief create a new .torrent file

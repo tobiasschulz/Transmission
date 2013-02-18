@@ -28,9 +28,9 @@
 #endif
 
 #include "bandwidth.h"
+#include "bencode.h"
 #include "bitfield.h"
 #include "utils.h"
-#include "variant.h"
 
 typedef enum { TR_NET_OK, TR_NET_ERROR, TR_NET_WAIT } tr_tristate_t;
 
@@ -56,7 +56,6 @@ struct tr_announcer_udp;
 struct tr_bindsockets;
 struct tr_cache;
 struct tr_fdInfo;
-struct tr_device_info;
 
 typedef void (tr_web_config_func)(tr_session * session, void * curl_pointer, const char * url, void * user_data);
 
@@ -110,7 +109,6 @@ struct tr_session
     bool                         isBlocklistEnabled;
     bool                         isPrefetchEnabled;
     bool                         isTorrentDoneScriptEnabled;
-    bool                         isClosing;
     bool                         isClosed;
     bool                         isIncompleteFileNamingEnabled;
     bool                         isRatioLimited;
@@ -120,9 +118,7 @@ struct tr_session
     bool                         deleteSourceTorrent;
     bool                         scrapePausedTorrents;
 
-    uint8_t                      peer_id_ttl_hours;
-
-    tr_variant                   removedTorrents;
+    tr_benc                      removedTorrents;
 
     bool                         stalledEnabled;
     bool                         queueEnabled[2];
@@ -185,13 +181,12 @@ struct tr_session
 
     char *                       tag;
     char *                       configDir;
+    char *                       downloadDir;
     char *                       resumeDir;
     char *                       torrentDir;
     char *                       incompleteDir;
 
     char *                       blocklist_url;
-
-    struct tr_device_info *      downloadDir;
 
     struct tr_list *             blocklists;
     struct tr_peerMgr *          peerMgr;
@@ -212,7 +207,7 @@ struct tr_session
     struct tr_announcer        * announcer;
     struct tr_announcer_udp    * announcer_udp;
 
-    tr_variant                 * metainfoLookup;
+    tr_benc                    * metainfoLookup;
 
     struct event               * nowTimer;
     struct event               * saveTimer;
@@ -226,12 +221,20 @@ struct tr_session
 
     struct tr_bindinfo         * public_ipv4;
     struct tr_bindinfo         * public_ipv6;
+
+    uint8_t peer_id[PEER_ID_LEN+1];
 };
 
 static inline tr_port
 tr_sessionGetPublicPeerPort (const tr_session * session)
 {
     return session->public_peer_port;
+}
+
+static inline const uint8_t*
+tr_getPeerId (tr_session * session)
+{
+    return session->peer_id;
 }
 
 bool         tr_sessionAllowsDHT (const tr_session * session);
@@ -323,10 +326,8 @@ bool  tr_sessionGetActiveSpeedLimit_Bps (const tr_session  * session,
                                          tr_direction        dir,
                                          unsigned int      * setme);
 
-void tr_sessionGetNextQueuedTorrents (tr_session   * session,
-                                      tr_direction   dir,
-                                      size_t         numwanted,
-                                      tr_ptrArray  * setme);
+tr_torrent * tr_sessionGetNextQueuedSeed (tr_session * session);
+tr_torrent * tr_sessionGetNextQueuedTorrent (tr_session * session, tr_direction);
 
 int tr_sessionCountQueueFreeSlots (tr_session * session, tr_direction);
 

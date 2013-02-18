@@ -48,7 +48,6 @@ THE SOFTWARE.
 
 /* libT */
 #include "transmission.h"
-#include "log.h"
 #include "net.h"
 #include "peer-mgr.h" /* tr_peerMgrAddPex () */
 #include "session.h"
@@ -226,7 +225,7 @@ static int lpd_extractParam (const char* const str, const char* const name, int 
         return 0;
 
     /* compose the string token to search for */
-    tr_snprintf (sstr, maxLength, CRLF "%s: ", name);
+    snprintf (sstr, maxLength, CRLF "%s: ", name);
 
     pos = strstr (str, sstr);
     if (pos == NULL)
@@ -281,7 +280,7 @@ int tr_lpdInit (tr_session* ss, tr_address* tr_addr UNUSED)
     if (lpd_port <= 0)
         return -1;
 
-    tr_logAddNamedDbg ("LPD", "Initialising Local Peer Discovery");
+    tr_ndbg ("LPD", "Initialising Local Peer Discovery");
 
     /* setup datagram socket (receive) */
     {
@@ -352,7 +351,7 @@ int tr_lpdInit (tr_session* ss, tr_address* tr_addr UNUSED)
     upkeep_timer = evtimer_new (ss->event_base, on_upkeep_timer, ss);
     tr_timerAdd (upkeep_timer, UPKEEP_INTERVAL_SECS, 0);
 
-    tr_logAddNamedDbg ("LPD", "Local Peer Discovery initialised");
+    tr_ndbg ("LPD", "Local Peer Discovery initialised");
 
     return 1;
 
@@ -363,7 +362,7 @@ int tr_lpdInit (tr_session* ss, tr_address* tr_addr UNUSED)
         close (lpd_socket2);
         lpd_socket = lpd_socket2 = -1;
         session = NULL;
-        tr_logAddNamedDbg ("LPD", "LPD initialisation failed (errno = %d)", save);
+        tr_ndbg ("LPD", "LPD initialisation failed (errno = %d)", save);
         errno = save;
     }
 
@@ -376,7 +375,7 @@ void tr_lpdUninit (tr_session* ss)
     if (session != ss)
         return;
 
-    tr_logAddNamedDbg ("LPD", "Uninitialising Local Peer Discovery");
+    tr_ndbg ("LPD", "Uninitialising Local Peer Discovery");
 
     event_free (lpd_event);
     lpd_event = NULL;
@@ -387,7 +386,7 @@ void tr_lpdUninit (tr_session* ss)
     /* just shut down, we won't remember any former nodes */
     evutil_closesocket (lpd_socket);
     evutil_closesocket (lpd_socket2);
-    tr_logAddNamedDbg ("LPD", "Done uninitialising Local Peer Discovery");
+    tr_ndbg ("LPD", "Done uninitialising Local Peer Discovery");
 
     session = NULL;
 }
@@ -455,8 +454,8 @@ tr_lpdSendAnnounce (const tr_torrent* t)
         hashString[i] = toupper (t->info.hashString[i]);
 
     /* prepare a zero-terminated announce message */
-    tr_snprintf (query, lpd_maxDatagramLength + 1, fmt, 1, 1,
-                 lpd_mcastGroup, lpd_mcastPort, lpd_port, hashString);
+    snprintf (query, lpd_maxDatagramLength + 1, fmt, 1, 1,
+        lpd_mcastGroup, lpd_mcastPort, lpd_port, hashString);
 
     /* actually send the query out using [lpd_socket2] */
     {
@@ -471,7 +470,7 @@ tr_lpdSendAnnounce (const tr_torrent* t)
             return false;
     }
 
-    tr_logAddTorDbg (t, "LPD announce message away");
+    tr_tordbg (t, "LPD announce message away");
 
     return true;
 }
@@ -532,7 +531,7 @@ static int tr_lpdConsiderAnnounce (tr_pex* peer, const char* const msg)
         {
             /* we found a suitable peer, add it to the torrent */
             tr_peerMgrAddPex (tor, TR_PEER_FROM_LPD, peer, -1);
-            tr_logAddTorDbg (tor, "Learned %d local peer from LPD (%s:%u)",
+            tr_tordbg (tor, "Learned %d local peer from LPD (%s:%u)",
                 1, tr_address_to_string (&peer->addr), peerPort);
 
             /* periodic reconnectPulse () deals with the rest... */
@@ -540,7 +539,7 @@ static int tr_lpdConsiderAnnounce (tr_pex* peer, const char* const msg)
             return 1;
         }
         else
-            tr_logAddNamedDbg ("LPD", "Cannot serve torrent #%s", hashString);
+            tr_ndbg ("LPD", "Cannot serve torrent #%s", hashString);
     }
 
     return res;
@@ -609,7 +608,7 @@ tr_lpdAnnounceMore (const time_t now, const int interval)
         const int maxAnnounceCap = interval * lpd_announceCapFactor;
 
         if (lpd_unsolicitedMsgCounter < 0)
-            tr_logAddNamedInfo ("LPD", "Dropped %d announces in the last interval (max. %d "
+            tr_ninf ("LPD", "Dropped %d announces in the last interval (max. %d "
                      "allowed)", -lpd_unsolicitedMsgCounter, maxAnnounceCap);
 
         lpd_unsolicitedMsgCounter = maxAnnounceCap;
@@ -667,7 +666,7 @@ static void event_callback (int s UNUSED, short type, void* ignore UNUSED)
                 return; /* OK so far, no log message */
         }
 
-        tr_logAddNamedDbg ("LPD", "Discarded invalid multicast message");
+        tr_ndbg ("LPD", "Discarded invalid multicast message");
     }
 }
 

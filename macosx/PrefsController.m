@@ -30,7 +30,7 @@
 #import "BonjourController.h"
 #import "NSApplicationAdditions.h"
 #import "NSStringAdditions.h"
-#import "VDKQueue.h"
+#import "UKKQueue.h"
 
 #import "transmission.h"
 #import "utils.h"
@@ -108,7 +108,7 @@
         //set auto import
         NSString * autoPath;
         if ([fDefaults boolForKey: @"AutoImport"] && (autoPath = [fDefaults stringForKey: @"AutoImportDirectory"]))
-            [[(Controller *)[NSApp delegate] fileWatcherQueue] addPath: [autoPath stringByExpandingTildeInPath] notifyingAbout: VDKQueueNotifyAboutWrite];
+            [[UKKQueue sharedFileWatcher] addPath: [autoPath stringByExpandingTildeInPath]];
         
         //set blocklist scheduler
         [[BlocklistScheduler scheduler] updateSchedule];
@@ -924,14 +924,11 @@
     NSString * path;
     if ((path = [fDefaults stringForKey: @"AutoImportDirectory"]))
     {
-        VDKQueue * watcherQueue = [(Controller *)[NSApp delegate] fileWatcherQueue];
+        path = [path stringByExpandingTildeInPath];
         if ([fDefaults boolForKey: @"AutoImport"])
-        {
-            path = [path stringByExpandingTildeInPath];
-            [watcherQueue addPath: path notifyingAbout: VDKQueueNotifyAboutWrite];
-        }
+            [[UKKQueue sharedFileWatcher] addPath: path];
         else
-            [watcherQueue removeAllPaths];
+            [[UKKQueue sharedFileWatcher] removePathFromQueue: path];
         
         [[NSNotificationCenter defaultCenter] postNotificationName: @"AutoImportSettingChange" object: self];
     }
@@ -950,23 +947,21 @@
     [panel setCanCreateDirectories: YES];
 
     [panel beginSheetModalForWindow: [self window] completionHandler: ^(NSInteger result) {
+        NSString * path = [fDefaults stringForKey: @"AutoImportDirectory"];
         if (result == NSFileHandlingPanelOKButton)
         {
-            VDKQueue * watcherQueue = [(Controller *)[NSApp delegate] fileWatcherQueue];
-            [watcherQueue removeAllPaths];
+            UKKQueue * sharedQueue = [UKKQueue sharedFileWatcher];
+            if (path)
+                [sharedQueue removePathFromQueue: [path stringByExpandingTildeInPath]];
             
-            NSString * path = [[[panel URLs] objectAtIndex: 0] path];
+            path = [[[panel URLs] objectAtIndex: 0] path];
             [fDefaults setObject: path forKey: @"AutoImportDirectory"];
-            [watcherQueue addPath: [path stringByExpandingTildeInPath] notifyingAbout: VDKQueueNotifyAboutWrite];
+            [sharedQueue addPath: [path stringByExpandingTildeInPath]];
             
             [[NSNotificationCenter defaultCenter] postNotificationName: @"AutoImportSettingChange" object: self];
         }
-        else
-        {
-            NSString * path = [fDefaults stringForKey: @"AutoImportDirectory"];
-            if (!path)
-                [fDefaults setBool: NO forKey: @"AutoImport"];
-        }
+        else if (!path)
+            [fDefaults setBool: NO forKey: @"AutoImport"];
         
         [fImportFolderPopUp selectItemAtIndex: 0];
     }];

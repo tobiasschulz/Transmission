@@ -164,9 +164,6 @@ typedef enum {
 - (NSString *) dataLocation;
 - (NSString *) fileLocation: (FileListNode *) node;
 
-- (void) renameTorrent: (NSString *) newName completionHandler: (void (^)(BOOL didRename)) completionHandler;
-- (void) renameFileNode: (FileListNode *) node withName: (NSString *) newName completionHandler: (void (^)(BOOL didRename)) completionHandler;
-
 - (CGFloat) progress;
 - (CGFloat) progressDone;
 - (CGFloat) progressLeft;

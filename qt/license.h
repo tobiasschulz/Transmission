@@ -17,11 +17,12 @@
 
 class LicenseDialog: public QDialog
 {
-    Q_OBJECT
+        Q_OBJECT
 
-  public:
-    LicenseDialog (QWidget * parent = 0);
-    ~LicenseDialog () {}
+    public:
+        LicenseDialog( QWidget * parent = 0 );
+        ~LicenseDialog( ) { }
+
 };
 
 #endif

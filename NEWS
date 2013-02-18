@@ -1,51 +1,25 @@
-=== Transmission 2.80 (2013/xx/yy) ===
-[http://trac.transmissionbt.com/query?milestone=2.80&group=component&order=severity All tickets closed by this release]
+=== Transmission 2.77 (2013/02/18) ===
+[http://trac.transmissionbt.com/query?milestone=2.77&group=component&order=severity All tickets closed by this release]
 ==== All Platforms ====
-  * Support renaming a transfer's files and folders
-  * Better use of the OS' filesystem cache
-  * Lengthen the prefetch cache for data sent to peers
-  * Faster parsing of JSON data and bencoded data
-  * Fewer public API calls in libtransmission need thread locks (ie, fewer beachballs)
-  * Other CPU speedups
-  * Replace the previous JSON parser with jsonsl to resolve DFSG license issue
-  * Fix FTBFS when compiling with -Werror=format-security
-  * Add 'freespace' argument to session-get in the Remote API
-  * Improved unit tests in libtransmission
-  * Tarballs are now released only in .xz format
-==== Mac Client ====
-  * VDKQueue
+  * Fix 2.75 regression that broke JSON parsing of real numbers in locales that don't use '.' as a decimal separator
+  * Don't invalidate the OS's file cache when closing files
+  * Fix overflow error when setting speed limits above ~8589 kB/s
+  * Generated magnet links didn't include webseeds
+  * Fix minor memory leaks when using webseeds
 ==== GTK+ Client ====
-  * Simplify the tracker filter pulldown's interface; now matches the Qt client
-  * Synced preferences text & shortcuts in the GTK+ and Qt clients
-  * Remove deprecated calls to gdk_threads_enter()
-  * Silence a handful of console warnings
+  * Minor pluralization fixes in the UI
+  * Fix folder mis-selection issue in the Preferences dialog
+  * Fix GTK+ console warnings on shutdown
 ==== Qt Client ====
-  * More efficient updates when receiving information from the server
-  * Add an option to play a sound when a torrent finishes downloading
-  * Add an option to start up iconified into the notification area
-  * Fix an issue with the tray icon preventing hibernation/logout
-  * Other CPU speedups
-  * Open the correct folder when clicking on single-file torrents
-  * Synced preferences text & shortcuts in the GTK+ and Qt clients
-  * Fix non Latin-1 unit strings
+  * Fix non Latin-1 symbol issue when showing file transfer speeds
+  * Fix issue when creating new torrents with multiple trackers
+  * Fix lost text selection in the properties dialog's 'comment' field
 ==== Daemon ====
-  * Add support for specifying recently-active torrents in transmission-remote
+  * Fix documentation errors in the spec and manpages
 ==== Web Client ====
-  * Exend the cookie lifespan so that settings like sort order don't get lost
-==== Utils ====
-  * Support user-defined piece sizes in transmission-create
-
-
-2.7x backport list... if this gets long enough, we'll do 2.77
-  #5238 'tr_inactvelimit in rpc-spec' -- fix obsolete documentation. 
-  #5235 'Plural wrong in torrent-cell-renderer'
-  #5219 'QPrintable and non Latin-1 symbols on Ubuntu'
-  #5215 fix a transmission-cli regression from 2.76
-  #5248 'fails to create torrent with multiple trackers'
-  #5249 'error parsing json in some locales'
-  #5259 minor memory leak in tr_torrentDeleteLocalData()
-  #5260 improved documentation for -w argument in transmission-remote
-
+  * Fix minor DOM leak
+==== CLI ====
+  * Fix transmission-cli failure when the download directory doesn't exist
 
 === Transmission 2.76 (2013/01/08) ===
 [http://trac.transmissionbt.com/query?milestone=2.76&group=component&order=severity All tickets closed by this release]

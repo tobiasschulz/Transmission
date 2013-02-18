@@ -21,6 +21,6 @@
  * @brief parse a peer-id into a human-readable client name and version number
  * @ingroup utils
  */
-char* tr_clientForId (char * buf, size_t buflen, const void * peer_id);
+void tr_clientForId (char * buf, size_t buflen, const void * peer_id);
 
 #endif

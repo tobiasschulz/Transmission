@@ -30,6 +30,8 @@ typedef enum
 }
 tr_web_task_info;
 
+void tr_webInit (tr_session * session);
+
 typedef enum
 {
     TR_WEB_CLOSE_WHEN_IDLE,
@@ -40,12 +42,12 @@ tr_web_close_mode;
 void tr_webClose (tr_session * session, tr_web_close_mode close_mode);
 
 typedef void (tr_web_done_func)(tr_session       * session,
-                                bool               timeout_flag,
-                                bool               did_connect_flag,
-                                long               response_code,
-                                const void       * response,
-                                size_t             response_byte_count,
-                                void             * user_data);
+                                   bool               timeout_flag,
+                                   bool               did_connect_flag,
+                                   long               response_code,
+                                   const void       * response,
+                                   size_t             response_byte_count,
+                                   void             * user_data);
 
 const char * tr_webGetResponseStr (long response_code);
 

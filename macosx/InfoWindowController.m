@@ -543,8 +543,7 @@ typedef enum
 
 - (void) resetInfoForTorrent: (NSNotification *) notification
 {
-    Torrent * torrent = [[notification userInfo] objectForKey: @"Torrent"];
-    if (fTorrents && (!torrent || [fTorrents containsObject: torrent]))
+    if (fTorrents && [fTorrents containsObject: [notification object]])
         [self resetInfo];
 }
 

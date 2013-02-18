@@ -16,7 +16,7 @@
 #include <QStyledItemDelegate>
 #include <QSize>
 
-class QStyleOptionProgressBar;
+class QStyleOptionProgressBarV2;
 class QStyleOptionViewItem;
 class QStyle;
 class Session;
@@ -27,11 +27,11 @@ class TorrentDelegate: public QStyledItemDelegate
         Q_OBJECT
 
     public:
-      static QColor blueBrush, greenBrush, silverBrush;
-      static QColor blueBack,  greenBack, silverBack;
+      static QColor blueBrush, greenBrush;
+      static QColor blueBack,  greenBack;
 
     protected:
-        QStyleOptionProgressBar * myProgressBarStyle;
+        QStyleOptionProgressBarV2 * myProgressBarStyle;
 
     protected:
         QString statusString( const Torrent& tor ) const;

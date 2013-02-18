@@ -28,7 +28,6 @@ THE SOFTWARE.
 #include <libutp/utp.h>
 
 #include "transmission.h"
-#include "log.h"
 #include "net.h"
 #include "session.h"
 #include "crypto.h" /* tr_cryptoWeakRandInt () */
@@ -40,8 +39,8 @@ THE SOFTWARE.
 
 #define dbgmsg(...) \
     do { \
-        if (tr_logGetDeepEnabled ()) \
-            tr_logAddDeep (__FILE__, __LINE__, MY_NAME, __VA_ARGS__); \
+        if (tr_deepLoggingIsActive ()) \
+            tr_deepLog (__FILE__, __LINE__, MY_NAME, __VA_ARGS__); \
     } while (0)
 
 #ifndef WITH_UTP
@@ -49,7 +48,7 @@ THE SOFTWARE.
 void
 UTP_Close (struct UTPSocket * socket)
 {
-    tr_logAddNamedError (MY_NAME, "UTP_Close (%p) was called.", socket);
+    tr_nerr (MY_NAME, "UTP_Close (%p) was called.", socket);
     dbgmsg ("UTP_Close (%p) was called.", socket);
     assert (0); /* FIXME: this is too much for the long term, but probably needed in the short term */
 }
@@ -57,7 +56,7 @@ UTP_Close (struct UTPSocket * socket)
 void
 UTP_RBDrained (struct UTPSocket *socket)
 {
-    tr_logAddNamedError (MY_NAME, "UTP_RBDrained (%p) was called.", socket);
+    tr_nerr (MY_NAME, "UTP_RBDrained (%p) was called.", socket);
     dbgmsg ("UTP_RBDrained (%p) was called.", socket);
     assert (0); /* FIXME: this is too much for the long term, but probably needed in the short term */
 }
@@ -65,7 +64,7 @@ UTP_RBDrained (struct UTPSocket *socket)
 bool
 UTP_Write (struct UTPSocket *socket, size_t count)
 {
-    tr_logAddNamedError (MY_NAME, "UTP_RBDrained (%p, %zu) was called.", socket, count);
+    tr_nerr (MY_NAME, "UTP_RBDrained (%p, %zu) was called.", socket, count);
     dbgmsg ("UTP_RBDrained (%p, %zu) was called.", socket, count);
     assert (0); /* FIXME: this is too much for the long term, but probably needed in the short term */
     return false;
@@ -116,7 +115,7 @@ incoming (void *closure, struct UTPSocket *s)
     UTP_GetPeerName (s, from, &fromlen);
     if (!tr_address_from_sockaddr_storage (&addr, &port, &from_storage))
     {
-        tr_logAddNamedError ("UTP", "Unknown socket family");
+        tr_nerr ("UTP", "Unknown socket family");
         UTP_Close (s);
         return;
     }

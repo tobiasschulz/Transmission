@@ -24,14 +24,13 @@
 #include <QVariant>
 
 #include <libtransmission/transmission.h>
-#include <libtransmission/quark.h>
 
 #include "speed.h"
 #include "types.h"
 
 extern "C"
 {
-    struct tr_variant;
+    struct tr_benc;
 }
 
 class Prefs;
@@ -40,21 +39,21 @@ class QStyle;
 
 struct Peer
 {
-  bool clientIsChoked;
-  bool clientIsInterested;
-  bool isDownloadingFrom;
-  bool isEncrypted;
-  bool isIncoming;
-  bool isUploadingTo;
-  bool peerIsChoked;
-  bool peerIsInterested;
-  QString address;
-  QString clientName;
-  QString flagStr;
-  int port;
-  Speed rateToClient;
-  Speed rateToPeer;
-  double progress;
+    QString address;
+    QString clientName;
+    bool clientIsChoked;
+    bool clientIsInterested;
+    QString flagStr;
+    bool isDownloadingFrom;
+    bool isEncrypted;
+    bool isIncoming;
+    bool isUploadingTo;
+    bool peerIsChoked;
+    bool peerIsInterested;
+    int port;
+    double progress;
+    Speed rateToClient;
+    Speed rateToPeer;
 };
 
 typedef QList<Peer> PeerList;
@@ -63,32 +62,32 @@ Q_DECLARE_METATYPE(PeerList)
 
 struct TrackerStat
 {
-  bool hasAnnounced;
-  bool hasScraped;
-  bool isBackup;
-  bool lastAnnounceSucceeded;
-  bool lastAnnounceTimedOut;
-  bool lastScrapeSucceeded;
-  bool lastScrapeTimedOut;
-  int announceState;
-  int downloadCount;
-  int id;
-  int lastAnnouncePeerCount;
-  int lastAnnounceStartTime;
-  int lastAnnounceTime;
-  int lastScrapeStartTime;
-  int lastScrapeTime;
-  int leecherCount;
-  int nextAnnounceTime;
-  int nextScrapeTime;
-  int scrapeState;
-  int seederCount;
-  int tier;
-  QString announce;
-  QString host;
-  QString lastAnnounceResult;
-  QString lastScrapeResult;
-  QPixmap getFavicon( ) const;
+    QString announce;
+    int announceState;
+    int downloadCount;
+    bool hasAnnounced;
+    bool hasScraped;
+    QString host;
+    int id;
+    bool isBackup;
+    int lastAnnouncePeerCount;
+    QString lastAnnounceResult;
+    int lastAnnounceStartTime;
+    bool lastAnnounceSucceeded;
+    int lastAnnounceTime;
+    bool lastAnnounceTimedOut;
+    QString lastScrapeResult;
+    int lastScrapeStartTime;
+    bool lastScrapeSucceeded;
+    int lastScrapeTime;
+    bool lastScrapeTimedOut;
+    int leecherCount;
+    int nextAnnounceTime;
+    int nextScrapeTime;
+    int scrapeState;
+    int seederCount;
+    int tier;
+    QPixmap getFavicon( ) const;
 };
 
 typedef QList<TrackerStat> TrackerStatsList;
@@ -97,14 +96,13 @@ Q_DECLARE_METATYPE(TrackerStatsList)
 
 struct TrFile
 {
-  TrFile(): wanted(true), index(-1), priority(0), size(0), have(0) { }
-
-  bool wanted;
-  int index;
-  int priority;
-  QString filename;
-  uint64_t size;
-  uint64_t have;
+    TrFile(): index(-1), priority(0), wanted(true), size(0), have(0) { }
+    int index;
+    int priority;
+    bool wanted;
+    uint64_t size;
+    uint64_t have;
+    QString filename;
 };
 
 typedef QList<TrFile> FileList;
@@ -153,7 +151,6 @@ class Torrent: public QObject
             UPLOADED_EVER,
             FAILED_EVER,
             TRACKERS,
-            HOSTS,
             TRACKERSTATS,
             MIME_ICON,
             SEED_RATIO_LIMIT,
@@ -174,6 +171,7 @@ class Torrent: public QObject
             CREATOR,
             MANUAL_ANNOUNCE_TIME,
             PEERS,
+            TORRENT_FILE,
             BANDWIDTH_PRIORITY,
             QUEUE_POSITION,
 
@@ -201,7 +199,7 @@ class Torrent: public QObject
         struct Property
         {
             int id;
-            tr_quark key;
+            const char * key;
             int type;
             int group;
         };
@@ -211,7 +209,7 @@ class Torrent: public QObject
         bool magnetTorrent;
 
     public:
-        typedef QList<tr_quark> KeyList;
+        typedef QList<const char*> KeyList;
         static const KeyList& getInfoKeys( );
         static const KeyList& getStatKeys( );
         static const KeyList& getExtraStatKeys( );
@@ -248,6 +246,7 @@ class Torrent: public QObject
         QString getPath( ) const { return getString( DOWNLOAD_DIR ); }
         QString getError( ) const;
         QString hashString( ) const { return getString( HASH_STRING ); }
+        QString torrentFile( ) const { return getString( TORRENT_FILE ); }
         bool hasError( ) const { return !getError( ).isEmpty( ); }
         bool isDone( ) const { return getSize( LEFT_UNTIL_DONE ) == 0; }
         bool isSeed( ) const { return haveVerified() >= totalSize(); }
@@ -306,7 +305,6 @@ class Torrent: public QObject
         tr_idlelimit seedIdleMode( ) const { return (tr_idlelimit) getInt( SEED_IDLE_MODE ); }
         TrackerStatsList trackerStats( ) const{ return myValues[TRACKERSTATS].value<TrackerStatsList>(); }
         QStringList trackers() const { return myValues[TRACKERS].value<QStringList>(); }
-        QStringList hosts() const { return myValues[HOSTS].value<QStringList>(); }
         PeerList peers( ) const{ return myValues[PEERS].value<PeerList>(); }
         const FileList& files( ) const { return myFiles; }
         int queuePosition( ) const { return getInt( QUEUE_POSITION ); }
@@ -328,7 +326,7 @@ class Torrent: public QObject
         void notifyComplete( ) const;
 
     public:
-        void update( tr_variant * dict );
+        void update( tr_benc * dict );
         void setMagnet( bool magnet ) { magnetTorrent = magnet; }
 
     private:

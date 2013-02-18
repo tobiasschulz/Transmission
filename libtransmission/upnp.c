@@ -26,7 +26,6 @@
 #endif
 
 #include "transmission.h"
-#include "log.h"
 #include "port-forwarding.h"
 #include "session.h"
 #include "upnp.h"
@@ -100,8 +99,7 @@ tr_upnpDiscover (int msec)
     ret = upnpDiscover (msec, NULL, NULL, 0);
     if (ret == NULL)
 #endif
-
-        tr_logAddNamedDbg (getKey (), "upnpDiscover failed (errno %d - %s)", errno, tr_strerror (errno));
+        tr_ndbg (getKey (), "upnpDiscover failed (errno %d - %s)", errno, tr_strerror (errno));
 
     return ret;
 }
@@ -149,7 +147,7 @@ tr_upnpAddPortMapping (const tr_upnp * handle, const char * proto, tr_port port,
 #endif
 
     if (err)
-        tr_logAddNamedDbg (getKey (), "%s Port forwarding failed with error %d (errno %d - %s)", proto, err, errno, tr_strerror (errno));
+        tr_ndbg (getKey (), "%s Port forwarding failed with error %d (errno %d - %s)", proto, err, errno, tr_strerror (errno));
 
     errno = old_errno;
     return err;
@@ -197,10 +195,10 @@ tr_upnpPulse (tr_upnp * handle,
         if (UPNP_GetValidIGD (devlist, &handle->urls, &handle->data,
                              handle->lanaddr, sizeof (handle->lanaddr)) == UPNP_IGD_VALID_CONNECTED)
         {
-            tr_logAddNamedInfo (getKey (), _(
+            tr_ninf (getKey (), _(
                          "Found Internet Gateway Device \"%s\""),
                      handle->urls.controlURL);
-            tr_logAddNamedInfo (getKey (), _(
+            tr_ninf (getKey (), _(
                          "Local Address is \"%s\""), handle->lanaddr);
             handle->state = TR_UPNP_IDLE;
             handle->hasDiscovered = 1;
@@ -208,11 +206,11 @@ tr_upnpPulse (tr_upnp * handle,
         else
         {
             handle->state = TR_UPNP_ERR;
-            tr_logAddNamedDbg (
+            tr_ndbg (
                  getKey (), "UPNP_GetValidIGD failed (errno %d - %s)",
                 errno,
                 tr_strerror (errno));
-            tr_logAddNamedDbg (
+            tr_ndbg (
                 getKey (),
                 "If your router supports UPnP, please make sure UPnP is enabled!");
         }
@@ -230,7 +228,7 @@ tr_upnpPulse (tr_upnp * handle,
         if ((tr_upnpGetSpecificPortMappingEntry (handle, "TCP") != UPNPCOMMAND_SUCCESS) ||
           (tr_upnpGetSpecificPortMappingEntry (handle, "UDP") != UPNPCOMMAND_SUCCESS))
         {
-            tr_logAddNamedInfo (getKey (), _("Port %d isn't forwarded"), handle->port);
+            tr_ninf (getKey (), _("Port %d isn't forwarded"), handle->port);
             handle->isMapped = false;
         }
     }
@@ -240,7 +238,7 @@ tr_upnpPulse (tr_upnp * handle,
         tr_upnpDeletePortMapping (handle, "TCP", handle->port);
         tr_upnpDeletePortMapping (handle, "UDP", handle->port);
 
-        tr_logAddNamedInfo (getKey (),
+        tr_ninf (getKey (),
                  _("Stopping port forwarding through \"%s\", service \"%s\""),
                  handle->urls.controlURL, handle->data.first.servicetype);
 
@@ -273,19 +271,19 @@ tr_upnpPulse (tr_upnp * handle,
 
             handle->isMapped = !err_tcp | !err_udp;
         }
-        tr_logAddNamedInfo (getKey (),
+        tr_ninf (getKey (),
                  _("Port forwarding through \"%s\", service \"%s\". (local address: %s:%d)"),
                  handle->urls.controlURL, handle->data.first.servicetype,
                  handle->lanaddr, port);
         if (handle->isMapped)
         {
-            tr_logAddNamedInfo (getKey (), "%s", _("Port forwarding successful!"));
+            tr_ninf (getKey (), "%s", _("Port forwarding successful!"));
             handle->port = port;
             handle->state = TR_UPNP_IDLE;
         }
         else
         {
-            tr_logAddNamedDbg (getKey (), "If your router supports UPnP, please make sure UPnP is enabled!");
+            tr_ndbg (getKey (), "If your router supports UPnP, please make sure UPnP is enabled!");
             handle->port = -1;
             handle->state = TR_UPNP_ERR;
         }

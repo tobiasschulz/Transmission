@@ -6,6 +6,7 @@
  * $Id$
  */
 
+#include <string.h> /* strcmp */
 #include <glib.h>
 #include <gtk/gtk.h>
 #include <gio/gio.h>

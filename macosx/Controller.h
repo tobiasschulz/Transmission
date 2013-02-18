@@ -26,7 +26,6 @@
 #import <transmission.h>
 #import <Quartz/Quartz.h>
 #import <Growl/Growl.h>
-#import "VDKQueue.h"
 
 @class AddMagnetWindowController;
 @class AddWindowController;
@@ -50,7 +49,7 @@ typedef enum
     ADD_CREATED
 } addType;
 
-@interface Controller : NSObject <GrowlApplicationBridgeDelegate, NSURLDownloadDelegate, NSUserNotificationCenterDelegate, NSPopoverDelegate, NSSoundDelegate, NSToolbarDelegate, NSWindowDelegate, QLPreviewPanelDataSource, QLPreviewPanelDelegate, VDKQueueDelegate>
+@interface Controller : NSObject <GrowlApplicationBridgeDelegate, NSURLDownloadDelegate, NSUserNotificationCenterDelegate, NSPopoverDelegate, NSSoundDelegate, NSToolbarDelegate, NSWindowDelegate, QLPreviewPanelDataSource, QLPreviewPanelDelegate>
 {
     tr_session                      * fLib;
     
@@ -70,8 +69,6 @@ typedef enum
 
     io_connect_t                    fRootPort;
     NSTimer                         * fTimer;
-    
-    VDKQueue                        * fFileWatcherQueue;
     
     IBOutlet NSMenuItem             * fOpenIgnoreDownloadFolder;
     IBOutlet NSButton               * fActionButton, * fSpeedLimitButton, * fClearCompletedButton;
@@ -173,8 +170,6 @@ typedef enum
 
 - (void) revealFile: (id) sender;
 
-- (IBAction) renameSelected: (id) sender;
-
 - (void) announceSelectedTorrents: (id) sender;
 
 - (void) verifySelectedTorrents: (id) sender;
@@ -237,8 +232,6 @@ typedef enum
 - (void) beginCreateFile: (NSNotification *) notification;
 
 - (void) sleepCallback: (natural_t) messageType argument: (void *) messageArgument;
-
-@property (retain, readonly) VDKQueue * fileWatcherQueue;
 
 - (void) torrentTableViewSelectionDidChange: (NSNotification *) notification;
 

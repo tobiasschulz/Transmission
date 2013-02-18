@@ -1,7 +1,9 @@
 #include "transmission.h"
 #include "clients.h"
 
+#undef VERBOSE
 #include "libtransmission-test.h"
+
 
 #define TEST_CLIENT(A, B) \
     tr_clientForId (buf, sizeof (buf), A); \

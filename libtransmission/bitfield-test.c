@@ -4,6 +4,7 @@
 #include "bitfield.h"
 #include "utils.h" /* tr_free */
 
+#undef VERBOSE
 #include "libtransmission-test.h"
 
 static int

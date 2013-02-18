@@ -32,7 +32,6 @@ class QPushButton;
 class QMessageBox;
 class QHttp;
 
-class FreespaceLabel;
 class Prefs;
 class Session;
 
@@ -78,13 +77,13 @@ class PrefsDialog: public QDialog
     private:
         void setPref( int key, const QVariant& v );
         bool isAllowed( int key ) const;
-        QWidget * createDownloadingTab( );
-        QWidget * createSeedingTab( );
+        QWidget * createTorrentsTab( );
+        QWidget * createDownloadTab( );
         QWidget * createSpeedTab( );
         QWidget * createPrivacyTab( );
         QWidget * createNetworkTab( );
         QWidget * createDesktopTab( );
-        QWidget * createRemoteTab( Session& );
+        QWidget * createWebTab( Session& );
 
     private:
         typedef QMap<int,QWidget*> key2widget_t;
@@ -109,7 +108,6 @@ class PrefsDialog: public QDialog
         QWidgetList mySchedWidgets;
         QWidgetList myBlockWidgets;
         QWidgetList myUnsupportedWhenRemote;
-        FreespaceLabel * myFreespaceLabel;
 
         int myBlocklistHttpTag;
         QHttp * myBlocklistHttp;
