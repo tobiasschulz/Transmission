@@ -1836,7 +1836,7 @@ struct tr_info
 
     /* Flags */
     bool               isPrivate;
-    bool               isFolder;
+    bool               isMultifile;
 };
 
 static inline bool tr_torrentHasMetadata (const tr_torrent * tor)

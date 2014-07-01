@@ -126,7 +126,7 @@ tr_metaInfoBuilderCreate (const char * topFileArg)
   {
     struct stat sb;
     stat (topFile, &sb);
-    ret->isFolder = S_ISDIR (sb.st_mode);
+    ret->isSingleFile = !S_ISDIR (sb.st_mode);
   }
 
   /* build a list of files containing topFile and,
@@ -165,37 +165,15 @@ tr_metaInfoBuilderCreate (const char * topFileArg)
   return ret;
 }
 
-static bool
-isValidPieceSize (uint32_t n)
-{
-  const bool isPowerOfTwo = !(n == 0) && !(n & (n - 1));
-
-  return isPowerOfTwo;
-}
-
-bool
+void
 tr_metaInfoBuilderSetPieceSize (tr_metainfo_builder * b,
                                 uint32_t              bytes)
 {
-  if (!isValidPieceSize (bytes))
-    {
-      char wanted[32];
-      char gotten[32];
-      tr_formatter_mem_B (wanted, bytes, sizeof(wanted));
-      tr_formatter_mem_B (gotten, b->pieceSize, sizeof(gotten));
-      tr_logAddError (_("Failed to set piece size to %s, leaving it at %s"),
-                      wanted,
-                      gotten);
-      return false;
-    }
-
   b->pieceSize = bytes;
 
   b->pieceCount = (int)(b->totalSize / b->pieceSize);
   if (b->totalSize % b->pieceSize)
     ++b->pieceCount;
-
-  return true;
 }
 
 
@@ -342,8 +320,7 @@ getFileInfo (const char                      * topFile,
       char * walk = filename;
       const char * token;
       while ((token = tr_strsep (&walk, TR_PATH_DELIMITER_STR)))
-        if (*token)
-          tr_variantListAddStr (uninitialized_path, token);
+        tr_variantListAddStr (uninitialized_path, token);
       tr_free (filename);
     }
 }
@@ -357,7 +334,11 @@ makeInfoDict (tr_variant          * dict,
 
   tr_variantDictReserve (dict, 5);
 
-  if (builder->isFolder) /* root node is a directory */
+  if (builder->isSingleFile)
+    {
+      tr_variantDictAddInt (dict, TR_KEY_length, builder->files[0].size);
+    }
+  else /* root node is a directory */
     {
       uint32_t  i;
       tr_variant * list = tr_variantDictAddList (dict, TR_KEY_files,
@@ -369,10 +350,6 @@ makeInfoDict (tr_variant          * dict,
           tr_variant * pathVal = tr_variantDictAdd (d, TR_KEY_path);
           getFileInfo (builder->top, &builder->files[i], length, pathVal);
         }
-    }
-  else
-    {
-      tr_variantDictAddInt (dict, TR_KEY_length, builder->files[0].size);
     }
 
   base = tr_basename (builder->top);

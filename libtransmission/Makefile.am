@@ -28,7 +28,6 @@ libtransmission_a_SOURCES = \
   completion.c \
   ConvertUTF.c \
   crypto.c \
-  error.c \
   fdlimit.c \
   handshake.c \
   history.c \
@@ -83,7 +82,6 @@ noinst_HEADERS = \
   ConvertUTF.h \
   crypto.h \
   completion.h \
-  error.h \
   fdlimit.h \
   handshake.h \
   history.h \
@@ -135,11 +133,9 @@ TESTS = \
   blocklist-test \
   clients-test \
   crypto-test \
-  error-test \
   history-test \
   json-test \
   magnet-test \
-  makemeta-test \
   metainfo-test \
   move-test \
   peer-msgs-test \
@@ -187,10 +183,6 @@ crypto_test_SOURCES = crypto-test.c $(TEST_SOURCES)
 crypto_test_LDADD = ${apps_ldadd}
 crypto_test_LDFLAGS = ${apps_ldflags}
 
-error_test_SOURCES = error-test.c $(TEST_SOURCES)
-error_test_LDADD = ${apps_ldadd}
-error_test_LDFLAGS = ${apps_ldflags}
-
 history_test_SOURCES = history-test.c $(TEST_SOURCES)
 history_test_LDADD = ${apps_ldadd}
 history_test_LDFLAGS = ${apps_ldflags}
@@ -210,10 +202,6 @@ magnet_test_LDFLAGS = ${apps_ldflags}
 metainfo_test_SOURCES = metainfo-test.c $(TEST_SOURCES)
 metainfo_test_LDADD = ${apps_ldadd}
 metainfo_test_LDFLAGS = ${apps_ldflags}
-
-makemeta_test_SOURCES = makemeta-test.c $(TEST_SOURCES)
-makemeta_test_LDADD = ${apps_ldadd}
-makemeta_test_LDFLAGS = ${apps_ldflags}
 
 move_test_SOURCES = move-test.c $(TEST_SOURCES)
 move_test_LDADD = ${apps_ldadd}
